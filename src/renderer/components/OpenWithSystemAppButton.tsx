@@ -53,7 +53,7 @@ export function OpenWithSystemAppButton({
           // 快速双击 ⧉ 时第二次点击会走 dblclick：只拦 click 的话宿主行的
           // onDoubleClick（打开预览）仍会被触发，于是"用系统程序打开"的同时又跑了预览。
           onDoubleClick={(event) => event.stopPropagation()}
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors text-muted-foreground hover:bg-accent hover:text-foreground ${className ?? ""}`}
+          className={`flex h-5 w-5 px-0 shrink-0 items-center justify-center rounded transition-colors text-muted-foreground hover:bg-accent hover:text-foreground ${className ?? ""}`}
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </Button>

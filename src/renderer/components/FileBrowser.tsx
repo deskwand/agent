@@ -245,7 +245,7 @@ export function FileBrowser({ width }: { width: number }) {
               type="button"
               aria-label={t("fileBrowser.clearFilter")}
               onClick={() => handleQueryChange("")}
-              className="shrink-0 w-4 h-4 rounded flex items-center justify-center hover:text-foreground transition-colors"
+              className="shrink-0 w-4 h-4 rounded px-0 flex items-center justify-center hover:text-foreground transition-colors"
             >
               <X className="w-3 h-3" />
             </Button>

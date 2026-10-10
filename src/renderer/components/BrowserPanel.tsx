@@ -206,7 +206,8 @@ export function BrowserPanel({ width }: { width: number }) {
               onClick={() => window.electronAPI?.browser.goBack()}
               disabled={!status.canGoBack}
               aria-label={t("browser.back")}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-default"
+              size="iconSm"
+              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-default"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -222,7 +223,8 @@ export function BrowserPanel({ width }: { width: number }) {
               onClick={() => window.electronAPI?.browser.goForward()}
               disabled={!status.canGoForward}
               aria-label={t("browser.forward")}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-default"
+              size="iconSm"
+              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-default"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -239,7 +241,8 @@ export function BrowserPanel({ width }: { width: number }) {
                   : window.electronAPI?.browser.reload()
               }
               aria-label={reloadLabel}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              size="iconSm"
+              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               {status.isLoading ? (
                 <X className="w-4 h-4" />
@@ -282,7 +285,8 @@ export function BrowserPanel({ width }: { width: number }) {
                   ? t("browser.picker.active")
                   : t("browser.picker.toggle")
               }
-              className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+              size="iconSm"
+              className={`flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
                 pickerActive
                   ? "bg-primary/15 text-primary-text"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
@@ -313,7 +317,8 @@ export function BrowserPanel({ width }: { width: number }) {
               }}
               disabled={!status.url || status.url === "about:blank"}
               aria-label={t("browser.openExternal")}
-              className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-accent"
+              size="iconSm"
+              className="flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-accent"
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </Button>
@@ -331,7 +336,8 @@ export function BrowserPanel({ width }: { width: number }) {
               onClick={handleToggleFullscreen}
               disabled={!status.url || status.url === "about:blank"}
               aria-label={fullscreenLabel}
-              className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-accent"
+              size="iconSm"
+              className="flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-accent"
             >
               {isBrowserFullscreen ? (
                 <Minimize2 className="w-3.5 h-3.5" />
@@ -350,7 +356,8 @@ export function BrowserPanel({ width }: { width: number }) {
               variant="ghost"
               onClick={handleClose}
               aria-label={t("common.close")}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              size="iconSm"
+              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <X className="w-4 h-4" />
             </Button>

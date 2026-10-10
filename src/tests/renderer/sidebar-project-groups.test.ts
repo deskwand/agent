@@ -1757,6 +1757,29 @@ describe("Sidebar project groups", () => {
     expect(marker.getAttribute("role")).toBe("status");
     expect(marker.querySelector("svg")).toBeNull();
   });
+
+  it("会话行的归档/更多键是 24² 槽：缺省档垫子不在场（盒宽不再被撑到 32）", async () => {
+    // 2026-10-10 实测：`cn` 只删同族冲突 ⇒ 手写 `h-6 w-6` + 缺省档 `px-4`
+    // ⇒ 盒宽被内边距之和撑到 32（比作者写的宽 8px ✗）；补 `px-0` 后 24×24、左右内边距 0 ✓。
+    await render([session("ordinary")]);
+    const row = sessionRow("ordinary");
+    const archive = row.querySelector<HTMLButtonElement>(
+      `button[title="${i18n.t("sidebar.archive")}"]`,
+    );
+    const more = sessionMoreButton("ordinary");
+    for (const [label, key] of [
+      ["archive", archive],
+      ["moreActions", more],
+    ] as const) {
+      expect(key, `${label} 应该渲染出来`).not.toBeNull();
+      const tokens = key!.className.split(/\s+/);
+      // 24² 槽位（`size="iconXs"`）或就地 `px-0` —— 要的是「盒子 24 宽、缺省档垫子不在场」
+      expect(tokens, label).toContain("h-6");
+      expect(tokens, label).toContain("w-6");
+      expect(tokens, label).not.toContain("px-4");
+      expect(tokens, label).not.toContain("py-2");
+    }
+  });
 });
 
 describe("Sidebar group expansion persistence", () => {

@@ -130,6 +130,53 @@ describe("顶栏播放控件", () => {
     expect(widgets().children.length).toBe(0);
   });
 
+  it("语音图标那颗按钮走 iconSm：28×28、缺省档内边距不在场（“图标没居中”的根因）", async () => {
+    // ⚠️ 2026-10-10 用户报障「右上角语音模式图标没有居中」：当时那颗按钮就地写 `w-7 h-7`，
+    //   而 `cn` 只删同族冲突 ⇒ 缺省档的 `px-4 py-2` 原样留下 ⇒ 内边距(32) 比 `w-7`(28) 还宽：
+    //   盒宽被撑成 **32×28**（线上实测 ✓），`grid place-items-center` 的内容盒只剩 **0×12** ⇒
+    //   单行在 `align-content: normal` 下落回顶部 ⇒ 24px 的星球球心比按钮中心低 **6px** ✗✗。
+    //   改走 `iconSm` 后整档替换 ⇒ 内边距不进场 ⇒ 28×28、球心偏移 0（真 Chromium 实测 ✓）。
+    openVoiceSession();
+    await mount();
+    const orb = widgets().querySelector(
+      '[data-testid="voice-mini-orb"]',
+    ) as HTMLElement;
+    const button = orb.closest("button") as HTMLButtonElement;
+    const tokens = button.className.split(/\s+/);
+    for (const needed of ["h-7", "w-7", "grid", "place-items-center"]) {
+      expect(tokens, `按钮应该是 28×28 的网格居中布局：缺 ${needed}`).toContain(
+        needed,
+      );
+    }
+    for (const slab of ["h-9", "px-4", "py-2", "h-auto"]) {
+      expect(
+        tokens,
+        `缺省档的 ${slab} 一旦在场，盒宽就被撑成 32、球会下偏 6px`,
+      ).not.toContain(slab);
+    }
+    // 球自己是占满 24px 槽位的画布（`h-full w-full`），槽位尺寸就是球界半径的输入 ✓。
+    expect(orb.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(["block", "h-6", "w-6"]),
+    );
+  });
+
+  it("语音卡片里的两颗控件也走 iconSm：28×28，不再被缺省档撑成 32", async () => {
+    // 2026-10-10 实测：类名来自常量 CARD_CONTROL_CLASS ⇒ 合并串含 "px-4 py-2 h-7 w-7"
+    // ⇒ 盒 32×28（内边距之和 32 > w-7 的 28）；源扫描守卫看不见这一形状 ⇒ 靠这条 DOM 断言守 ✓。
+    openVoiceSession();
+    await mount();
+    for (const testid of ["voice-mini-mute", "voice-mini-end"]) {
+      const key = widgets().querySelector(
+        `[data-testid="${testid}"]`,
+      ) as HTMLButtonElement;
+      const tokens = key.className.split(/\s+/);
+      expect(tokens, testid).toContain("h-7");
+      for (const slab of ["h-9", "px-4", "py-2"]) {
+        expect(tokens, `${testid} 不该带缺省档的 ${slab}`).not.toContain(slab);
+      }
+    }
+  });
+
   it("titlebar-no-drag 这个工具类还在声明 no-drag", () => {
     // 上一条只锁住 JSX 那一半：类名被改名或删掉时它照样绿，按钮却重新变死。
     // 只查声明，不查任何提及 —— globals.css 注释多，子串匹配会假红。

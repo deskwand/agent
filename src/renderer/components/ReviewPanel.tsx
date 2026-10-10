@@ -322,9 +322,10 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost"
+            size="iconXs"
             onClick={loadDiffFiles}
             aria-label={t("reviewPanel.refresh")}
-            className="w-6 h-6 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors ml-2"
+            className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors ml-2"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${loadingFiles ? "animate-spin" : ""}`}
@@ -345,8 +346,9 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
                 m === "unified" ? "side-by-side" : "unified",
               )
             }
+            size="iconXs"
             aria-label={viewModeLabel}
-            className="w-6 h-6 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           >
             <Columns2 className="w-3.5 h-3.5" />
           </Button>
@@ -357,9 +359,10 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost"
+            size="iconSm"
             onClick={() => setIsFullscreen((f) => !f)}
             aria-label={fullscreenLabel}
-            className="w-7 h-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           >
             {isFullscreen ? (
               <Minimize2 className="w-4 h-4" />
@@ -373,9 +376,10 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost"
+            size="iconSm"
             onClick={handleClose}
             aria-label={t("common.close")}
-            className="w-7 h-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-4 h-4" />
           </Button>

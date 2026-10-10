@@ -892,7 +892,8 @@ export function Sidebar({
                           setPendingArchiveId(session.id);
                         }
                       }}
-                      className={`h-6 w-6 rounded-lg flex items-center justify-center transition-colors ${
+                      size="iconXs"
+                      className={`rounded-lg flex items-center justify-center transition-colors ${
                         pendingArchiveId === session.id
                           ? "text-primary-text bg-primary/10 border border-primary/30"
                           : "text-muted-foreground hover:text-primary-text hover:bg-accent"
@@ -925,7 +926,8 @@ export function Sidebar({
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost"
                             type="button"
-                            className="h-6 w-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary-text hover:bg-accent transition-colors"
+                            size="iconXs"
+                            className="rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary-text hover:bg-accent transition-colors"
                             aria-label={t("sidebar.moreActions")}
                           >
                             <MoreHorizontal className="h-3 w-3" />
@@ -1105,7 +1107,7 @@ export function Sidebar({
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost"
                         type="button"
-                        className="w-5 h-8 rounded-r-xl text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center"
+                        className="w-5 h-8 rounded-r-xl px-0 text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center"
                       >
                         <ChevronDown className="w-3 h-3" />
                       </Button>

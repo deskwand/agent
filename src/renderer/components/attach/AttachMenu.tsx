@@ -711,7 +711,8 @@ export function AttachMenu({
                     data-command-edit={row.name}
                     aria-label={t("common.edit")}
                     onClick={() => void openEditForm(row.name)}
-                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground group-hover:flex group-focus-within:flex"
+                    size="iconXs"
+                    className="hidden shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground group-hover:flex group-focus-within:flex"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -720,7 +721,8 @@ export function AttachMenu({
                     data-command-delete={row.name}
                     aria-label={t("common.delete")}
                     onClick={() => setPendingDelete(row.name)}
-                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive group-hover:flex group-focus-within:flex"
+                    size="iconXs"
+                    className="hidden shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive group-hover:flex group-focus-within:flex"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

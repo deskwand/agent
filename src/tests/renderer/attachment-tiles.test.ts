@@ -106,6 +106,15 @@ describe("AttachmentTiles", () => {
     const tile = container.querySelector("[title]") as HTMLElement;
     expect(tile.className).not.toContain("cursor-pointer");
   });
+
+  it("删除角标补了 px-0：20px 的圆点不再被缺省档撑成 32 宽", () => {
+    // 2026-10-10 实测：不传 size + 手写 `h-5 w-5` ⇒ 缺省档 `px-4` 留下 ⇒ 盒宽 32（作者写的是 20 ✗）。
+    render([fileTile]);
+    const badge = container.querySelector("button")!;
+    const tokens = badge.className.split(/\s+/);
+    expect(tokens).toContain("px-0");
+    expect(tokens).not.toContain("px-4");
+  });
 });
 
 const elementTile: AttachmentTile = {

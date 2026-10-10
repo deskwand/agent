@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { appButtonVariants, shouldLeftAlign } from "@renderer/components/app-button";
 import { buttonVariants } from "@renderer/components/ui/button";
+import { cn } from "@renderer/utils/cn";
 
 /**
  * `app-button` 是 vendored `ui/button` 的**非 vendored 包装层** ✓，只做三处**有意的**差异：
@@ -104,8 +105,10 @@ describe("app-button 包装层", () => {
         expect(tokens, `${name} 不该带默认档的 ${slab}`).not.toContain(slab);
       }
     }
-    // 尺寸：带字那档 24px 高；图标那档 28×28 —— 与仓库既有的 `w-7 h-7` 图标键（`BrowserPanel` /
-    // `TitlebarButton` / `ReviewPanel`）**同尺寸** ✓，这档位只是给那个既有约定一个名字 ✓。
+    // 尺寸：带字那档 24px 高；图标那档 28×28 —— 就是仓库图标键的那一档（`BrowserPanel` /
+    // `TitlebarButton` / `ReviewPanel` 现在都传 `size="iconSm"` ✓）。
+    // ⚠️ 2026-10-10 订正：手写 `w-7 h-7` **不等于** 28×28（实测 32×28，`px-4` 不是宽高的同族类）
+    // ⇒ 图标键只能走这一档，别再照抄旧注释 ✓（本文件下面那条用例就是这条事实的锁 ✓）。
     expect(xs, "xs 应该是 24px 高").toContain("h-6");
     expect(xs, "带字的档不该定宽（靠内容撑宽）").not.toContain("w-6");
     expect(iconSm, "iconSm 应该是 28px 高").toContain("h-7");
@@ -121,5 +124,25 @@ describe("app-button 包装层", () => {
     expect(xs).toContain("text-xs");
     expect(iconSm).not.toContain("text-xs");
     expect(iconXs).not.toContain("text-xs");
+  });
+  it("⚠️ 手写 `w-7 h-7` **顶不掉**缺省档的 `px-4 py-2` —— 紧凑档只能走 `size`", () => {
+    // 2026-10-10 实测（本仓真 `cn` + 线上真 CSS 在 Chromium 量过）：
+    //   cn("h-9 px-4 py-2", "h-7 w-7") ⇒ "px-4 py-2 h-7 w-7" —— 只删了**同族**的 `h-9` ✗
+    // ⇒ `w-7`(28) 比内边距之和(16+16) 还小 ⇒ 盒宽被撑成 **32×28** ✗（顶栏那排按钮就是这么被撑成 32 的）；
+    // 而 `grid place-items-center` 的内容盒只剩 **0×12** ⇒ 单行在 `align-content: normal` 下落回顶部
+    // ⇒ 子元素下偏：24px 的星球球低 **6px**、16px 图标低 2px ✗✗
+    //（即 `TitlebarButton` 2026-10-10「语音图标没居中」的根因 —— 它当时就写了 `w-7 h-7` ✓）。
+    const slab = appButtonVariants({ variant: "ghost" }); // 缺省档 ⇒ h-9 px-4 py-2
+    const handWritten = cn(slab, "w-7 h-7");
+    expect(handWritten, "同族的 h-9 会被删掉").not.toContain("h-9");
+    expect(handWritten, "h-7 在场").toContain("h-7");
+    expect(handWritten, "⚠️ 内边距不是同族类 ⇒ 原样留下").toContain("px-4");
+    expect(handWritten, "⚠️ 同上").toContain("py-2");
+    // 走 `size` 时是**整档替换** ⇒ 内边距根本不进场 ✓（另一个干净写法是在调用点补 `p-0`/`px-0` ✓，
+    // 实测 `cn("h-9 px-4 py-2", "h-7 w-7 p-0")` ⇒ `p-0` 胜出 ✓，但那要每处各写一遍）。
+    const bySize = appButtonVariants({ variant: "ghost", size: "iconSm" });
+    expect(bySize).not.toContain("px-4");
+    expect(bySize).not.toContain("py-2");
+    expect(bySize).not.toContain("h-9");
   });
 });

@@ -35,7 +35,7 @@ import { Button } from "../app-button";
 
 /** 卡片里那一行控件的统一样式。 */
 const CARD_CONTROL_CLASS =
-  "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+  "flex shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
 
 export function VoiceMiniButton(): JSX.Element | null {
   const { t } = useTranslation();
@@ -130,6 +130,7 @@ export function VoiceMiniButton(): JSX.Element | null {
           <div className="mt-2 flex items-center justify-center gap-1 border-t border-border/40 pt-1.5">
             <Button
               variant="ghost"
+              size="iconSm"
               type="button"
               data-testid="voice-mini-mute"
               aria-label={
@@ -146,6 +147,7 @@ export function VoiceMiniButton(): JSX.Element | null {
             </Button>
             <Button
               variant="ghost"
+              size="iconSm"
               type="button"
               data-testid="voice-mini-end"
               aria-label={t("voiceMode.endVoice")}

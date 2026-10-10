@@ -397,6 +397,23 @@ describe("表单打开时菜单不该被点关", () => {
       "表单输入框仍要在",
     ).not.toBeNull();
   });
+  it("编辑/删除键是 24² 槽：缺省档垫子不在场（盒宽不再被撑成 32）", async () => {
+    // 2026-10-10 实测：调用点写 `h-6 w-6` 而不传 size ⇒ 缺省档 `px-4` 留下 ⇒ 盒宽 32 ✗。
+    await openMenu({ onCommandEntry: vi.fn() });
+    for (const selector of [
+      "[data-command-edit='translate']",
+      "[data-command-delete='translate']",
+    ]) {
+      const el = document.body.querySelector<HTMLButtonElement>(selector);
+      expect(el, selector).not.toBeNull();
+      const tokens = el!.className.split(/\s+/);
+      // 24² 的槽位（`size="iconXs"`）或就地 `px-0` —— 两者都行，要的是「缺省档垫子不在场」
+      expect(tokens, selector).toContain("h-6");
+      expect(tokens, selector).toContain("w-6");
+      expect(tokens, selector).not.toContain("px-4");
+      expect(tokens, selector).not.toContain("py-2");
+    }
+  });
 });
 
 describe("行内按钮的键盘可达性", () => {

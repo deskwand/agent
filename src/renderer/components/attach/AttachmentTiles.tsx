@@ -59,7 +59,7 @@ function RemoveButton({
         event.stopPropagation();
         onClick();
       }}
-      className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100 hover:bg-transparent hover:text-current"
+      className="absolute right-1.5 top-1.5 flex h-5 w-5 px-0 items-center justify-center rounded-full bg-destructive text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100 hover:bg-transparent hover:text-current"
     >
       <X className="h-3 w-3" />
     </Button>

@@ -195,4 +195,18 @@ describe("FileBrowser panel", () => {
 
     expect(visibleText()).toContain("fileBrowser.emptyDir");
   });
+
+  it("清空筛选键补了 px-0：16px 的盒子不再被缺省档撑到 32 宽", async () => {
+    // 输入框有内容、`filtering` 为真时才渲染这颗键（见 FileBrowser 的 `{filtering && …}`）。
+    // 2026-10-10 实测：不传 size + 手写 `w-4 h-4` ⇒ 缺省档 `px-4` 留下 ⇒ 盒宽 32（作者写的是 16 ✗）。
+    await render();
+    await type("zzz");
+    const clear = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="fileBrowser.clearFilter"]',
+    );
+    expect(clear, "过滤时应该渲染清空键").not.toBeNull();
+    const tokens = clear!.className.split(/\s+/);
+    expect(tokens).toContain("px-0");
+    expect(tokens).not.toContain("px-4");
+  });
 });

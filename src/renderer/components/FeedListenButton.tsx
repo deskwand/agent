@@ -26,7 +26,7 @@ import { TitlebarButton } from "./TitlebarButton";
 import { Button } from "./app-button";
 
 const CONTROL_CLASS =
-  "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40";
+  "flex shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40";
 
 export function FeedListenButton(): JSX.Element | null {
   const { t } = useTranslation();
@@ -155,6 +155,7 @@ export function FeedListenButton(): JSX.Element | null {
           ) : null}
           <div className="mt-1.5 flex items-center justify-center gap-1 border-t border-border/40 pt-1.5">
             <Button variant="ghost"
+              size="iconSm"
               type="button"
               data-testid="feed-listen-prev"
               aria-label={t("feed.listenPrev")}
@@ -165,6 +166,7 @@ export function FeedListenButton(): JSX.Element | null {
               <SkipBack className="h-4 w-4 hover:bg-transparent hover:text-current" />
             </Button>
             <Button variant="ghost"
+              size="iconSm"
               type="button"
               data-testid="feed-listen-toggle"
               aria-label={
@@ -180,6 +182,7 @@ export function FeedListenButton(): JSX.Element | null {
               )}
             </Button>
             <Button variant="ghost"
+              size="iconSm"
               type="button"
               data-testid="feed-listen-next"
               aria-label={t("feed.listenNext")}
@@ -190,6 +193,7 @@ export function FeedListenButton(): JSX.Element | null {
               <SkipForward className="h-4 w-4 hover:bg-transparent hover:text-current" />
             </Button>
             <Button variant="ghost"
+              size="iconSm"
               type="button"
               data-testid="feed-listen-close"
               aria-label={t("feed.listenClose")}

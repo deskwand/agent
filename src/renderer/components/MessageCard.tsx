@@ -388,7 +388,9 @@ export const MessageCard = memo(function MessageCard({
   const renderActionBar = (extraClass?: string) => {
     const showFork = canFork && onForkMessage;
     if (!showActions && !showFork) return null;
-    // ⚠️ 图标按钮一律走 `iconSm`（28×28，与 `BrowserPanel` / `TitlebarButton` 的 `w-7 h-7` 同尺寸 ✓）
+    // ⚠️ 图标按钮一律走 `iconSm`（28×28，与 `BrowserPanel` / `TitlebarButton` 的图标键同尺寸 ✓
+    // —— 那两处现在也传 `size="iconSm"` 了；**手写 `w-7 h-7` 只有 32×28**，不是 28×28 ✗，
+    // 2026-10-10 实测见 `app-button.tsx` 紧凑档说明 ✓）
     // —— 缺省档是 `h-9 px-4 py-2`，而这四处原先只写 `h-auto`：高度归了内容、**内边距仍是 base 的
     // 16/8** ⇒ 16px 图标被撑成 **48×32 的方块**（2026-10-10 用户报障「元数据的这个框太大了」✓；
     // Chromium 量测见 `app-button.tsx` 紧凑档说明 ✓）。

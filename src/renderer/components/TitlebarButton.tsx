@@ -50,7 +50,15 @@ export function TitlebarButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`w-7 h-7 rounded-control grid place-items-center transition-[background-color,color,transform] duration-150 ${stateClasses}`}
+      // ⚠️ 必须是 `size="iconSm"`，**不能**就地写 `w-7 h-7`：
+      // `cn` 只删同族冲突（缺省档的 `h-9` ↔ `h-7` ✓），`px-4 py-2` **不是**宽高的同族类
+      // ⇒ 原样留下 ✗ ⇒ 内边距之和 16+16 比 `w-7`(28) 还宽，盒宽被撑成 **32**、内容盒只剩
+      // **0×12** ⇒ `grid place-items-center` 的单行在 `align-content: normal` 下落回内容盒
+      // 顶部 ⇒ 子元素顶到下沿：24px 的星球球中心比按钮中心**低 6px**（16px 图标低 2px）✗✗。
+      // 2026-10-10 用户报障「语音模式图标没有居中」的根因，线上实测：按钮 32×28 / 球心 +6 ✓。
+      // `iconSm` 整档替换缺省档 ⇒ 内边距根本不进场 ⇒ 28×28、球心偏移 0 ✓（Chromium 实测 ✓）。
+      size="iconSm"
+      className={`rounded-control grid place-items-center transition-[background-color,color,transform] duration-150 ${stateClasses}`}
     >
       {children}
     </Button>

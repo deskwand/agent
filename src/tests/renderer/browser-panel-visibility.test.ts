@@ -158,4 +158,23 @@ describe("BrowserPanel visibility", () => {
         ?.getAttribute("aria-pressed"),
     ).toBe("false");
   });
+  it("导航键是 28×28 的 iconSm，不再被缺省档内边距撑成 32 宽", async () => {
+    // 2026-10-10 实测：不传 size + 手写 w-7 h-7 ⇒ cn 合并成 "px-4 py-2 w-7 h-7"
+    // ⇒ 盒宽被内边距之和撑到 32（28 → 32，左右各多 2px）；走 iconSm 后 28×28、内边距 0 ✓。
+    await act(async () => {
+      root.render(React.createElement(BrowserPanel, { width: 420 }));
+    });
+    await flush();
+    const keys = [
+      ...container.querySelectorAll<HTMLButtonElement>("button"),
+    ].filter((b) => b.className.split(/\s+/).includes("w-7"));
+    expect(keys, "面板头部应有 7 颗 28×28 的导航键").toHaveLength(7);
+    for (const key of keys) {
+      const tokens = key.className.split(/\s+/);
+      expect(tokens).toContain("h-7");
+      for (const slab of ["h-9", "px-4", "py-2"]) {
+        expect(tokens, `缺省档的 ${slab} 不该在场`).not.toContain(slab);
+      }
+    }
+  });
 });

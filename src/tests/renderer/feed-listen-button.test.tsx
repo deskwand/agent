@@ -214,4 +214,23 @@ describe("FeedListenButton", () => {
     ).toBeNull();
     expect(el("feed-listen-button").querySelector("svg")).not.toBeNull();
   });
+
+  it("卡片里四颗控件走 iconSm：28×28，不再被缺省档内边距撑成 32", () => {
+    // 2026-10-10 实测：类名来自 CONTROL_CLASS 常量 ⇒ 合并串含 "px-4 py-2 h-7 w-7"
+    // ⇒ 盒 32×28（内边距之和 32 > w-7 的 28）；走 iconSm 后 28×28、内边距 0 ✓。
+    useAppStore.setState({ feedListen: sessionWith(0) });
+    render();
+    for (const testid of [
+      "feed-listen-prev",
+      "feed-listen-toggle",
+      "feed-listen-next",
+      "feed-listen-close",
+    ]) {
+      const tokens = el(testid).className.split(/\s+/);
+      expect(tokens, testid).toContain("h-7");
+      for (const slab of ["h-9", "px-4", "py-2"]) {
+        expect(tokens, `${testid} 不该带缺省档的 ${slab}`).not.toContain(slab);
+      }
+    }
+  });
 });
