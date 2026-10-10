@@ -105,7 +105,8 @@ export function AccountCluster() {
              data-state / ref 都交给它。本仓的 Tooltip 是个普通函数组件，
              **既不透传 props 也不 forwardRef** → 包着它这些全会丢，
              菜单根本打不开（而且不会有任何报错）。
-             Tooltip 由 AccountMenu 自己在 Trigger **外面**加（HelpMenu 同形）。 */
+             ⚠️ 账号槽位**不再挂气泡**（2026-10-10，与 HelpMenu 的「?」一致）：
+             可访问名由下面这颗 button 的 aria-label 给，不再有 Tooltip 了。 */
           <Button variant="ghost"
             type="button"
             aria-label={t("sidebar.user")}

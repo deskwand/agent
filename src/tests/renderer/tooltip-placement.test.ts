@@ -6,10 +6,14 @@ import { RENDERER } from "./theme-css-helpers";
 const read = (rel: string) => fs.readFileSync(path.join(RENDERER, rel), "utf8");
 
 describe("tooltip 方位", () => {
-  it("rail 三处都显式传右侧，不靠默认值（图标右侧、垂直居中）", () => {
+  it("rail 剩下的站点都显式传右侧，不靠默认值（图标右侧、垂直居中）", () => {
     // 意图与迁移前一字未变（「三处都显式右侧」）。宿主已全部迁到 Radix ⇒
     // 判据统一成 `side="right"`（HelpMenu / AccountMenu 在计划 12 相位 2 迁完，
     // AppRail 在本轮迁完）。
+    //
+    // ⚠️ 2026-10-10：rail 底部两处（HelpMenu 的「?」/ 升级按钮、AccountMenu 的
+    // 头像）**去掉了气泡** ⇒ 「三处」变两处。计数从 3 改 2 的同时补了下面那条
+    // 反向断言：不然「有人把气泡加回去」这里会静悄悄地绿。
     //
     // ⚠️ 必须点名 `<TooltipContent`：`side="right"` 在全仓**也出现在
     // `DropdownMenuContent` 上**（`AccountMenu:93`、`HelpMenu:119`）⇒ 裸断言
@@ -32,10 +36,14 @@ describe("tooltip 方位", () => {
       "components/HelpMenu.tsx",
       "components/AccountMenu.tsx",
     ]) {
-      expect(
-        read(file),
-        `${file} 必须给 TooltipContent 传 side="right"`,
-      ).toContain('<TooltipContent side="right"');
+      const source = read(file);
+      // 反向断言：这两处**没有**气泡了。
+      // 只钉组件与导入两个事实 —— 注释里提到 Tooltip 是允许的（AccountMenu 就
+      // 留着一条「trigger 不能包在不透传 props 的组件里」的说明）。
+      expect(source, `${file} 不该再挂 Tooltip 了`).not.toContain("<Tooltip");
+      expect(source, `${file} 不该再导入 app-tooltip`).not.toContain(
+        "app-tooltip",
+      );
     }
   });
 

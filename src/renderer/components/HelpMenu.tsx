@@ -17,7 +17,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { RAIL_BUTTON_CLASS } from "./rail-styles";
 import { UpdateConfirmDialog } from "./UpdateConfirmDialog";
 import { Button } from "./app-button";
@@ -77,44 +76,34 @@ export function HelpMenu() {
         // 有更新时它是**直接动作按钮**，不是菜单按钮 —— 而 Radix 的
         // DropdownMenuTrigger 会硬塞 aria-haspopup="menu" 并接管点击，
         // 所以这条分支不能接 Radix，必须条件渲染（设计 §3.4）。
-        <Tooltip>
-          <TooltipTrigger asChild>
+        <Button variant="ghost"
+          type="button"
+          aria-label={railLabel}
+          onClick={() => {
+            // 菜单可能正开着：假状态被清掉时它不该自己冒出来
+            setMenuOpen(false);
+            setShowUpdateDialog(true);
+          }}
+          className={`${RAIL_BUTTON_CLASS} relative text-primary-text hover:bg-accent`}
+        >
+          <CircleArrowUp className="w-4 h-4" />
+        </Button>
+      ) : (
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          {/* 这颗按钮**不再有气泡**（2026-10-10）：整条 rail 底部的「? / 头像」槽位
+              都去掉了视觉提示，可访问名只由 aria-label 提供（升级态那支同此）。
+              asChild 仍然必要：它把 trigger 的 props/ref 交给**直接子元素**，
+              少一层它们就会落在包装组件上而不是 button 上。 */}
+          <DropdownMenuTrigger asChild>
             <Button variant="ghost"
               type="button"
               aria-label={railLabel}
-              onClick={() => {
-                // 菜单可能正开着：假状态被清掉时它不该自己冒出来
-                setMenuOpen(false);
-                setShowUpdateDialog(true);
-              }}
-              className={`${RAIL_BUTTON_CLASS} relative text-primary-text hover:bg-accent`}
+              // aria-haspopup / aria-expanded 由 Radix 的 Trigger 管，不要手写
+              className={`${RAIL_BUTTON_CLASS} relative text-muted-foreground hover:bg-accent hover:text-foreground`}
             >
-              <CircleArrowUp className="w-4 h-4" />
+              <CircleHelp className="w-4 h-4" />
             </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right">{railLabel}</TooltipContent>
-        </Tooltip>
-      ) : (
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          {/* 两层 Trigger 都要 asChild，且 TooltipTrigger 在外、DropdownMenuTrigger 在内：
-              asChild 把 trigger props/ref 交给它的**直接子元素**，反过来会把 Tooltip 的
-              props 落到 DropdownMenuTrigger 上而不是 button 上。
-              气泡在图标右侧（rail 的既定方位，side=right 显式给 —— 不写会落到上方）。 */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost"
-                  type="button"
-                  aria-label={railLabel}
-                  // aria-haspopup / aria-expanded 由 Radix 的 Trigger 管，不要手写
-                  className={`${RAIL_BUTTON_CLASS} relative text-muted-foreground hover:bg-accent hover:text-foreground`}
-                >
-                  <CircleHelp className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="right">{railLabel}</TooltipContent>
-          </Tooltip>
+          </DropdownMenuTrigger>
 
           <DropdownMenuContent align="start" side="right" className="w-64">
             <DropdownMenuItem

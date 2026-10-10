@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import type { CloudConfig } from "../types";
 import { useAppStore } from "../store";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { CloudApiClient } from "../services/cloud-api";
 import { avatarInitials } from "../utils/identity";
 import {
@@ -79,17 +78,13 @@ export function AccountMenu({
 
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      {/* Tooltip 必须在 Trigger **外面**：Radix 的 asChild 只处理它的直接子元素，
-          所以顺序必须是 Tooltip > TooltipTrigger asChild > DropdownMenuTrigger asChild
-          > (调用方的 button)。
-          反过来（把 DropdownMenuTrigger 当 Tooltip 的 trigger）会让菜单的 props 全丢。 */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-        </TooltipTrigger>
-        {/* rail 里的账号气泡在图标**右侧**（本仓老 Tooltip 的 placement="right"）。 */}
-        <TooltipContent side="right">{t("sidebar.user")}</TooltipContent>
-      </Tooltip>
+      {/* 触发按钮**不再有气泡**（2026-10-10）：rail 底部的账号槽位跟「?」那颗一样
+          去掉了视觉提示，可访问名只由调用方 button 上的 aria-label（sidebar.user）给。
+          ⚠️ trigger 必须保持「只裹 DropdownMenuTrigger 这一层 asChild」：Radix 把
+          onPointerDown / aria-* / ref 交给它的**直接子元素**，中间再插任何不透传
+          props/ref 的包装组件都会让菜单**打不开且不报错**（旧 Tooltip 就这么栽过）。
+          回归闸：src/tests/renderer/account-menu-structure.test.ts 的 aria-haspopup 断言。 */}
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="right" className="w-64">
         {isLoggedIn && cloudConfig ? (
           <>
