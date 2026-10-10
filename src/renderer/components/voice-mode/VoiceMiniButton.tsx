@@ -42,7 +42,7 @@ export function VoiceMiniButton(): JSX.Element | null {
   const open = useAppStore((s) => s.voiceModeOpen);
   const caption = useAppStore((s) => s.voiceMiniCaption);
   const miniState = useAppStore((s) => s.voiceMiniState);
-  // 球按主题换画笔：浅底画深粒子、深底画浅粒子。全屏那颗不受主题影响（永远深底）。
+  // 球按主题换画笔：浅底画深粒子、深底画浅粒子。全屏那颗另有一对球画笔（GLOW_BALL_*）。
   const isDark = useEffectiveTheme() === "dark";
   // 卡片是 CSS 显隐、一直挂在 DOM 里；里面那颗球是 canvas，所以只在指针 / 键盘真进到
   // 卡片里时才挂上，离开就卸掉 —— 否则一颗 300 颗粒子的球会全程空转。
@@ -128,7 +128,8 @@ export function VoiceMiniButton(): JSX.Element | null {
             </p>
           </div>
           <div className="mt-2 flex items-center justify-center gap-1 border-t border-border/40 pt-1.5">
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               type="button"
               data-testid="voice-mini-mute"
               aria-label={
@@ -143,7 +144,8 @@ export function VoiceMiniButton(): JSX.Element | null {
                 <Mic className="h-3.5 w-3.5" />
               )}
             </Button>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               type="button"
               data-testid="voice-mini-end"
               aria-label={t("voiceMode.endVoice")}

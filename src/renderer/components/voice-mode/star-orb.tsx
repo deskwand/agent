@@ -8,9 +8,11 @@
  * 刻意不乘 —— 半径恒为 `R`，能量只走亮度 / 湍流 / 核心，见 `orbEnergy`。
  * 对比预览：design-docs/2026-10-07-star-orb-fixed-radius-preview.html。
  *
- * 颜色是画笔值，不是主题色。谁用谁选画笔：全屏那颗永远 GLOW_BRUSH（在 `#050507`
- * 深底上发光）；后台小球按主题拿两套星点画笔（浅底深粒子、深底浅粒子）—— 见
- * design-docs/2026-10-06-mini-orb-theme-brush-design.md。
+ * 颜色是画笔值，不是主题色。谁用谁选画笔：全屏那颗按主题拿 `GLOW_BALL_LIGHT` /
+ * `GLOW_BALL_DARK`（有边界的球，舞台跟随主题）；后台小球与顶栏图标按主题拿两套
+ * 星点画笔（浅底深粒子、深底浅粒子）—— 见
+ * design-docs/2026-10-06-mini-orb-theme-brush-design.md 与
+ * design-docs/2026-10-10-voice-light-theme-design.md。
  */
 import { useEffect, useRef, useState } from "react";
 
@@ -91,6 +93,8 @@ export interface GlowBrush {
   sparks: number;
   size: number;
   composite: "lighter" | "source-over";
+  /** 有边界的球：给了就把球内的一切裁进半径 R 的圆里画；不给 = 满屏画法。 */
+  ball?: GlowBallSkin;
 }
 
 /** 星点档：锐利星点 + 核心簇 + 球界描边（浅底靠密度与描边读球）。 */
@@ -138,7 +142,7 @@ export const GLOW_BRUSH: GlowBrush = {
  * 注意：`STARS_BRUSH_*` 这对常量是给 **40px 那档**（旧的后台小球尺寸）调的。它们从
  * 2026-10-08 起一度没有生产使用者（唯一那颗迷你球搬进 header 后改成了静态状态点）；
  * 2026-10-09 起由语音小球卡面里那颗 62px 的球使用。
- * 保留 `brush.kind === "stars"` 分支是有意的：浮层那颗球永远用 `GLOW_BRUSH`，而 stars
+ * 保留 `brush.kind === "stars"` 分支是有意的：浮层那颗球用的是 `GLOW_BALL_*`，而 stars
  * 那一支是完整的绘制实现，删它要动 500 多行的球体核心，收益只是少几十行不可达代码。
  *
  * 顶栏图标那颗 16px 球**不用这一对**：见下面的 `STARS_BRUSH_ICON_*`。
@@ -324,7 +328,7 @@ export function StarOrb({
   state: OrbState;
   level: number;
   /**
-   * 谁来画：全屏传 GLOW_BRUSH，小球按主题传两套星点画笔。
+   * 谁来画：全屏按主题传 `GLOW_BALL_*`（有边界的球），小球按主题传两套星点画笔。
    *
    * **必须是模块级常量**：它进了 useEffect 的依赖里，内联对象会让粒子每渲染一次
    * 就重建一次（300+ 颗 + 4 张精灵）。
@@ -387,9 +391,43 @@ export function StarOrb({
       const lv = levelRef.current;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, W, H);
+      // 上一帧的粒子循环把 globalAlpha 逐个写过，这里复位：落影与底色不吃残留
+      ctx.globalAlpha = 1;
 
       // 能量不进几何：半径恒定，球界才不会跟着音量一大一小地跳。
       const energy = orbEnergy(stateRef.current, t, lv);
+
+      // 有边界的球（浅色主题下的浮层）：落影 → 球体底色 → 把球内的一切裁进半径 R 的圆。
+      // 顺序是规格：底色在 clip 之前，hairline 与 blocked 弧在 restore 之后（球外）。
+      // 没有 ball 的画笔（顶栏那颗图标球、旧的全屏画法）这一段整个跳过。
+      const ball = skin.kind === "glow" ? skin.ball : undefined;
+      if (ball) {
+        if (ball.shadow) {
+          const sy = CY + R * BALL_SHADOW_OFFSET;
+          const shadow = ctx.createRadialGradient(
+            CX,
+            sy,
+            R * BALL_SHADOW_INNER,
+            CX,
+            sy,
+            R * BALL_SHADOW_OUTER,
+          );
+          shadow.addColorStop(0, `rgba(${ball.shadow.rgb},${ball.shadow.a})`);
+          shadow.addColorStop(1, `rgba(${ball.shadow.rgb},0)`);
+          ctx.fillStyle = shadow;
+          ctx.beginPath();
+          ctx.arc(CX, sy, R * BALL_SHADOW_OUTER, 0, 6.2832);
+          ctx.fill();
+        }
+        ctx.fillStyle = ball.body;
+        ctx.beginPath();
+        ctx.arc(CX, CY, R, 0, 6.2832);
+        ctx.fill();
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(CX, CY, R, 0, 6.2832);
+        ctx.clip();
+      }
 
       // 光晕只属于发光档：星点档靠粒子与描边读球。颜色仍取自状态（三档 hue 不同），
       // 画笔不管它 —— 写进画笔就等于把状态色定死。
@@ -487,11 +525,20 @@ export function StarOrb({
       // 不复位的话描边透明度会随最后那颗粒子的 alpha 漂移（看起来像在闪）。
       ctx.globalAlpha = 1;
 
+      // 球体裁剪到这里就关掉：球界与 blocked 弧都画在球外（半径 1.12R）。放在 ring 之前
+      // 是承重的 —— 弧画在 clip 里会被裁成零像素，blocked 态于是与 listening 像素一样。
+      // restore 同时把合成模式退回 source-over（save 是在设 brush.composite 之前做的），
+      // 浅色那条弧才不会被 lighter 叠成纯白。
+      if (ball) ctx.restore();
+
       if (cfg.ring) {
         // blocked 那圈弧：原有颜色是浅色，浅底上本来就看不见 —— 星点档改用画笔的
-        // 球界颜色，状态语言在小球上也保得住。
-        ctx.strokeStyle =
-          skin.kind === "stars" ? skin.edge : "rgba(226,238,255,0.28)";
+        // 球界颜色，给了一颗球（全屏那颗）就用球规格里的弧色，状态语言都保得住。
+        ctx.strokeStyle = ball
+          ? ball.arc
+          : skin.kind === "stars"
+            ? skin.edge
+            : "rgba(226,238,255,0.28)";
         ctx.lineWidth = 1.5 * dpr;
         ctx.beginPath();
         const rr = R * 1.12;
@@ -510,6 +557,15 @@ export function StarOrb({
       }
 
       ctx.globalCompositeOperation = "source-over";
+
+      // 球界 hairline：必须在 restore 之后 —— 压在裁剪圆上的描边会被裁成半条。
+      if (ball) {
+        ctx.strokeStyle = ball.edge;
+        ctx.lineWidth = 1 * dpr;
+        ctx.beginPath();
+        ctx.arc(CX, CY, R, 0, 6.2832);
+        ctx.stroke();
+      }
       // 减少动态时不排下一帧：整个效果只有 resize() 触发的那一帧
       if (!still) raf = requestAnimationFrame(frame);
     };
@@ -588,3 +644,59 @@ export function prefersReducedMotion(): boolean {
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
 }
+
+/**
+ * 有边界的球（浅色主题下的全屏那颗）：球体底色 + 球界 hairline + blocked 弧 + 可选的落影。
+ *
+ * 为什么是画笔上的规格而不是组件的 prop：`star-orb.tsx` 的规矩是「颜色是画笔值，
+ * 不是主题色；谁用谁选画笔」。球体裁剪要的两件事（球体色、球界色）恰好都是颜色，
+ * 由消费者按主题挑两支持久常量，组件自己不认识主题。
+ *
+ * 验收标准（`star-orb-brush.test.ts` 里三条对比度钉子）：浅底上球体是一块实心暗物
+ * （≥ 15:1）；hairline 看得见但不成为实体（1.05–1.6:1）；blocked 弧白底上真看得见
+ * （≥ 3:1）。数值改动必须同时改测试里的阈值。
+ */
+export interface GlowBallSkin {
+  /** 球体底色。 */
+  body: string;
+  /** 球界那一圈 hairline。 */
+  edge: string;
+  /** blocked 那圈弧（画在球外，浅底上要看得见）。 */
+  arc: string;
+  /**
+   * 落影。给了才画 —— 深底上看不见，画了是纯浪费。
+   *
+   * `rgb` 写三元组（与 `palette` / `cfg.hue` 同一写法），`a` 是不透明度：渐变的末端
+   * 要用**同色透明**（`rgba(0,0,0,0)` 的插值会在浅色底上留下一层灰）。
+   */
+  shadow?: { rgb: string; a: number };
+}
+
+/** 全屏那颗的浅色版：白底上一颗带落影的深色球。 */
+export const GLOW_BALL_LIGHT: GlowBrush = {
+  ...GLOW_BRUSH,
+  ball: {
+    body: "#050507",
+    edge: "rgba(15,20,45,0.10)",
+    arc: "rgba(58,78,178,0.85)",
+    shadow: { rgb: "28,36,84", a: 0.18 },
+  },
+};
+
+/** 全屏那颗的深色版：舞台与球体同是近黑，靠那圈 10% 亮边读球界；深底上不画落影。 */
+export const GLOW_BALL_DARK: GlowBrush = {
+  ...GLOW_BRUSH,
+  ball: {
+    body: "#050507",
+    edge: "rgba(190,212,255,0.10)",
+    arc: "rgba(226,238,255,0.28)",
+  },
+};
+
+// 落影的几何：中心下移一点、内圈落在球内、外圈比球大 22%。写在这里而不是画笔里 ——
+// 画笔只管颜色，与 TABLE / 画笔表的既有分工一致。
+// （常量声明在文件尾部、引用它的绘制代码在文件中部：模块级 const 在模块求值时就已
+// 初始化，渲染发生在之后，没有 TDZ 问题。）
+const BALL_SHADOW_OFFSET = 0.04;
+const BALL_SHADOW_INNER = 0.9;
+const BALL_SHADOW_OUTER = 1.22;

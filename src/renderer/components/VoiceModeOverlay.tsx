@@ -11,9 +11,14 @@
 import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Minus, X } from "lucide-react";
-import { GLOW_BRUSH, StarOrb } from "./voice-mode/star-orb";
+import {
+  GLOW_BALL_DARK,
+  GLOW_BALL_LIGHT,
+  StarOrb,
+} from "./voice-mode/star-orb";
 import { CAPTION_KEY, ORB_STATE } from "./voice-mode/orb-state";
 import { voiceCaptionLine } from "../utils/voice/voice-caption";
+import { useEffectiveTheme } from "../store/selectors";
 import { VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import type { VoiceModeView } from "../hooks/useVoiceMode";
 import { Button } from "./app-button";
@@ -31,6 +36,9 @@ export function VoiceModeOverlay({
   onMinimize,
 }: VoiceModeOverlayProps): JSX.Element {
   const { t } = useTranslation();
+  // 主题决定球怎么画：深浅两支持久常量，组件自己不认主题色（沿用 star-orb 的规矩）。
+  const isDark = useEffectiveTheme() === "dark";
+  const brush = isDark ? GLOW_BALL_DARK : GLOW_BALL_LIGHT;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -54,36 +62,32 @@ export function VoiceModeOverlay({
   );
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
-      // 固定深色底，不跟主题走：星空球是按深色底定稿的（设计 §3.1 的原型就是
-      // #050507）。浅色主题下粒子与光晕会糊成一块脏斑 —— 沉浸式场景固定深底是
-      // 常规做法，这里不是漏了主题适配。
-      style={{ backgroundColor: "#050507" }}
-    >
+    // 舞台跟随主题（浅色下是白底上一颗带落影的深色球，深色下舞台与球同是近黑、
+    // 靠球界那圈亮边读球）；球本身的材质在 star-orb.tsx 的 `GLOW_BALL_*` 里。
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-background">
       {/* `titlebar-no-drag` 不是装饰：按钮上边距 16px、高 36px，跨在标题栏 40px 高的
           拖窗区里。拖窗命中是矩形，也不看 z-index —— 浮层盖在标题栏上不等于把这块
           从拖窗区里抠出来：以前能点全靠标题栏右簇自己那块 no-drag 恰好盖到 y=34，
           y=34–40 这 6px 仍是拖窗区，点击落在✕中间就被当成拖窗吞掉（悬停照常亮）。
           两个按钮现在都在这里，都得带这个类。 */}
       <div className="absolute top-4 right-4 flex items-center gap-1">
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           data-testid="voice-minimize"
           onClick={onMinimize}
           aria-label={t("voiceMode.minimize")}
-          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/10"
-          style={{ color: "#8f8f9b" }}
+          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Minus className="h-4 w-4" />
         </Button>
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           data-testid="voice-close"
           onClick={onClose}
           aria-label={t("voiceMode.exit")}
-          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/10"
-          style={{ color: "#8f8f9b" }}
+          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <X className="h-4 w-4" />
         </Button>
@@ -91,15 +95,13 @@ export function VoiceModeOverlay({
 
       <div className="h-[min(620px,62vh)] w-[min(620px,86vw)]">
         <StarOrb
-          brush={GLOW_BRUSH}
+          brush={brush}
           state={ORB_STATE[view.state]}
           level={view.level}
         />
       </div>
 
-      <p className="mt-2 text-sm" style={{ color: "#8f8f9b" }}>
-        {caption}
-      </p>
+      <p className="mt-2 text-sm text-muted-foreground">{caption}</p>
 
       {/*
         只显示正在念的那个合成单元（规则在 `voiceCaptionLine` 里）。定宽、居中、折行、定高，
@@ -122,11 +124,11 @@ export function VoiceModeOverlay({
       <div
         key={spoken}
         data-testid="voice-caption-text"
-        className="mx-auto mt-6 h-12 max-w-[34rem] overflow-y-auto whitespace-pre-wrap break-words text-center text-lg leading-6 [scrollbar-width:none]"
+        className="mx-auto mt-6 h-12 max-w-[34rem] overflow-y-auto whitespace-pre-wrap break-words text-center text-lg leading-6 text-foreground [scrollbar-width:none]"
         // pre-wrap 对常见路径是空的（合成单元里的空白已被 `speech-text.ts` 的
         // `replace(/\s+/g, " ")` 压成单空格），但对 `answer` 回落分支是必需的：
         // 那里是 markdown 原文，段落靠 \n 分（实测 pre-wrap 6 行 vs 折行版 1 行）。
-        style={{ color: "#e7e7ea", lineBreak: "strict" }}
+        style={{ lineBreak: "strict" }}
       >
         {text}
       </div>
