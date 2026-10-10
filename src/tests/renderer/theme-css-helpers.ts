@@ -305,11 +305,19 @@ export function textColorToken(cls: string): string {
   throw new Error(`未找到 text-<color> 类：${cls}`);
 }
 
-/** `py-3` → 0.75（rem）。tailwind 默认 spacing 基数 0.25rem，本项目未覆写。 */
+/** `py-3` → 0.75（rem）。 */
 export function paddingYRem(cls: string): number {
   const m = /(?:^|\s)py-([\d.]+)(?:\s|$)/.exec(cls);
   if (!m) throw new Error(`未找到 py-* 类：${cls}`);
-  return Number(m[1]) * 0.25;
+  return Number(m[1]) * spacingRem();
+}
+
+/**
+ * tailwind 的间距基数（rem）。本仓未覆写 `theme.spacing` ⇒ 就是默认的 0.25rem。
+ * 单独导出：`boxPx` 一类按 token 算尺寸的仓库，与 `paddingYRem` 共用同一个基数。
+ */
+export function spacingRem(): number {
+  return 0.25;
 }
 
 /**

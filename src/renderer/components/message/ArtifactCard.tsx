@@ -83,7 +83,7 @@ function VideoThumb({ reference }: { reference: VideoReference }) {
     reference.playbackKind === "inline" && Boolean(src) && !failed;
 
   return (
-    <div className="relative flex h-9 w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+    <div className="relative flex h-7 w-[50px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
       {showVideo ? (
         <video
           src={src}
@@ -360,7 +360,7 @@ export const ArtifactCard = memo(function ArtifactCard({
 
   return (
     <>
-      <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto">
+      <div className="flex flex-col gap-1.5 max-h-[320px] overflow-y-auto">
         {allItems.map((item) => {
           if (item.kind === "video") {
             const ref = item.reference;
@@ -368,7 +368,7 @@ export const ArtifactCard = memo(function ArtifactCard({
             return (
               <div
                 key={key}
-                className="flex cursor-pointer items-center justify-between rounded-xl border border-border/40 px-4 py-3.5 transition-colors hover:bg-accent/50"
+                className="flex cursor-pointer items-center justify-between rounded-xl border border-border/40 px-3 py-2 transition-colors hover:bg-accent/50"
                 onClick={() => void handleClickVideo(ref)}
                 role="button"
                 tabIndex={0}
@@ -382,13 +382,14 @@ export const ArtifactCard = memo(function ArtifactCard({
                 <div className="flex min-w-0 items-center gap-3">
                   <VideoThumb reference={ref} />
                   <div className="min-w-0">
-                    <div className="truncate text-base font-semibold text-foreground">
+                    <div className="truncate text-sm font-medium text-foreground">
                       {ref.name}
                     </div>
                   </div>
                 </div>
                 <div className="ml-3 flex shrink-0 items-center gap-1.5">
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     className="rounded-md border border-border/40 px-2.5 py-1 text-xs text-primary-text hover:bg-primary/5 h-auto"
                     onClick={(e) => {
@@ -415,7 +416,12 @@ export const ArtifactCard = memo(function ArtifactCard({
           return (
             <div
               key={file.path}
-              className={`flex items-center justify-between rounded-xl border border-border/40 px-4 py-3.5 transition-colors outline-none ${
+              /* 紧凑档尺寸（2026-10-10 定稿，1:1 量测见 design-docs/mockups）：
+                 行标题 14px 与聊天正文同档（此前 16px 比正文还大一档，是「字体太大」的根因）；
+                 内边距 8/12 、扩展名方块 28²（对齐仓库图标键的 w-7 h-7）、卡间距 6
+                 ⇒ 单行 56px / 四行 242px（原 72 / 312，已经贴住 max-h-[320px] 才出滚动条）。
+               */
+              className={`flex items-center justify-between rounded-xl border border-border/40 px-3 py-2 transition-colors outline-none ${
                 reverted
                   ? "cursor-default opacity-50"
                   : "cursor-pointer hover:bg-accent/50"
@@ -433,7 +439,13 @@ export const ArtifactCard = memo(function ArtifactCard({
             >
               <div className="flex min-w-0 items-center gap-3">
                 <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground ${
+                  /* 方块 28² 对齐仓库图标键（`app-button` 的 `iconSm` 档、`BrowserPanel` 的 `w-7 h-7`）。
+                     标签用 rem 任意值而非 `text-[10px]`：App.tsx 把「设置 → 字号」做成根字号上的
+                     `--ui-font-scale`，只有 rem 会缩放；方块自身是 h-7/w-7（rem）⇒ 写死 px 时
+                     把字号调到 12 会让 4 字符扩展名漫出方块（HEAD 的 36² 方块不会）。
+                     容量边界：4 字符最坏情况（MAKE / DOCK）约 28.6px、方块宽 28px ⇒ 靠
+                     overflow-hidden 兜底（裁不到的 0.3px），不至于溢出到方块外。 */
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-[0.625rem] font-semibold text-muted-foreground ${
                     reverted ? "line-through" : ""
                   }`}
                 >
@@ -441,7 +453,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                 </div>
                 <div className="min-w-0">
                   <div
-                    className={`truncate text-base font-semibold text-foreground ${
+                    className={`truncate text-sm font-medium text-foreground ${
                       reverted ? "line-through text-muted-foreground" : ""
                     }`}
                   >
@@ -485,7 +497,8 @@ export const ArtifactCard = memo(function ArtifactCard({
               <div className="ml-3 flex shrink-0 items-center gap-1.5">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost"
+                    <Button
+                      variant="ghost"
                       type="button"
                       className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-muted-foreground h-auto"
                       onClick={(e) => {
@@ -510,7 +523,8 @@ export const ArtifactCard = memo(function ArtifactCard({
                 {canRevert ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
                         className="rounded-md border border-border/40 px-2.5 py-1 text-xs text-muted-foreground hover:border-destructive/20 hover:bg-destructive/5 hover:text-destructive h-auto"
                         onClick={(e) => {
@@ -527,7 +541,8 @@ export const ArtifactCard = memo(function ArtifactCard({
                     </TooltipContent>
                   </Tooltip>
                 ) : null}
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   className="rounded-md border border-border/40 px-2.5 py-1 text-xs text-primary-text hover:bg-primary/5 h-auto"
                   onClick={(e) => {
