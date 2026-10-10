@@ -55,6 +55,9 @@ vi.mock("react-i18next", () => ({
 const orb = vi.hoisted(() => ({ brushes: [] as unknown[] }));
 vi.mock("../../renderer/components/voice-mode/star-orb", () => ({
   GLOW_BRUSH: { kind: "glow" },
+  // 浮层（本文件会经过它）现在按主题拿这两支 —— mock 缺了导出会让整个宿主测试炸掉
+  GLOW_BALL_LIGHT: { kind: "glow", tag: "ball-light" },
+  GLOW_BALL_DARK: { kind: "glow", tag: "ball-dark" },
   STARS_BRUSH_LIGHT: { kind: "stars", tag: "light" },
   STARS_BRUSH_DARK: { kind: "stars", tag: "dark" },
   STARS_BRUSH_ICON_LIGHT: { kind: "stars", tag: "icon-light" },
@@ -271,7 +274,7 @@ describe("VoiceModeHost", () => {
 
   // 这里原有两条「小球的画笔跟着主题走」用例：STARS 画笔的最后一个使用者
   // （右下角那颗星球球）已在本次搬动中消失 —— 它变成 header 里的静态状态点，
-  // 不带画笔。全屏那侧仍由 voice-mode-overlay.test.tsx 锁着 GLOW_BRUSH。
+  // 不带画笔。全屏那侧现由 voice-mode-overlay.test.tsx 锁着 GLOW_BALL_LIGHT / DARK。
 
   it("换语音会话时旧运行时被卸载：停麦、换新", () => {
     renderHost();

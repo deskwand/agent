@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VoiceModeOverlay } from "../../renderer/components/VoiceModeOverlay";
 import { cssFlat } from "./theme-css-helpers";
 import type { VoiceModeView } from "../../renderer/hooks/useVoiceMode";
-import { GLOW_BRUSH } from "../../renderer/components/voice-mode/star-orb";
+import { useAppStore } from "../../renderer/store";
 
-// 球是 canvas，jsdom 里画不了 —— 这里只关心全屏拿到的是哪支画笔。
+// 球是 canvas，jsdom 里画不了 —— 这里只关心全屏拿到的是哪支画笔、有没有被重挂载。
 const orb = vi.hoisted(() => ({ brushes: [] as unknown[] }));
 vi.mock("../../renderer/components/voice-mode/star-orb", () => ({
   GLOW_BRUSH: { kind: "glow" },
+  GLOW_BALL_LIGHT: { kind: "glow", tag: "ball-light" },
+  GLOW_BALL_DARK: { kind: "glow", tag: "ball-dark" },
   STARS_BRUSH_LIGHT: { kind: "stars", tag: "light" },
   STARS_BRUSH_DARK: { kind: "stars", tag: "dark" },
   StarOrb: ({ brush }: { brush: unknown }) => {
@@ -34,9 +36,23 @@ let root: Root;
 
 beforeEach(() => {
   orb.brushes.length = 0;
+  useAppStore.setState(useAppStore.getInitialState(), true);
   container = document.createElement("div");
   document.body.appendChild(container);
 });
+
+/** 设主题（含 system 跟随）；照 voice-mini-button.test.tsx 的写法。 */
+function setTheme(
+  theme: "light" | "dark" | "system",
+  systemDarkMode = false,
+): void {
+  act(() => {
+    useAppStore.setState({
+      settings: { ...useAppStore.getState().settings, theme },
+      systemDarkMode,
+    });
+  });
+}
 
 afterEach(() => {
   act(() => root?.unmount());
@@ -216,12 +232,92 @@ describe("VoiceModeOverlay", () => {
     expect(second).not.toBe(first); // 换了 key 就是新节点
     expect(second.scrollTop).toBe(0);
   });
+});
 
-  it("浮层不读主题：挂载时永远用发光画笔", () => {
-    // 浮层是纯展示也不订阅 store —— 切主题不会让它重渲染，它自己硬编码 GLOW_BRUSH。
-    // 所以这里只钉「渲染过、且每次都是 GLOW_BRUSH」；“小球要避开发光画笔”由宿主测试守。
+describe("VoiceModeOverlay 跟随主题", () => {
+  const stage = () => container.firstElementChild as HTMLElement;
+
+  it("浅色主题：舞台是主题底色，不再写死深色", () => {
+    setTheme("light");
     renderOverlay();
-    expect(orb.brushes.length).toBeGreaterThan(0);
-    for (const brush of orb.brushes) expect(brush).toBe(GLOW_BRUSH);
+    expect(stage().className).toContain("bg-background");
+    expect(stage().getAttribute("style") ?? "").not.toContain("background");
+    expect(stage().getAttribute("style") ?? "").not.toContain("#050507");
+  });
+
+  it("字幕两行与两个按钮都走 token，没有内联色值", () => {
+    setTheme("light");
+    renderOverlay();
+    const caption = container.querySelector("p")!;
+    const text = captionRegion();
+    const buttons = Array.from(
+      container.querySelectorAll(
+        '[data-testid="voice-close"], [data-testid="voice-minimize"]',
+      ),
+    );
+
+    expect(caption.className).toContain("text-muted-foreground");
+    expect(text.className).toContain("text-foreground");
+    for (const el of [caption, text, ...buttons]) {
+      expect(el.getAttribute("style") ?? "").not.toContain("color");
+    }
+    for (const button of buttons) {
+      expect(button.className).toContain("text-muted-foreground");
+      expect(button.className).toContain("hover:bg-accent");
+      expect(button.className).not.toContain("bg-white/10");
+      expect(button.className).toContain("titlebar-no-drag"); // 既有约束，别删
+    }
+  });
+
+  it("球按主题拿画笔：浅色 ball-light、深色 ball-dark", () => {
+    const last = () => orb.brushes[orb.brushes.length - 1];
+
+    setTheme("light");
+    renderOverlay();
+    expect(last()).toMatchObject({ tag: "ball-light" });
+
+    setTheme("dark");
+    expect(last()).toMatchObject({ tag: "ball-dark" });
+  });
+
+  it("system 跟随系统深浅", () => {
+    const last = () => orb.brushes[orb.brushes.length - 1];
+
+    setTheme("system", true);
+    renderOverlay();
+    expect(last()).toMatchObject({ tag: "ball-dark" });
+
+    setTheme("system", false);
+    expect(last()).toMatchObject({ tag: "ball-light" });
+  });
+
+  it("换主题预设（深浅不变）：球还是同一支画笔", () => {
+    // 球只跟深浅，不跟 palette / accent —— 两支持久常量就是为这一点存在的
+    setTheme("light");
+    act(() => {
+      useAppStore.setState({
+        settings: { ...useAppStore.getState().settings, themePreset: "mist" },
+      });
+    });
+    renderOverlay();
+    expect(orb.brushes[orb.brushes.length - 1]).toMatchObject({
+      tag: "ball-light",
+    });
+  });
+
+  it("运行中切主题：球换画笔但不重挂载（麦克风不重启）", () => {
+    setTheme("light");
+    renderOverlay();
+    const canvas = container.querySelector("canvas");
+    const brushesAfterFirst = orb.brushes.length;
+
+    setTheme("dark");
+
+    // 「没重挂载」用节点身份证明：重挂载会换一个新 canvas 节点
+    expect(container.querySelector("canvas")).toBe(canvas);
+    expect(orb.brushes.length).toBeGreaterThan(brushesAfterFirst);
+    expect(orb.brushes[orb.brushes.length - 1]).toMatchObject({
+      tag: "ball-dark",
+    });
   });
 });

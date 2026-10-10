@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import {
+  GLOW_BALL_DARK,
+  GLOW_BALL_LIGHT,
   GLOW_BRUSH,
   prefersReducedMotion,
   STARS_BRUSH_DARK,
@@ -9,12 +11,31 @@ import {
   STARS_BRUSH_LIGHT,
 } from "../../renderer/components/voice-mode/star-orb";
 import {
+  composite,
   contrast,
+  parseAlphaColor,
   parseHex,
   rgbHex,
   themeBlocks,
   tokenOf,
 } from "./theme-css-helpers";
+
+/** 两个主题块里的 `--background`，转成 hex。 */
+function themeBackgrounds(): { light: string; dark: string } {
+  const blocks = themeBlocks();
+  const light = blocks.find((b) => /^\s*\.light/.test(b))!;
+  const dark = blocks.find((b) => /^\s*:root/.test(b))!;
+  return {
+    light: rgbHex(parseHex(tokenOf(light, "--background"))),
+    dark: rgbHex(parseHex(tokenOf(dark, "--background"))),
+  };
+}
+
+/** 把（可能带 alpha 的）颜色叠到背景上 —— 对比度必须拿混合后的颜色算。 */
+function over(color: string, background: string): string {
+  const parsed = parseAlphaColor(color);
+  return composite(background, rgbHex(parsed.rgb), parsed.alpha);
+}
 
 /** palette 里各色相对亮度的算术平均，当「粒子亮度」；只用于方向性断言。 */
 function meanRgb(palette: string[]): [number, number, number] {
@@ -108,6 +129,55 @@ describe("星空球的画笔", () => {
     // 深浅方向没搞反：两支的调色是同一份
     expect(STARS_BRUSH_ICON_LIGHT.palette).toEqual(STARS_BRUSH_LIGHT.palette);
     expect(STARS_BRUSH_ICON_DARK.palette).toEqual(STARS_BRUSH_DARK.palette);
+  });
+
+  it("两套球画笔与全屏那支只有 ball 一项不同", () => {
+    // 这条是**配置钉子**：它锁的是四个字面值，不是行为 —— 改色必须改这里。
+    // 「改完之后白底上还看得见吗」由下面两条对比度钉子守。
+    expect(GLOW_BALL_LIGHT).toEqual({
+      ...GLOW_BRUSH,
+      ball: {
+        body: "#050507",
+        edge: "rgba(15,20,45,0.10)",
+        arc: "rgba(58,78,178,0.85)",
+        shadow: { rgb: "28,36,84", a: 0.18 },
+      },
+    });
+    expect(GLOW_BALL_DARK).toEqual({
+      ...GLOW_BRUSH,
+      ball: {
+        body: "#050507",
+        edge: "rgba(190,212,255,0.10)",
+        arc: "rgba(226,238,255,0.28)",
+      },
+    });
+    // 深底上看不见落影 —— 不画
+    expect(GLOW_BALL_DARK.ball?.shadow).toBeUndefined();
+  });
+
+  it("球在浅底上是实心暗物，球界看得见但不成为实体", () => {
+    const { light, dark } = themeBackgrounds();
+
+    const body = GLOW_BALL_LIGHT.ball!.body;
+    expect(contrast(over(body, light), light)).toBeGreaterThanOrEqual(15);
+
+    const pairs = [
+      [GLOW_BALL_LIGHT.ball!.edge, light],
+      [GLOW_BALL_DARK.ball!.edge, dark],
+    ] as const;
+    for (const [edge, bg] of pairs) {
+      const c = contrast(over(edge, bg), bg);
+      expect(c).toBeGreaterThan(1.05); // 看得见
+      expect(c).toBeLessThan(1.6); // 但不成为「实体」
+    }
+  });
+
+  it("blocked 那圈弧在白底上看得见，深底上仍是原来的值", () => {
+    const { light } = themeBackgrounds();
+    const arc = GLOW_BALL_LIGHT.ball!.arc;
+    expect(contrast(over(arc, light), light)).toBeGreaterThanOrEqual(3);
+    // 既有值，本次不动它 —— 改它就不再是「只改浅色」
+    expect(GLOW_BALL_DARK.ball!.arc).toBe("rgba(226,238,255,0.28)");
   });
 });
 
