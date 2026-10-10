@@ -167,14 +167,14 @@ function SubscriptionCard({
                 data-action="confirm-remove"
                 disabled={busy}
                 onClick={() => void remove()}
-                className="text-xs text-destructive h-auto hover:bg-transparent hover:text-current"
+                className="text-xs text-destructive h-auto px-0 hover:bg-transparent hover:text-current"
               >
                 {t("api.subscriptionDisconnect")}
               </Button>
               <Button variant="ghost"
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
+                className="text-xs text-muted-foreground h-auto px-0 hover:bg-transparent hover:text-current"
               >
                 {t("common.cancel")}
               </Button>
@@ -182,12 +182,13 @@ function SubscriptionCard({
           ) : (
             <Button variant="ghost"
               type="button"
+              size="xs"
               data-action="remove"
               onClick={() => {
                 setConfirming(true);
                 setEditing(false);
               }}
-              className="text-xs text-muted-foreground hover:text-destructive h-auto"
+              className="text-xs text-muted-foreground hover:text-destructive"
             >
               {t("api.subscriptionDisconnect")}
             </Button>

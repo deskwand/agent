@@ -321,7 +321,7 @@ function SkillCardCards(props: SkillCardProps) {
             {onSkillMd ? (
               <Button variant="ghost"
                 onClick={onSkillMd}
-                className="text-base font-semibold text-foreground hover:text-primary-text transition-colors truncate text-left h-auto"
+                className="text-base font-semibold text-foreground hover:text-primary-text transition-colors truncate text-left h-auto px-0"
               >
                 {skill.name}
               </Button>
@@ -396,7 +396,7 @@ function SkillCardList(props: SkillCardProps) {
               {onSkillMd ? (
                 <Button variant="ghost"
                   onClick={onSkillMd}
-                  className="text-sm font-medium text-foreground truncate hover:text-primary-text transition-colors text-left h-auto"
+                  className="text-sm font-medium text-foreground truncate hover:text-primary-text transition-colors text-left h-auto px-0"
                 >
                   {skill.name}
                 </Button>
@@ -481,7 +481,7 @@ function CloudOnlyCardView(props: CloudOnlySkillCardProps) {
             {onSkillMd ? (
               <Button variant="ghost"
                 onClick={onSkillMd}
-                className="text-base font-semibold text-foreground hover:text-primary-text transition-colors truncate text-left h-auto"
+                className="text-base font-semibold text-foreground hover:text-primary-text transition-colors truncate text-left h-auto px-0"
               >
                 {name}
               </Button>
@@ -551,7 +551,7 @@ function CloudOnlyListView(props: CloudOnlySkillCardProps) {
               {onSkillMd ? (
                 <Button variant="ghost"
                   onClick={onSkillMd}
-                  className="text-sm font-medium text-foreground truncate hover:text-primary-text transition-colors text-left h-auto"
+                  className="text-sm font-medium text-foreground truncate hover:text-primary-text transition-colors text-left h-auto px-0"
                 >
                   {name}
                 </Button>
