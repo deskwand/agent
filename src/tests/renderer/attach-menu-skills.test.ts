@@ -179,6 +179,23 @@ describe("+ 菜单的技能组", () => {
     expect(skillRows()).toHaveLength(0);
   });
 
+  it("星标槽是 24px：星标按钮不许带回缺省档的内边距", async () => {
+    await openMenu({ onInsertSkill: vi.fn() }, ["pdf"]);
+
+    // 与 slash 菜单同一个坑：星标按钮只写 `h-6 w-6`、不给 size 档时，缺省档的 `px-4 py-2`
+    // 会跟着来，而 border-box 的宽度下限是内边距之和 ⇒ 槽位实测 32px、星标与行名各自右移
+    // 4px / 8px（本菜单还另有一笔 2px 的基准偏差，由容器自身的左内边距造成——见 AttachMenu ✓）。
+    // jsdom 不做布局 ⇒ 锁在机制层：宽度来自档位，类名里不许有非零内边距。
+    const pin = pinButton("pdf");
+    for (const cls of ["h-6", "w-6"]) {
+      expect(pin.classList).toContain(cls);
+    }
+    const padding = [...pin.classList].filter((token) =>
+      /^(?:[a-z-]+:)*(?:p|px|py|pt|pb|pl|pr|ps|pe)-/.test(token),
+    );
+    expect(padding.filter((token) => token !== "p-0")).toEqual([]);
+  });
+
   it("点行首星标能把最近调用里的技能固定住（补齐区也能上星）", async () => {
     localStorage.setItem("slashRecency", JSON.stringify({ "skill:review": 1 }));
     await openMenu({ onInsertSkill: vi.fn() }, []);

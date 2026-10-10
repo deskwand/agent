@@ -217,6 +217,9 @@ export function SlashMenu({
                 leading={
                   <Button
                     variant="ghost"
+                    // 24² 槽：与 MENU_ITEM_AFTER_SLOT_CLASS 的账成对（槽宽与基准见那边的注释）；
+                    // 只写 `w-6 h-6` 会带着默认档的 `px-4 py-2` 把槽撑成 32px ✗。
+                    size="iconXs"
                     type="button"
                     tabIndex={-1}
                     data-skill-pin={item.skill.name}
@@ -228,7 +231,7 @@ export function SlashMenu({
                       event.stopPropagation();
                       onToggleSkillPin(item.skill.name);
                     }}
-                    className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-accent ${
+                    className={`flex flex-none items-center justify-center rounded-md transition-colors hover:bg-accent ${
                       pinned ? "text-primary-text" : "text-muted-foreground"
                     }`}
                   >

@@ -568,12 +568,20 @@ export function AttachMenu({
                   ? t("chat.skillPinRemove")
                   : t("chat.skillPinAdd");
                 return (
-                  <div key={name} className="flex items-center pl-1.5">
+                  // ⚠️ `pl-1` 是**本组件**的基准，不是 slash 菜单的 `pl-1.5` ✗：这里的兄弟行是 Radix
+                  // 菜单项（`px-2` + 16px 图标 + `gap-2` = 32px），不是 slash 菜单那套 `px-2.5`（34px）
+                  // ⇒ 4px + 24px 槽 + 4px = 32px 才落在兄弟行的图标/文字上 ✓
+                  // （2026-10-10 Chromium 实测：星标中心 21 = 21、行名 37 = 37 ✓）。
+                  <div key={name} className="flex items-center pl-1">
                     {/* 星标刻意**不是**菜单项、也不进焦点环（tabIndex=-1，鼠标专用）——
                         原实现就是这样。焦点若落到它上面，方向键的起点会错位。
                         Radix 的 roving focus 只走注册过的 item，所以这个裸按钮
                         保持「鼠标可达、键盘不可达」的原状 ✓。 */}
-                    <Button variant="ghost"
+                    <Button
+                      variant="ghost"
+                      // 24² 槽：只写 `w-6 h-6` 会带着默认档的 `px-4 py-2` 把槽撑成 32px ⇒ 星标
+                      // 右移 4px、行名右移 8px（相对本菜单的兄弟行，Chromium 实测 ✓）。
+                      size="iconXs"
                       type="button"
                       tabIndex={-1}
                       data-skill-pin={name}
@@ -602,7 +610,7 @@ export function AttachMenu({
                             ?.focus();
                         });
                       }}
-                      className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-accent ${
+                      className={`flex flex-none items-center justify-center rounded-md transition-colors hover:bg-accent ${
                         pinned ? "text-primary-text" : "text-muted-foreground"
                       }`}
                     >

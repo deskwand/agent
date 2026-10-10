@@ -84,19 +84,21 @@ describe("app-button 包装层", () => {
     }
   });
 
-  it("app 层独有的紧凑两档 xs / iconSm —— 默认档的垫子一个都不许留", () => {
-    // ⚠️ 这两档**只有 app 层有** ✓（vendored 的表里没有）⇒ 本用例**能编译**本身即一道锁 ✓：
-    // 谁把 `xs` / `iconSm` 从 `app-button.tsx` 删掉，这里立刻 TS 报错 ✓✓；
+  it("app 层独有的紧凑三档 xs / iconSm / iconXs —— 默认档的垫子一个都不许留", () => {
+    // ⚠️ 这三档**只有 app 层有** ✓（vendored 的表里没有）⇒ 本用例**能编译**本身即一道锁 ✓：
+    // 谁把 `xs` / `iconSm` / `iconXs` 从 `app-button.tsx` 删掉，这里立刻 TS 报错 ✓✓；
     // 而 `buttonVariants({ variant: "ghost", size: "iconSm" })` 会**编译失败** ✓ —— 差异是单向的 ✓。
     // 2026-10-10 用户报障「元数据的这个框太大了」的由来：缺省档 `h-9 px-4 py-2` 一直在场，而那几处
     // 只写了 `h-auto`（只顶掉高度 ✗）⇒ 16px 图标被 16/8 的内边距撑成 48×32 ✓（Chromium 实测 ✓）。
-    const tokensOf = (size: "xs" | "iconSm") =>
+    const tokensOf = (size: "xs" | "iconSm" | "iconXs") =>
       appButtonVariants({ variant: "ghost", size }).split(/\s+/);
     const xs = tokensOf("xs");
     const iconSm = tokensOf("iconSm");
+    const iconXs = tokensOf("iconXs");
     for (const [name, tokens] of [
       ["xs", xs],
       ["iconSm", iconSm],
+      ["iconXs", iconXs],
     ] as const) {
       for (const slab of ["h-9", "px-4", "py-2", "h-auto"]) {
         expect(tokens, `${name} 不该带默认档的 ${slab}`).not.toContain(slab);
@@ -108,9 +110,16 @@ describe("app-button 包装层", () => {
     expect(xs, "带字的档不该定宽（靠内容撑宽）").not.toContain("w-6");
     expect(iconSm, "iconSm 应该是 28px 高").toContain("h-7");
     expect(iconSm, "纯图标那档必须同时定宽 —— 缺省档本身没有 w-*").toContain("w-7");
+    // `iconXs` 是 24² 的纯图标档（菜单行首的星标槽：6px 容器 + 24px 槽 + 4px = 34px）。
+    // 它存在的理由是一条实测：调用点只写 `h-6 w-6` 而不给档位时，**默认档的 `px-4 py-2`
+    // 仍在场**，而 border-box 的宽度下限是内边距之和 ⇒ 槽位撑成 32px、星标右移 4px、
+    // 行名右移 8px（2026-10-10 用户报障「slash 菜单图标没有对齐」的根因 ✓）。
+    expect(iconXs, "iconXs 该是 24px 高").toContain("h-6");
+    expect(iconXs, "纯图标那档必须同时定宽").toContain("w-6");
     // `xs` 带 `text-xs` ⇒ 顶掉 base 的 `text-sm` ✓（`cn` 合并同类、后来者胜 ✓）；
     // 图标那档不带字号，避免把调用点的文字改小 ✓。
     expect(xs).toContain("text-xs");
     expect(iconSm).not.toContain("text-xs");
+    expect(iconXs).not.toContain("text-xs");
   });
 });

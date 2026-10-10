@@ -137,6 +137,32 @@ describe("SlashMenu menu rows", () => {
     expect(rows[0]?.classList).toContain("bg-accent");
     expect(rows[0]?.classList).not.toContain("bg-primary/10");
   });
+
+  /**
+   * 星标槽必须是 24px 宽（`MENU_ITEM_AFTER_SLOT_CLASS` 那笔账：6px 容器 + 24px 槽 + 4px = 34px）。
+   *
+   * 根因（2026-10-10 用户报障「slash 菜单图标没有对齐」）：星标按钮原先只写 `h-6 w-6`、
+   * **不给 size 档**，而 `Button` 的缺省档带着 `px-4 py-2` —— `cn` 不会把 `px-4 py-2`
+   * 当成 `h-6 w-6` 的冲突类删掉 ✗，border-box 的宽度下限又是内边距之和 ⇒ 槽位实测 **32px**。
+   * 后果是两档偏移：星标比命令行的图标右 4px、技能行名右 8px（Chromium 实测 ✓），
+   * 也就是用户看到的那一列图标没对齐。
+   *
+   * jsdom 不做布局 ⇒ 这里把判据锁在**机制层**：槽位由档位（或 `p-0`）给出，类名里不许有非零内边距。
+   */
+  it("keeps the pin slot 24px wide (no inherited default-size padding)", () => {
+    const pins = [...renderMenu("all").querySelectorAll("[data-skill-pin]")];
+    expect(pins).toHaveLength(SKILL_TYPES.length);
+    for (const pin of pins) {
+      for (const cls of ["h-6", "w-6"]) {
+        expect(pin.classList).toContain(cls);
+      }
+      const padding = [...pin.classList].filter((token) =>
+        /^(?:[a-z-]+:)*(?:p|px|py|pt|pb|pl|pr|ps|pe)-/.test(token),
+      );
+      // `p-0` 是等价的另一种写法（零内边距），留给将来的实现；非零的一律是回归。
+      expect(padding.filter((token) => token !== "p-0")).toEqual([]);
+    }
+  });
 });
 
 /**
