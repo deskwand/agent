@@ -728,7 +728,7 @@ export function AttachMenu({
                     type="button"
                     data-command-retry
                     onClick={() => void loadPromptCommands()}
-                    className="shrink-0 underline h-auto hover:bg-transparent hover:text-current"
+                    className="shrink-0 underline h-auto px-0 hover:bg-transparent hover:text-current"
                   >
                     {t("chat.commandRetry")}
                   </Button>

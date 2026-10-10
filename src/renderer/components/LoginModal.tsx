@@ -251,12 +251,13 @@ export function LoginModal({
         {step === "social" && (
           <div className="text-center mt-4">
             <Button variant="ghost"
+              size="xs"
               onClick={() => {
                 setStep("email");
                 setTimeout(() => emailRef.current?.focus(), 100);
               }}
               disabled={loading}
-              className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50 h-auto"
+              className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50"
             >
               {t("auth.emailFallback")}
             </Button>
@@ -267,12 +268,13 @@ export function LoginModal({
           <>
             <div className="flex items-center gap-2 mb-4">
               <Button variant="ghost"
+                size="xs"
                 onClick={() => {
                   setStep("social");
                   setError(null);
                 }}
                 disabled={loading}
-                className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50 h-auto"
+                className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50"
               >
                 {t("auth.backToSelect")}
               </Button>
@@ -308,12 +310,13 @@ export function LoginModal({
           <>
             <div className="flex items-center gap-2 mb-4">
               <Button variant="ghost"
+                size="xs"
                 onClick={() => {
                   setStep("social");
                   setError(null);
                 }}
                 disabled={loading}
-                className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50 h-auto"
+                className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50"
               >
                 {t("auth.backToSelect")}
               </Button>

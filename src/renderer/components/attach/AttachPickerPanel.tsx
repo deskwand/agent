@@ -190,7 +190,7 @@ export function AttachPickerPanel({
               type="button"
               data-retry
               onClick={onRetry}
-              className="text-xs text-foreground underline underline-offset-2 h-auto hover:bg-transparent hover:text-current"
+              className="text-xs text-foreground underline underline-offset-2 h-auto px-0 hover:bg-transparent hover:text-current"
             >
               {t("attachPicker.retry")}
             </Button>
@@ -205,7 +205,7 @@ export function AttachPickerPanel({
                 type="button"
                 data-empty-action
                 onClick={emptyAction.onClick}
-                className="text-xs text-foreground underline underline-offset-2 h-auto hover:bg-transparent hover:text-current"
+                className="text-xs text-foreground underline underline-offset-2 h-auto px-0 hover:bg-transparent hover:text-current"
               >
                 {emptyAction.label}
               </Button>

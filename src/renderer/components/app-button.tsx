@@ -22,7 +22,8 @@ import { cn } from "@renderer/utils/cn";
  * vendored 的 base 含 `justify-center` ✓，而原生 `<button className="flex …">` 的 flex
  * 默认是 **`flex-start`（居左）** ✓ ⇒ 凡「满宽/弹性宽 + 一行内容」的按钮（设置页菜单项 ✓、
  * 消息区工具摘要行 ✓）迁过来后**全部居中** ✗✓。
- * ⇒ 本层**默认追加 `justify-start`** ✓，并靠 `cn`（`@renderer/utils/cn`，即 `cn` 包 0.4.0 ✓，**不是** tailwind-merge ✗）去重：
+ * ⇒ 本层**默认追加 `justify-start`** ✓，并靠 `cn`（`@renderer/utils/cn`，即 `cn` 包 0.4.0 ✓ —— **包名不是**
+ * `tailwind-merge`，但语义兼容：它会合并同族冲突类 ✓，不是只去重 ✗）按调用顺序定胜负：
  * 调用方若显式写了 `justify-center`，**它排在后面、会赢** ✓（无需改调用点 ✓✓）。
  *
  * ⚠️ 这一层**不 vendor 进 `ui/`** ✗ —— 与 `app-tooltip.tsx` 同一策略：

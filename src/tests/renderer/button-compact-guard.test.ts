@@ -4,33 +4,29 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const RENDERER = path.resolve(import.meta.dirname, "../../renderer");
-const HORIZONTAL = /^-?px?-/; // `p-*` 或 `px-*`
+const HORIZONTAL = /^-?(?:p|px|pl|pr)-/; // `p-*` / `px-*` / `pl-*` / `pr-*`
 
 /**
- * ⚠️ 待收口的「虚宽按钮」——**文件集合**（不是计数）✓，只许减、不许加 ✓✓。集合清空是
- * 2026-10-10 那次收口的目标；清空后本守卫就只剩「不许新增」这一条，且允许数为 0 ✓。
+ * ✅ 2026-10-10 收口已完成：**全仓不允许再出现虚宽按钮** ⇒ 本守卫只剩一条断言（全仓扫描必须
+ * 为空 ✓✓），任何新增写法当场红 ✓。下面记的是判据与成因，改动前先读完 ✓。
  *
  * 违规口径（四条同时成立）：
  *  ① `<Button>` 的 className 含 `h-auto`（把高度交还内容）；
- *  ② 没传 `size`；
+ *  ② `size` 没传、或传的正是 `default`（等于没传 ⇒ 缺省档的 `px-4 py-2` 还在 ✗）；
  *  ③ 不是「满宽 + 内容居中」的块级按钮（见 `isExempt`）；
- *  ④ **横轴一个内边距类都没有**（`p-` / `px-`）⇒ 这一轴还是 base 的 `px-4`。
+ *  ④ **横轴一个内边距类都没有**（`p-` / `px-` / `pl-` / `pr-`）⇒ 这一轴还是 base 的 `px-4`。
  *
  * 成因：`cn`（`@renderer/utils/cn`，clsx + tailwind-merge 的替代品 ✓）只删「同族冲突」的类 ——
  * 只写 `h-auto` 时高度归内容，`px-4` 却原样留下 ⇒ 文字两侧各多 16px 虚宽（16px 图标更是被
  * 16/8 撑成 48×32 的方块 ✓，2026-10-10 用户报障「元数据的这个框太大了」，Chromium 实测 ✓）。
+ * 当时的收口按「框是否可见」分两类：看得见的传紧凑档（`iconSm` 28×28 / `xs` 24px）✓，
+ * 看不见的就地补 `px-0`、**高度刻意不动** ✓（横向收窄是修 bug、纵向收窄是审美变更 ✗）。
  *
- * ⚠️ 只看**横轴**：纵轴的 `py-2` 决定行高与点击目标，是**刻意保留**的（2026-10-10 评审后定的
- * 口径：横向收窄是修 bug，纵向收窄是审美变更 ⇒ 不在那次范围）。所以补一个 `px-0` 就足以
- * 离开这张表 ✓，不需要 `p-0`。
+ * ⚠️ 已知盲区（审查核过：今天全仓无此类写法 ⇒ 未处理，出现时靠评审而不是靠这条守卫 ✓）：
+ *  · `className={SOME_CONST}` —— 常量里的 `h-auto` / 内边距看不见 ✗；
+ *  · `cn("h-auto", cond && "px-0")` —— 条件为假时仍会被判成「有内边距」✗；
+ *  · `size={expr}` —— 无法静态判断 ⇒ 一律放行（宁可漏报、不误报 ✗）。
  */
-const COMPACT_PENDING = new Set([
-  "components/LoginModal.tsx",
-  "components/ProviderGuidance.tsx",
-  "components/attach/AttachMenu.tsx",
-  "components/attach/AttachPickerPanel.tsx",
-]);
-
 /** className 的 token 视图：引号/反引号/花括号/`$` 全当分隔符（模板串与三元里的类也看得见 ✓）。 */
 function classTokens(raw: string): string[] {
   return raw
@@ -57,12 +53,24 @@ export function isExempt(tokens: string[]): boolean {
   return spreads && !edgePushed;
 }
 
-/** 该文件里「只写 `h-auto` 又没有横向内边距」的 `<Button>` 个数。 */
-export function missesHorizontalPadding(relPath: string): number {
-  const abs = path.join(RENDERER, relPath);
+/**
+ * `size` 是否已经把缺省档的 `px-4 py-2` 换掉了 ✓。
+ *
+ * ⚠️ 只看「有没有传 `size`」是不够的：`size="default"` 是合法写法，它带回来的正是
+ * `h-9 px-4 py-2` ⇒ 与「没传」等价，原始的虚宽 bug 会复现 ✗（审查发现的潜在地雷；今天全仓
+ * 没有调用点这么写 ✓，但守卫得拦住它 ✓）。
+ */
+export function sizeReplacesDefaultSlab(sizeText: string | null): boolean {
+  if (sizeText === null) return false; // 没传 ⇒ 缺省档在场
+  if (sizeText.startsWith("{")) return true; // 表达式：静态判断不了 ⇒ 放行（见文件头盲区）
+  return sizeText.replace(/^["']|["']$/g, "").trim() !== "default";
+}
+
+/** 直接从源码文本数（导出以便用内联 fixture 做正控 —— 活文件收口后就没有正例了 ✓）。 */
+export function countInSource(sourceText: string): number {
   const sf = ts.createSourceFile(
-    abs,
-    fs.readFileSync(abs, "utf8"),
+    "probe.tsx",
+    sourceText,
     ts.ScriptTarget.Latest,
     true,
     ts.ScriptKind.TSX,
@@ -71,11 +79,13 @@ export function missesHorizontalPadding(relPath: string): number {
   const visit = (n: ts.Node) => {
     if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) {
       if (n.tagName.getText() === "Button") {
-        let hasSize = false;
+        let sizeText: string | null = null;
         let classText = "";
         for (const attr of n.attributes.properties) {
           if (!ts.isJsxAttribute(attr)) continue;
-          if (attr.name.getText() === "size") hasSize = true;
+          if (attr.name.getText() === "size") {
+            sizeText = attr.initializer ? attr.initializer.getText() : "";
+          }
           if (attr.name.getText() === "className" && attr.initializer) {
             classText = attr.initializer.getText();
           }
@@ -83,7 +93,7 @@ export function missesHorizontalPadding(relPath: string): number {
         const tokens = classTokens(classText);
         if (
           tokens.includes("h-auto") &&
-          !hasSize &&
+          !sizeReplacesDefaultSlab(sizeText) &&
           !isExempt(tokens) &&
           !tokens.some((t) => HORIZONTAL.test(t))
         ) {
@@ -95,6 +105,11 @@ export function missesHorizontalPadding(relPath: string): number {
   };
   visit(sf);
   return count;
+}
+
+/** 该文件里「只写 `h-auto` 又没有横向内边距」的 `<Button>` 个数。 */
+export function missesHorizontalPadding(relPath: string): number {
+  return countInSource(fs.readFileSync(path.join(RENDERER, relPath), "utf8"));
 }
 
 /** 全仓扫一遍：新增文件里的违规也拦得住 ✓。 */
@@ -115,6 +130,42 @@ function offenders(): Set<string> {
 }
 
 describe("Button 横向虚宽守卫", () => {
+  it("正控：AST 路径本身必须抓得到违规（活文件收口后已无正例，靠内联 fixture 守）", () => {
+    // ① 原始 bug 的形状：只写 `h-auto`、没内边距、没 size ✓
+    expect(
+      countInSource(
+        `const A = () => (<Button className="text-xs h-auto hover:bg-transparent">重试</Button>);`,
+      ),
+      "① 只写 h-auto 的必须抓",
+    ).toBe(1);
+    // ② `size="default"` 等于没传 ⇒ 缺省档的 `px-4 py-2` 还在 ⇒ 同样必须抓 ✓（潜在地雷）
+    expect(
+      countInSource(
+        `const B = () => (<Button size="default" className="text-xs h-auto">重试</Button>);`,
+      ),
+      "② size=default 必须抓",
+    ).toBe(1);
+    // ③ 三种合法写法都放过：补了 `px-0` / 传了紧凑档 / 满宽且内容居中 ✓
+    expect(
+      countInSource(
+        `const C = () => (<Button className="text-xs h-auto px-0">重试</Button>);`,
+      ),
+      "③ 补了 px-0 应放过",
+    ).toBe(0);
+    expect(
+      countInSource(
+        `const D = () => (<Button size="xs" className="text-xs h-auto">重试</Button>);`,
+      ),
+      "③ 传了紧凑档应放过",
+    ).toBe(0);
+    expect(
+      countInSource(
+        `const E = () => (<Button className="w-full py-2 h-auto">确定</Button>);`,
+      ),
+      "③ 满宽 + 居中应放过",
+    ).toBe(0);
+  });
+
   it("负控：两轴都写了内边距的图标按钮不算违规（否则就是「见 h-auto 就红」的假警报）", () => {
     // `components/ScheduleToolbar.tsx` 全是 `p-1 … h-auto` 的图标按钮 ⇒ 放过 ✓。
     expect(missesHorizontalPadding("components/ScheduleToolbar.tsx")).toBe(0);
@@ -125,28 +176,18 @@ describe("Button 横向虚宽守卫", () => {
     expect(missesHorizontalPadding("components/TopUpModal.tsx")).toBe(0);
   });
 
-  it("正控：内容靠边的满宽按钮必须被抓（豁免不能放宽到「写了 w-full 就放过」）", () => {
-    // 直接锁判据本身，不依赖某个具体文件还违规 —— 活文件会随收口变绿，判据不会 ✓。
+  it("判据本身：靠边的满宽按钮不得被豁免（豁免不能放宽到「写了 w-full 就放过」）", () => {
     const t = (s: string) => s.split(/\s+/);
     expect(isExempt(t("w-full py-2 h-auto"))).toBe(true); // 满宽 + 默认居中 ⇒ 豁免 ✓
     expect(isExempt(t("flex-1 truncate text-left h-auto"))).toBe(false); // 靠边 ⇒ 不豁免 ✓
     expect(isExempt(t("w-full justify-between py-2 h-auto"))).toBe(false); // 靠边 ⇒ 不豁免 ✓
-    // 活文件证据：`justify-between` 的折叠头仍在集合内 ✓；页签补 `px-0` 后已退出 ✓。
-    expect(missesHorizontalPadding("components/ProviderGuidance.tsx")).toBe(1);
-    expect(missesHorizontalPadding("components/FilePreviewPanel.tsx")).toBe(0);
   });
 
-  it("集合只许减不许加 —— 每收口一个文件就删一条 ✓", () => {
+  it("集合为空 ⇒ 全仓再无虚宽按钮；任何新增都会当场红 ✓", () => {
     const actual = offenders();
-    // 方向一：表外不许出现新的违规（文件级，新文件同样拦得住 ✓）。
     expect(
-      [...actual].filter((f) => !COMPACT_PENDING.has(f)),
-      "新出现的虚宽按钮：请传 size，或补 px-0",
-    ).toEqual([]);
-    // 方向二：表里的文件必须真的有违规 —— 收口后忘了删条目会红 ✓（防止表变成挡箭牌）。
-    expect(
-      [...COMPACT_PENDING].filter((f) => !actual.has(f)),
-      "已收口，集合里这行该删了",
+      [...actual],
+      "新出现的虚宽按钮：请传 size（xs / iconSm），或补 px-0",
     ).toEqual([]);
   });
 });
