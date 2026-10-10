@@ -1157,6 +1157,7 @@
     "elapsedRunning": "已运行 {{time}}",
     "elapsedDone": "本轮耗时 {{time}}",
     "voiceStart": "语音输入",
+    "voiceBusyElsewhere": "另一处正在录音",
     "voiceStartWithShortcut": "语音输入 · 按住 {{keys}}",
     "voiceHoldKeyAltRightMac": "右 Option",
     "voiceHoldKeyAltRightWin": "右 Alt",

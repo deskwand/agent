@@ -572,6 +572,16 @@ interface AppState {
    */
   voiceModeOpen: boolean;
   voiceModeSessionId: string | null;
+  /**
+   * 正在用麦克风的那一路；`null` = 没有录音。
+   *
+   * 全应用同一时刻只允许一个占用者：卡片的字段麦克风（`ask-user:<toolCallId>:…`）
+   * 与底部聊天框（`chat-input`）靠它互相让路 —— `useVoiceInput` 没有跨实例总线，
+   * 两路一起跑就是两路 getUserMedia 抢同一支麦克风。规则见
+   * `src/renderer/utils/voice/voice-owner.ts`。
+   */
+  voiceInputOwner: string | null;
+  setVoiceInputOwner: (owner: string | null) => void;
   /** 最小化到悬浮小球：运行时仍在，只是不占满屏。 */
   voiceModeMinimized: boolean;
   setVoiceModeMinimized: (minimized: boolean) => void;
@@ -741,6 +751,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   voiceModeSessionId: null,
   voiceModeMinimized: false,
   voiceModeMuted: false,
+  voiceInputOwner: null,
   voiceMiniCaption: null,
   voiceMiniState: null,
   readAloud: {
@@ -1988,6 +1999,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setVoiceModeMinimized: (minimized) => set({ voiceModeMinimized: minimized }),
   setVoiceModeMuted: (muted) => set({ voiceModeMuted: muted }),
+  setVoiceInputOwner: (owner) => set({ voiceInputOwner: owner }),
   setVoiceMiniCaption: (caption) => set({ voiceMiniCaption: caption }),
   setVoiceMiniState: (state) => set({ voiceMiniState: state }),
 

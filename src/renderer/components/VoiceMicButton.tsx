@@ -29,6 +29,14 @@ export interface VoiceMicButtonProps {
    */
   polishing?: boolean;
   /**
+   * 另一处在录音（全局互斥）。
+   *
+   * true = 整粒禁用，气泡与可访问名改报「另一处正在录音」。可选：既有几个替身只填了
+   * 录音那几项，不该为一个新状态去改它们；真正要守的是**接线**漏传 —— 那一条由
+   * `toMicButtonProps` 的必传参数拦下。
+   */
+  blocked?: boolean;
+  /**
    * 「按住说话」的键名（已 i18n，如「右 Option」）。缺省 = 本气泡不提快捷键：
    * 引擎没启用，或用户在设置里选了「不使用快捷键」。
    */
@@ -85,6 +93,7 @@ export function VoiceMicButton({
   seconds,
   install,
   polishing,
+  blocked,
   shortcutKeys,
   onToggle,
 }: VoiceMicButtonProps) {
@@ -96,7 +105,7 @@ export function VoiceMicButton({
   const percent = install?.percent ?? 0;
   // 但收尾中也要锁住麦克风：hook 里 toggle() 只认 idle/recording，
   // 不锁的话用户会点一个没反应的按钮。下载中同理：这一次点击不该被解释成录音。
-  const micDisabled = busy || installing;
+  const micDisabled = busy || installing || blocked === true;
   const recording = status === "recording";
   /** 胶囊占那一格的两种状态：录音与收尾。收尾期间条冻住、整粒不可点。 */
   const pillVisible = recording || status === "finishing";
@@ -108,12 +117,15 @@ export function VoiceMicButton({
     !busy &&
     !installing &&
     !installFailed;
-  // 下载中 / 整理中，麦克风在忙别的事，气泡与可访问名都报那个状态。
+  // 下载中 / 被别人占着 / 整理中，麦克风在忙别的事，气泡与可访问名都报那个状态。
+  // 「被别人占着」排在整理环前面：它才是这一格现在为什么点不动。
   const activeLabel = installing
     ? t("chat.voiceInstalling", { percent })
-    : showPolishRing
-      ? t("chat.voicePolishing")
-      : null;
+    : blocked === true
+      ? t("chat.voiceBusyElsewhere")
+      : showPolishRing
+        ? t("chat.voicePolishing")
+        : null;
   // 气泡在空闲且麦克风可用时才多报一句快捷键。收尾 / 下载时那颗键按下去
   // 没反应（usePushToTalk 的 onStart 只认 idle），写了就是假的。
   const idleTooltip =
@@ -235,6 +247,8 @@ export function toMicButtonProps(
     platform: string | undefined;
     t: TFunction;
   },
+  // 同上不给默认值：漏传 = 这一格永远不进入互斥，没人会发现。
+  blocked: boolean,
 ): VoiceMicButtonProps {
   // 与 usePushToTalk 的 enabled 同源：引擎没启用时快捷键不监听，气泡也就不提它。
   // `disabled` 由 holdKeyNameKey 自己吞掉，这里不用再判一次。
@@ -252,6 +266,7 @@ export function toMicButtonProps(
     seconds: voice.seconds,
     polishing: voice.polishing,
     install,
+    blocked,
     shortcutKeys: keyNameKey ? shortcut.t(keyNameKey) : undefined,
     onToggle: voice.toggle,
   };

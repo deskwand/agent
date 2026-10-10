@@ -24,6 +24,11 @@ import { usePushToTalk } from "../hooks/usePushToTalk";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { attachmentKeySet } from "../utils/attached-files";
+import {
+  CHAT_INPUT_VOICE_OWNER,
+  isPushToTalkAllowed,
+  isVoiceHeldElsewhere,
+} from "../utils/voice/voice-owner";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import { resolveDisplayedContextUsage } from "../utils/context-usage";
 import { MessageCard } from "./MessageCard";
@@ -451,6 +456,8 @@ export function ChatView() {
 
   // --- 语音输入 ---
   const voiceEngineConfig = appConfig?.voiceEngine;
+  const voiceInputOwner = useAppStore((s) => s.voiceInputOwner);
+  const setVoiceInputOwner = useAppStore((s) => s.setVoiceInputOwner);
   const voiceNoticeSeqRef = useRef(0);
   const notify = (
     messageKey: string,
@@ -483,6 +490,36 @@ export function ChatView() {
     onError: (code) => notify(VOICE_MESSAGE_KEYS[code], "error"),
   });
 
+  // 全局互斥：本机同一时刻只允许一路录音，卡片字段的麦克风靠这个占用者让路。
+  // 占用覆盖 requesting / recording / finishing —— 收尾期间主进程会话还在、引擎还在
+  // 吐尾巴，这时放开会让别处在「上一路没结束」时开第二路。
+  const voiceHoldsMic = voice.status !== "idle";
+  useEffect(() => {
+    if (!voiceHoldsMic) return;
+    setVoiceInputOwner(CHAT_INPUT_VOICE_OWNER);
+    return () => {
+      // 只释放自己那份：清理晚到一步时别把接手的那一路的占用误删。
+      if (useAppStore.getState().voiceInputOwner === CHAT_INPUT_VOICE_OWNER) {
+        setVoiceInputOwner(null);
+      }
+    };
+  }, [voiceHoldsMic, setVoiceInputOwner]);
+
+  // 卸载即收掉。窗口切换（切 Settings / Apps / 关会话）会把 ChatView 整个卸掉，
+  // 而 `useVoiceInput` 卸载时不停采集、也不 cancel 主进程会话 —— 不收就是系统录音灯
+  // 常亮；更糟的是上面那个占用者会被清理掉，于是「麦克风空着」变成一句谎话，
+  // 别处（卡片字段）会据此合法地开第二路。
+  const voiceStatusRef = useRef(voice.status);
+  voiceStatusRef.current = voice.status;
+  const voiceCancelRef = useRef(voice.cancel);
+  voiceCancelRef.current = voice.cancel;
+  useEffect(
+    () => () => {
+      if (voiceStatusRef.current !== "idle") void voiceCancelRef.current();
+    },
+    [],
+  );
+
   // 记住这次录音是不是「按住说话」启动的。
   // 不记的话：用户点按钮开始录音后，手滑按一下右 Option 再松开，
   // onStop 只看 status === "recording"，录音会被静默停掉。
@@ -507,8 +544,10 @@ export function ChatView() {
       },
     },
     // 浮层打开时禁用按住说话：两处采集同一支麦克风会互相打架（设计 §4 互斥）。
+    // 占用者不是自己时同理 —— 卡片正在录，这一键不该抢麦。
     Boolean(voiceEngineConfig?.enabled) &&
       !voiceModeOpen &&
+      isPushToTalkAllowed(voiceInputOwner) &&
       (activeSession?.kind !== "voice" || useTextInput),
   );
 
@@ -2285,11 +2324,19 @@ export function ChatView() {
                   isExpanded={isInputExpanded}
                   onToggleExpand={() => setIsInputExpanded((v) => !v)}
                   hasInputContent={hasInputContent}
-                  voice={toMicButtonProps(voice, voiceEngine.install, {
-                    config: voiceEngineConfig,
-                    platform: window.electronAPI?.platform,
-                    t,
-                  })}
+                  voice={toMicButtonProps(
+                    voice,
+                    voiceEngine.install,
+                    {
+                      config: voiceEngineConfig,
+                      platform: window.electronAPI?.platform,
+                      t,
+                    },
+                    isVoiceHeldElsewhere(
+                      voiceInputOwner,
+                      CHAT_INPUT_VOICE_OWNER,
+                    ),
+                  )}
                 />
               }
             />

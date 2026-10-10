@@ -13,7 +13,11 @@ import type { ContentBlock, ToolUseContent, Message } from "../../types";
 import { findToolResult } from "../../utils/tool-result-summary";
 import { useAppStore } from "../../store";
 import { useIPC } from "../../hooks/useIPC";
-import { Input } from "../ui/input";
+import {
+  askUserVoiceOwnerPrefix,
+  isAskUserRecording,
+} from "../../utils/voice/voice-owner";
+import { AskUserVoiceField } from "./AskUserVoiceField";
 import { Button } from "../app-button";
 
 interface AskUserCardProps {
@@ -21,9 +25,6 @@ interface AskUserCardProps {
   allBlocks?: ContentBlock[];
   allMessages: Message[];
 }
-
-// "其他…" 与 text 题共用同一份上限，与工具侧校验保持一致。
-const ASK_USER_INPUT_MAX_LENGTH = 2000;
 
 // ⚠️ 尾部的四条重置**不是**装饰：选项按钮走 `app-button`，而它的 base 是
 // `inline-flex items-center justify-center gap-2 whitespace-nowrap` + size `h-9`（cva 默认档）。
@@ -35,8 +36,6 @@ export const OPTION_BASE =
   "w-full rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-default h-auto flex-col items-stretch gap-0 whitespace-normal";
 export const OPTION_IDLE = "border-border/40 bg-muted hover:bg-accent";
 export const OPTION_SELECTED = "border-primary bg-primary/10";
-const INPUT_BASE =
-  "w-full rounded-lg border border-border/40 bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none h-auto shadow-none";
 
 export function AskUserCard({
   block,
@@ -89,6 +88,14 @@ export function AskUserCard({
   // 展示用答案：优先 tool_result 解析结果，回退到提交快照（result 未返回期间）
   const displayAnswers = answers ?? submittedAnswers ?? undefined;
 
+  // 本卡有字段正在录音：半截转写不该被提交（与聊天框的 submitBlocked 同一语义）。
+  // 读占用者而不是让各字段往上报，省一套回调与多字段次序处理。
+  // 必须在早退之前 —— 它是 hook，不能挂在 `questions.length === 0` 那个 return 后面。
+  const selfRecording = useAppStore((s) =>
+    isAskUserRecording(s.voiceInputOwner, block.id),
+  );
+  const voiceOwnerPrefix = askUserVoiceOwnerPrefix(block.id);
+
   if (questions.length === 0) return null;
 
   const cancelled = resultBlock?.askUserStatus === "cancelled";
@@ -140,7 +147,9 @@ export function AskUserCard({
   }
 
   const canSubmit =
-    interactive && questions.every((q, i) => Boolean(questionValue(i, q)));
+    interactive &&
+    !selfRecording &&
+    questions.every((q, i) => Boolean(questionValue(i, q)));
 
   function onSubmit() {
     if (!interactive || !canSubmit) return;
@@ -193,16 +202,14 @@ export function AskUserCard({
           </span>
         </Button>
         {otherOpen[index] && (
-          <Input
-            type="text"
-            disabled={!interactive}
-            maxLength={ASK_USER_INPUT_MAX_LENGTH}
+          <AskUserVoiceField
+            ownerId={`${voiceOwnerPrefix}other:${index}`}
             value={otherText[index] ?? ""}
-            placeholder={t("tool.askUser.otherPlaceholder")}
-            onChange={(event) =>
-              setOtherText((prev) => ({ ...prev, [index]: event.target.value }))
+            onChange={(text) =>
+              setOtherText((prev) => ({ ...prev, [index]: text }))
             }
-            className={INPUT_BASE}
+            placeholder={t("tool.askUser.otherPlaceholder")}
+            interactive={interactive}
           />
         )}
       </>
@@ -214,18 +221,16 @@ export function AskUserCard({
     const options = question.options ?? [];
     if (type === "text") {
       return (
-        <Input
-          type="text"
-          disabled={!interactive}
-          maxLength={ASK_USER_INPUT_MAX_LENGTH}
+        <AskUserVoiceField
+          ownerId={`${voiceOwnerPrefix}text:${index}`}
           value={textInput[index] ?? ""}
+          onChange={(text) =>
+            setTextInput((prev) => ({ ...prev, [index]: text }))
+          }
           placeholder={
             question.placeholder || t("tool.askUser.inputPlaceholder")
           }
-          onChange={(event) =>
-            setTextInput((prev) => ({ ...prev, [index]: event.target.value }))
-          }
-          className={INPUT_BASE}
+          interactive={interactive}
         />
       );
     }

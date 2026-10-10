@@ -197,6 +197,17 @@ describe("VoiceMicButton", () => {
     expect(buttonByLabel("chat.voiceStart")!.disabled).toBe(false);
   });
 
+  it("别人在录时整粒禁用，气泡说清是另一处在录", () => {
+    const onToggle = vi.fn();
+
+    render({ blocked: true, onToggle });
+
+    expect(button().disabled).toBe(true);
+    expect(button().getAttribute("aria-label")).toBe("chat.voiceBusyElsewhere");
+    act(() => button().click());
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
   it("整理中：外圈画呼吸环、可访问名报「正在整理」，麦克风仍可点", () => {
     render({ polishing: true });
 
@@ -284,54 +295,103 @@ describe("toMicButtonProps 的快捷键条件", () => {
       autoPolish: true,
     } as const;
     expect(
-      toMicButtonProps(stubVoice, null, {
-        config,
-        platform: "darwin",
-        t: keyT,
-      }).shortcutKeys,
+      toMicButtonProps(
+        stubVoice,
+        null,
+        {
+          config,
+          platform: "darwin",
+          t: keyT,
+        },
+        false,
+      ).shortcutKeys,
     ).toBe("chat.voiceHoldKeyAltSpaceMac");
     expect(
-      toMicButtonProps(stubVoice, null, {
-        config,
-        platform: "win32",
-        t: keyT,
-      }).shortcutKeys,
+      toMicButtonProps(
+        stubVoice,
+        null,
+        {
+          config,
+          platform: "win32",
+          t: keyT,
+        },
+        false,
+      ).shortcutKeys,
     ).toBe("chat.voiceHoldKeyAltSpaceWin");
   });
 
   it("引擎关 / 快捷键 disabled / 配置未加载 → 不提快捷键", () => {
     // 这三条与 usePushToTalk 的 enabled 条件同源：写了就是骗人。
     expect(
-      toMicButtonProps(stubVoice, null, {
-        config: { enabled: false, shortcut: "AltRight", autoPolish: true },
-        platform: "darwin",
-        t: keyT,
-      }).shortcutKeys,
+      toMicButtonProps(
+        stubVoice,
+        null,
+        {
+          config: { enabled: false, shortcut: "AltRight", autoPolish: true },
+          platform: "darwin",
+          t: keyT,
+        },
+        false,
+      ).shortcutKeys,
     ).toBeUndefined();
     expect(
-      toMicButtonProps(stubVoice, null, {
-        config: { enabled: true, shortcut: "disabled", autoPolish: true },
-        platform: "darwin",
-        t: keyT,
-      }).shortcutKeys,
+      toMicButtonProps(
+        stubVoice,
+        null,
+        {
+          config: { enabled: true, shortcut: "disabled", autoPolish: true },
+          platform: "darwin",
+          t: keyT,
+        },
+        false,
+      ).shortcutKeys,
     ).toBeUndefined();
     expect(
-      toMicButtonProps(stubVoice, null, {
-        config: undefined,
-        platform: "darwin",
-        t: keyT,
-      }).shortcutKeys,
+      toMicButtonProps(
+        stubVoice,
+        null,
+        {
+          config: undefined,
+          platform: "darwin",
+          t: keyT,
+        },
+        false,
+      ).shortcutKeys,
     ).toBeUndefined();
   });
 
   it("透传 polishing", () => {
     expect(
-      toMicButtonProps({ ...stubVoice, polishing: true }, null, {
-        config: undefined,
-        platform: "darwin",
-        t: keyT,
-      }).polishing,
+      toMicButtonProps(
+        { ...stubVoice, polishing: true },
+        null,
+        {
+          config: undefined,
+          platform: "darwin",
+          t: keyT,
+        },
+        false,
+      ).polishing,
     ).toBe(true);
+  });
+
+  it("透传 blocked", () => {
+    expect(
+      toMicButtonProps(
+        stubVoice,
+        null,
+        { config: undefined, platform: "darwin", t: keyT },
+        true,
+      ).blocked,
+    ).toBe(true);
+    expect(
+      toMicButtonProps(
+        stubVoice,
+        null,
+        { config: undefined, platform: "darwin", t: keyT },
+        false,
+      ).blocked,
+    ).toBe(false);
   });
 });
 

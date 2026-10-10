@@ -1158,6 +1158,7 @@
     "elapsedRunning": "running {{time}}",
     "elapsedDone": "took {{time}}",
     "voiceStart": "Voice input",
+    "voiceBusyElsewhere": "Recording elsewhere",
     "voiceStartWithShortcut": "Voice input · Hold {{keys}}",
     "voiceHoldKeyAltRightMac": "Right Option",
     "voiceHoldKeyAltRightWin": "Right Alt",
