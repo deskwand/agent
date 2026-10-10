@@ -25,11 +25,16 @@ interface AskUserCardProps {
 // "其他…" 与 text 题共用同一份上限，与工具侧校验保持一致。
 const ASK_USER_INPUT_MAX_LENGTH = 2000;
 
-const OPTION_BASE =
-  "w-full rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-default";
-const OPTION_IDLE =
-  "border-border/40 bg-muted hover:bg-accent";
-const OPTION_SELECTED = "border-primary bg-primary/10";
+// ⚠️ 尾部的四条重置**不是**装饰：选项按钮走 `app-button`，而它的 base 是
+// `inline-flex items-center justify-center gap-2 whitespace-nowrap` + size `h-9`（cva 默认档）。
+// 选项内容是「标题 span + 描述 span」两段文字，落在那套 base 里会变成
+// **一行不换行的 flex 行**塞进 **固定 36px 高**的盒子 ⇒ 描述横向溢出、被卡片的
+// `overflow-hidden` 裁掉（用户截图：推荐项描述停在「这块是唯…」）。原生 `<button>` 时代
+// 描述在标题下一行、盒子随内容长高（实测 57px），这四条把该行为还原回来。
+export const OPTION_BASE =
+  "w-full rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-default h-auto flex-col items-stretch gap-0 whitespace-normal";
+export const OPTION_IDLE = "border-border/40 bg-muted hover:bg-accent";
+export const OPTION_SELECTED = "border-primary bg-primary/10";
 const INPUT_BASE =
   "w-full rounded-lg border border-border/40 bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none h-auto shadow-none";
 
