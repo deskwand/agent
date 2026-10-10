@@ -1731,7 +1731,7 @@ describe("Sidebar project groups", () => {
 
     const header = projectHeader("/work/pinned")!;
     const pin = pinButtonWithin(header);
-    // 常显的 pin 必须是尾部动作里的最后一个：hover 才出现的「新建 / 删除」
+    // pin 必须是尾部动作里的最后一个：同样只在 hover / 聚焦时浮出的「新建 / 删除」
     // 只能落在它左边，否则 pin 的图标中心会停在这一行的中段，
     // 和会话行的相对时间 / 状态点错开两列。
     const trailing = Array.from(header.querySelectorAll("button[aria-label]"));
@@ -1743,35 +1743,44 @@ describe("Sidebar project groups", () => {
     expect(header.className).toContain("pr-0.5");
   });
 
-  it("gives the pinned marker and the relative time the same rail cell", async () => {
+  it("置顶的会话不再用 pin 顶替相对时间", async () => {
     localStorage.setItem(
       "deskwand.sidebarPins",
       JSON.stringify({ sessionIds: ["ordinary"], projectKeys: [] }),
     );
-    await render([session("ordinary")]);
+    await render([
+      session("ordinary", { updatedAt: 10 }),
+      session("plain", { updatedAt: 10 }),
+    ]);
 
-    const rail = findSessionRail("ordinary");
-    expect(rail).toBeTruthy();
-    const visible = rail!.firstElementChild as HTMLElement;
-    // 一个格子只放一个标记：pin 顶替相对时间，不再各占一列。
-    expect(visible.children).toHaveLength(1);
-    // `justify-end` 是这条右边线的机制本身：掉了它，标记会退回 72px 槽的
-    // 最左边（改动前的样子）。jsdom 量不了布局，只能锁类名。
-    expect(visible.className).toContain("justify-end");
-    const marker = visible.firstElementChild as HTMLElement;
-    // 钉住的行不再有时间文本，标记要对读屏有可说出来的状态。
-    expect(marker.getAttribute("role")).toBe("img");
-    expect(marker.getAttribute("aria-label")).toBe(i18n.t("sidebar.pinned"));
-    expect(marker.querySelector("svg")).toBeTruthy();
-    expect(marker.className).toContain("h-4");
-    expect(marker.className).toContain("w-4");
+    const railCell = (sessionId: string): HTMLElement => {
+      const rail = findSessionRail(sessionId);
+      expect(rail, sessionId).toBeTruthy();
+      const visible = rail!.firstElementChild as HTMLElement;
+      // 一个格子只放一个标记：尾槽里不会出现 pin 和时间并排
+      expect(visible.children, sessionId).toHaveLength(1);
+      // `justify-end` 是这条右边线的机制本身：掉了它，标记会退回 72px 槽的
+      // 最左边（改动前的样子）。jsdom 量不了布局，只能锁类名。
+      expect(visible.className, sessionId).toContain("justify-end");
+      return visible.firstElementChild as HTMLElement;
+    };
+
+    // 置顶不再占这一格：置顶行的尾槽和普通行一样，都是相对时间
+    const pinnedCell = railCell("ordinary");
+    const pinnedText = pinnedCell.textContent?.trim() ?? "";
+    expect(pinnedText).not.toBe("");
+    expect(pinnedText).toBe(railCell("plain").textContent?.trim());
+    expect(pinnedCell.querySelector("svg")).toBeNull();
+    // 看得见的标记没了，但状态没丢：读屏仍能听到「已置顶」（`sr-only` 那句）
+    expect(sessionRow("ordinary").textContent).toContain(
+      i18n.t("sidebar.pinned"),
+    );
+    expect(sessionRow("plain").textContent).not.toContain(
+      i18n.t("sidebar.pinned"),
+    );
   });
 
-  it("prefers the running dot over the pin in that rail cell", async () => {
-    localStorage.setItem(
-      "deskwand.sidebarPins",
-      JSON.stringify({ sessionIds: ["running"], projectKeys: [] }),
-    );
+  it("运行中的状态点仍顶替相对时间", async () => {
     await render([session("running", { status: "running" })]);
 
     const rail = findSessionRail("running");
@@ -1785,22 +1794,13 @@ describe("Sidebar project groups", () => {
 
   it("尾槽每个标记的右缘都落在相对时间那条线上", async () => {
     // 尾槽只在**右缘**上对齐：基准线是相对时间的右缘（= 行右缘内缩 10px，即 `px-2.5` 的
-    // 内容盒边缘 ✓）。两处会自己掉进去的内缩：16px 标记格居中放 10px 状态点 / 12px pin
-    // ⇒ 墨迹各缩 3px / 2px ✗；24px 动作槽（`size="iconXs"`）里装 16px 图标 ⇒ 缩 4px ✗。
+    // 内容盒边缘 ✓）。两处会自己掉进去的内缩：16px 标记格居中放 10px 状态点
+    // ⇒ 墨迹缩 3px ✗；24px 动作槽（`size="iconXs"`）里装 16px 图标 ⇒ 缩 4px ✗。
     // 修法就是各交回那条线（`justify-end` / `-mr-1`）；jsdom 量不了距离，只能锁类名 ✓。
-    localStorage.setItem(
-      "deskwand.sidebarPins",
-      JSON.stringify({ sessionIds: ["pinned"], projectKeys: [] }),
-    );
     await render([
       session("running", { title: "Running chat", status: "running" }),
       session("meta-project", {
         title: "Project chat",
-        isProjectMode: true,
-        cwd: "/work/rail",
-      }),
-      session("pinned", {
-        title: "Pinned chat",
         isProjectMode: true,
         cwd: "/work/rail",
       }),
@@ -1816,13 +1816,11 @@ describe("Sidebar project groups", () => {
       expect(visible.children, sessionId).toHaveLength(1);
       return visible.firstElementChild as HTMLElement;
     };
-    // 状态点 / pin 的 16px 标记格右对齐；掉成 `justify-center` 就又退回 3px / 2px 的内缩 ✗
-    for (const sessionId of ["running", "pinned"]) {
-      const cell = cellOf(sessionId);
-      expect(cell.className, sessionId).toContain("h-4");
-      expect(cell.className, sessionId).toContain("w-4");
-      expect(cell.className, sessionId).toContain("justify-end");
-    }
+    // 状态点的 16px 标记格右对齐；掉成 `justify-center` 就又退回 3px 的内缩 ✗
+    const dotCell = cellOf("running");
+    expect(dotCell.className).toContain("h-4");
+    expect(dotCell.className).toContain("w-4");
+    expect(dotCell.className).toContain("justify-end");
     // 动作行整体右移 4px：图标右缘才回到基准线（掉 `-mr-1` 就又缩回 4px ✗）
     const actionRow = findActionRow(sessionMoreButton("bulk-0"));
     expect(actionRow?.className).toContain("justify-end");
@@ -1866,6 +1864,87 @@ describe("Sidebar project groups", () => {
       expect(tokens, label).not.toContain("px-4");
       expect(tokens, label).not.toContain("py-2");
     }
+  });
+
+  it("项目行的 pin 不再常显：hover / 行内聚焦才浮出，置顶靠顺序标记", async () => {
+    localStorage.setItem(
+      "deskwand.sidebarPins",
+      JSON.stringify({ sessionIds: [], projectKeys: ["/work/pinned"] }),
+    );
+    await render([
+      session("pinned-project", {
+        isProjectMode: true,
+        cwd: "/work/pinned",
+        createdAt: 10,
+      }),
+    ]);
+
+    const pin = pinButtonWithin(projectHeader("/work/pinned")!);
+    // 置顶状态不再有常驻标记：静止时它和「新建 / 删除」一样是藏着的。
+    // 逐 token 比对：`toContain("opacity-100")` 会被 `group-hover/project:opacity-100`
+    // 这类带前缀的 token 骗过，所以先 split 再比。
+    const tokens = pin.className.split(/\s+/);
+    expect(tokens).toContain("opacity-0");
+    expect(tokens).toContain("pointer-events-none");
+    expect(tokens).not.toContain("opacity-100");
+    // 浮出的两条路径：鼠标 hover ✓，键盘把焦点落进行内 ✓ —— `opacity-0` 连焦点环
+    // 一起吃掉，少了 focus-within 这条，键盘用户就撞在一个看不见的按钮上。
+    expect(tokens).toContain("group-hover/project:opacity-100");
+    expect(tokens).toContain("group-focus-within/project:opacity-100");
+    // 藏起来的是标记，不是能力：已置顶时仍是「取消置顶」，实心图标保留。
+    expect(pin.getAttribute("aria-label")).toBe(i18n.t("sidebar.unpin"));
+    expect(pin.querySelector("svg")?.getAttribute("class")).toContain(
+      "fill-current",
+    );
+  });
+
+  it("后置顶的项目排到最上面（新置顶进数组头）", async () => {
+    await render([
+      session("old", { isProjectMode: true, cwd: "/work/old", createdAt: 10 }),
+      session("new", { isProjectMode: true, cwd: "/work/new", createdAt: 20 }),
+    ]);
+    const projectOrder = (): string[] =>
+      Array.from(container.querySelectorAll("[title]"))
+        .map((element) => element.getAttribute("title") ?? "")
+        .filter((cwd) => cwd === "/work/old" || cwd === "/work/new");
+    // 未置顶时按最早创建时间倒序：新的在前
+    expect(projectOrder()).toEqual(["/work/new", "/work/old"]);
+
+    await act(async () => pinButtonWithin(projectHeader("/work/old")!).click());
+    // 置顶区按在未置顶区前面，所以 old 上来
+    expect(projectOrder()).toEqual(["/work/old", "/work/new"]);
+    // 后置顶的进数组头 = 排在先置顶的那颗前面
+    await act(async () => pinButtonWithin(projectHeader("/work/new")!).click());
+    expect(projectOrder()).toEqual(["/work/new", "/work/old"]);
+    expect(
+      JSON.parse(localStorage.getItem("deskwand.sidebarPins") ?? "{}"),
+    ).toEqual({ sessionIds: [], projectKeys: ["/work/new", "/work/old"] });
+  });
+
+  it("后置顶的会话也排到最上面（同一套排序规则）", async () => {
+    await render([
+      session("newer", { title: "Newer", updatedAt: 20 }),
+      session("older", { title: "Older", updatedAt: 10 }),
+    ]);
+    const sessionOrder = (): string[] =>
+      Array.from(container.querySelectorAll("[data-session-id]")).map(
+        (element) => element.getAttribute("data-session-id") ?? "",
+      );
+    expect(sessionOrder()).toEqual(["newer", "older"]);
+
+    await openSessionMenu("older");
+    await act(async () => menuAction(i18n.t("sidebar.pin")).click());
+    await flush();
+    expect(sessionOrder()).toEqual(["older", "newer"]);
+
+    // 会话置顶与项目置顶共用 `toggleOrderedId`：后置顶的同样进数组头
+    await openSessionMenu("newer");
+    await act(async () => menuAction(i18n.t("sidebar.pin")).click());
+    await flush();
+    expect(sessionOrder()).toEqual(["newer", "older"]);
+    expect(
+      JSON.parse(localStorage.getItem("deskwand.sidebarPins") ?? "{}"),
+    ).toEqual({ sessionIds: ["newer", "older"], projectKeys: [] });
   });
 });
 

@@ -823,12 +823,16 @@ export function Sidebar({
                 {highlightTitle(session.title, normalizedQuery)}
               </div>
             )}
+            {/* 置顶不再有看得见的标记（和项目行一致），但状态不能只剩「排在最前面」
+                这一条线索 ⇒ 给读屏留一句（`sr-only` 不占位，视觉上依旧什么都没有）✓。 */}
+            {isPinned && <span className="sr-only">{t("sidebar.pinned")}</span>}
             {showRelativeTime && (
               <div className="ml-auto h-6 w-[4.5rem] flex-shrink-0 relative">
                 {/* 尾槽只有一条基准线：相对时间文字的右缘（= 行右缘内缩 10px）✓。
-                    标记格是 16px 宽的盒子，若把 10px 状态点 / 12px pin **居中**，它们的
-                    墨迹会自己内缩 3px / 2px ⇒ 和上下行的时间错开 ✗（2026-10-11 报障图里
-                    那列点比时间靠左就是这么来的 ✓）⇒ `justify-end` 把盒子的右缘交回那条线 ✓。 */}
+                    标记格是 16px 宽的盒子，若把 10px 状态点 **居中**，它的墨迹会自己
+                    内缩 3px ⇒ 和上下行的时间错开 ✗（2026-10-11 报障图里那列点比时间
+                    靠左就是这么来的 ✓）⇒ `justify-end` 把盒子的右缘交回那条线 ✓。
+                    置顶不再占这一格（和项目行一致）：置顶的会话照常显示相对时间 ✓。 */}
                 <div
                   className={`absolute inset-0 flex items-center justify-end transition-opacity ${
                     showSessionActions
@@ -854,17 +858,6 @@ export function Sidebar({
                       ) : (
                         <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
                       )}
-                    </span>
-                  ) : isPinned ? (
-                    <span
-                      className="h-4 w-4 flex items-center justify-end"
-                      role="img"
-                      aria-label={t("sidebar.pinned")}
-                    >
-                      <Pin
-                        aria-hidden="true"
-                        className="h-3 w-3 fill-current text-primary-text"
-                      />
                     </span>
                   ) : (
                     <span className="text-sm leading-5 text-muted-foreground whitespace-nowrap">
@@ -1285,7 +1278,7 @@ export function Sidebar({
                             <section key={group.key} className="pt-1.5">
                               {/* pr-0.5：会话行尾部那个 16px 图标格的中心距行右缘 18px，
                                   而 32px 按钮的图标中心距右缘 16px；尾部动作整体内缩 2px，
-                                  常显的 pin 才和会话行的时间 / 状态点落在同一条竖线上。 */}
+                                  hover / 聚焦时浮出的 pin 才和会话行的时间 / 状态点落在同一条竖线上。 */}
                               <div
                                 className="group/project flex items-center justify-between pr-0.5"
                                 title={group.cwd}
@@ -1366,9 +1359,11 @@ export function Sidebar({
                                     {t("common.delete")}
                                   </TooltipContent>
                                 </Tooltip>
-                                {/* 钉住的 pin 常显，放最后一个：它的图标中心与
-                                    会话行的状态点/时间同一条右边线，hover 才出现
-                                    的新建/删除从它左边展开，pin 自己不会挪位。 */}
+                                {/* pin 放最后一个、静止时和「新建 / 删除」一样藏着：hover
+                                    浮出，另外多一条 focus-within，键盘 Tab 进来时才看得见它
+                                    （`opacity-0` 会把焦点环一起吃成透明）。图标中心与会话行的
+                                    状态点/时间同一条右边线，新建/删除从它左边展开，pin 自己
+                                    不会挪位。置顶不再常显 —— 排在置顶区首位本身就是标记。 */}
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Button variant="ghost"
@@ -1376,10 +1371,10 @@ export function Sidebar({
                                       onClick={(event) =>
                                         handleToggleProjectPin(event, group.key)
                                       }
-                                      className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center ${
+                                      className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto group-focus-within/project:opacity-100 hover:bg-primary/10 ${
                                         isProjectPinned
-                                          ? "opacity-100 text-primary-text hover:bg-primary/10"
-                                          : "opacity-0 pointer-events-none text-muted-foreground hover:bg-primary/10 hover:text-primary-text group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                          ? "text-primary-text"
+                                          : "text-muted-foreground hover:text-primary-text"
                                       }`}
                                       aria-label={t(
                                         isProjectPinned
@@ -1572,8 +1567,9 @@ function saveGroupExpansion(state: Map<string, boolean>): void {
   }
 }
 
+/** 新置顶的插进数组头：排序侧按下标升序（`buildRankMap`），头就是置顶区首位。 */
 function toggleOrderedId(ids: string[], id: string): string[] {
-  return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
+  return ids.includes(id) ? ids.filter((item) => item !== id) : [id, ...ids];
 }
 
 function getWorkspaceName(cwd: string): string {
