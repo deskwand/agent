@@ -60,8 +60,9 @@ export function GlobalNoticeToast({ notice, onDismiss, onAction }: Props) {
           </div>
           <Button variant="ghost"
             type="button"
+            size="iconSm"
             onClick={onDismiss}
-            className="text-muted-foreground hover:text-foreground transition-colors h-auto"
+            className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />

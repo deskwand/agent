@@ -194,4 +194,40 @@ describe("MessageCard action bar", () => {
     );
     expect(container.querySelector('[title="button.primary"]')).toBeNull();
   });
+
+  it("元数据行的图标按钮走 `iconSm`：28×28，不再是围着 16px 图标的 48×32 方块", () => {
+    // 2026-10-10 用户报障「元数据的这个框太大了」：缺省档 `h-9 px-4 py-2` + 调用点只写 `h-auto`
+    // ⇒ hover 方块 = 图标 16px + base 内边距 px-4(32) × py-2(16) = 48×32（Chromium 实测 ✓）。
+    // 28×28 是**有意**的：与仓库既有的图标键（`BrowserPanel` / `TitlebarButton` / `ReviewPanel`
+    // 都写 `w-7 h-7`）同尺寸 ✓。jsdom 没有布局 ⇒ 只能锁「缺省档三件套不在 class 里」✓
+    //（从 48×32 到 28×28 的对照见 `app-button.tsx` 紧凑档的说明 ✓）。
+    renderCard(makeMessage(), true, vi.fn());
+    for (const selector of [
+      '[data-testid="read-aloud-button"]',
+      '[aria-label="Copy message"]',
+      '[aria-label="Fork from here"]',
+    ]) {
+      const el = container.querySelector(selector);
+      expect(el, selector).not.toBeNull();
+      const tokens = (el as HTMLElement).className.split(/\s+/);
+      expect(tokens, selector).toContain("h-7");
+      expect(tokens, selector).toContain("w-7");
+      // ⚠️ `justify-center` 必须在场、`justify-start` 必须不在：这四个键写了 `flex`、
+      // `app-button` 的 `shouldLeftAlign()` 会因此注入 `justify-start` ⇒ 图标贴左（实测左 0 / 右 12 ✓）。
+      expect(tokens, `${selector} 必须显式居中`).toContain("justify-center");
+      expect(tokens, `${selector} 不能再被注成靠左`).not.toContain(
+        "justify-start",
+      );
+      // 这排只要颜色反馈、不要灰底（2026-10-10 用户：图标带底色看着重 ✓）。
+      expect(tokens, `${selector} 不该带 hover 底色`).toContain(
+        "hover:bg-transparent",
+      );
+      expect(tokens, `${selector} 不该带 hover 底色`).not.toContain(
+        "hover:bg-accent",
+      );
+      for (const slab of ["h-9", "px-4", "py-2", "h-auto"]) {
+        expect(tokens, `${selector} 不该再出现 ${slab}`).not.toContain(slab);
+      }
+    }
+  });
 });

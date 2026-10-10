@@ -388,21 +388,34 @@ export const MessageCard = memo(function MessageCard({
   const renderActionBar = (extraClass?: string) => {
     const showFork = canFork && onForkMessage;
     if (!showActions && !showFork) return null;
+    // ⚠️ 图标按钮一律走 `iconSm`（28×28，与 `BrowserPanel` / `TitlebarButton` 的 `w-7 h-7` 同尺寸 ✓）
+    // —— 缺省档是 `h-9 px-4 py-2`，而这四处原先只写 `h-auto`：高度归了内容、**内边距仍是 base 的
+    // 16/8** ⇒ 16px 图标被撑成 **48×32 的方块**（2026-10-10 用户报障「元数据的这个框太大了」✓；
+    // Chromium 量测见 `app-button.tsx` 紧凑档说明 ✓）。
+    // ⚠️ 图标上写的 `w-3 h-3` 是**死代码** ✗：base 的 `[&_svg]:size-4`（特异性 0,1,1）稳压它，
+    // 而且调用点再写 `[&_svg]:size-3` 也赢不了（2026-10-10 实测 ✓）⇒ 实际渲染 16px ✓，28×28 盒
+    // 子里的视觉留白是 6px，**别照 `w-3` 去推算** ✗✓。
+    // ⚠️ `justify-center` **必须显式写** ✗✗：写了 `flex` 又没写 `justify-*` 时，`app-button` 的
+    // `shouldLeftAlign()` 会注入 `justify-start`（它的判据是「原生 `<button class="flex">` 本来就居左」）
+    // ⇒ 图标会贴着左边（2026-10-10 实测：左 0 / 右 12；显式 `justify-center` 后 6 / 6 ✓）。
+    // ⚠️ `hover:bg-transparent` 也是**有意**的：这排只要颜色反馈、不要灰底（`cn` 合并后 ghost 的
+    // `hover:bg-accent` 会被删掉 ✓；2026-10-10 用户：图标带底色看着重）。
     return (
       <div
-        className={`flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-200 scale-90 group-hover:scale-100${extraClass ? ` ${extraClass}` : ""}`}
+        className={`flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-200 scale-90 group-hover:scale-100${extraClass ? ` ${extraClass}` : ""}`}
       >
         {showActions ? (
           <>
-            <span className="text-xs text-muted-foreground select-none">
+            <span className="mr-1 text-xs text-muted-foreground select-none">
               {timestampLabel}
             </span>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost"
+                  size="iconSm"
                   onClick={handleCopy}
                   aria-label={t("messageCard.copyMessage")}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors h-auto"
+                  className="flex items-center justify-center hover:bg-transparent text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {copied ? (
                     <Check className="w-3 h-3 text-success" />
@@ -424,6 +437,7 @@ export const MessageCard = memo(function MessageCard({
                   <TooltipTrigger asChild>
                     <Button variant="ghost"
                       type="button"
+                      size="iconSm"
                       data-testid="read-aloud-button"
                       disabled={
                         voiceRuntimeActive || (!readingThis && !speechAvailable)
@@ -437,7 +451,7 @@ export const MessageCard = memo(function MessageCard({
                           reader.start(message.id, bodyRef.current);
                         }
                       }}
-                      className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 h-auto"
+                      className="flex items-center justify-center hover:bg-transparent text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
                     >
                       {readingThis &&
                       (reader.status === "playing" ||
@@ -468,10 +482,11 @@ export const MessageCard = memo(function MessageCard({
                   <>
                     <Button variant="ghost"
                       type="button"
+                      size="iconSm"
                       data-testid="stop-reading-button"
                       aria-label={t("messageCard.stopReading")}
                       onClick={() => reader.stop()}
-                      className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground h-auto"
+                      className="flex items-center justify-center hover:bg-transparent text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <Square className="w-3 h-3" />
                     </Button>
@@ -499,9 +514,10 @@ export const MessageCard = memo(function MessageCard({
             <TooltipTrigger asChild>
               <Button variant="ghost"
                 type="button"
+                size="iconSm"
                 onClick={() => onForkMessage(message)}
                 aria-label={t("messageCard.forkMessage")}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors h-auto"
+                className="flex items-center justify-center hover:bg-transparent text-muted-foreground hover:text-foreground transition-colors"
               >
                 <GitBranch className="w-3 h-3" />
               </Button>

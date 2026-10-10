@@ -53,6 +53,25 @@ const appButtonVariants = cva(
         sm: "h-8 rounded-md px-3 text-xs",
         lg: "h-10 rounded-md px-8",
         icon: "h-9 w-9",
+        // ⚠️ 与 vendored 相比的**又一处有意差异**：**只有 app 层有**的紧凑两档 ✓✓ —— 2026-10-10
+        // 用户报障「元数据行那个框太大」的收口处 ✓（登记：`app-button.test.tsx` 的紧凑档用例 ✓）。
+        //
+        // 为什么非要开档位：缺省档是 `h-9 px-4 py-2` ✓，而**只写 `h-auto` 只能顶掉高度** ✗
+        // ⇒ 那几处合并后仍是 `px-4 py-2 h-auto`，16px 图标被 16/8 的内边距撑成 **48×32 的方块** ✓
+        //（2026-10-10 用 `dist` 里的真 CSS 在 Chromium 量过 ✓：旧写法 48×32 / `iconSm` 28×28 ✓）。
+        // 调用点自己写 `h-7 w-7` 同样能修（`cn` = clsx + tailwind-merge 的替代品，同族类
+        // **后来者胜** ✓），但那要在几十处各重复一串类、还没名字 ⇒ 收进档位一处定义 ✓✓。
+        //
+        // ⚠️ `iconSm` 的 28×28 是**有意对齐**仓库既有的图标键 —— `BrowserPanel`（6 个）、
+        // `TitlebarButton`、`ReviewPanel`（2 个）都就地写 `w-7 h-7` 且装 16px 图标
+        //（`w-4 h-4` / base 的 `[&_svg]:size-4` ✓）⇒ 这个档位只是给既有约定一个名字，**不是新尺寸** ✓。
+        //
+        // ⇒ 凡「按钮看着比内容大一圈」的一律用这两档 ✓。两档都**不用**写 `p-0`：`cn` 会把 base
+        // 那档的 `px-4 py-2` 当作冲突类删掉 ✓（实测 `h-9 px-4 py-2` + `h-7 w-7` ⇒ 只剩 `h-7 w-7` ✓）。
+        // ⚠️ `xs` 带 `text-xs` ⇒ 会顶掉缺省档的 `text-sm`；想保留 14px 就在调用点写 `text-sm`
+        //（调用点排在最后、**后来者胜** ✓，`SubagentSettings` 就是这么干的 ✓）。
+        xs: "h-6 rounded-md px-1.5 text-xs",
+        iconSm: "h-7 w-7 rounded-md",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

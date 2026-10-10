@@ -23,6 +23,10 @@ describe("app-button 包装层", () => {
   it("真正的 flex 容器才拿到 justify-start", () => {
     expect(shouldLeftAlign("flex w-full items-center gap-2")).toBe(true);
     expect(shouldLeftAlign("inline-flex items-center")).toBe(true);
+    // ⚠️ 没写 `flex` 的调用点**不会**被注入 ✓ —— 消息区图标按钮就靠这一条：它们只要颜色类，
+    // 居中由 base 的 `justify-center` 负责（2026-10-10：写了 `flex` 的那几个被注成靠左，实测
+    // 图标左 0 / 右 12 ✗；显式 `justify-center` 后 6 / 6 ✓）。
+    expect(shouldLeftAlign("text-muted-foreground hover:text-foreground transition-colors")).toBe(false);
   });
 
   it("⚠️ flex-1 / flex-shrink-0 是 flex 子项，不是容器 —— 绝不能注入", () => {
@@ -78,5 +82,35 @@ describe("app-button 包装层", () => {
         }
       }
     }
+  });
+
+  it("app 层独有的紧凑两档 xs / iconSm —— 默认档的垫子一个都不许留", () => {
+    // ⚠️ 这两档**只有 app 层有** ✓（vendored 的表里没有）⇒ 本用例**能编译**本身即一道锁 ✓：
+    // 谁把 `xs` / `iconSm` 从 `app-button.tsx` 删掉，这里立刻 TS 报错 ✓✓；
+    // 而 `buttonVariants({ variant: "ghost", size: "iconSm" })` 会**编译失败** ✓ —— 差异是单向的 ✓。
+    // 2026-10-10 用户报障「元数据的这个框太大了」的由来：缺省档 `h-9 px-4 py-2` 一直在场，而那几处
+    // 只写了 `h-auto`（只顶掉高度 ✗）⇒ 16px 图标被 16/8 的内边距撑成 48×32 ✓（Chromium 实测 ✓）。
+    const tokensOf = (size: "xs" | "iconSm") =>
+      appButtonVariants({ variant: "ghost", size }).split(/\s+/);
+    const xs = tokensOf("xs");
+    const iconSm = tokensOf("iconSm");
+    for (const [name, tokens] of [
+      ["xs", xs],
+      ["iconSm", iconSm],
+    ] as const) {
+      for (const slab of ["h-9", "px-4", "py-2", "h-auto"]) {
+        expect(tokens, `${name} 不该带默认档的 ${slab}`).not.toContain(slab);
+      }
+    }
+    // 尺寸：带字那档 24px 高；图标那档 28×28 —— 与仓库既有的 `w-7 h-7` 图标键（`BrowserPanel` /
+    // `TitlebarButton` / `ReviewPanel`）**同尺寸** ✓，这档位只是给那个既有约定一个名字 ✓。
+    expect(xs, "xs 应该是 24px 高").toContain("h-6");
+    expect(xs, "带字的档不该定宽（靠内容撑宽）").not.toContain("w-6");
+    expect(iconSm, "iconSm 应该是 28px 高").toContain("h-7");
+    expect(iconSm, "纯图标那档必须同时定宽 —— 缺省档本身没有 w-*").toContain("w-7");
+    // `xs` 带 `text-xs` ⇒ 顶掉 base 的 `text-sm` ✓（`cn` 合并同类、后来者胜 ✓）；
+    // 图标那档不带字号，避免把调用点的文字改小 ✓。
+    expect(xs).toContain("text-xs");
+    expect(iconSm).not.toContain("text-xs");
   });
 });

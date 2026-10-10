@@ -297,7 +297,10 @@ export function SubagentSettings() {
       {/* 新增 Agent */}
       <Button variant="ghost"
         type="button"
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-muted-foreground h-auto"
+        size="xs"
+        // ⚠️ `text-sm` 是**有意**的：`xs` 档自带 `text-xs`，而这行要保留原本的 14px 字号 ——
+        // 调用点排在最后、`cn` 合并后只剩 `text-sm` ✓（档位只管几何，字号由调用点定 ✓）。
+        className="flex items-center text-sm text-muted-foreground hover:text-muted-foreground"
         onClick={() => setShowNewModal(true)}
       >
         <Plus size={14} />

@@ -555,8 +555,9 @@ function TimePicker({
               {t}
               <Button variant="ghost"
                 type="button"
+                size="iconSm"
                 onClick={() => remove(t)}
-                className="hover:text-destructive transition-colors leading-none h-auto"
+                className="hover:text-destructive transition-colors leading-none"
               >
                 ×
               </Button>
