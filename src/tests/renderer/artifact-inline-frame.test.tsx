@@ -69,6 +69,37 @@ describe("ArtifactInlineFrame", () => {
     expect(getRenderUrl).not.toHaveBeenCalled();
   });
 
+  it("展开态的折叠头按钮不吃 base 的 px-4，且高度不变", async () => {
+    // 2026-10-10：这类按钮原先只写 `h-auto` ⇒ `cn` 合并后 base 的 `px-4` 留下 ⇒ 左右各 16px
+    // 虚宽（Chromium 实测：80×32）✓。修法是补 `px-0`、**不动** `py` ⇒ 行高与点击目标不变 ✓。
+    // ⚠️ 折叠态（`expanded={false}`）走的是另一个按钮（`w-full` 的折叠条，自带 `px-2 py-1.5`
+    // ⇒ 本来就不在收口范围 ✓）⇒ 本用例必须渲染展开态 ✓。
+    // jsdom 量不到像素 ⇒ 锁类名 ✓（全仓同类守卫见 `button-compact-guard.test.ts` ✓）。
+    getRenderUrl.mockResolvedValue(
+      "deskwand-artifact://local/root/sig/report.html",
+    );
+    await act(async () => {
+      root.render(
+        <ArtifactInlineFrame
+          artifact={ARTIFACT}
+          expanded={true}
+          onToggle={() => {}}
+        />,
+      );
+      await Promise.resolve();
+    });
+    const head = container.querySelector(
+      '[data-testid="artifact-inline-toggle"]',
+    );
+    expect(head).not.toBeNull();
+    const tokens = (head as HTMLElement).className.split(/\s+/);
+    expect(tokens).toContain("px-0");
+    expect(tokens).not.toContain("px-4");
+    // 高度必须保持 ⇒ 不能用 `p-0`（那会连带把 `py-2` 收掉，行变矮 ✗）。
+    expect(tokens).not.toContain("p-0");
+    expect(tokens).toContain("h-auto");
+  });
+
   it("renders a sandboxed iframe when expanded", async () => {
     getRenderUrl.mockResolvedValue(
       "deskwand-artifact://local/root/sig/report.html",

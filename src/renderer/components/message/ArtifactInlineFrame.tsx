@@ -111,8 +111,9 @@ export function ArtifactInlineFrame({
       <div className="flex min-h-9 items-center gap-2 border-b border-border bg-muted px-2 py-1.5">
         <Button variant="ghost"
           type="button"
+          data-testid="artifact-inline-toggle"
           onClick={() => onToggle(artifact.path)}
-          className="flex min-w-0 items-center gap-2 text-xs text-foreground h-auto hover:bg-transparent hover:text-current"
+          className="flex min-w-0 items-center gap-2 text-xs text-foreground h-auto px-0 hover:bg-transparent hover:text-current"
         >
           <ChevronDown className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate font-medium">{label}</span>
@@ -162,7 +163,7 @@ export function ArtifactInlineFrame({
           <Button variant="ghost"
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
-            className="underline h-auto hover:bg-transparent hover:text-current"
+            className="underline h-auto px-0 hover:bg-transparent hover:text-current"
           >
             {t("artifact.inline.retry")}
           </Button>

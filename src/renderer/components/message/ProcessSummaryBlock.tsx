@@ -172,7 +172,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost"
                     type="button"
-                    className="cursor-pointer text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
+                    className="cursor-pointer text-xs text-muted-foreground h-auto px-0 hover:bg-transparent hover:text-current"
                   >
                     {t("tool.grouped.scriptDetails")}
                   </Button>

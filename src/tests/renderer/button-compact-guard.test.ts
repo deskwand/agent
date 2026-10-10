@@ -25,18 +25,13 @@ const HORIZONTAL = /^-?px?-/; // `p-*` 或 `px-*`
  * 离开这张表 ✓，不需要 `p-0`。
  */
 const COMPACT_PENDING = new Set([
-  "components/ErrorBoundary.tsx",
   "components/FeedItemRow.tsx",
   "components/FeedReaderPane.tsx",
   "components/FeedView.tsx",
-  "components/FilePreviewPanel.tsx",
   "components/LoginModal.tsx",
   "components/ProviderGuidance.tsx",
   "components/attach/AttachMenu.tsx",
   "components/attach/AttachPickerPanel.tsx",
-  "components/message/ArtifactInlineFrame.tsx",
-  "components/message/ProcessSummaryBlock.tsx",
-  "components/message/ResultSummaryBlock.tsx",
 ]);
 
 /** className 的 token 视图：引号/反引号/花括号/`$` 全当分隔符（模板串与三元里的类也看得见 ✓）。 */
@@ -56,7 +51,7 @@ function classTokens(raw: string): string[] {
  * 内边距就是**可见的内缩** ⇒ 不豁免 ✓（这正是 `FilePreviewPanel` 页签白吃 32px 截断宽度、
  * `ProviderGuidance` 折叠头比卡片内其余内容多缩 16px 的原因 ✓）。
  */
-function isExempt(tokens: string[]): boolean {
+export function isExempt(tokens: string[]): boolean {
   const spreads = tokens.includes("w-full") || tokens.includes("flex-1");
   const edgePushed =
     tokens.includes("text-left") ||
@@ -134,9 +129,14 @@ describe("Button 横向虚宽守卫", () => {
   });
 
   it("正控：内容靠边的满宽按钮必须被抓（豁免不能放宽到「写了 w-full 就放过」）", () => {
-    // `justify-between` 的折叠头与 `flex-1` + `text-left` 的页签都是真实个案 ✓。
+    // 直接锁判据本身，不依赖某个具体文件还违规 —— 活文件会随收口变绿，判据不会 ✓。
+    const t = (s: string) => s.split(/\s+/);
+    expect(isExempt(t("w-full py-2 h-auto"))).toBe(true); // 满宽 + 默认居中 ⇒ 豁免 ✓
+    expect(isExempt(t("flex-1 truncate text-left h-auto"))).toBe(false); // 靠边 ⇒ 不豁免 ✓
+    expect(isExempt(t("w-full justify-between py-2 h-auto"))).toBe(false); // 靠边 ⇒ 不豁免 ✓
+    // 活文件证据：`justify-between` 的折叠头仍在集合内 ✓；页签补 `px-0` 后已退出 ✓。
     expect(missesHorizontalPadding("components/ProviderGuidance.tsx")).toBe(1);
-    expect(missesHorizontalPadding("components/FilePreviewPanel.tsx")).toBe(1);
+    expect(missesHorizontalPadding("components/FilePreviewPanel.tsx")).toBe(0);
   });
 
   it("集合只许减不许加 —— 每收口一个文件就删一条 ✓", () => {

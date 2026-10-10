@@ -258,7 +258,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
                 type="button"
                 onClick={() => openPreview(item)}
                 title={item.path}
-                className="min-w-0 flex-1 truncate text-left text-xs h-auto hover:bg-transparent hover:text-current"
+                className="min-w-0 flex-1 truncate text-left text-xs h-auto px-0 hover:bg-transparent hover:text-current"
               >
                 {item.name}
               </Button>
