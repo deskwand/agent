@@ -75,6 +75,43 @@ describe("LocalVaultStore", () => {
     );
   });
 
+  it("ignores OS metadata at the root instead of failing the whole vault", async () => {
+    const store = await createStore();
+    const root = store.rootDir;
+    await mkdir(join(root, "files"), { recursive: true });
+    await writeFile(join(root, "files", "a.md"), "a");
+    // Finder/Explorer 在用户浏览目录时会自己写这些文件。它们没有同步价值，
+    // 但只要让根层判定抛错，整个密库（文件、技能、上传、同步）就全部打不开。
+    await writeFile(join(root, ".DS_Store"), "junk");
+    await writeFile(join(root, "._a.md"), "appledouble");
+    await writeFile(join(root, "Thumbs.db"), "junk");
+    await writeFile(join(root, "desktop.ini"), "junk");
+
+    const names = (await store.scanFiles()).map((file) => file.name);
+    expect(names).toEqual(["files/a.md"]);
+  });
+
+  it("keeps ignored root metadata out of the index and out of the cloud cleanup", async () => {
+    const store = await createStore();
+    const root = store.rootDir;
+    await mkdir(join(root, "files"), { recursive: true });
+    await writeFile(join(root, "files", "a.md"), "a");
+    await writeFile(join(root, ".DS_Store"), "junk");
+
+    const index = await store.reconcile(await store.readIndex());
+
+    // 索引键必须以模块名开头，根层条目永远进不了索引 ⇒ 忽略它不会让 reconcile
+    // 把它判为「本地已删除」而排队删掉云端对象。
+    expect(Object.keys(index.files)).toEqual(["files/a.md"]);
+    expect(index.pendingDeletes).toEqual([]);
+
+    // 忽略只在根层生效：模块内的同名文件仍会被扫到。若有人把跳过挪进
+    // scanModule，已索引的模块内条目会凭空消失并触发云端删除 —— 这条会红。
+    await writeFile(join(root, "files", ".DS_Store"), "junk");
+    const names = (await store.scanFiles()).map((file) => file.name);
+    expect(names).toContain("files/.DS_Store");
+  });
+
   it("scans hidden directories inside modules", async () => {
     const store = await createStore();
     await mkdir(join(store.rootDir, "files", ".cache"), { recursive: true });

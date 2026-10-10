@@ -31,6 +31,27 @@ const ROOT_INTERNAL = new Set<string>([
   STAGING_DIR,
 ]);
 
+/**
+ * 操作系统自己写进目录的元数据文件：Finder 的 `.DS_Store`、AppleDouble `._*`、
+ * Explorer 的 `Thumbs.db` / `desktop.ini`。它们不是用户内容，但根层的模块判定
+ * 会把任何非模块条目当成「未知条目」抛错，而密库的每一项操作（快照、同步、
+ * 恢复、重置）都要先经 `scanFiles` —— 用户只要在 Finder 里看过一眼密库目录，
+ * 整页密库就会因为一个 `.DS_Store` 全部打不开。
+ *
+ * 只在根层生效：模块内部的名字都是用户内容，静默跳过会让 `reconcile` 把它们
+ * 判为已删除并删掉云端对象。
+ */
+const OS_METADATA_FILES = new Set<string>([
+  ".DS_Store",
+  ".localized",
+  "Thumbs.db",
+  "desktop.ini",
+]);
+
+function isOsMetadataFile(name: string): boolean {
+  return OS_METADATA_FILES.has(name) || name.startsWith("._");
+}
+
 export function isVaultModule(value: string): value is VaultModule {
   return (VAULT_MODULES as readonly string[]).includes(value);
 }
@@ -304,6 +325,7 @@ export class LocalVaultStore {
     const entries = await readdir(this.rootDir, { withFileTypes: true });
     for (const entry of entries) {
       if (ROOT_INTERNAL.has(entry.name)) continue;
+      if (isOsMetadataFile(entry.name)) continue;
       if (!isVaultModule(entry.name) || !entry.isDirectory()) {
         throw new Error(`VAULT_UNSUPPORTED_PATH:${entry.name}`);
       }
