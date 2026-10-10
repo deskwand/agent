@@ -495,4 +495,34 @@ describe("activity chip", () => {
     expect(container.textContent).not.toContain("activity.statusCancelled");
     expect(container.textContent).not.toContain("activity.statusCleared");
   });
+
+  // 迁移回归守卫：子代理行是 `<Button variant="ghost">`，base 的 `text-sm`（14px）/ `font-medium`
+  // 与 `[&_svg]:size-4`（把 `h-3 w-3` 的状态图标顶回 16px）、缺省档的 `h-9`（36px 定高）
+  // 会盖掉面板容器的 `text-xs`（元素上的类胜过继承值）—— 面板出生时这里是原生 `<button>`，
+  // 四者都是继承来的。真机（Chromium + 构建 CSS）实测：行内 14px/500、图标 16px，比同一面板里
+  // 的计划行（12px）还大；且 `h-9` 把三行内容（64px）压进 36px 的盒子 ⇒ 第三行溢出、被面板底边
+  // 裁掉 9px（2026-10-10 用户截图报障「子代理面板字体大小不对」）。
+  // ⚠️ jsdom 没有布局引擎 ⇒ 这一条钉的是「泄漏的类不在 + 写回的类都在」，几何归真机目视。
+  it("子代理行不继承 Button 的高度 / 字号 / 字重 / 图标尺寸", async () => {
+    render(strip({ backgroundAgentRows: [row("running")] }));
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushMacrotask();
+    const panel = document.body.querySelector("[role='dialog']");
+    // ⚠️ 按内容定位，不用 `panel.querySelector("button")` —— 那是 popover 里的**第一个** button，
+    // 面板将来随便加个控件（可折叠区块头 / 行内跳转箭头）都会让断言打到别的元素上。
+    const rowButton = Array.from(panel?.querySelectorAll("button") ?? []).find(
+      (button) => button.textContent?.includes("curie"),
+    );
+    expect(rowButton, "面板里应有子代理行").toBeTruthy();
+    // 写回的：`cn` 会把四条冲突类整条删掉（同族后来者胜），所以这里只断言「在场」
+    for (const cls of ["h-auto", "text-xs", "font-normal", "[&_svg]:size-3"]) {
+      expect(rowButton?.classList.contains(cls), cls).toBe(true);
+    }
+    // 泄漏的：缺省档 / base 的四个，一条都不许留下
+    for (const cls of ["h-9", "text-sm", "font-medium", "[&_svg]:size-4"]) {
+      expect(rowButton?.classList.contains(cls), cls).toBe(false);
+    }
+  });
 });

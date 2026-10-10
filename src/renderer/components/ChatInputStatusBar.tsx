@@ -337,7 +337,15 @@ export function ChatInputStatusBar({
                   setPanelOpen(false);
                   onSelectBackgroundAgent?.(row.toolCallId);
                 }}
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-accent/60 ${
+                // ⚠️ 这四条类必须显式写回：`<Button>` base 的 `text-sm` / `font-medium` /
+                // `[&_svg]:size-4` 与缺省档的 `h-9` 会盖掉面板容器的 `text-xs`（元素上的类胜过
+                // 继承值）⇒ 行内字号 14px、图标 16px，比同一面板里的计划行（12px）还大
+                // （2026-10-10 用户报障「子代理面板字体大小不对」的根因；面板出生时这里是原生
+                // `<button>`，四者都是继承来的）。`cn` 会把四条冲突类**整条删掉**（同族后来者胜）
+                // ⇒ 不必操心样式表里的先后顺序。
+                // ⚠️ `[&_svg]:size-3` 的作用面是**行内所有 svg**，不只是右侧那个状态图标 ——
+                // 往这一行里再加图标的人要回读这句，否则新图标会被静默压成 12px。
+                className={`flex h-auto w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-normal [&_svg]:size-3 hover:bg-accent/60 ${
                   // 已完成的行降一档：面板里可能同时有"上一轮还在跑的"和"本轮已完成的"。
                   // `error` 刻意不降 —— 失败是应该被注意到的信号。
                   row.status === "completed" ? "opacity-60" : ""
