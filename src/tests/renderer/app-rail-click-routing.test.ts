@@ -377,4 +377,23 @@ describe("AppRail 点击路由", () => {
       "group-hover:visible",
     );
   });
+
+  it("灵感卡片里没有标题行：那一格只剩「记一笔」", async () => {
+    // 用户 2026-10-12：卡片顶部那颗「灵感」是多余的，样式参照「更多」那张
+    // （它 2026-10-11 就去掉了标题行）。
+    //
+    // ⚠️ 判据要用 **mock 出来的 key**、而不是中文文案：本文件把 react-i18next 换成了
+    // `t: (key) => key`（见文件头），那行标题在 DOM 里是文本 `navRail.ideas`，
+    // 断言「不含灵感」的话这条用例永远是绿的（评审 2026-10-12 抓到）。
+    // 也不写成「不含 `navRail.ideas`」：那样只挡住这一个 key，换个 key、换个语言回来就绿。
+    // 直接比文字：卡片的文字必须**全部**由这一行贡献 —— 任何被塞回来的标题都会让它变。
+    await mountRail("chat");
+    const card = container.querySelector('[data-testid="ideas-rail-card"]')!;
+    const rows = card.querySelectorAll("button");
+    expect(rows, "卡片里只剩「记一笔」这一颗按钮").toHaveLength(1);
+    expect(card.textContent, "卡片里除了这一行不该还有别的字").toBe(
+      rows[0].textContent,
+    );
+    expect(rows[0].textContent).toContain("capture.title");
+  });
 });

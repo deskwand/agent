@@ -156,15 +156,22 @@ export function AppRail({
                     浅色下气泡离页面底色只 1.10，**阴影是唯一的分隔**，别当装饰删掉
                     （tooltip 那份皮肤文档里算过同一笔账）。
 
-                    ⚠️ 行动行**不能**用 `bg-accent`：在这个主题体系里 `--accent` 与 `--secondary`
-                    是同一个值（实测浅色 244,244,245 对 244,244,245 = **1.00**、深色 39,39,42
-                    对 39,39,42 = **1.00**，两个主题都各只有一个值），铺上去按钮会彻底消失。
-                    改用 `bg-background`：浅色 1.10、深色 1.34，与改版前 `bg-accent` 印在
-                    白卡片上的步长同级 ⇒ 看得见又不抢眼。 */}
+                    ⚠️ 行动行的底色**不能**用 `bg-accent`（静止的底与悬停的底都不行）：在这个
+                    主题体系里 `--accent` 与 `--secondary` 是同一个值 —— 2026-10-12 扫过
+                    `globals.css` 全部 13 个主题块，每一块里这两者的 oklch 字面量都逐个相等、
+                    而 `--background` 每块都不等于 `--secondary` ⇒ 铺 `bg-accent` 的行会彻底消失，
+                    底色只能走 `bg-background`。
+
+                    **没有标题行**，且这一行静止时透明、悬停才亮、字色不再自己指定 ——
+                    三条都是与「更多」那张卡片逐条同款（用户 2026-10-12：「灵感」那两个字是多余的，
+                    样式参照「更多」那张）。去掉 `text-foreground` 后字色继承卡片，实测
+                    与「更多」的行取值完全相同（改前更深一档）。
+                    图标本身就说明一切，可访问名仍由这一格图标按钮的 `aria-label` 给。
+
+                    键盘那条路不缺反馈：`globals.css` 对裸 `button` 统一给了
+                    `focus-visible:ring-1 ring-primary` 的环（与「更多」卡片里的行一致）
+                    ⇒ 别为它补 `focus-visible:bg-background`，那反而与参考的那张卡片不一致。 */}
             <div className="rounded-md bg-secondary p-2 text-secondary-foreground shadow-elevated">
-              <p className="px-1 pb-1.5 text-[11px] text-secondary-foreground/70">
-                {t(item.labelKey)}
-              </p>
               <button
                 type="button"
                 data-testid="ideas-rail-capture"
@@ -175,9 +182,9 @@ export function AppRail({
                   if (event.detail > 0) setIdeasCardDismissed(true);
                   openIdeaCapture();
                 }}
-                className="flex w-full items-center gap-2 rounded-md bg-background px-2 py-1.5 text-left text-xs text-foreground"
+                className="flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-xs hover:bg-background"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5 shrink-0 opacity-70" />
                 {t("capture.title")}
                 <span className="ml-auto text-[11px] text-muted-foreground">
                   {captureShortcutLabel(window.electronAPI?.platform)}

@@ -89,9 +89,42 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
     // （`-` 是词边界），这是本文件已经记录过的教训。
     const bareBackground = /\bbg-background(?![\w-])/;
 
+    // ⚠️ 2026-10-12 收窄射程：这条原来扫**整个文件**，于是「灵感 / 更多」两张悬停卡片里的
+    // 弹层行（它们借内容区底色当悬停高亮）也会被算进去 —— 灵感卡片落地那天（2f13d888）
+    // 起这条断言就一直是红的，而写着同样东西的「更多」卡片住在 RailMoreMenu.tsx，
+    // 反而没被查到（同一个不变量，两种结果）。现在只查**栏自己的表面**：
+    // `<nav>` 那条 strip 与栏内按钮（都带 RAIL_BUTTON_CLASS）。
+    //
+    // 弹层不在射程内：它浮在栏**上面**（皮肤 bg-secondary），借用内容区底色做行悬停高亮
+    // 是刻意的、与「更多」那张逐字同源；要禁掉它得先改设计，不是改判据。
+    //
+    // 取「标记 → 该元素开标签的 `>`」这一段，而不是取整行：按钮的配色写在 className
+    // 模板字面量的**下一行**（`${RAIL_BUTTON_CLASS} relative ${ isActive ? "bg-accent" : "…" }`），
+    // 只查标记那一行会漏掉「把 bg-background 塞进变体里」这种改法。
+    const railOwnSurfaces = (source: string): string[] => {
+      const marker = /RAIL_BUTTON_CLASS|data-rail-key|\bbg-app-chrome\b/g;
+      return [...source.matchAll(marker)].map((match) => {
+        const start = match.index ?? 0;
+        const end = source.indexOf(">", start);
+        return source.slice(start, end === -1 ? undefined : end);
+      });
+    };
+
     const rail = read("components/AppRail.tsx");
     expect(rail).toMatch(/\bbg-app-chrome\b/);
-    expect(rail).not.toMatch(bareBackground);
+    for (const rel of [
+      "components/AppRail.tsx",
+      "components/RailMoreMenu.tsx",
+    ]) {
+      const surfaces = railOwnSurfaces(read(rel));
+      // 先保证真的扫到了东西：标记改名后扫出 0 段会让下面那个循环空转、全绿
+      expect(surfaces.length, `${rel} 没扫到栏自己的表面`).toBeGreaterThan(0);
+      for (const surface of surfaces) {
+        expect(surface, `${rel} 的外圈表面不该铺内容区底色`).not.toMatch(
+          bareBackground,
+        );
+      }
+    }
 
     // 标题栏这半边用「含 titlebar-drag 的整行」取类串：titlebar-drag 写在 className 中间，
     // 只截标记之后那段会漏掉写在标记前面的类名（本文件既有注释）。
@@ -126,9 +159,7 @@ describe("右面板：区域级分界靠底色差", () => {
 
   it("四个面板都改用 background-secondary 当底", () => {
     for (const rel of PANEL_FILES) {
-      expect(read(rel), `${rel} 缺少 bg-muted`).toContain(
-        "bg-muted",
-      );
+      expect(read(rel), `${rel} 缺少 bg-muted`).toContain("bg-muted");
     }
   });
 
@@ -143,9 +174,7 @@ describe("右面板：区域级分界靠底色差", () => {
     // 面板底已经是 background-secondary；活动标签若还用它就会同色消失。
     // 这一条不红、不报错，只是标签看不见了 —— 所以必须单独锁。
     const preview = read("components/FilePreviewPanel.tsx");
-    expect(preview).not.toContain(
-      '"bg-muted text-foreground"',
-    );
+    expect(preview).not.toContain('"bg-muted text-foreground"');
     expect(preview).toContain('"bg-card text-foreground"');
   });
 });

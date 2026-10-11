@@ -69,8 +69,8 @@ describe("图标与「记一笔」入口", () => {
       "bg-secondary p-2 text-secondary-foreground shadow-elevated",
     );
     expect(rail).toContain("rounded-md bg-secondary");
-    // ⚠️ 陷阱：`--accent` 与 `--secondary` 同值（浅色/深色都实测 1.00）
-    // ⇒ 行动行铺 bg-accent 会彻底隐形，必须用 bg-background。
+    // ⚠️ 陷阱：`--accent` 与 `--secondary` 同值（2026-10-12 扫过 globals.css 全部 13 个
+    // 主题块，逐块相等）⇒ 行动行铺 `bg-accent` 会彻底隐形，底色必须走 `bg-background`。
     // 判据取**整颗按钮元素**（从 testid 到它的 `</button>`），不用固定字符窗口：
     // 2026-10-11 给这颗按钮加了 onClick（点过收起卡片），注释一长窗口就被顶出去、假红。
     const captureStart = rail.indexOf('data-testid="ideas-rail-capture"');
@@ -78,7 +78,11 @@ describe("图标与「记一笔」入口", () => {
       captureStart,
       rail.indexOf("</button>", captureStart),
     );
-    expect(captureBtn).toContain("bg-background");
+    // 2026-10-12 起这一行**静止透明、悬停才亮**（与「更多」那张卡片的行同款）：
+    // 所以钉的是 `hover:bg-background`。⚠️ 别退回裸的 `toContain("bg-background")` ——
+    // `"hover:bg-background"` 里也含这个子串，那样判据就分不清「常铺底」与「悬停才亮」了
+    // （子串假绿的坑，本仓反复踩过）。
+    expect(captureBtn).toContain("hover:bg-background");
     expect(captureBtn).not.toContain("bg-accent");
   });
 
