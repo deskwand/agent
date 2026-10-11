@@ -138,8 +138,10 @@ describe("设置面板侧栏", () => {
     // 分组标题只在宽版渲染。
     expect(container.textContent).not.toContain("settings.groupGeneral");
     // 窄栏只剩图标，名字必须来自 aria-label（title 不是无障碍名）。
+    // 10 = 9 个导航条目 + 返回键：返回键自 2026-10-11 起也带 aria-label（与 rail 各页统一），
+    // 它同样是「只有图标」的按钮，一并纳入这条断言。
     const rail = buttons().filter((b) => b.getAttribute("aria-label"));
-    expect(rail).toHaveLength(9);
+    expect(rail).toHaveLength(10);
     expect(rail.every((b) => (b.textContent ?? "") === "")).toBe(true);
   });
 });

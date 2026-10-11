@@ -226,15 +226,26 @@ export function SettingsPanel({
       <div
         className={`${compactSidebar ? "w-14" : "w-[220px]"} bg-muted/80 flex flex-col flex-shrink-0`}
       >
-        {/* Back button — settings top-left */}
+        {/* Back button — settings top-left。
+            与 rail 各页同一套类名（2026-10-11 统一）：`p-1.5` + `-ml-1.5`（把图标左缘顶到内容
+            基线上，与下方「设置」标题同一列）+ hover 面 + w-5 图标；`aria-label` 也补上
+            （此前这颗是裸图标按钮，没有无障碍名）。 */}
         <div
           className={
-            compactSidebar ? "flex justify-center pt-3 pb-1" : "px-4 pt-4 pb-0"
+            compactSidebar
+              ? // 紧凑态没有标题、按钮自己居中：`pl-1.5` 抵消子元素的 `-ml-1.5`，否则偏左 3px
+                "flex justify-center pl-1.5 pt-3 pb-1"
+              : // `px-5` 与同侧栏下方「设置」标题同级（让图标左缘与标题同列）；这是设置侧栏
+                // 自己的对齐，不是 rail 页面的 `PAGE_INSET_X`（设置页不在本轮宽度体系内）
+                "px-5 pt-4 pb-0"
           }
         >
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-accent transition-colors inline-flex h-auto"
+            aria-label={t("common.back")}
+            className="p-1.5 -ml-1.5 rounded-lg hover:bg-accent transition-colors h-auto"
           >
             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </Button>

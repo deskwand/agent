@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { PAGE_INSET_X } from "./page-styles";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -154,7 +155,9 @@ export function FeedView(): JSX.Element {
         data-testid="feed-view"
         className="flex h-full flex-col bg-background"
       >
-        <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
+        <div
+          className={`flex items-center gap-2 border-b border-border/40 ${PAGE_INSET_X} py-2.5`}
+        >
           <Button
             variant="ghost"
             type="button"
@@ -206,7 +209,9 @@ export function FeedView(): JSX.Element {
     <div data-testid="feed-view" className="flex h-full flex-col bg-background">
       <style>{`.feed-row:hover [data-testid="feed-actions"],.feed-row:focus-within [data-testid="feed-actions"]{opacity:1 !important}`}</style>
 
-      <div className="flex items-start gap-3 border-b border-border/40 px-4 pb-2.5 pt-3.5">
+      <div
+        className={`flex items-start gap-3 border-b border-border/40 ${PAGE_INSET_X} pb-2.5 pt-3.5`}
+      >
         <Button
           variant="ghost"
           type="button"
@@ -307,7 +312,7 @@ export function FeedView(): JSX.Element {
       {lastRun?.status === "failed" ? (
         <div
           data-testid="feed-error"
-          className="flex items-center gap-2 border-b border-destructive/35 bg-destructive/10 px-4 py-1.5 text-xs text-destructive"
+          className={`flex items-center gap-2 border-b border-destructive/35 bg-destructive/10 ${PAGE_INSET_X} py-1.5 text-xs text-destructive`}
         >
           <span>{t("feed.errorSearchFailed")}</span>
           <span className="flex-1" />
@@ -322,20 +327,24 @@ export function FeedView(): JSX.Element {
       ) : null}
 
       {lastRun?.status === "partial" ? (
-        <div className="border-b border-border/40 px-4 py-1.5 text-xs text-muted-foreground hover:bg-transparent hover:text-destructive">
+        <div
+          className={`border-b border-border/40 ${PAGE_INSET_X} py-1.5 text-xs text-muted-foreground hover:bg-transparent hover:text-destructive`}
+        >
           {t("feed.partial")}
         </div>
       ) : null}
 
       {notice ? (
-        <div className="border-b border-border/40 px-4 py-1.5 text-xs text-muted-foreground">
+        <div
+          className={`border-b border-border/40 ${PAGE_INSET_X} py-1.5 text-xs text-muted-foreground`}
+        >
           {notice}
         </div>
       ) : null}
 
       <div
         data-testid="feed-filters"
-        className="flex items-center gap-3 px-4 pt-2 text-xs"
+        className={`flex items-center gap-3 ${PAGE_INSET_X} pt-2 text-xs`}
       >
         <Button
           variant="ghost"
@@ -375,9 +384,12 @@ export function FeedView(): JSX.Element {
           把右栏正文压到 133px ≈ 6.6 字/行（真实浏览器实测）。写成 min(25rem,50%) 后同样是
           800px 窗口，右栏能拿回 332px ≈ 16.6 字/行。
 
-          列宽带来的收益：带缩略图时标题列 = 520 − 32(padding) − 88(图) − 12(间距) = 388px ≈ 27 字
-          （未读行再扣 13px 的未读点与间距，≈ 26.8 字）；400px 时只有 268px ≈ 19 字，中文长标题要折三行。
+          列宽带来的收益：带缩略图时标题列 = 520 − 40(padding) − 88(图) − 12(间距) = 380px ≈ 26 字
+          （未读行再扣 13px 的未读点与间距，≈ 25.5 字）；400px 时只有 260px ≈ 18 字，中文长标题要折三行。
           窗口窄于约 1356px 时列表吃不满 520，这个数字按比例缩小。
+
+          padding 从 16×2 提到 20×2（2026-10-11 页面内边距统一到 PAGE_INSET_X）：让页头、报错条、
+          搜索行、列表行、播放条落在同一条左基线上；代价就是上面那 8px。
         */}
         <div
           data-testid="feed-list-column"
@@ -385,7 +397,7 @@ export function FeedView(): JSX.Element {
         >
           {visible.length === 0 ? (
             <div
-              className="px-6 py-6 text-sm text-muted-foreground"
+              className={`${PAGE_INSET_X} py-6 text-sm text-muted-foreground`}
               style={{ lineHeight: 1.8 }}
             >
               {items.length === 0 ? (
@@ -409,7 +421,9 @@ export function FeedView(): JSX.Element {
             return (
               <Fragment key={item.id}>
                 {key !== previousKey ? (
-                  <div className="sticky top-0 z-10 bg-background px-4 pb-1.5 pt-2.5 text-xs font-medium tracking-wider text-muted-foreground">
+                  <div
+                    className={`sticky top-0 z-10 bg-background ${PAGE_INSET_X} pb-1.5 pt-2.5 text-xs font-medium tracking-wider text-muted-foreground`}
+                  >
                     {t(key)}
                   </div>
                 ) : null}
@@ -459,7 +473,9 @@ export function FeedView(): JSX.Element {
         ) : null}
       </div>
 
-      <div className="relative border-t border-border/40 px-4 py-2 text-xs text-muted-foreground">
+      <div
+        className={`relative border-t border-border/40 ${PAGE_INSET_X} py-2 text-xs text-muted-foreground`}
+      >
         <Button
           variant="ghost"
           type="button"

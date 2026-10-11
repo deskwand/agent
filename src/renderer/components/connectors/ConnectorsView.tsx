@@ -23,6 +23,7 @@ import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../../store";
 import { Button } from "../app-button";
 import { Toggle } from "../ui/toggle";
+import { PAGE_INSET_X } from "../page-styles";
 
 type TabId = "connect" | "skills" | "plugins";
 
@@ -377,7 +378,9 @@ export function ConnectorsView() {
       onValueChange={handleTabChange}
     >
       <div className="flex flex-col h-full w-full overflow-hidden bg-background">
-        <div className="flex items-center gap-3 px-5 pt-4 flex-none">
+        <div
+          className={`flex items-center gap-3 ${PAGE_INSET_X} pt-4 flex-none`}
+        >
           <Button
             variant="ghost"
             type="button"

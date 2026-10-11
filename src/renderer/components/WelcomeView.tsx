@@ -49,6 +49,7 @@ import {
   connectOAuthProvider,
 } from "../services/connect-provider";
 import { Button } from "./app-button";
+import { PAGE_INSET_X } from "./page-styles";
 
 function hasUsableProviderConfig(
   profileKey: ProviderProfileKey,
@@ -441,8 +442,10 @@ export function WelcomeView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-5 py-10 md:px-8 md:py-14">
-      <div className="max-w-[840px] w-full space-y-7">
+    <div
+      className={`flex-1 flex flex-col items-center justify-center ${PAGE_INSET_X} py-10 md:py-14`}
+    >
+      <div className="max-w-[52.5rem] w-full space-y-7">
         <div className="space-y-4 text-center">
           <p className="text-base font-medium tracking-[-0.02em] text-muted-foreground text-center">
             {showProjectTitle

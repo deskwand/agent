@@ -32,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
+import { PAGE_INSET_X } from "./page-styles";
 
 const RANGES = ["1d", "7d", "30d", "90d", "all"] as const;
 type Range = (typeof RANGES)[number];
@@ -99,7 +100,9 @@ export function UsageView() {
   const unpricedCalls = sumUnpricedCalls(snapshot?.byModel ?? []);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-6 py-5">
+    <section
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-background ${PAGE_INSET_X} py-5`}
+    >
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost"

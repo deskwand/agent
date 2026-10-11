@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { FeedItemWithMeta } from "../../shared/feed";
 import { Button } from "./app-button";
+import { PAGE_INSET_X } from "./page-styles";
 
 export interface FeedItemRowProps {
   item: FeedItemWithMeta;
@@ -47,7 +48,7 @@ export function FeedItemRow({
         if (isSelectingText()) return;
         onOpen(item.id);
       }}
-      className={`selectable relative flex items-start gap-3 border-b border-border/40 px-4 py-2.5 ${
+      className={`selectable relative flex items-start gap-3 border-b border-border/40 ${PAGE_INSET_X} py-2.5 ${
         selected ? "bg-card" : "hover:bg-accent"
       }`}
     >

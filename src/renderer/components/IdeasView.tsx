@@ -26,6 +26,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { MessageMarkdown } from "./MessageMarkdown";
+import { PAGE_INSET_X } from "./page-styles";
 
 /** 打字时自动保存的静默期；失焦、⌘↵、切条目都会立刻冲刷掉它。 */
 const AUTOSAVE_DEBOUNCE_MS = 1000;
@@ -476,7 +477,9 @@ export function IdeasView(): JSX.Element {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      <header className="flex items-center justify-between gap-4 px-5 py-3">
+      <header
+        className={`flex items-center justify-between gap-4 ${PAGE_INSET_X} py-3`}
+      >
         <div className="flex items-center gap-3">
           {/* 返回与密库页/应用页同一颗键、同一套类名（既有约定，不另发明）。 */}
           <button
@@ -581,7 +584,7 @@ export function IdeasView(): JSX.Element {
                   move(-1);
                 }
               }}
-              className="flex w-[322px] shrink-0 flex-col gap-0.5 overflow-auto border-r border-border p-2"
+              className="flex w-[20.125rem] shrink-0 flex-col gap-0.5 overflow-auto border-r border-border p-2"
             >
               {visible.map((idea, index) => (
                 <li key={idea.name}>

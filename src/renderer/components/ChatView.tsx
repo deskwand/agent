@@ -103,6 +103,7 @@ import {
   type RailTickEntry,
 } from "./MessageNavRail";
 import { Button } from "./app-button";
+import { PAGE_INSET_X } from "./page-styles";
 
 function hasUsableProviderConfig(
   profileKey: ProviderProfileKey,
@@ -2028,7 +2029,7 @@ export function ChatView() {
         >
           <div
             ref={messagesContainerRef}
-            className="selectable w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
+            className={`selectable w-full max-w-[57.5rem] mx-auto py-8 ${PAGE_INSET_X} space-y-5`}
           >
             {mergedTurnEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-28 text-muted-foreground space-y-3 text-center">
@@ -2167,7 +2168,7 @@ export function ChatView() {
       {/* Input */}
       <div className="bg-transparent">
         {inputQueue.length > 0 && (
-          <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
+          <div className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-1`}>
             <ChatInputQueueBar
               items={inputQueue}
               isRunning={canStop}
@@ -2178,7 +2179,7 @@ export function ChatView() {
             />
           </div>
         )}
-        <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
+        <div className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-1`}>
           <ChatInputStatusBar
             status={inputStatus}
             backgroundAgentRows={backgroundRows}
@@ -2191,7 +2192,7 @@ export function ChatView() {
             executionClock={activeExecutionClock}
           />
         </div>
-        <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-0.5 pb-5">
+        <div className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-0.5 pb-5`}>
           {activeSession?.kind === "voice" && activeSessionId ? (
             <div className="flex items-center justify-center gap-3 py-3">
               {/* 主色胶囊：走 default 变体，别用 ghost —— ghost 自带 `hover:bg-accent`

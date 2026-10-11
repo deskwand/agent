@@ -35,6 +35,7 @@ import type {
 } from "../../shared/vault";
 import { Input } from "./ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { PAGE_INSET_X } from "./page-styles";
 
 type Filter = "files" | "skills" | "sessions";
 type SyncFeedback = "idle" | "syncing" | "success" | "error";
@@ -694,7 +695,7 @@ export function VaultView(): JSX.Element {
 
   return (
     <section
-      className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-6 py-5"
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden bg-background ${PAGE_INSET_X} py-5`}
       onClick={(event) => {
         if (
           advancedMenuOpen &&

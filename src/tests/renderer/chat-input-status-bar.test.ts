@@ -571,7 +571,7 @@ describe("background subagent entry", () => {
   });
 
   // jsdom 没有布局，这里只能断言 class 与 inline 上限；"锚点上移 + max-w-full = 聊天列宽"
-  // 这条架构主张靠父链保证（ChatView.tsx:1911 的 max-w-[920px] ... px-5），不在测试里验证。
+  // 这条架构主张靠父链保证（ChatView 尾部的 max-w-[57.5rem] 容器 … px-5），不在测试里验证。
   it("面板宽度按可用宽度限幅、并带滚动上限", async () => {
     renderEntry(rows);
     await openPanel(container);

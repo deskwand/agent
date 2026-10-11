@@ -49,7 +49,9 @@ export function ScheduleToolbar({
       : t("schedule.dateFormatMonth", { year, month });
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-border/60 bg-card">
+    // 左右内边距在父层（ScheduleView 的内边距盒）上：这条底色带必须与下方网格同宽，
+    // 自己再带一次 px-* 就会比网格宽出 20px（2026-10-11 截图报障）。
+    <div className="flex items-center justify-between py-2 border-b border-border/60 bg-card">
       {/* Left: nav */}
       <div className="flex items-center gap-1">
         <Button

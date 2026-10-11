@@ -14,6 +14,7 @@ import { ScheduleToolbar } from "./ScheduleToolbar";
 import { ScheduleCalendar, type CalendarView } from "./ScheduleCalendar";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { Button } from "./app-button";
+import { PAGE_INSET_X } from "./page-styles";
 
 export function ScheduleView() {
   const { t } = useTranslation();
@@ -108,46 +109,54 @@ export function ScheduleView() {
       tabIndex={-1}
       className="flex-1 min-h-0 flex flex-col overflow-hidden bg-background"
     >
-      {/* Header */}
-      <div className="bg-background/90 border-b border-border/40 px-5 py-4 lg:px-8">
-        <Button
-          variant="ghost"
-          onClick={() => setShowSchedule(false)}
-          className="mb-1 p-1 -ml-1 rounded-lg hover:bg-accent transition-colors inline-flex h-auto"
-        >
-          <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-        </Button>
-        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-          DeskWand
-        </p>
-        <h2 className="mt-0.5 text-xl font-semibold text-foreground">
-          {t("sidebar.automation")}
-        </h2>
-        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-          {t("schedule.viewDesc")}
-        </p>
-      </div>
+      {/* 页面级内边距只在**这一处**给出：页头文字、工具栏底色带、日历网格共用同一个盒，
+          所以带子不会比下方网格宽出 20px（2026-10-11 截图报障），三条左边缘也同在基线上。
+          这里**不设宽度上限**：自动化页与其他六页一样铺满主区（2026-10-11 截图对照后就定了）。 */}
+      <div className={`${PAGE_INSET_X} flex min-h-0 flex-1 flex-col`}>
+        {/* Header —— 形状对齐其余六页：返回键与标题同行，h1 + 副标题 */}
+        <header className="flex items-center justify-between gap-4 py-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => setShowSchedule(false)}
+              aria-label={t("common.back")}
+              className="p-1.5 -ml-1.5 rounded-lg hover:bg-accent transition-colors h-auto"
+            >
+              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold text-foreground">
+                {t("sidebar.automation")}
+              </h1>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {t("schedule.viewDesc")}
+              </p>
+            </div>
+          </div>
+        </header>
 
-      {/* Toolbar */}
-      <ScheduleToolbar
-        view={view}
-        currentDate={currentDate}
-        onViewChange={setView}
-        onNavigatePrev={() => navigate(-1)}
-        onNavigateNext={() => navigate(1)}
-        onToday={goToday}
-        onCreateClick={handleCreateClick}
-      />
-
-      {/* Calendar */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <ScheduleCalendar
-          tasks={tasks}
+        {/* Toolbar */}
+        <ScheduleToolbar
           view={view}
           currentDate={currentDate}
-          onSlotClick={handleSlotClick}
-          onTaskClick={handleTaskClick}
+          onViewChange={setView}
+          onNavigatePrev={() => navigate(-1)}
+          onNavigateNext={() => navigate(1)}
+          onToday={goToday}
+          onCreateClick={handleCreateClick}
         />
+
+        {/* Calendar —— 与页头、工具栏共用同一个盒 */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScheduleCalendar
+            tasks={tasks}
+            view={view}
+            currentDate={currentDate}
+            onSlotClick={handleSlotClick}
+            onTaskClick={handleTaskClick}
+          />
+        </div>
       </div>
 
       {/* Edit Modal */}
