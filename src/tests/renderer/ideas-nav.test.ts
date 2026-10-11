@@ -71,9 +71,15 @@ describe("图标与「记一笔」入口", () => {
     expect(rail).toContain("rounded-md bg-secondary");
     // ⚠️ 陷阱：`--accent` 与 `--secondary` 同值（浅色/深色都实测 1.00）
     // ⇒ 行动行铺 bg-accent 会彻底隐形，必须用 bg-background。
-    const captureBtn = rail.slice(rail.indexOf("ideas-rail-capture"));
-    expect(captureBtn.slice(0, 400)).toContain("bg-background");
-    expect(captureBtn.slice(0, 400)).not.toContain("bg-accent");
+    // 判据取**整颗按钮元素**（从 testid 到它的 `</button>`），不用固定字符窗口：
+    // 2026-10-11 给这颗按钮加了 onClick（点过收起卡片），注释一长窗口就被顶出去、假红。
+    const captureStart = rail.indexOf('data-testid="ideas-rail-capture"');
+    const captureBtn = rail.slice(
+      captureStart,
+      rail.indexOf("</button>", captureStart),
+    );
+    expect(captureBtn).toContain("bg-background");
+    expect(captureBtn).not.toContain("bg-accent");
   });
 
   it("标题栏那颗捕获键已经去掉（入口收敛到 rail 卡片）", () => {

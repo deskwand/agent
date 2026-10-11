@@ -74,12 +74,16 @@ export function AppRail({
         <div
           key={item.key}
           className="group relative"
-          // 指针离开这一格 ⇒ 复位（重新悬停照旧展开）；
+          // 指针**重新进入**这一格 ⇒ 复位（重新悬停照旧展开）；
+          // 挂 `onMouseEnter` 而不是 `onMouseLeave`（2026-10-11）：点卡片里的「记一笔」会把卡片
+          // 自己变成 invisible ⇒ 指针脚下那一下被判定成「离开这一格」⇒ 离开事件里的复位会把刚设的
+          // 「已收起」抹掉，卡片又弹回来。复现与两种策略的对比见
+          // `design-docs/mockups/_repro-rail-more-panel-dismiss.html`（RailMoreMenu 里那段同源）。
           // 键盘焦点回到这一格 ⇒ 也复位（否则"先用鼠标点过、再改用键盘"的人
           // 会再也看不到卡片，也就 Tab 不进卡片里的「记一笔」）。
           // 不做 `:focus-visible` 匹配：jsdom 上那个伪类会抛，且指针点击已被
           // mousedown 的 preventDefault 挡在焦点之外 ⇒ 这里的焦点基本就等于键盘来的。
-          onMouseLeave={() => setIdeasCardDismissed(false)}
+          onMouseEnter={() => setIdeasCardDismissed(false)}
           onFocus={() => setIdeasCardDismissed(false)}
         >
           <Button
@@ -164,7 +168,13 @@ export function AppRail({
               <button
                 type="button"
                 data-testid="ideas-rail-capture"
-                onClick={openIdeaCapture}
+                onClick={(event) => {
+                  // 点过就把卡片收起来（同这一格图标那颗按钮的规则）：
+                  // 只认指针点击（`detail > 0`），键盘激活不摘 —— 否则键盘用户
+                  // Shift+Tab 回来时卡片已经没了。
+                  if (event.detail > 0) setIdeasCardDismissed(true);
+                  openIdeaCapture();
+                }}
                 className="flex w-full items-center gap-2 rounded-md bg-background px-2 py-1.5 text-left text-xs text-foreground"
               >
                 <Plus className="h-3.5 w-3.5" />

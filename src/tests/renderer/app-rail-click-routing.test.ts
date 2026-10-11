@@ -49,34 +49,21 @@ function railKeys(): string[] {
   ).map((el) => el.dataset.railKey ?? "");
 }
 
-async function openMoreMenu(): Promise<void> {
-  const button = container.querySelector<HTMLButtonElement>(
-    'button[aria-label="navRail.more"]',
-  );
-  expect(button, "「更多」触发器必须存在").toBeTruthy();
-  await act(async () => {
-    button!.dispatchEvent(
-      new MouseEvent("pointerdown", {
-        bubbles: true,
-        cancelable: true,
-        button: 0,
-      }),
-    );
-    button!.click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-}
-
-function menuItemFor(labelKey: string): HTMLElement {
-  const items = Array.from(
-    document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
-  );
-  const found = items.find(
+/** 卡片里按行名取「行本体」那颗按钮（它没有 aria-label，靠文字认）。
+ *
+ * 「更多」自 2026-10-11 起是**悬停卡片**（与灵感那张同一族），不再是点开的菜单 ——
+ * 卡片与行一直在 DOM 里，靠 `invisible` / 展开类切换可见性，所以直接查 DOM 就行，
+ * 没有「先点开菜单」那一步（旧版的 `openMoreMenu()` 已删）。 */
+function moreRowFor(labelKey: string): HTMLElement {
+  const card = container.querySelector('[data-testid="rail-more-card"]');
+  expect(card, "「更多」卡片必须在 DOM 里").toBeTruthy();
+  const row = Array.from(card!.querySelectorAll<HTMLElement>("button")).find(
     (el) =>
-      el.getAttribute("aria-label") === null && el.textContent === labelKey,
+      el.getAttribute("aria-label") === null &&
+      el.textContent?.trim() === labelKey,
   );
-  expect(found, labelKey).toBeTruthy();
-  return found!;
+  expect(row, labelKey).toBeTruthy();
+  return row!;
 }
 
 /** 取某一行右侧那颗图钉（不能直接取第一颗，见 rail-more-menu.test.tsx 里那段说明）。 */
@@ -129,11 +116,10 @@ describe("AppRail 点击路由", () => {
     expect(railKeys()).toEqual(["chat", "ideas", "feed", "more"]);
   });
 
-  it("长尾项从菜单切视图（apps），且不动侧栏", async () => {
+  it("长尾项从卡片切视图（apps），且不动侧栏", async () => {
     await mountRail("chat");
-    await openMoreMenu();
 
-    await act(async () => menuItemFor("sidebar.apps").click());
+    await act(async () => moreRowFor("sidebar.apps").click());
 
     expect(useAppStore.getState().activeView).toBe("apps");
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
@@ -141,9 +127,14 @@ describe("AppRail 点击路由", () => {
 
   it("固定之后栏上多一格，点它切视图，并落进 localStorage", async () => {
     await mountRail();
-    await openMoreMenu();
     const pin = pinFor("sidebar.vault");
-    await act(async () => pin.click());
+    // 必须派发**指针**点击（`detail > 0`）：`.click()` 的 detail 是 0，那被当成键盘激活，
+    // 按设计不收起卡片。这条同时也钉住了「收起只在指针点击时发生」。
+    await act(async () =>
+      pin.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }),
+      ),
+    );
 
     const pinned = buttonFor("sidebar.vault");
     expect(pinned.querySelector("svg")).toBeTruthy();
@@ -152,6 +143,15 @@ describe("AppRail 点击路由", () => {
     expect(localStorage.getItem("deskwand.railPins")).toBe(
       JSON.stringify(["vault"]),
     );
+
+    // 真实挂载路径下也要收起：单测里 onTogglePin 是 vi.fn()、不会触发父级重渲染，
+    // 这里点的是真图钉、父级 state 真的会变（评审 2026-10-11 要求补这条端到端闸）。
+    expect(
+      container
+        .querySelector('[data-testid="rail-more-card"]')!
+        .className.includes("group-hover:visible"),
+      "点过图钉，卡片要收起",
+    ).toBe(false);
 
     await act(async () => pinned.click());
     expect(useAppStore.getState().activeView).toBe("vault");
@@ -215,12 +215,14 @@ describe("AppRail 点击路由", () => {
     localStorage.setItem("deskwand.railPins", JSON.stringify(["vault"]));
     await mountRail();
     const rail = container.querySelector("nav")!;
-    const order = Array.from(rail.children).map(
-      (el) =>
-        el.getAttribute("data-rail-key") ??
-        el.getAttribute("data-testid") ??
-        el.tagName,
-    );
+    // 按 DOM 顺序取「栏上带 data-rail-key 的格」与那条细线。
+    // ⚠️ 不能用 `rail.children`：「更多」自 2026-10-11 起裹在悬停卡片的 group 容器里，
+    // 不再是 nav 的直接子元素（灵感那格同样裹了一层）。
+    const order = Array.from(
+      rail.querySelectorAll<HTMLElement>(
+        '[data-rail-key], [data-testid="rail-pins-divider"]',
+      ),
+    ).map((el) => el.dataset.railKey ?? "rail-pins-divider");
     const divider = order.indexOf("rail-pins-divider");
     expect(divider, "细线必须存在").toBeGreaterThan(-1);
     expect(order[divider - 1]).toBe("more");
@@ -301,7 +303,8 @@ describe("AppRail 点击路由", () => {
     );
     expect(reveal(), "点过之后要摘掉展开类（卡片立刻消失）").toBe(false);
 
-    // 指针离开这一格 → 复位，重新悬停照旧展开。
+    // 离开**不**复位（根因回归闸）：点卡片里的按钮会让卡片自己 invisible ⇒ 指针脚下那一下
+    // 被判定成「离开这一格」；复位若挂在这条离开事件上，刚收起的会被立刻抹掉。
     // React 的 onMouseLeave 走 `mouseout` 委托（和 onBlur 走 focusout 一样），
     // 裸派发 mouseleave 收不到；relatedTarget 落在格子外面才会被合成成 leave。
     const cell = card.parentElement!;
@@ -313,7 +316,18 @@ describe("AppRail 点击路由", () => {
         }),
       ),
     );
-    expect(reveal(), "离开后要复位").toBe(true);
+    expect(reveal(), "离开不该复位").toBe(false);
+
+    // 指针**重新进入**这一格 → 复位，重新悬停照旧展开（onMouseEnter 由 mouseover 合成）。
+    await act(async () =>
+      cell.dispatchEvent(
+        new MouseEvent("mouseover", {
+          bubbles: true,
+          relatedTarget: document.body,
+        }),
+      ),
+    );
+    expect(reveal(), "重新进入后要复位").toBe(true);
 
     // 再点一次 → 又立刻收起（同样要 bubbles：React 的 onClick 是根上的委托）
     await act(async () =>
@@ -326,6 +340,29 @@ describe("AppRail 点击路由", () => {
     // 键盘焦点回到这一格 → 复位（否则"先用鼠标点过、再改用键盘"的人再也看不到卡片）
     await act(async () => buttonFor("navRail.ideas").focus());
     expect(reveal(), "聚焦要能把它找回来").toBe(true);
+  });
+
+  it("点卡片里的「记一笔」也把卡片收起来", async () => {
+    // 与这一格图标那颗按钮同一条规则（用户 2026-10-11：面板/卡片里的按钮点过就该消失）。
+    // 只认指针点击：键盘激活（detail === 0）不摘。
+    await mountRail("chat");
+    const card = container.querySelector('[data-testid="ideas-rail-card"]')!;
+    const reveal = () => card.className.includes("group-hover:visible");
+    expect(reveal()).toBe(true);
+
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="ideas-rail-capture"]')!
+        .dispatchEvent(
+          new MouseEvent("click", {
+            bubbles: true,
+            cancelable: true,
+            detail: 1,
+          }),
+        ),
+    );
+
+    expect(reveal(), "点过「记一笔」要收起卡片").toBe(false);
   });
 
   it("键盘激活（detail === 0）不摘展开类：Shift+Tab 回来卡片还在", async () => {
