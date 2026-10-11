@@ -119,7 +119,7 @@ export function SettingsArchived() {
             <div
               key={session.id}
               onClick={() => toggleSelect(session.id)}
-              className={`group cursor-pointer rounded-lg px-3 py-2 transition-colors ${
+              className={`group rounded-lg px-3 py-2 transition-colors ${
                 isSelected ? "bg-primary/10" : "hover:bg-accent/60"
               }`}
             >

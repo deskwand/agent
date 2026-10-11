@@ -570,7 +570,7 @@ function renderDiffContent(
   if (diffViewMode === "side-by-side") {
     const rows = toSideBySide(diffData.lines);
     return (
-      <div className="text-xs leading-[1.6] font-mono overflow-x-auto">
+      <div className="selectable text-xs leading-[1.6] font-mono overflow-x-auto">
         {rows.map((row, i) => {
           if (row.hunk) {
             return (

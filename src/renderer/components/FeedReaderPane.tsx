@@ -114,7 +114,7 @@ export function FeedReaderPane({
 
         {item.summary ? (
           <div
-            className="mb-3 border-l-2 border-primary pl-3 text-sm text-foreground"
+            className="selectable mb-3 border-l-2 border-primary pl-3 text-sm text-foreground"
             style={{ lineHeight: 1.8 }}
           >
             {item.summary}

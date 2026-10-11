@@ -86,7 +86,9 @@ describe("AttachmentTiles", () => {
     const onOpen = vi.fn();
     render([{ ...fileTile, onOpen }]);
     const tile = container.querySelector("[title]") as HTMLElement;
-    expect(tile.className).toContain("cursor-pointer");
+    // 可点击的条件信号：2026-10-11 起从手型光标改为 hover 底色
+    // （原生行不换光标，见 src/tests/renderer/native-cursor-guard.test.ts）。
+    expect(tile.className).toContain("hover:bg-accent");
     act(() => tile.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
@@ -104,7 +106,7 @@ describe("AttachmentTiles", () => {
   it("没传 onOpen 的文件磁贴不可点击", () => {
     render([fileTile]);
     const tile = container.querySelector("[title]") as HTMLElement;
-    expect(tile.className).not.toContain("cursor-pointer");
+    expect(tile.className).not.toContain("hover:bg-accent");
   });
 
   it("删除角标补了 px-0：20px 的圆点不再被缺省档撑成 32 宽", () => {

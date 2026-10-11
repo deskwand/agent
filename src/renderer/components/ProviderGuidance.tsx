@@ -66,7 +66,7 @@ export function CommonProviderSetupsCard({
       <CollapsibleTrigger asChild>
         <Button variant="ghost"
           type="button"
-          className="flex w-full cursor-pointer items-center justify-between gap-3 text-sm font-medium text-foreground h-auto px-0 hover:bg-transparent hover:text-current"
+          className="flex w-full items-center justify-between gap-3 text-sm font-medium text-foreground h-auto px-0 hover:bg-transparent hover:text-current"
         >
           <span className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary-text" />

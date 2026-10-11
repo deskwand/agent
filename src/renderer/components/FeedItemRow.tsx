@@ -47,7 +47,7 @@ export function FeedItemRow({
         if (isSelectingText()) return;
         onOpen(item.id);
       }}
-      className={`relative flex cursor-pointer items-start gap-3 border-b border-border/40 px-4 py-2.5 ${
+      className={`selectable relative flex items-start gap-3 border-b border-border/40 px-4 py-2.5 ${
         selected ? "bg-card" : "hover:bg-accent"
       }`}
     >

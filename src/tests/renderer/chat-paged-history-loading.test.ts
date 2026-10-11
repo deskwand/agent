@@ -847,7 +847,9 @@ describe("ChatView dock jump vs bottom reclamation", () => {
     });
     expect(hasUser(300, scrollContainer.textContent ?? "")).toBe(true);
 
-    // 模拟 smooth scrollIntoView 的第一个 scroll 事件（scrollTop 尚未变化）
+    // 跳转后随之而来的 scroll 事件：窗口起点必须保持，不得因 isAtBottomRef 残留
+    // 而被回收分支拉回尾部。2026-10-11 起程序化跳转都是 behavior:"instant"，
+    // 所以这里守的是「陈旧 scroll 事件不得回收窗口」这个防御性不变量，与平滑滚动无关。
     await act(async () => {
       scrollContainer.dispatchEvent(new Event("scroll"));
       await Promise.resolve();

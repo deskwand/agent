@@ -200,7 +200,7 @@ const TickMark = memo(function TickMark({
           e.stopPropagation();
           onClick();
         }}
-        className="absolute cursor-pointer rounded-full z-20"
+        className="absolute rounded-full z-20"
         style={{
           left: HALF_ZONE,
           top: y,
@@ -314,7 +314,7 @@ export const MessageNavRail = memo(function MessageNavRail({
       }
       container
         .querySelector(`[data-message-id="${tick.messageId}"]`)
-        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+        ?.scrollIntoView({ block: "start", behavior: "instant" });
     },
     [scrollContainerRef, n, ticks, onTickSelect],
   );

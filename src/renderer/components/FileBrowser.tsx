@@ -41,7 +41,7 @@ function FileTreeRow({
 }) {
   return (
     <div
-      className={`group flex items-center gap-1 py-0.5 px-2 hover:bg-accent rounded cursor-pointer text-xs select-none ${
+      className={`group flex items-center gap-1 py-0.5 px-2 hover:bg-accent rounded text-xs select-none ${
         selected ? "bg-primary/10 ring-1 ring-primary/20" : ""
       }`}
       style={{ paddingLeft: `${row.depth * 16 + 8}px` }}
@@ -333,7 +333,7 @@ export function FileBrowser({ width }: { width: number }) {
                           handleFileOpen(fullPath, name);
                         }
                       }}
-                      className="group w-full flex items-center gap-2 px-2 py-0.5 hover:bg-accent rounded text-xs text-left cursor-pointer"
+                      className="group w-full flex items-center gap-2 px-2 py-0.5 hover:bg-accent rounded text-xs text-left"
                     >
                       <FileTypeIcon kind={getFileKind(name)} size={16} />
                       <span className="truncate text-foreground">{name}</span>

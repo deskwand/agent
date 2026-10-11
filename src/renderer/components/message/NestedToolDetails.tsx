@@ -63,7 +63,7 @@ export function NestedToolDetails({
           <CollapsibleTrigger asChild>
             <Button variant="ghost"
               type="button"
-              className={`cursor-pointer ${
+              className={`${
                 trace.status === "error" ? "text-destructive" : "text-muted-foreground"
               }`}
             >

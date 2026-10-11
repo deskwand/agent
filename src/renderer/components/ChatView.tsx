@@ -1146,17 +1146,18 @@ export function ChatView() {
     (messageId: string) => {
       const container = scrollContainerRef.current;
       if (!container) return;
-      // A dock jump is an explicit leave-bottom intent: without this, the
-      // smooth scrollIntoView's first scroll event can still see
-      // isAtBottomRef=true (scrollTop has not moved yet) and the bottom
-      // reclamation branch would snap the window back to the tail,
-      // removing the very message we just jumped to.
+      // A dock jump is an explicit leave-bottom intent, cleared BEFORE the
+      // scroll so the scroll event the jump emits is not read as "still
+      // following the bottom" — the reclamation branch would then snap the
+      // window back to the tail, removing the very message we jumped to.
+      // (2026-10-11 起跳转是 behavior:"instant"；这条理由与平滑无关 ——
+      //  瞬时跳转同样会发出 scroll 事件。)
       isAtBottomRef.current = false;
       const target = container.querySelector(
         `[data-message-id="${messageId}"]`,
       );
       if (target) {
-        target.scrollIntoView({ block: "start", behavior: "smooth" });
+        target.scrollIntoView({ block: "start", behavior: "instant" });
         return;
       }
       // Target is outside the render window: slide the window to it and
@@ -1181,7 +1182,7 @@ export function ChatView() {
     pendingDockJumpRef.current = null;
     scrollContainerRef.current
       ?.querySelector(`[data-message-id="${messageId}"]`)
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+      ?.scrollIntoView({ block: "start", behavior: "instant" });
   }, [visibleMessageStartIndex]);
 
   const handleSelectBackgroundAgent = useCallback(
@@ -1453,10 +1454,13 @@ export function ChatView() {
       if (followChange === false) {
         isAtBottomRef.current = false;
         setShowScrollToBottom(true);
-        // Chromium cancels in-flight programmatic smooth-scroll animations
-        // on user wheel input, so an ongoing button/send glide cannot reach
-        // the bottom and falsely revive follow. Browser behavior dependency
-        // (not testable in jsdom) — covered by manual checklist item 7.
+        // Upward wheel input = the user left the bottom, so follow is cleared
+        // here, at the gesture, rather than from a scroll event.
+        // (Before 2026-10-11 this also guarded an in-flight smooth scroll that
+        // user wheel input cancelled mid-glide, so a button/send glide could
+        // not reach the bottom and falsely revive follow. Programmatic scrolls
+        // are all behavior:"instant" now, so that hazard is gone — and with it
+        // the "not testable in jsdom" caveat this comment used to carry.)
       } else if (followChange === true) {
         // Downward wheel at the physical bottom: the user re-commits to the
         // bottom, so follow resumes here (not via a scroll event — a short
@@ -1554,7 +1558,7 @@ export function ChatView() {
     if (isOwnNewMessage) {
       // Sending a message is an explicit return-to-bottom action.
       isAtBottomRef.current = true;
-      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      container.scrollTo({ top: container.scrollHeight, behavior: "instant" });
     } else if (isAtBottomRef.current) {
       // Any content growth (streaming tick, new message, in-place refresh)
       // pins unconditionally — no debounce, no guard: idempotent.
@@ -1601,7 +1605,7 @@ export function ChatView() {
     const rafId = requestAnimationFrame(() => {
       const c = scrollContainerRef.current;
       if (c && typeof c.scrollTo === "function") {
-        c.scrollTo({ top: c.scrollHeight, behavior: "auto" });
+        c.scrollTo({ top: c.scrollHeight, behavior: "instant" });
       }
     });
     return () => cancelAnimationFrame(rafId);
@@ -1978,7 +1982,7 @@ export function ChatView() {
     restoreTailWindow();
     setShowScrollToBottom(false);
     const c = scrollContainerRef.current;
-    c?.scrollTo({ top: c.scrollHeight, behavior: "smooth" });
+    c?.scrollTo({ top: c.scrollHeight, behavior: "instant" });
   };
 
   // An expansion frame must restore the latest committed tail window.
@@ -2024,7 +2028,7 @@ export function ChatView() {
         >
           <div
             ref={messagesContainerRef}
-            className="w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
+            className="selectable w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
           >
             {mergedTurnEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-28 text-muted-foreground space-y-3 text-center">

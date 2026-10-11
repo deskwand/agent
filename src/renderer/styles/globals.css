@@ -747,6 +747,31 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* 原生约定：UI 骨架不可选中，只有内容区可选中（第 22 项）。
+       内容面见下面那条 allowlist；判定理由见
+       design-docs/2026-10-11-native-feel-audit.md 第 22 项。 */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* 内容区可选中：原生文本框/代码块/正文都能拖选复制。
+     按 `role` 整类放开弹层是刻意的 —— Radix 弹层里常有一串要复制的命令与配置
+     （PermissionDialog / MCPConfigDialog / SudoPasswordDialog），逐个点名容易漏；
+     Radix Popover 的 Content 也是 role="dialog"，顺带覆盖。
+     `[contenteditable]` 必须在列：聊天编辑器的划词与 slash 菜单靠 window.getSelection()
+     算偏移（utils/editor-content.ts:122/169），漏了就会坏。 */
+  input,
+  textarea,
+  [contenteditable],
+  pre,
+  code,
+  [role="dialog"],
+  [role="alertdialog"],
+  .prose-chat,
+  .message-user-text,
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   /* Native date / datetime pickers follow OS-level color scheme */
@@ -773,6 +798,22 @@
   /* Buttons: suppress browser default outline; keep a subtle ring for keyboard focus only */
   button {
     @apply focus:outline-none focus-visible:ring-1 focus-visible:ring-primary;
+  }
+
+  /* 原生按钮不换光标。
+     ⚠️ 这条压的是 **Tailwind v3 preflight**：它自带
+       `button, [role="button"] { cursor: pointer }`
+     （node_modules/tailwindcss/lib/css/preflight.css，构建时生成，**不在任何源码文件里**）。
+     2026-10-11 用户报障「鼠标挪到左下角头像上现在是一个手」就是它 ——
+     删掉源码里的 cursor-pointer 类删不掉这条，413 个 <Button> + 51 个 <button> +
+     4 个 role="button" 当时全都还挂着手型光标。
+     声明放 @layer base（preflight 同层且在前，同名选择器后者胜）⇒ 压回 default；
+     utilities 层的 disabled:cursor-not-allowed / cursor-col-resize / cursor-grab 排在 base 之后，
+     仍然生效；`:disabled { cursor: default }` 也是 preflight 自带的。
+     守卫：src/tests/renderer/native-cursor-guard.test.ts 最后一条用例会盯住这里。 */
+  button,
+  [role="button"] {
+    cursor: default;
   }
 
   /* Native checkboxes/radios follow the theme accent instead of OS defaults.
@@ -854,6 +895,18 @@
   .titlebar-no-drag {
     -webkit-app-region: no-drag;
     app-region: no-drag;
+  }
+
+  /* 显式声明「这块要能选中」。骨架在 body 上默认禁掉后，任何内容容器都挂它。
+     为什么 allowlist 里已有 .selectable 还要再来一条：allowlist 在 @layer base，
+     对**同时带 `select-none` 的元素**压不过 utilities 层（utilities 胜 base）。
+     这一份与 `select-none` 同层，且在编译产物里排在它之后（实测 .select-none 在 3075 行、
+     .selectable 在 5512 行）⇒ 同时挂两者时选中生效。
+     注意：今天全仓还没有元素同时带 `select-none` 与 `selectable`，这一份是给那种情形预置的；
+     把它当成「allowlist 的重复」删掉会失去这条逃生通道（2026-10-11 评审修正了此处的旧论证）。 */
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   /* Message bubbles */

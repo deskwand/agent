@@ -263,7 +263,7 @@ function DayView({
           {hours.map((h) => (
             <div
               key={h}
-              className="border-t border-border/60 cursor-pointer hover:bg-accent/50"
+              className="border-t border-border/60 hover:bg-accent/50"
               style={{ height: HOUR_HEIGHT }}
               onClick={() => {
                 const d = new Date(date);
@@ -290,7 +290,7 @@ function DayView({
             return (
               <div
                 key={`${ev.taskId}-${ev.start}`}
-                className={`absolute left-1 right-1 rounded-lg px-2 py-1 cursor-pointer overflow-hidden border transition-opacity ${
+                className={`absolute left-1 right-1 rounded-lg px-2 py-1 overflow-hidden border transition-opacity ${
                   isDisabled ? "opacity-40" : ""
                 } ${ev.isRepeating ? "border-dashed" : "border-solid"}`}
                 style={{
@@ -403,7 +403,7 @@ function WeekView({
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="border-t border-border/60 cursor-pointer hover:bg-accent/50"
+                    className="border-t border-border/60 hover:bg-accent/50"
                     style={{ height: HOUR_HEIGHT }}
                     onClick={() => {
                       const d = new Date(day);
@@ -428,7 +428,7 @@ function WeekView({
                   return (
                     <div
                       key={`${ev.taskId}-${ev.start}`}
-                      className={`absolute left-0.5 right-0.5 rounded px-1 py-0.5 cursor-pointer overflow-hidden border transition-opacity ${
+                      className={`absolute left-0.5 right-0.5 rounded px-1 py-0.5 overflow-hidden border transition-opacity ${
                         isDisabled ? "opacity-40" : ""
                       } ${ev.isRepeating ? "border-dashed" : "border-solid"}`}
                       style={{
@@ -510,7 +510,7 @@ function MonthView({
           return (
             <div
               key={idx}
-              className={`border-r border-b border-border/60 p-1 cursor-pointer hover:bg-accent/30 transition-colors ${
+              className={`border-r border-b border-border/60 p-1 hover:bg-accent/30 transition-colors ${
                 inMonth ? "" : "opacity-40"
               } ${idx % 7 === 0 ? "border-l" : ""}`}
               onClick={() => {
@@ -585,7 +585,7 @@ function renderMonthCellEvents(
       items.push(
         <div
           key={taskId}
-          className={`text-xs leading-tight px-1 rounded truncate cursor-pointer ${opacity}`}
+          className={`text-xs leading-tight px-1 rounded truncate ${opacity}`}
           style={{ backgroundColor: `${color}18`, color }}
           title={first.title}
           onClick={(e: React.MouseEvent) => {
@@ -608,7 +608,7 @@ function renderMonthCellEvents(
         items.push(
           <div
             key={`${ev.taskId}-${ev.time}`}
-            className={`text-xs leading-tight px-1 rounded truncate cursor-pointer ${opacity}`}
+            className={`text-xs leading-tight px-1 rounded truncate ${opacity}`}
             style={{ backgroundColor: `${color}18`, color }}
             title={`${ev.title} ${ev.time}`}
             onClick={(e: React.MouseEvent) => {

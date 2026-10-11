@@ -1096,7 +1096,7 @@ export function VaultView(): JSX.Element {
                         return (
                           <label
                             key={skill.name}
-                            className={`flex cursor-pointer select-none items-center gap-3 px-4 py-3 ${
+                            className={`flex select-none items-center gap-3 px-4 py-3 ${
                               isSelected ? "bg-primary/10" : ""
                             }`}
                           >

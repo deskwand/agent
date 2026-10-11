@@ -535,7 +535,7 @@ export const ContentBlockView = memo(function ContentBlockView({
             <img
               src={imageSrc}
               alt={t("messageCard.pastedContentAlt")}
-              className="h-auto max-h-[240px] w-auto max-w-[240px] rounded-lg border border-border cursor-pointer hover:opacity-90 transition-opacity"
+              className="h-auto max-h-[240px] w-auto max-w-[240px] rounded-lg border border-border hover:opacity-90 transition-opacity"
               onClick={handleImageClick}
             />
           </div>
@@ -560,7 +560,7 @@ export const ContentBlockView = memo(function ContentBlockView({
 
         return (
           <div
-            className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border overflow-hidden ${isInteractive ? "cursor-pointer hover:bg-accent transition-colors" : ""}`}
+            className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border overflow-hidden ${isInteractive ? "hover:bg-accent transition-colors" : ""}`}
             onClick={() => {
               void (async () => {
                 if (!attachmentPath || !isInteractive) return;

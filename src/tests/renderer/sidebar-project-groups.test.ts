@@ -954,7 +954,9 @@ describe("Sidebar project groups", () => {
     const title = Array.from(container.querySelectorAll("div")).find(
       (element) => element.textContent === "Project chat",
     );
-    const row = title?.closest(".group.relative.cursor-pointer");
+    // 用会话行的稳定锚点定位，不用一串表现类 —— 2026-10-11 移除了行上的手型光标类，
+    // 原选择器 `.group.relative.cursor-pointer` 会直接查不到（Sidebar.tsx:775 的 data-session-id 才是意图锚点）。
+    const row = title?.closest("[data-session-id]");
     expect(row?.textContent).not.toContain("deskwand");
 
     await search("deskwand");

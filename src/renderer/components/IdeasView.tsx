@@ -565,7 +565,7 @@ export function IdeasView(): JSX.Element {
                       if (idea.name !== ideasSelectedName) commit(true);
                       selectIdea(idea.name);
                     }}
-                    className={`group flex cursor-pointer items-start gap-1.5 rounded-md px-2.5 py-2 ${
+                    className={`group flex items-start gap-1.5 rounded-md px-2.5 py-2 ${
                       idea.name === ideasSelectedName
                         ? "bg-accent"
                         : "hover:bg-muted"

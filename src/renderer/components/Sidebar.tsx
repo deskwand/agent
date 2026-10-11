@@ -780,7 +780,7 @@ export function Sidebar({
             current === session.id ? null : current,
           );
         }}
-        className={`group relative cursor-pointer rounded-lg px-2.5 py-1 transition-colors ${
+        className={`group relative rounded-lg px-2.5 py-1 transition-colors ${
           isActive ? "bg-accent" : "hover:bg-accent/60"
         }`}
       >

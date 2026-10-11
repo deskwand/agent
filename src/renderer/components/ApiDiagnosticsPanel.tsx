@@ -204,7 +204,7 @@ function FailureDetail({ step }: { step: DiagnosticStep }) {
   })();
 
   return (
-    <div className="mt-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs">
+    <div className="selectable mt-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs">
       {step.error && <p className="text-destructive font-medium">{step.error}</p>}
       {fixText && <p className="mt-1 text-muted-foreground">{fixText}</p>}
     </div>

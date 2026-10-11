@@ -112,7 +112,6 @@ export function ArtifactPanel() {
         bg-background
         border border-border/40 rounded-2xl shadow-2xl
         flex flex-col overflow-hidden
-        animate-fade-in
       "
       >
         {/* Header */}
@@ -143,7 +142,7 @@ export function ArtifactPanel() {
                 <div
                   key={artifact.path || artifact.label || `artifact-${index}`}
                   className={`group flex items-center gap-2.5 px-4 py-2 transition-colors ${
-                    canClick ? "cursor-pointer hover:bg-accent" : ""
+                    canClick ? "hover:bg-accent" : ""
                   }`}
                   onClick={() => {
                     if (!canClick) return;
@@ -152,7 +151,7 @@ export function ArtifactPanel() {
                   title={artifactPath || undefined}
                 >
                   <FileTypeIcon kind={getFileKind(artifactPath)} size={16} />
-                  <span className="text-sm text-foreground truncate flex-1">
+                  <span className="selectable text-sm text-foreground truncate flex-1">
                     {label}
                   </span>
                   {artifactPath && (

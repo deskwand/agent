@@ -143,7 +143,7 @@ export function ExtensionDialogs() {
                 {dialog.options.map((option) => (
                   <li
                     key={option}
-                    className="cursor-pointer border-b border-border/50 px-3 py-2 text-sm hover:bg-primary"
+                    className="border-b border-border/50 px-3 py-2 text-sm hover:bg-primary"
                     onClick={() => respond(option)}
                   >
                     {option}

@@ -272,7 +272,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
             <div className="flex items-start gap-2">
               <Button
                 variant="ghost"
-                className="font-mono text-xs text-muted-foreground break-all text-left hover:text-primary-text hover:underline cursor-pointer bg-transparent border-none p-0 h-auto"
+                className="font-mono text-xs text-muted-foreground break-all text-left hover:text-primary-text hover:underline bg-transparent border-none p-0 h-auto"
                 onClick={() => window.electronAPI.logs.open()}
                 title={t("logs.openFolder")}
               >

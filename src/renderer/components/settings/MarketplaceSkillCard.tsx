@@ -70,7 +70,7 @@ function MarketplaceCardView({
               ))}
             </div>
           ) : null}
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+          <p className="selectable text-sm text-muted-foreground line-clamp-2 mb-2">
             {desc}
           </p>
           <div className="flex gap-4 text-xs text-muted-foreground">

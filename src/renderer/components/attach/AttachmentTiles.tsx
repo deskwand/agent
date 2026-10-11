@@ -82,7 +82,7 @@ export function AttachmentTiles({ tiles }: { tiles: AttachmentTile[] }) {
                 src={tile.url}
                 alt={tile.alt}
                 onClick={tile.onOpen}
-                className="block h-full w-full cursor-pointer object-cover transition-opacity hover:opacity-90"
+                className="block h-full w-full object-cover transition-opacity hover:opacity-90"
               />
               <RemoveButton label={removeLabel} onClick={tile.onRemove} />
             </div>
@@ -122,7 +122,7 @@ export function AttachmentTiles({ tiles }: { tiles: AttachmentTile[] }) {
             key={tile.key}
             title={tile.hint}
             onClick={tile.onOpen}
-            className={`${TILE_CLASS} flex flex-col items-center justify-center bg-muted px-2${tile.onOpen ? " cursor-pointer hover:bg-accent" : ""}`}
+            className={`${TILE_CLASS} flex flex-col items-center justify-center bg-muted px-2${tile.onOpen ? " hover:bg-accent" : ""}`}
           >
             <FileText
               className="h-6 w-6 shrink-0 text-muted-foreground"

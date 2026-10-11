@@ -55,7 +55,7 @@ export function GlobalNoticeToast({ notice, onDismiss, onAction }: Props) {
         className={`max-w-sm rounded-4xl border bg-background/95 shadow-elevated ${tone.border}`}
       >
         <div className="flex items-start gap-3 px-4 py-3">
-          <div className={`flex-1 text-sm leading-relaxed ${tone.text}`}>
+          <div className={`selectable flex-1 text-sm leading-relaxed ${tone.text}`}>
             {message}
           </div>
           <Button variant="ghost"
