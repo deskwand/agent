@@ -33,6 +33,7 @@ import {
 import {
   buildSidebarSessionGroups,
   isSessionBusy,
+  splitSunkSessions,
   type SidebarPins,
   type SidebarProjectGroup,
 } from "../utils/sidebar-session-groups";
@@ -761,6 +762,7 @@ export function Sidebar({
     session: Session,
     showRelativeTime: boolean,
     isProjectSession = false,
+    showCompletedMark = true,
   ) => {
     const isActive = activeSessionId === session.id;
     const hasPendingAskUser = sessionHasPendingAskUser(session.id);
@@ -824,7 +826,7 @@ export function Sidebar({
                 className={`text-sm font-normal leading-5 truncate flex-1 ${
                   isActive
                     ? "text-foreground"
-                    : session.completedAt
+                    : session.completedAt && showCompletedMark
                       ? "text-muted-foreground/60"
                       : "text-muted-foreground"
                 }`}
@@ -870,7 +872,7 @@ export function Sidebar({
                         <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
                       )}
                     </span>
-                  ) : session.completedAt ? (
+                  ) : session.completedAt && showCompletedMark ? (
                     <span
                       className="h-4 w-4 flex items-center justify-end text-muted-foreground"
                       role="img"
@@ -1042,7 +1044,9 @@ export function Sidebar({
     );
   };
 
-  const renderSessionList = (
+  // 会话行的渲染。主排与「已完成」组各走一遍 —— 名字从 renderSessionList 让出来，
+  // 内容一字不改（含置顶拆分、5 条上限、「展开更多 / 收起」）。
+  const renderSessionRows = (
     groupKey: string,
     groupSessions: Session[],
     isProjectList = false,
@@ -1111,6 +1115,77 @@ export function Sidebar({
               </Button>
             )}
           </div>
+        )}
+      </>
+    );
+  };
+
+  const renderSessionList = (
+    groupKey: string,
+    groupSessions: Session[],
+    isProjectList = false,
+  ) => {
+    // 切分只做一次、在渲染之前：主排那 5 条上限、「展开更多」的计数、
+    // active 的自动展开都只看得见主排 ✓。
+    const { active: runSessions, completed: completedSessions } =
+      splitSunkSessions(groupSessions, {
+        isBusy: (session) =>
+          isSessionBusy(
+            session,
+            sessionStates[session.id]?.backgroundAgents,
+            sessionHasPendingAskUser(session.id),
+          ),
+      });
+
+    // 组头沿用折叠机制的既有 key 空间（`projectExpansionOverrides` + 那份持久化）
+    const completedKey = `${groupKey}::completed`;
+    // 优先级照 `resolveProjectExpanded` 抄：搜索强制展开（否则命中的会话在折叠堆里，
+    // 搜到了却看不见）→ 用户的显式开合 → 组里装着当前打开的会话就展开。
+    //
+    // 最后那一档是「打勾后行不能从眼前消失」的正解：把**容器**打开，而不是把行搬走。
+    // 曾把这条兼进谓词（`session.id === activeSessionId ⇒ 不沉`），结果是
+    // 从组里点开一条会话它就会被弹回主排 ✗ —— 成员资格不能取决于谁开着。
+    // 用户显式的开合仍然优先：他真要收起一个装着活跃会话的组，就由他 ✓。
+    const completedExpanded = normalizedQuery
+      ? true
+      : (projectExpansionOverrides.get(completedKey) ??
+        completedSessions.some(
+          (session) => session.id === activeSessionId,
+        ));
+
+    return (
+      <>
+        {renderSessionRows(groupKey, runSessions, isProjectList)}
+        {completedSessions.length > 0 && (
+          <>
+            {/* 组头 = 「展开更多」那一行的同款：纯文字、左对齐、无图标、无配套「收起」
+                （再点一次就是收起）。左内边距必须自己给 —— `SESSION_OVERFLOW_BUTTON_CLASS`
+                自 45d09601 起只剩 `pr-3`，已经没有左内边距可继承 ✗ */}
+            <Button variant="ghost"
+              type="button"
+              aria-expanded={completedExpanded}
+              onClick={() => {
+                requestSectionMotion(completedKey);
+                setProjectExpanded(completedKey, !completedExpanded);
+              }}
+              className={`${SESSION_OVERFLOW_BUTTON_CLASS} flex-1 text-left ${
+                isProjectList ? "pl-9" : "pl-3"
+              }`}
+            >
+              {t("sidebar.completedGroup", { count: completedSessions.length })}
+            </Button>
+            <SidebarAnimatedSection
+              expanded={completedExpanded}
+              motionVersion={sectionMotionVersions.get(completedKey) ?? 0}
+            >
+              {/* 组内全量展示，不再套一层折叠（决策 6）；`showCompletedMark=false`
+                  把灰标题和尾槽勾号一起撤掉，相对时间还给这一列 ✓。
+                  顺序由 `splitSunkSessions` 保持（置顶次序随原数组带走）✓。 */}
+              {completedSessions.map((session) =>
+                renderSessionItem(session, true, isProjectList, false),
+              )}
+            </SidebarAnimatedSection>
+          </>
         )}
       </>
     );

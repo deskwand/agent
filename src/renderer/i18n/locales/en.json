@@ -1010,6 +1010,7 @@
     "markComplete": "Mark complete",
     "markIncomplete": "Unmark complete",
     "completed": "Completed",
+    "completedGroup": "Completed ({{count}})",
     "renameFailed": "Failed to rename session",
     "moreActions": "More actions",
     "automation": "Automation",

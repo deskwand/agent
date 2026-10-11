@@ -1010,6 +1010,7 @@
     "markComplete": "标记完成",
     "markIncomplete": "取消完成",
     "completed": "已完成",
+    "completedGroup": "已完成（{{count}}）",
     "renameFailed": "会话重命名失败",
     "moreActions": "更多操作",
     "automation": "自动化",

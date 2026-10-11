@@ -113,6 +113,34 @@ describe("Sidebar session completion", () => {
     );
   }
 
+  // 组头是纯文字按钮：按渲染出来的文案找，不按 data-* 找（文案本身也要被钉住）
+  function completedGroupHeader(count: number): HTMLButtonElement | null {
+    const label = i18n.t("sidebar.completedGroup", { count });
+    return (
+      (Array.from(
+        document.body.querySelectorAll<HTMLButtonElement>("button"),
+      ).find((node) => node.textContent?.trim() === label) as
+        | HTMLButtonElement
+        | undefined) ?? null
+    );
+  }
+
+  function toggleByLabel(label: string): HTMLButtonElement {
+    const button = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button[aria-expanded]"),
+    ).find((candidate) => candidate.textContent?.includes(label));
+    if (!button) throw new Error(`toggle not found: ${label}`);
+    return button;
+  }
+
+  // 查 document.body 而不是 container：菜单与确认框经 Portal 挂在 body 下。
+  // body 是 container 的超集，侧栏自己的按钮照样找得到。
+  function findButton(text: string): HTMLButtonElement | undefined {
+    return Array.from(document.body.querySelectorAll("button")).find(
+      (button) => button.textContent === text,
+    );
+  }
+
   function sessionMoreButton(sessionId: string): HTMLButtonElement {
     const button = sessionRow(sessionId).querySelector(
       `button[aria-label="${i18n.t("sidebar.moreActions")}"]`,
@@ -148,9 +176,11 @@ describe("Sidebar session completion", () => {
     expect(zh.sidebar.markComplete).toBe("标记完成");
     expect(zh.sidebar.markIncomplete).toBe("取消完成");
     expect(zh.sidebar.completed).toBe("已完成");
+    expect(zh.sidebar.completedGroup).toBe("已完成（{{count}}）");
     expect(en.sidebar.markComplete).toBe("Mark complete");
     expect(en.sidebar.markIncomplete).toBe("Unmark complete");
     expect(en.sidebar.completed).toBe("Completed");
+    expect(en.sidebar.completedGroup).toBe("Completed ({{count}})");
   });
 
   it("悬停格一键标记完成，且不会顺带选中这个会话", async () => {
@@ -184,36 +214,41 @@ describe("Sidebar session completion", () => {
     expect(menuAction(i18n.t("sidebar.markComplete"))).toBeTruthy();
   });
 
-  it("已完成的会话：右侧那一格只显示勾号（顶替相对时间），且勾号不可点", async () => {
+  it("已完成的会话离开主排，收进「已完成（1）」组；组内是普通行，尾槽回到相对时间", async () => {
+    useAppStore.setState({ activeSessionId: null });
     await render([
-      session("s1", { title: "会话一", completedAt: 1_700_000_000_000 }),
+      session("s1", {
+        title: "会话一",
+        completedAt: 1_700_000_000_000,
+        updatedAt: 1,
+      }),
     ]);
 
-    const badge = completedBadge("s1");
-    expect(badge).toBeTruthy();
-    // 状态标记不是按钮：动作已经有悬停格与菜单两处入口
-    expect(badge?.tagName).not.toBe("BUTTON");
-    // 运行中 / 完成 / 时间 是这条链：那一格只装一件东西
-    // （并排会撑爆 72px 的盒子）
-    expect(badge?.parentElement?.children).toHaveLength(1);
-    // 比上一条更强的一刀：那一格只有图标、没有任何文本 —— 相对时间没被顺带渲染
-    expect(badge?.parentElement?.textContent?.trim()).toBe("");
-    // 颜色：中性，且**不得**是成功色（绿色在本仓是“成功/连通正常”的语义）
-    expect(badge?.className).toContain("text-muted-foreground");
-    expect(badge?.className).not.toContain("text-success");
-    // 右缘对齐靠 justify-end（这一列的既有规矩，见 1786 那条测试的注释）
-    expect(badge?.className).toContain("justify-end");
+    // 主排里没有它 —— 从根上没有「一眼区分」这回事了
+    expect(container.querySelector('[data-session-id="s1"]')).toBeNull();
 
-    await hoverSession("s1");
-    expect(markToggle("s1").getAttribute("title")).toBe(
-      i18n.t("sidebar.markIncomplete"),
-    );
-    // 切换键要把状态也暴露给读屏（文案说明动作，aria-pressed 说明当前状态）
-    expect(markToggle("s1").getAttribute("aria-pressed")).toBe("true");
+    const header = completedGroupHeader(1);
+    expect(header, "「已完成（1）」组头").toBeTruthy();
+    // 组头是纯文字：没有 chevron 图标，也没有配套的「收起」
+    expect(header?.querySelector("svg")).toBeNull();
+    expect(findButton(i18n.t("sidebar.showLessSessions"))).toBeUndefined();
+    // 收起态：组内行根本不在 DOM 里（SidebarAnimatedSection 用 `rendered &&` 渲染子层）
+    expect(header?.getAttribute("aria-expanded")).toBe("false");
 
-    await act(async () => markToggle("s1").click());
+    await act(async () => header?.click());
     await flush();
-    expect(ipc.setSessionCompleted).toHaveBeenCalledWith("s1", false);
+
+    const title = sessionRow("s1").querySelector(".truncate");
+    // 组内是普通行：不再置灰（状态由容器承载，不再是第三档灰度）
+    expect(title?.className).toContain("text-muted-foreground");
+    expect(title?.className).not.toContain("text-muted-foreground/60");
+    // 尾槽把相对时间还回去了，勾号不在
+    expect(completedBadge("s1")).toBeNull();
+
+    // 再点一次就是收起 —— 没有第二个按钮
+    await act(async () => completedGroupHeader(1)?.click());
+    await flush();
+    expect(container.querySelector('[data-session-id="s1"]')).toBeNull();
   });
 
   it("运行中压过完成：右侧那一格只显示运行中，勾号让位", async () => {
@@ -240,12 +275,23 @@ describe("Sidebar session completion", () => {
     expect(row.querySelector(".truncate")?.className).toContain(
       "text-muted-foreground/60",
     );
+
+    // 也进不了完成组 —— isBusy 挡在谓词第一层
+    expect(completedGroupHeader(1)).toBeNull();
   });
 
   it("菜单项随状态翻转：已完成时只有「取消完成」，点了就取消", async () => {
+    useAppStore.setState({ activeSessionId: null });
     await render([
-      session("s1", { title: "会话一", completedAt: 1_700_000_000_000 }),
+      session("s1", {
+        title: "会话一",
+        completedAt: 1_700_000_000_000,
+        updatedAt: 1,
+      }),
     ]);
+
+    await act(async () => completedGroupHeader(1)?.click());
+    await flush();
 
     await openSessionMenu("s1");
     expect(menuAction(i18n.t("sidebar.markIncomplete"))).toBeTruthy();
@@ -254,25 +300,35 @@ describe("Sidebar session completion", () => {
       document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
     ).map((node) => node.textContent?.trim());
     expect(labels).not.toContain(i18n.t("sidebar.markComplete"));
-    await act(async () => menuAction(i18n.t("sidebar.markIncomplete")).click());
+    await act(async () =>
+      menuAction(i18n.t("sidebar.markIncomplete"))?.click(),
+    );
     await flush();
 
     expect(ipc.setSessionCompleted).toHaveBeenCalledWith("s1", false);
   });
 
-  it("当前打开的已完成会话：标题仍是正常前景色（isActive 优先于置灰）", async () => {
+  it("当前打开的已完成会话：它沉在组里、组替它开着，标题仍是正常前景色（isActive 压过组内的不置灰）", async () => {
+    useAppStore.setState({ activeSessionId: null });
     await render([
       session("s1", { title: "会话一", completedAt: 1_700_000_000_000 }),
     ]);
     useAppStore.setState({ activeSessionId: "s1" });
     await flush();
 
+    // 它不在主排，而是沉在组里 —— 但组替它开着，所以仍然可见。
+    // （曾经这里断言的是「不进组」：那会让从组里点开一条会话时，它被弹回主排。）
+    const header = completedGroupHeader(1);
+    expect(header, "「已完成（1）」组头").toBeTruthy();
+    expect(header?.getAttribute("aria-expanded")).toBe("true");
+
     const title = sessionRow("s1").querySelector(".truncate");
     expect(title?.className).toContain("text-foreground");
     expect(title?.className).not.toContain("text-muted-foreground/60");
   });
 
-  it("置顶的已完成会话：尾槽显示勾号，置顶状态改由顺序 + sr-only 承担", async () => {
+  it("置顶的已完成会话同样进组：置顶决定次序，不决定位置", async () => {
+    useAppStore.setState({ activeSessionId: null });
     localStorage.setItem(
       "deskwand.sidebarPins",
       JSON.stringify({ sessionIds: ["done"], projectKeys: [] }),
@@ -286,16 +342,181 @@ describe("Sidebar session completion", () => {
       session("fresh", { title: "Fresh", updatedAt: 20 }),
     ]);
 
-    const row = sessionRow("done");
-    expect(completedBadge("done")).toBeTruthy();
-    // 上游 e347bc05 起，置顶不再有看得见的标记（视觉上空着、靠排在最前 + sr-only 说状态），
-    // 所以这里不是"图钉让位给勾号"，而是"这一格只剩勾号"。
-    // 置顶的状态没有丢：读屏仍能听到「已置顶」那句。
-    expect(row.textContent).toContain(i18n.t("sidebar.pinned"));
-    // 位置仍由置顶决定（这一半说不明"下沉"，下沉由 Step 5 那条排序守卫钉）
-    expect((container.textContent ?? "").indexOf("Done")).toBeLessThan(
-      (container.textContent ?? "").indexOf("Fresh"),
+    // 主排只剩 Fresh —— 置顶自 e347bc05 起就没有可见标记，是「排在最前」而不是位置承诺
+    expect(container.querySelector('[data-session-id="done"]')).toBeNull();
+    expect(sessionRow("fresh")).toBeTruthy();
+
+    await act(async () => completedGroupHeader(1)?.click());
+    await flush();
+    // 置顶的状态没丢：读屏仍能听到「已置顶」那句
+    expect(sessionRow("done").textContent).toContain(i18n.t("sidebar.pinned"));
+  });
+
+  it("计数是沉下去的条数，不是这个列表的总数", async () => {
+    useAppStore.setState({ activeSessionId: null });
+    await render([
+      session("open", { title: "活跃", updatedAt: 9 }),
+      session("d1", {
+        title: "完一",
+        completedAt: 1_700_000_000_000,
+        updatedAt: 1,
+      }),
+      session("d2", {
+        title: "完二",
+        completedAt: 1_700_000_000_001,
+        updatedAt: 2,
+      }),
+    ]);
+
+    expect(completedGroupHeader(2), "沉了两条").toBeTruthy();
+    expect(completedGroupHeader(3), "三条没沉").toBeNull();
+    expect(sessionRow("open")).toBeTruthy();
+  });
+
+  it("一条都没完成时不渲染组头", async () => {
+    useAppStore.setState({ activeSessionId: null });
+    await render([session("open", { title: "活跃", updatedAt: 9 })]);
+
+    expect(
+      Array.from(document.body.querySelectorAll("button")).some((node) =>
+        node.textContent?.includes(i18n.t("sidebar.completed")),
+      ),
+    ).toBe(false);
+  });
+
+  it("一个列表的会话全部完成时，主排为空、只剩组头，且不自动展开", async () => {
+    useAppStore.setState({ activeSessionId: null });
+    await render([
+      session("a", {
+        title: "A",
+        completedAt: 1_700_000_000_000,
+        updatedAt: 1,
+      }),
+      session("b", {
+        title: "B",
+        completedAt: 1_700_000_000_001,
+        updatedAt: 2,
+      }),
+    ]);
+
+    const header = completedGroupHeader(2);
+    expect(header).toBeTruthy();
+    expect(container.querySelector('[data-session-id="a"]')).toBeNull();
+    expect(container.querySelector('[data-session-id="b"]')).toBeNull();
+    // 不自动展开：免得你以为列表还是满的
+    expect(header?.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("标记之后又被唤起、如今已跑完的会话仍然沉在组里 —— 不会永久卡在主排", async () => {
+    const mark = 1_700_000_000_000;
+    useAppStore.setState({ activeSessionId: null });
+    await render([
+      session("settled", {
+        title: "收尾之后没再动",
+        completedAt: mark,
+        updatedAt: mark - 1000,
+      }),
+      session("woke", {
+        title: "唤醒过、现在闲着",
+        completedAt: mark,
+        updatedAt: mark + 60_000,
+      }),
+    ]);
+
+    // 两条都沉 —— 时间戳不参与资格判定
+    expect(completedGroupHeader(2)).toBeTruthy();
+    expect(container.querySelector('[data-session-id="settled"]')).toBeNull();
+    expect(container.querySelector('[data-session-id="woke"]')).toBeNull();
+    // 标记都还在（两条仍然是「已完成」）
+    await act(async () => completedGroupHeader(2)?.click());
+    await flush();
+    await hoverSession("woke");
+    expect(markToggle("woke").getAttribute("title")).toBe(
+      i18n.t("sidebar.markIncomplete"),
     );
+  });
+
+  // 功能主用途：并行时最想收的往往就是还在跑的那个（旧 plan 决策 6）。
+  it("给正在跑的会话打勾：它本轮跑完就沉下去，不会永远卡在主排", async () => {
+    const mark = 1_700_000_000_000;
+    useAppStore.setState({ activeSessionId: null });
+
+    // 打勾时它还在跑
+    await render([
+      session("s1", {
+        title: "还在跑",
+        status: "running",
+        completedAt: mark,
+        updatedAt: mark,
+      }),
+    ]);
+    // 运行中 ⇒ isBusy 把它留在主排
+    expect(sessionRow("s1")).toBeTruthy();
+    expect(completedGroupHeader(1)).toBeNull();
+
+    // 本轮跑完 ⇒ idle，而 updateSessionStatus 无条件把 updated_at 推到标记点之后
+    await render([
+      session("s1", {
+        title: "还在跑",
+        status: "idle",
+        completedAt: mark,
+        updatedAt: mark + 5000,
+      }),
+    ]);
+
+    // 于是它沉下去了 —— 不会因为「时间戳越过了标记点」而永远卡在主排
+    expect(completedGroupHeader(1)).toBeTruthy();
+    expect(container.querySelector('[data-session-id="s1"]')).toBeNull();
+  });
+
+  it("搜索命中一条已完成的会话时组强制展开 —— 搜到了必须看得见", async () => {
+    useAppStore.setState({ activeSessionId: null });
+    await render([
+      session("hit", {
+        title: "宽度排查",
+        completedAt: 1_700_000_000_000,
+        updatedAt: 1,
+      }),
+      session("other", { title: "别的", updatedAt: 5 }),
+    ]);
+
+    expect(container.querySelector('[data-session-id="hit"]')).toBeNull();
+
+    const input = container.querySelector("input");
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, "宽度");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await flush();
+
+    expect(sessionRow("hit")).toBeTruthy();
+  });
+
+  it("项目内列表的组头跟着内层缩进（pl-9），不是 pl-3", async () => {
+    useAppStore.setState({ activeSessionId: null });
+    const cwd = "/work/completed-group-indent";
+    await render([
+      session("nested", {
+        cwd,
+        isProjectMode: true,
+        title: "项目里的一条",
+        completedAt: 1_700_000_000_000,
+        updatedAt: 1,
+      }),
+    ]);
+
+    await act(async () => toggleByLabel(i18n.t("sidebar.projects")).click());
+    await flush();
+
+    const header = completedGroupHeader(1);
+    expect(header).toBeTruthy();
+    // `SESSION_OVERFLOW_BUTTON_CLASS` 自 45d09601 起只剩 `pr-3`，左内边距得调用点自己给
+    expect(header?.className).toContain("pl-9");
+    expect(header?.className).not.toContain("pl-3");
   });
 
   it("归档项保持今天的门：等你回答问题的会话不能归档（删除项不受影响）", async () => {
@@ -319,5 +540,90 @@ describe("Sidebar session completion", () => {
     expect(labels).not.toContain(i18n.t("sidebar.archive"));
     // 删除：门是既有的 status !== "running" → 照旧出现（两个门本来就不一样，本次不改它）
     expect(labels).toContain(i18n.t("common.delete"));
+  });
+
+  // 评审时我曾断言 `canShowLess` 有 bug（比的是「请求的条数」而不是「实际显示的条数」，
+  // 标记完成会让请求值停在旧高位 ⇒ 多出一个无事可做的「收起」）。**这条是误报，已证伪**：
+  // `resolveSessionVisibleCount` 里 `Math.min(override ?? 5, groupSessions.length)` 早就把
+  // visibleCount 夹在表长以内 ⇒ `visibleUnpinnedCount ≤ unpinned.length` 恒成立（穷举 637 组
+  // 参数，0 反例）⇒ 两者永远相等。不必改代码。
+  //
+  // 这个用例保留为**不变量守卫**：它钉的是两条既有实现（那条 clamp 与本次的切分）
+  // 碰在一起时的结果 —— 主排变短后折叠线要自己收干净，不能只留一个「收起」。
+  it("展开过之后标记完成让主排变短：折叠线自己收干净，不只剩一个「收起」", async () => {
+    useAppStore.setState({ activeSessionId: null });
+    const all = Array.from({ length: 8 }, (_, i) =>
+      session(`s${i}`, { title: `会话${i}`, updatedAt: 100 - i }),
+    );
+    await render(all);
+
+    // 展开到 8 条（默认显 5 条）
+    await act(async () =>
+      findButton(i18n.t("sidebar.showMoreSessions", { count: 3 }))?.click(),
+    );
+    await flush();
+    expect(findButton(i18n.t("sidebar.showLessSessions"))).toBeTruthy();
+
+    // 标记 5 条完成 ⇒ 主排只剩 s5/s6/s7，全部可见
+    await render(
+      all.map((s, i) => (i < 5 ? { ...s, completedAt: 1_700_000_000_000 } : s)),
+    );
+
+    for (let i = 0; i < 5; i += 1) {
+      expect(container.querySelector(`[data-session-id="s${i}"]`)).toBeNull();
+    }
+    expect(sessionRow("s7")).toBeTruthy();
+    // 显示 3 条 < 默认的 5 条 ⇒ 「收起」无事可做，不该在
+    expect(findButton(i18n.t("sidebar.showLessSessions"))).toBeUndefined();
+    // 而「已完成（5）」组头在
+    expect(completedGroupHeader(5)).toBeTruthy();
+  });
+
+  // 用户报障：点组里的一条会话，它会当场跳回主排。
+  // 根因在谓词第三条（`session.id === activeSessionId` 就不沉）—— 它把两个场景当成一个了：
+  // 给「你正在读的那条」打勾（行不能从眼前消失）与「从组里点开一条」。
+  it("从组里点开一条会话，它不会被弹回主排", async () => {
+    const mark = 1_700_000_000_000;
+    await render([
+      session("s1", { title: "已完成的一条", completedAt: mark, updatedAt: 1 }),
+      session("s2", { title: "还在干的一条", updatedAt: 9 }),
+    ]);
+
+    await act(async () => completedGroupHeader(1)?.click());
+    await flush();
+    expect(sessionRow("s1")).toBeTruthy();
+
+    // 点它 —— 走的就是真实那条路：`handleSessionClick` → `setActiveSession`
+    await act(async () => sessionRow("s1").click());
+    await flush();
+
+    // 成员资格不取决于「谁开着」：它还在组里，没被搬到主排去
+    expect(completedGroupHeader(1), "组头还在").toBeTruthy();
+    expect(sessionRow("s1"), "行还在组里").toBeTruthy();
+    expect(sessionRow("s1").className).toContain("bg-accent");
+  });
+
+  // 谓词第三条当年要守的那条需求 —— 行不能从眼前消失 —— 得由别的东西接手：
+  // 把容器打开（本文件既有的规矩，见 resolveProjectExpanded）。
+  it("给当前打开的会话打勾：组自动展开，那一行仍在眼前", async () => {
+    const mark = 1_700_000_000_000;
+    useAppStore.setState({ activeSessionId: "s1" });
+    await render([session("s1", { title: "会话一", updatedAt: 1 })]);
+
+    // 打勾之前它在主排里
+    expect(sessionRow("s1")).toBeTruthy();
+    expect(completedGroupHeader(1)).toBeNull();
+
+    // 打勾落地（= 这一条现在有 completedAt 且有 updatedAt，于是它满足沉底条件）
+    await render([
+      session("s1", { title: "会话一", updatedAt: 1, completedAt: mark }),
+    ]);
+
+    const header = completedGroupHeader(1);
+    expect(header, "「已完成（1）」组头").toBeTruthy();
+    // 它沉下去了，但组替它开着 ⇒ 仍然可见、仍然高亮
+    expect(header?.getAttribute("aria-expanded")).toBe("true");
+    expect(sessionRow("s1")).toBeTruthy();
+    expect(sessionRow("s1").className).toContain("bg-accent");
   });
 });

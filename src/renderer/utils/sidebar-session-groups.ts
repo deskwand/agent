@@ -162,3 +162,61 @@ export function isSessionBusy(
     (backgroundAgents?.some((agent) => agent.status === "running") ?? false)
   );
 }
+
+/** 「已完成」沉底所需的上下文。由调用方算好 —— 这个函数自己不查 store。 */
+export interface SunkSessionContext {
+  /** 这一条此刻还在干活吗（运行中 / 待答 ask_user / 后台子代理在跑）。 */
+  isBusy: boolean;
+}
+
+/**
+ * 这条会话该不该沉进「已完成」组。**两条**：有标记、现在没在干活。
+ *
+ * **成员资格故意不看「谁开着」。** 曾经在这里加过一条
+ * `session.id === activeSessionId ⇒ 不沉`，想把「给当前会话打勾时行不能从眼前消失」
+ * 兼下来 —— 结果是把两个场景当成了一个：那样一来，**从组里点开一条会话，
+ * 它就会当场失去资格、被搬回主排**（用户报障）。那个需求是另一件事，
+ * 由渲染侧把容器打开来兑现（`Sidebar` 的 `completedExpanded`，与本文件外面
+ * `resolveProjectExpanded` / `resolveSessionVisibleCount` 同一条优先级）。
+ *
+ * **也不再比较时间戳。** 曾经还有一条 `sessionTime(session) <= completedAt`
+ * （「标记之后又被唤起就爬回主排」）。它的洞是 `updateSessionStatus` **无条件**写
+ * `updated_at`（`session-manager.ts:2292`，running 与 idle 两个转换都写），
+ * 所以给**正在跑**的会话打勾时，本轮结束时必然 `updatedAt > completedAt`
+ * ⇒ 那条永远沉不下去 —— 而「并行时最想收的往往就是还在跑的那个」
+ * 正是这个功能的主用途。而且时间戳分不开「打勾时那一轮还在飞」与
+ * 「打勾之后它才被唤醒」，两者数值上完全一样。
+ *
+ * 「不能让它躲在折叠堆里干活」由 `isBusy` **直接**兑现（它是当下状态，不是代理）；
+ * 「你正在看的那条别消失」由组头自动展开兑现。两条代理都不需要。
+ *
+ * 已知取舍：旧决策 5 的「重新活跃就浮回上面」现在只剩**排序**含义 ——
+ * 被唤醒过的会按 `updatedAt` 排在组内首位，而不是爬出组。
+ */
+export function isSunkSession(
+  session: Session,
+  context: SunkSessionContext,
+): boolean {
+  if (!session.completedAt) return false;
+  return !context.isBusy;
+}
+
+/**
+ * 按 `isSunkSession` 把一组会话切成「留在主排」与「收进完成组」两份。
+ * 两边都保持传入顺序 —— `sortByActivity` 排好的置顶次序随原数组带走 ✓。
+ */
+export function splitSunkSessions(
+  sessions: Session[],
+  context: { isBusy: (session: Session) => boolean },
+): { active: Session[]; completed: Session[] } {
+  const active: Session[] = [];
+  const completed: Session[] = [];
+  for (const session of sessions) {
+    if (isSunkSession(session, { isBusy: context.isBusy(session) })) {
+      completed.push(session);
+    } else {
+      active.push(session);
+    }
+  }
+  return { active, completed };
+}
