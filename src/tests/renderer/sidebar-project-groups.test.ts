@@ -351,7 +351,7 @@ describe("Sidebar project groups", () => {
     expect(container.textContent).toContain("Ordinary chat");
   });
 
-  it("uses primary state icons instead of chevrons for group state", async () => {
+  it("keeps existing state icons when section labels are muted", async () => {
     await render([
       session("ordinary", { title: "Ordinary chat" }),
       session("project", {
@@ -362,7 +362,9 @@ describe("Sidebar project groups", () => {
     ]);
 
     const ordinary = ordinaryToggle();
-    expect(ordinary.classList.contains("text-foreground")).toBe(true);
+    // 2026-10-11：外层分组标题改为 text-muted-foreground（弱化），
+    // 图标本身的种类与颜色不变。
+    expect(ordinary.classList.contains("text-muted-foreground")).toBe(true);
     const collapsedSessionsIcon = ordinary.querySelector(
       ".lucide-message-square",
     ) as SVGElement;
@@ -1094,6 +1096,9 @@ describe("Sidebar project groups", () => {
 
     let showMore = findButton(i18n.t("sidebar.showMoreSessions", { count: 5 }));
     expect(showMore).toBeTruthy();
+    // 2026-10-11：左内边距由调用点显式给出 —— 最近列表沿用 12px（`pl-3`）
+    expect(showMore?.className).toContain("pl-3");
+    expect(showMore?.className).not.toContain("pl-9");
     expect(showMore?.className).toContain("text-muted-foreground");
     expect(showMore?.className).toContain("hover:text-muted-foreground");
     expect(showMore?.className).toContain("focus-visible:text-muted-foreground");
@@ -1238,6 +1243,19 @@ describe("Sidebar project groups", () => {
       ...makeProjectSessions("project-2", 1, 400),
       ...makeProjectSessions("project-3", 1, 300),
     ]);
+
+    // 2026-10-11：项目内列表的「展开更多」跟随内层缩进（36px = `pl-9`）
+    const projectMore = Array.from(
+      projectSection("/work/deskwand").querySelectorAll("button"),
+    ).find((button) =>
+      button.textContent?.includes(
+        i18n.t("sidebar.showMoreSessions", { count: 5 }),
+      ),
+    );
+    expect(projectMore).toBeTruthy();
+    expect(projectMore?.className).toContain("pl-9");
+    expect(projectMore?.className).not.toContain("pl-3");
+    expect(projectMore?.className).toContain("pr-3");
 
     await act(async () =>
       findButton(i18n.t("sidebar.showMoreSessions", { count: 5 }))?.click(),
@@ -1945,6 +1963,108 @@ describe("Sidebar project groups", () => {
     expect(
       JSON.parse(localStorage.getItem("deskwand.sidebarPins") ?? "{}"),
     ).toEqual({ sessionIds: ["newer", "older"], projectKeys: [] });
+  });
+
+  // ---- 2026-10-11 字号 / 缩进层级（jsdom 不计算真实几何，这里锁的是布局机制）----
+
+  it("aligns project session text with project labels without moving the right rail", async () => {
+    const cwd = "/work/sidebar-spacing";
+    await render([
+      session("nested", { cwd, isProjectMode: true }),
+      session("recent"),
+    ]);
+    if (projectToggle(cwd).getAttribute("aria-expanded") !== "true") {
+      await act(async () => projectToggle(cwd).click());
+      await flush();
+    }
+    const project = projectToggle(cwd);
+    expect(project.className).toContain("text-sm");
+    expect(project.className).toContain("font-normal");
+    expect(project.className).toContain("px-3");
+    expect(project.className).toContain("gap-2");
+    for (const id of ["nested", "recent"]) {
+      const row = sessionRow(id);
+      expect(row.className).toContain("min-h-8");
+      expect(row.className).toContain("py-1.5");
+      expect(row.className).toContain("pr-2.5");
+      expect(row.classList.contains("px-2.5")).toBe(false);
+      const title = row.querySelector(".truncate");
+      expect(title?.className).toContain("text-sm");
+      expect(title?.className).toContain("font-normal");
+      const rail = findSessionRail(id);
+      expect(rail?.className).toContain("w-[4.5rem]");
+      expect(rail?.className).toContain("flex-shrink-0");
+    }
+    expect(sessionRow("nested").className).toContain("pl-9");
+    expect(sessionRow("recent").className).toContain("pl-3");
+  });
+
+  it("keeps search and both new-session controls in the toolbar", async () => {
+    await render([]);
+    const input = container.querySelector('input[type="text"]');
+    expect(input?.getAttribute("placeholder")).toBe(
+      i18n.t("sidebar.searchPlaceholder"),
+    );
+    const newChat = container.querySelector(
+      `button[aria-label="${i18n.t("sidebar.newChat")}"]`,
+    );
+    expect(newChat).toBeTruthy();
+    const controls = newChat?.parentElement;
+    const dropdown = controls?.querySelector(
+      'button[data-state][aria-haspopup="menu"]',
+    );
+    expect(dropdown).toBeTruthy();
+    // 工具栏左→右的 DOM 顺序（不量几何：jsdom 没有布局）：search → newChat → dropdown。
+    // `compareDocumentPosition` 返回位掩码，用 FOLLOWING 位确认先后。
+    expect(input?.compareDocumentPosition(newChat as Node) ?? 0).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(newChat?.compareDocumentPosition(dropdown as Node) ?? 0).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it("retains truncation and rail space for long project titles", async () => {
+    const cwd = "/work/sidebar-long-title";
+    await render([
+      session("long", {
+        cwd,
+        isProjectMode: true,
+        title: "长会话标题 Long session title ".repeat(10),
+      }),
+    ]);
+    if (projectToggle(cwd).getAttribute("aria-expanded") !== "true") {
+      await act(async () => projectToggle(cwd).click());
+      await flush();
+    }
+    const row = sessionRow("long");
+    expect(row.querySelector(".truncate")).toBeTruthy();
+    expect(row.querySelector(".min-w-0")).toBeTruthy();
+    expect(findSessionRail("long")?.className).toContain("flex-shrink-0");
+  });
+
+  it("uses scalable muted typography for section headings", async () => {
+    await render([
+      session("heading-project", {
+        cwd: "/work/sidebar-heading",
+        isProjectMode: true,
+      }),
+      session("heading-recent"),
+    ]);
+    const headings = Array.from(
+      container.querySelectorAll("button[aria-expanded]"),
+    ).filter((button) =>
+      [i18n.t("sidebar.recents"), i18n.t("sidebar.projects")].some((label) =>
+        button.textContent?.includes(label),
+      ),
+    );
+    expect(headings).toHaveLength(2);
+    for (const heading of headings) {
+      expect(heading.classList.contains("text-[0.8125rem]")).toBe(true);
+      expect(heading.classList.contains("font-normal")).toBe(true);
+      expect(heading.classList.contains("text-muted-foreground")).toBe(true);
+      expect(heading.className).not.toContain("text-[13px]");
+    }
   });
 });
 

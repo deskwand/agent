@@ -55,8 +55,9 @@ const ORDINARY_SESSION_GROUP_KEY = "__ordinary_sessions__";
 const PROJECTS_GROUP_KEY = "__projects__";
 const SIDEBAR_PINS_STORAGE_KEY = "deskwand.sidebarPins";
 const SIDEBAR_GROUP_EXPANSION_STORAGE_KEY = "deskwand.sidebarGroupExpansion";
+// 展开更多按所属列表设置左内边距；收起按钮保留原有左右留白。
 const SESSION_OVERFLOW_BUTTON_CLASS =
-  "rounded-lg bg-transparent px-3 py-1.5 text-xs text-muted-foreground hover:bg-transparent hover:text-muted-foreground focus-visible:bg-transparent focus-visible:text-muted-foreground transition-colors";
+  "rounded-lg bg-transparent pr-3 py-1.5 text-xs text-muted-foreground hover:bg-transparent hover:text-muted-foreground focus-visible:bg-transparent focus-visible:text-muted-foreground transition-colors";
 
 export function Sidebar({
   width = 280,
@@ -756,7 +757,11 @@ export function Sidebar({
     );
   };
 
-  const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
+  const renderSessionItem = (
+    session: Session,
+    showRelativeTime: boolean,
+    isProjectSession = false,
+  ) => {
     const isActive = activeSessionId === session.id;
     const hasPendingAskUser = sessionHasPendingAskUser(session.id);
     const hasStatusIndicator = isSessionBusy(
@@ -780,9 +785,9 @@ export function Sidebar({
             current === session.id ? null : current,
           );
         }}
-        className={`group relative rounded-lg px-2.5 py-1 transition-colors ${
-          isActive ? "bg-accent" : "hover:bg-accent/60"
-        }`}
+        className={`group relative min-h-8 rounded-lg pr-2.5 py-1.5 transition-colors ${
+          isProjectSession ? "pl-9" : "pl-3"
+        } ${isActive ? "bg-accent" : "hover:bg-accent/60"}`}
       >
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -816,7 +821,7 @@ export function Sidebar({
               />
             ) : (
               <div
-                className={`text-sm font-medium leading-5 truncate flex-1 ${
+                className={`text-sm font-normal leading-5 truncate flex-1 ${
                   isActive
                     ? "text-foreground"
                     : session.completedAt
@@ -1037,7 +1042,11 @@ export function Sidebar({
     );
   };
 
-  const renderSessionList = (groupKey: string, groupSessions: Session[]) => {
+  const renderSessionList = (
+    groupKey: string,
+    groupSessions: Session[],
+    isProjectList = false,
+  ) => {
     const visibleCount = resolveSessionVisibleCount(groupKey, groupSessions);
     const pinnedSessions = groupSessions.filter((session) =>
       pinnedSessionIds.has(session.id),
@@ -1064,7 +1073,9 @@ export function Sidebar({
 
     return (
       <>
-        {visibleSessions.map((session) => renderSessionItem(session, true))}
+        {visibleSessions.map((session) =>
+          renderSessionItem(session, true, isProjectList),
+        )}
         {!normalizedQuery && (hiddenCount > 0 || canShowLess) && (
           <div className="flex items-center">
             {hiddenCount > 0 && (
@@ -1078,13 +1089,15 @@ export function Sidebar({
                       nextBatchCount,
                   );
                 }}
-                className={`${SESSION_OVERFLOW_BUTTON_CLASS} flex-1 text-left`}
+                className={`${SESSION_OVERFLOW_BUTTON_CLASS} flex-1 text-left ${
+                  isProjectList ? "pl-9" : "pl-3"
+                }`}
               >
                 {t("sidebar.showMoreSessions", { count: nextBatchCount })}
               </Button>
             )}
-            {/* 「收起」和上一条共用 `px-3` 内边距 ⇒ 比会话行的时间多缩 2px ✗：右拉回 2px
-                落到同一条基准线上 ✓（「展开更多」是左对齐，不在这条线上，不动 ✓）。 */}
+            {/* 「收起」和上一条一样用 `pr-3` 右内边距 ⇒ 比会话行的时间（`pr-2.5`）多缩 2px ✗：
+                右拉回 2px 落到同一条基准线上 ✓（「展开更多」是左对齐，不在这条线上，不动 ✓）。 */}
             {canShowLess && (
               <Button variant="ghost"
                 type="button"
@@ -1092,7 +1105,7 @@ export function Sidebar({
                   requestSectionMotion(groupKey);
                   setSessionVisibleCount(groupKey, DEFAULT_VISIBLE_SESSIONS);
                 }}
-                className={`${SESSION_OVERFLOW_BUTTON_CLASS} ml-auto -mr-0.5 flex-shrink-0 text-right`}
+                className={`${SESSION_OVERFLOW_BUTTON_CLASS} pl-3 ml-auto -mr-0.5 flex-shrink-0 text-right`}
               >
                 {t("sidebar.showLessSessions")}
               </Button>
@@ -1232,7 +1245,7 @@ export function Sidebar({
                         );
                       }
                     }}
-                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
                   >
                     <SidebarGroupIcon
                       kind="sessions"
@@ -1276,7 +1289,7 @@ export function Sidebar({
                           !projectsExpanded,
                         );
                       }}
-                      className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                      className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
                     >
                       <SidebarGroupIcon
                         kind="project"
@@ -1287,7 +1300,7 @@ export function Sidebar({
                         badgeKind={projectsRootBadgeKind}
                       />
                       <span>{t("sidebar.projects")}</span>
-                      {/* -mr-0.5：这行按钮的内边距是 `px-3`（比会话行的 `px-2.5` 多 2px）✗
+                      {/* -mr-0.5：这行按钮右内边距是 `px-3`（比会话行的 `pr-2.5` 多 2px）✗
                           ⇒ 计数要落回会话行那条基准线，就得往右拉回这 2px ✓。
                           左边不动：分组图标 / 标签的内缩保持原样 ✓。 */}
                       <span className="ml-auto -mr-0.5 text-xs font-normal text-muted-foreground">
@@ -1341,7 +1354,7 @@ export function Sidebar({
                                       );
                                     }
                                   }}
-                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-medium leading-5 text-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-sm font-normal leading-5 text-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
                                 >
                                   <SidebarGroupIcon
                                     kind="project"
@@ -1439,7 +1452,11 @@ export function Sidebar({
                                   sectionMotionVersions.get(group.key) ?? 0
                                 }
                               >
-                                {renderSessionList(group.key, group.sessions)}
+                                {renderSessionList(
+                                  group.key,
+                                  group.sessions,
+                                  true,
+                                )}
                               </SidebarAnimatedSection>
                             </section>
                           );

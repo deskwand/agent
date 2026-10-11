@@ -3,7 +3,9 @@
 // 三处改动都不改运行时逻辑，所以这里锁的是可计算的量：
 //   1. 行内代码底块边界 —— 在全部 14 套主题下的真实对比度
 //   2. 用户气泡形状 —— 圆角 / 最小高度的比例（不是"类名等于某个值"）
-//   3. 侧栏层级 —— 分组的字号必须真的小于导航项、颜色必须不与辅助元素撞档
+//   3. 侧栏层级 —— 外层分组标题弱化（更小 + muted），内层项目名与会话标题同字号，
+//      靠缩进区分层级；两处外层标题的字号 / 颜色与子会话缩进由
+//      sidebar-project-groups.test.ts 的 DOM 断言锁定。
 // 圆角与字号的数值一律从 tailwind.config.js 读，颜色从 globals.css 读，不写死在断言里。
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
@@ -162,9 +164,12 @@ describe("用户气泡：形状不随消息长度漂移", () => {
   });
 });
 
-describe("侧栏：四级两两可区分", () => {
-  // 修复前四级的字号（13px）、字重（500）、行高（20px）完全相同，层级只能靠颜色，
-  // 而分组标签是 text-primary（最亮），压过了下一级的会话行（text-secondary）。
+describe("侧栏：分组弱化，项目与会话靠缩进区分", () => {
+  // 旧设计（2026-09）四级字号相同、字重 500，层级只能靠颜色；
+  // 2026-10-11 改写：外层两处分组标题用 13px + muted（默认根字号下），
+  // 项目名与会话标题同为 text-sm + font-normal，层级由项目图标和子会话缩进表达 ✓。
+  // `group` = 内层项目名开关（`renderSessionProjectHeader`），
+  // `contentHead` = 会话标题（`renderSessionItem`）。
   const group = classNameAt(
     sidebar,
     "min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2",
@@ -176,7 +181,7 @@ describe("侧栏：四级两两可区分", () => {
   // 若像旧版那样只锚定「不含字号的结构前缀」，切出来的串就从字号之后开始，
   // textSizeRem 会直接抛「未找到 text-size 类」。含字号的 marker 仍是唯一的，
   // 字号改了这里会立刻报错（而不是静默通过），所以防漂移性质仍在。
-  const contentMarker = "text-sm font-medium leading-5 truncate flex-1 ";
+  const contentMarker = "text-sm font-normal leading-5 truncate flex-1 ";
   const contentStart = sidebar.indexOf(contentMarker);
   if (contentStart < 0) throw new Error("找不到会话标题的 className");
   const contentHead = sidebar.slice(
@@ -192,26 +197,26 @@ describe("侧栏：四级两两可区分", () => {
   );
   const showMore = classNameAt(
     sidebar,
-    "rounded-lg bg-transparent px-3 py-1.5 text-xs text-muted-foreground",
+    "rounded-lg bg-transparent pr-3 py-1.5 text-xs text-muted-foreground",
     '"',
   );
 
-  it("分组标签字号严格小于会话标题（这条就是「层级拉平」的修复本身）", () => {
-    // 两侧都从源码读：左边是分组开关，右边是被锚定的会话标题。
-    // 会话标题一旦改字号，右边会跟着变（而不是像硬编码副本那样看不出来）。
-    expect(textSizeRem(group), `group=${group}`).toBeLessThan(
-      textSizeRem(contentHead),
-    );
+  it("项目名与会话标题同字号且均使用常规字重", () => {
+    // 两侧都从源码读：左边是内层项目名开关，右边是被锚定的会话标题。
+    // 旧不变量「内层项目必须比会话小」已在 2026-10-11 被替换：
+    // 层级改由项目图标 + 子会话缩进表达，字号/字重必须拉平 ✓。
+    expect(textSizeRem(group)).toBe(textSizeRem(contentHead));
+    expect(group).toMatch(/(?:^|\s)font-normal(?:\s|$)/);
+    expect(contentHead).toMatch(/(?:^|\s)font-normal(?:\s|$)/);
   });
 
-  it("分组标签颜色保持 primary（与其他 toggle 行一致），且不与 12px+muted 的辅助元素撞档", () => {
-    // 保持 text-foreground 是既有约定，由 sidebar-project-groups.test.ts:338 锁定：
-    // 侧栏的 toggle 行（Sessions 行 Sidebar.tsx:1103、项目分组行 :1166）都是 primary。
-    // 本次只动字号不动颜色 —— 层级靠「字号差」建立，不是把颜色压暗。
-    // 下面两条断言防的是：若将来有人把分组标签降到 muted，它会与会话计数徽标、
+  it("内层项目名保持 foreground，与 12px+muted 的辅助元素不撞档", () => {
+    // 外层两处分组标题改为 muted，内层项目名仍是 foreground（由
+    // sidebar-project-groups.test.ts 的 DOM 用例区分锁定）。
+    // 下面两条断言防的是：若将来有人把内层项目名也降到 muted，它会与会话计数徽标、
     // "Show 5 more" 完全同字号同色（只差字重），层级又塌回去。
     const groupColor = textColorToken(group);
-    // 2026-10：分组标签的类名从 text-foreground 迁到 text-foreground（官方词汇表）。
+    // 2026-10-11：外层分组标题迁到 muted，内层项目名保持 text-foreground。
     expect(groupColor, `group=${group}`).toBe("foreground");
     expect(groupColor, `badge=${badge}`).not.toBe(textColorToken(badge));
     expect(groupColor, `showMore=${showMore}`).not.toBe(
