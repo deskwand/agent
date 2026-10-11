@@ -2349,7 +2349,10 @@
     "label": "Main navigation",
     "chat": "Chat",
     "ideas": "Ideas",
-    "feed": "Feed"
+    "feed": "Feed",
+    "more": "More",
+    "pinItem": "Pin {{name}}",
+    "unpinItem": "Unpin {{name}}"
   },
   "capture": {
     "title": "Jot an idea",

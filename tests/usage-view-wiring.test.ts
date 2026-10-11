@@ -16,8 +16,9 @@ describe("usage view wiring", () => {
     expect(app).toContain('activeView === "usage"');
   });
 
-  it("puts the entry on the app rail, not in the account menu", async () => {
-    // 用量入口在图标栏上：RAIL_ITEMS 必须含 usage
+  it("keeps the entry on the rail — since 2026-10-11 inside its more menu", async () => {
+    // 用量入口仍归图标栏管：只是它从「常驻那一列」收进了栏上的「更多」菜单。
+    // RAIL_ITEMS 仍是全量登记表（menu 项也在里面）⇒ 这条断言本身不变。
     const { RAIL_ITEMS } = await import("../src/renderer/utils/nav-rail");
     expect(RAIL_ITEMS.some((item) => item.view === "usage")).toBe(true);
     // 且不再重复出现在账号弹层里
@@ -31,8 +32,7 @@ describe("usage view wiring", () => {
   });
 
   it("keeps the entry reachable while logged out", async () => {
-    // 图标栏常驻、与登录状态无关，所以用量项在栏上就等于"未登录也能到用量"。
-    // 这比原来那条源码字符串断言强：它锁的是"用量必须是图标栏项之一"。
+    // 图标栏（连同它那颗「更多」）常驻且与登录状态无关 ⇒ 未登录也到得了用量。
     const { RAIL_ITEMS } = await import("../src/renderer/utils/nav-rail");
     expect(RAIL_ITEMS.map((item) => item.view)).toContain("usage");
   });

@@ -13,7 +13,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, it, expect } from "vitest";
 
-/** 仓库里全部 12 个弹出菜单/浮层组件。新增菜单时补进来。 */
+/** 仓库里全部 14 个弹出菜单/浮层组件。新增菜单时补进来。 */
 const MENU_FILES = [
   "src/renderer/components/attach/AttachMenu.tsx",
   "src/renderer/components/usage/CurrencySelect.tsx",
@@ -26,6 +26,7 @@ const MENU_FILES = [
   "src/renderer/components/StatusPopover.tsx",
   "src/renderer/components/ChatInputStatusBar.tsx",
   "src/renderer/components/HelpMenu.tsx",
+  "src/renderer/components/RailMoreMenu.tsx",
   // 设置项里的下拉换成自绘菜单后也用了共享外壳（原生 select 的展开菜单由系统绘制，
   // 主题跟不了 app）。登记进来才会一并受"不许内联阴影 / 必须有入场动画"那几条检查。
   "src/renderer/components/settings/shared.tsx",

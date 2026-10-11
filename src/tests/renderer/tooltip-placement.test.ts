@@ -20,7 +20,10 @@ describe("tooltip 方位", () => {
     // `toContain('side="right"')` 会被菜单那两处侥幸通过，而它们跟 tooltip 方位
     // 毫无关系。这正是仓库反复栽过的「判据假绿」（plan-12 §29 的裸 grep）。
     // ⚠️ 必须**计数**，不能用「存在至少一处」（`toContain`）—— AppRail 有 2 个站点：
-    // 导航项（在 `RAIL_ITEMS.map` 里渲染 6 次）与语音项（`item.key === "chat"` 分支）。
+    // 导航项（在 AppRail 里只有**一处** JSX 站点，按常驻组 + 固定组渲染多次）
+    // 与语音项（`item.key === "chat"` 分支）。「更多」触发器**没有**气泡：
+    // 这是设计选择（与栏底「?」/头像同族），**不是**技术禁区 —— 理由与「若日后要加」
+    // 的链式约束写在 RailMoreMenu.tsx 的组件注释里。
     // 只查存在性时，把语音那处改成 `side="top"` 或整处删掉，判据**照样全绿** ✗
     //（审查员 2026-10-10 指出的假绿面）。
     const rail = read("components/AppRail.tsx");

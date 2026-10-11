@@ -2346,7 +2346,10 @@
     "label": "主导航",
     "chat": "聊天",
     "ideas": "灵感",
-    "feed": "动态"
+    "feed": "动态",
+    "more": "更多",
+    "pinItem": "固定「{{name}}」",
+    "unpinItem": "取消固定「{{name}}」"
   },
   "capture": {
     "title": "记一笔",

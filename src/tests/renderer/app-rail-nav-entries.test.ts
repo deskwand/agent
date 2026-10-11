@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { RENDERER } from "./theme-css-helpers";
-import { RAIL_ITEMS } from "../../renderer/utils/nav-rail";
+import {
+  RAIL_MORE_ITEMS,
+  RAIL_PRIMARY_ITEMS,
+} from "../../renderer/utils/nav-rail";
 
 const read = (rel: string) => fs.readFileSync(path.join(RENDERER, rel), "utf8");
 const rail = read("components/AppRail.tsx");
@@ -14,11 +17,19 @@ describe("AppRail", () => {
     expect(app).toContain('from "./components/AppRail"');
   });
 
-  it("renders one button per rail item, driven by RAIL_ITEMS", () => {
-    expect(rail).toContain("RAIL_ITEMS.map");
-    for (const item of RAIL_ITEMS) {
+  it("常驻项各渲染一颗按钮，驱动源是 RAIL_PRIMARY_ITEMS", () => {
+    expect(rail).toContain("RAIL_PRIMARY_ITEMS.map");
+    for (const item of RAIL_PRIMARY_ITEMS) {
       expect(rail, item.key).toContain("t(item.labelKey)");
       expect(rail, item.key).toContain("resolveRailActiveKey");
+    }
+  });
+
+  it("长尾项渲染在「更多」菜单里，驱动源是 RAIL_MORE_ITEMS", () => {
+    const moreMenu = read("components/RailMoreMenu.tsx");
+    expect(moreMenu).toContain("RAIL_MORE_ITEMS.map");
+    for (const item of RAIL_MORE_ITEMS) {
+      expect(moreMenu, item.key).toContain("t(item.labelKey)");
     }
   });
 
@@ -50,8 +61,10 @@ describe("AppRail", () => {
   });
 
   it("does not add MENU_PANEL or native title attributes", () => {
-    expect(rail).not.toContain("MENU_PANEL");
-    expect(rail).not.toContain("<button title=");
+    for (const source of [rail, read("components/RailMoreMenu.tsx")]) {
+      expect(source).not.toContain("MENU_PANEL");
+      expect(source).not.toContain("<button title=");
+    }
   });
 });
 

@@ -14,13 +14,17 @@ vi.mock("react-i18next", () => ({
   // 缺它时 `i18n.language` 会读到 undefined 并炸掉整棵渲染树 ——
   // 而修法不该是去改生产代码迁就 mock（见 progress.md 的 Task 7 Ruling）。
   useTranslation: () => ({
-    t: (key: string) => key,
+    // 带 options 的 key（固定/取消固定的可达名）必须把插值拼进去 ——
+    // 否则图钉的 aria-label 里看不到那一项的名字，pinFor 找不到它。
+    t: (key: string, options?: Record<string, unknown>) =>
+      options ? `${key}:${JSON.stringify(options)}` : key,
     i18n: { language: "en", resolvedLanguage: "en" },
   }),
 }));
 
 import { AppRail } from "../../renderer/components/AppRail";
-import { RAIL_ITEMS } from "../../renderer/utils/nav-rail";
+import type { ActiveView } from "../../renderer/store";
+import { RAIL_PRIMARY_ITEMS } from "../../renderer/utils/nav-rail";
 import { useAppStore } from "../../renderer/store";
 
 let container: HTMLDivElement;
@@ -32,7 +36,59 @@ function buttonFor(labelKey: string): HTMLButtonElement {
   return element as HTMLButtonElement;
 }
 
-async function mountRail(activeView: "chat" | "apps" = "chat"): Promise<void> {
+function buttonOrNull(labelKey: string): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>(
+    `button[aria-label="${labelKey}"]`,
+  );
+}
+
+/** 栏上带 data-rail-key 的按钮（导航项 + 「更多」），按 DOM 顺序。 */
+function railKeys(): string[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>("nav [data-rail-key]"),
+  ).map((el) => el.dataset.railKey ?? "");
+}
+
+async function openMoreMenu(): Promise<void> {
+  const button = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="navRail.more"]',
+  );
+  expect(button, "「更多」触发器必须存在").toBeTruthy();
+  await act(async () => {
+    button!.dispatchEvent(
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    );
+    button!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+function menuItemFor(labelKey: string): HTMLElement {
+  const items = Array.from(
+    document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+  );
+  const found = items.find(
+    (el) =>
+      el.getAttribute("aria-label") === null && el.textContent === labelKey,
+  );
+  expect(found, labelKey).toBeTruthy();
+  return found!;
+}
+
+/** 取某一行右侧那颗图钉（不能直接取第一颗，见 rail-more-menu.test.tsx 里那段说明）。 */
+function pinFor(labelKey: string): HTMLElement {
+  const pin = Array.from(
+    document.querySelectorAll<HTMLElement>('[aria-label^="navRail.pinItem"]'),
+  ).find((el) => el.getAttribute("aria-label")?.includes(labelKey));
+  expect(pin, labelKey).toBeTruthy();
+  return pin!;
+}
+
+async function mountRail(activeView: ActiveView = "chat"): Promise<void> {
   await act(async () => {
     useAppStore.setState({ activeView });
     root.render(React.createElement(AppRail));
@@ -40,6 +96,8 @@ async function mountRail(activeView: "chat" | "apps" = "chat"): Promise<void> {
 }
 
 beforeEach(() => {
+  // AppRail 现在会读固定集合：上下文不清会造成用例间串味
+  localStorage.clear();
   useAppStore.setState(useAppStore.getInitialState(), true);
   container = document.createElement("div");
   document.body.innerHTML = "";
@@ -53,9 +111,9 @@ afterEach(async () => {
 });
 
 describe("AppRail 点击路由", () => {
-  it("图标栏每一项都渲染出图标", async () => {
+  it("常驻项都渲染出图标", async () => {
     await mountRail();
-    for (const item of RAIL_ITEMS) {
+    for (const item of RAIL_PRIMARY_ITEMS) {
       expect(
         buttonFor(item.labelKey).querySelector("svg"),
         item.key,
@@ -65,13 +123,124 @@ describe("AppRail 点击路由", () => {
     expect(buttonFor("sidebar.user")).toBeTruthy();
   });
 
-  it("点其它项切视图，且不动侧栏", async () => {
-    await mountRail("chat");
+  it("长尾项未固定时栏上**没有**它那颗按钮（防止「改了却没真接上」假绿）", async () => {
+    await mountRail();
+    expect(buttonOrNull("sidebar.vault")).toBeNull();
+    expect(railKeys()).toEqual(["chat", "ideas", "feed", "more"]);
+  });
 
-    await act(async () => buttonFor("sidebar.apps").click());
+  it("长尾项从菜单切视图（apps），且不动侧栏", async () => {
+    await mountRail("chat");
+    await openMoreMenu();
+
+    await act(async () => menuItemFor("sidebar.apps").click());
 
     expect(useAppStore.getState().activeView).toBe("apps");
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+  });
+
+  it("固定之后栏上多一格，点它切视图，并落进 localStorage", async () => {
+    await mountRail();
+    await openMoreMenu();
+    const pin = pinFor("sidebar.vault");
+    await act(async () => pin.click());
+
+    const pinned = buttonFor("sidebar.vault");
+    expect(pinned.querySelector("svg")).toBeTruthy();
+    // 顺序：固定的项落在「更多」**下方**（D4）
+    expect(railKeys()).toEqual(["chat", "ideas", "feed", "more", "vault"]);
+    expect(localStorage.getItem("deskwand.railPins")).toBe(
+      JSON.stringify(["vault"]),
+    );
+
+    await act(async () => pinned.click());
+    expect(useAppStore.getState().activeView).toBe("vault");
+  });
+
+  it("存储里是坏数据时栏照常渲染，只是没有固定组", async () => {
+    localStorage.setItem("deskwand.railPins", "{oops");
+    await mountRail();
+    expect(buttonFor("navRail.chat")).toBeTruthy();
+    expect(buttonOrNull("sidebar.vault")).toBeNull();
+  });
+
+  it("存储里是过期 key（已不存在的视图）时不渲染空白格", async () => {
+    localStorage.setItem(
+      "deskwand.railPins",
+      JSON.stringify(["vault", "ghost"]),
+    );
+    await mountRail();
+    // 有效的那一项照常出现，幽灵 key 被丢掉
+    expect(buttonFor("sidebar.vault")).toBeTruthy();
+    expect(railKeys()).toEqual(["chat", "ideas", "feed", "more", "vault"]);
+    expect(railKeys()).not.toContain("ghost");
+  });
+
+  it("存储里是常驻项的 key 时不重复渲染（chat 只能出现一次）", async () => {
+    // 越界数据：栏上常驻的项被写进固定集合（手工改过、或将来某视图从常驻降级）
+    localStorage.setItem("deskwand.railPins", JSON.stringify(["chat"]));
+    await mountRail();
+    expect(railKeys()).toEqual(["chat", "ideas", "feed", "more"]);
+    expect(buttonFor("navRail.chat").querySelector("svg")).toBeTruthy();
+  });
+
+  it("固定组为空时不画那条细线", async () => {
+    await mountRail();
+    expect(
+      container.querySelector('[data-testid="rail-pins-divider"]'),
+    ).toBeNull();
+  });
+
+  it("未固定时高亮在「更多」上、栏上没有它那格（D5）", async () => {
+    await mountRail("vault");
+    expect(buttonOrNull("sidebar.vault")).toBeNull();
+    expect(
+      container.querySelector('button[aria-label="navRail.more"]')!.className,
+    ).toContain("bg-accent text-primary-text");
+  });
+
+  it("固定之后高亮回到栏上那一格，「更多」不再高亮（D5）", async () => {
+    localStorage.setItem("deskwand.railPins", JSON.stringify(["vault"]));
+    await mountRail("vault");
+
+    expect(buttonFor("sidebar.vault").getAttribute("aria-current")).toBe(
+      "page",
+    );
+    expect(
+      container.querySelector('button[aria-label="navRail.more"]')!.className,
+    ).not.toContain("bg-accent text-primary-text");
+  });
+
+  it("固定之后细线恰好在「更多」下方、固定项之上", async () => {
+    localStorage.setItem("deskwand.railPins", JSON.stringify(["vault"]));
+    await mountRail();
+    const rail = container.querySelector("nav")!;
+    const order = Array.from(rail.children).map(
+      (el) =>
+        el.getAttribute("data-rail-key") ??
+        el.getAttribute("data-testid") ??
+        el.tagName,
+    );
+    const divider = order.indexOf("rail-pins-divider");
+    expect(divider, "细线必须存在").toBeGreaterThan(-1);
+    expect(order[divider - 1]).toBe("more");
+    expect(order[divider + 1]).toBe("vault");
+  });
+
+  it("固定顺序 = 固定先后（后固定的排下面）", async () => {
+    localStorage.setItem(
+      "deskwand.railPins",
+      JSON.stringify(["usage", "vault"]),
+    );
+    await mountRail();
+    expect(railKeys()).toEqual([
+      "chat",
+      "ideas",
+      "feed",
+      "more",
+      "usage",
+      "vault",
+    ]);
   });
 
   it("点聊天项只切视图，不碰侧栏状态", async () => {

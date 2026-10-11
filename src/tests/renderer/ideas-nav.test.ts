@@ -23,10 +23,12 @@ describe("rail 上的灵感", () => {
 // （见 app-rail-nav-entries.test.ts），这里沿用同一种守法。
 describe("图标与「记一笔」入口", () => {
   const rail = read("src/renderer/components/AppRail.tsx");
+  // 图标映射自 2026-10-11 拆到 rail-icons.ts（栏与「更多」菜单共用一份）
+  const icons = read("src/renderer/components/rail-icons.ts");
 
   it("灵感与捕获键是同一颗图标（NotebookPen）", () => {
     // 曾经是「左栏灯泡 + 右上角纸笔」两颗不搭的图标，用户实测说割裂；现在两处同形。
-    expect(rail).toMatch(/ideas:\s*NotebookPen/);
+    expect(icons).toMatch(/ideas:\s*NotebookPen/);
   });
 
   it("rail 卡片里有「记一笔」，键位按平台渲染", () => {
