@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   applySubagentModelSpec,
+  normalizeCallerModelSpec,
   normalizeSubagentModelSpec,
 } from "../src/main/agent/subagent/model-spec";
 
@@ -131,5 +132,57 @@ describe("applySubagentModelSpec", () => {
     expect(result).toContain(
       "model: deskwand:custom:openai/deepseek-v4-flash",
     );
+  });
+});
+
+describe("normalizeCallerModelSpec", () => {
+  const available = [
+    { provider: "deskwand:oa", id: "gpt-5" },
+    { provider: "anthropic", id: "claude-sonnet-4-5" },
+    { provider: "deskwand:anthropic", id: "claude-opus-4-5" },
+    { provider: "deskwand:other", id: "claude-sonnet-4-5" },
+  ];
+
+  it("prefixes only an exactly available target", () => {
+    expect(normalizeCallerModelSpec("oa/gpt-5", available)).toBe(
+      "deskwand:oa/gpt-5",
+    );
+    expect(normalizeCallerModelSpec("oa/gpt-6", available)).toBe("oa/gpt-6");
+    expect(normalizeCallerModelSpec("oa/gpt-5", [])).toBe("oa/gpt-5");
+  });
+
+  it("does not rewrite a native spec when a same-name profile lacks the model", () => {
+    expect(
+      normalizeCallerModelSpec("anthropic/claude-sonnet-4-5", available),
+    ).toBe("anthropic/claude-sonnet-4-5");
+  });
+
+  it("preserves qualified specs and upstream shorthand behavior", () => {
+    for (const spec of [
+      "deskwand:oa/gpt-5",
+      "deskwand:missing/gpt-5",
+      "gpt-5",
+      "inherit",
+    ]) {
+      expect(normalizeCallerModelSpec(spec, available)).toBe(spec);
+    }
+    expect(normalizeCallerModelSpec("   ", available)).toBe("");
+    expect(normalizeCallerModelSpec(" oa/gpt-5 ", available)).toBe(
+      "deskwand:oa/gpt-5",
+    );
+  });
+
+  it("does not guess casing or repair incomplete specs", () => {
+    for (const spec of ["OA/gpt-5", "oa/GPT-5", "/gpt-5", "oa/"]) {
+      expect(normalizeCallerModelSpec(spec, available)).toBe(spec);
+    }
+  });
+
+  it("keeps slashes inside model ids", () => {
+    expect(
+      normalizeCallerModelSpec("custom:router/org/model", [
+        { provider: "deskwand:custom:router", id: "org/model" },
+      ]),
+    ).toBe("deskwand:custom:router/org/model");
   });
 });

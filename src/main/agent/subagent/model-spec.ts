@@ -83,3 +83,29 @@ export function applySubagentModelSpec(
   }
   writeFileSync(target, content, "utf-8");
 }
+
+/**
+ * Normalize caller shorthand only when the complete DeskWand target is available.
+ * A configured profile or a registered provider alone does not prove that its
+ * requested model exists with usable auth. Keep misses unchanged so rewriting
+ * cannot introduce an exact miss followed by cross-provider fuzzy fallback.
+ */
+export function normalizeCallerModelSpec(
+  spec: string,
+  availableModels: ReadonlyArray<{ provider: string; id: string }>,
+): string {
+  const trimmed = spec.trim();
+  if (!trimmed || trimmed === "inherit") return trimmed;
+  const slashIdx = trimmed.indexOf("/");
+  if (slashIdx === -1) return trimmed;
+  const provider = trimmed.slice(0, slashIdx);
+  const modelId = trimmed.slice(slashIdx + 1);
+  if (!provider || !modelId) return trimmed;
+  if (provider.startsWith(DESKWAND_PROVIDER_PREFIX)) return trimmed;
+
+  const targetProvider = `${DESKWAND_PROVIDER_PREFIX}${provider}`;
+  const available = availableModels.some(
+    (model) => model.provider === targetProvider && model.id === modelId,
+  );
+  return available ? `${targetProvider}/${modelId}` : trimmed;
+}
