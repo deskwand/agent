@@ -109,3 +109,9 @@ describe("扩展注入", () => {
     expect(result?.systemPromptSuffix).toBeUndefined();
   });
 });
+
+describe("暴露层", () => {
+  it("三个工具都降到 codemode 层：不在提示里声明，仍可从脚本调用", () => {
+    for (const tool of tools) expect(tool.exposure).toBe("codemode");
+  });
+});

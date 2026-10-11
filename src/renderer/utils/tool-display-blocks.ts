@@ -32,6 +32,10 @@ export interface ProcessSummary {
   voiceChangeCount?: number;
   calledRead?: boolean;
   calledSearch?: boolean;
+  /** 查阅想法的次数（`idea_search` + `idea_read`）。与 ttsCount 一样可选：老字面量不必跟着改。 */
+  ideaLookupCount?: number;
+  /** 记录想法的次数（`idea_add`）。 */
+  ideaAddedCount?: number;
 }
 
 export interface ResultSummary {
@@ -217,6 +221,8 @@ function buildProcessSummary(
   let usedToolCount = 0;
   let ttsCount = 0;
   let voiceChangeCount = 0;
+  let ideaLookupCount = 0;
+  let ideaAddedCount = 0;
   let todoUpdateCount = 0;
   let scriptCount = 0;
   let calledRead = false;
@@ -326,6 +332,15 @@ function buildProcessSummary(
       todoUpdateCount += 1;
       countedAsSpecific = true;
     }
+    // 想法三件套：查阅（search / read）与记录（add）分开计数 —— 动作不同（AGENTS.md §4）。
+    if (lower === "idea_search" || lower === "idea_read") {
+      ideaLookupCount += 1;
+      countedAsSpecific = true;
+    }
+    if (lower === "idea_add") {
+      ideaAddedCount += 1;
+      countedAsSpecific = true;
+    }
     if (!countedAsSpecific) {
       usedToolCount += 1;
     }
@@ -352,6 +367,8 @@ function buildProcessSummary(
     scriptCount,
     calledRead,
     calledSearch,
+    ideaLookupCount,
+    ideaAddedCount,
   };
 }
 
@@ -643,7 +660,8 @@ export type ProcessSummaryFragment = {
     | "goal"
     | "tasklist"
     | "tts"
-    | "tool";
+    | "tool"
+    | "ideas";
 };
 
 export function getProcessSummaryFragments(
@@ -704,6 +722,20 @@ export function getProcessSummaryFragments(
     fragments.push({
       text: t("tool.grouped.consultedMemory"),
       iconType: "memory",
+    });
+  }
+  if ((summary.ideaLookupCount ?? 0) > 0) {
+    const count = summary.ideaLookupCount ?? 0;
+    fragments.push({
+      text: t(pluralKey("tool.grouped.lookedUpIdeas", count), { count }),
+      iconType: "ideas",
+    });
+  }
+  if ((summary.ideaAddedCount ?? 0) > 0) {
+    const count = summary.ideaAddedCount ?? 0;
+    fragments.push({
+      text: t(pluralKey("tool.grouped.savedIdeas", count), { count }),
+      iconType: "ideas",
     });
   }
   if (summary.commandCount > 0) {

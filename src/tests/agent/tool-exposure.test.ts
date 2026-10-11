@@ -6,6 +6,8 @@ import {
   codemodeOnly,
 } from "../../main/agent/tools/tool-exposure";
 import { createOfficeTools } from "../../main/agent/tools/office/office-tools";
+import { createIdeaTools } from "../../main/ideas/idea-tools";
+import type { IdeaService } from "../../main/ideas/idea-service";
 
 const read = (relative: string) =>
   fs.readFileSync(path.join(process.cwd(), relative), "utf8");
@@ -48,6 +50,16 @@ describe("工具 exposure 分层", () => {
     ).not.toBeNull();
     expect((wrapped?.[1].match(/\btd\(/g) ?? []).length).toBe(12);
     expect((source.match(/name: "internal_browser_/g) ?? []).length).toBe(12);
+  });
+
+  it("idea 三件套都是 codemode 暴露", () => {
+    const tools = createIdeaTools({} as unknown as IdeaService);
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "idea_search",
+      "idea_read",
+      "idea_add",
+    ]);
+    for (const tool of tools) expect(tool.exposure).toBe("codemode");
   });
 
   it("保持 direct 的几组没有混入降级（web / memory / goal）", () => {

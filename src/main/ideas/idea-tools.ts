@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
+import { codemodeOnly } from "../agent/tools/tool-exposure";
 import type { IdeaService } from "./idea-service";
 
 /** 与 `MemoryToolDefinition` 同一个形状（`ToolDefinition<TSchema, unknown>`）。 */
@@ -30,7 +31,11 @@ function textBlock(value: string): {
  * 真要加 agent 归档，补一个 `idea_set_status` 是 20 行的事，不预先造。
  */
 export function createIdeaTools(service: IdeaService): IdeaToolDefinition[] {
-  return [
+  // 三个工具都降到 codemode 层：偶发、意图明确，不必为它们的 schema 每请求付费
+  //（A1 已对浏览器 / office / 视觉 / OCR / TTS 这么做）。降级后仍可从脚本
+  // `tools.idea_search({...})` 调用，靠 searchTools / describeTool 发现；代价是提示里
+  // 不再有它们的描述，所以 `agent-runner.ts` 的 `<tool_behavior>` 里点名了这一组。
+  return codemodeOnly([
     {
       name: "idea_search",
       label: "idea_search",
@@ -121,5 +126,5 @@ export function createIdeaTools(service: IdeaService): IdeaToolDefinition[] {
         );
       },
     },
-  ];
+  ]);
 }

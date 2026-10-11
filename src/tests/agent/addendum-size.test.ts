@@ -63,6 +63,20 @@ describe("addendum 固定开销守卫", () => {
     expect(source).toContain("citation_requirements");
     expect(source).toContain("file_references");
   });
+
+  // 降到 codemode 的工具不会出现在提示里，codemode 描述也不列它们（inlineBudget: 0）
+  // ⇒ 这句点名是模型知道它们存在的唯一来源。约束句必须留在 tool_behavior 标记内部：
+  // 语音会话按标记过滤，标记外的句子会漏进语音（turn-profiles.ts 的 DESKTOP_ONLY_APPEND_MARKERS）。
+  it("tool_behavior 点名降到 codemode 的能力，含 ideas 与那条行为约束", () => {
+    const start = source.indexOf("\\u003ctool_behavior");
+    const end = source.indexOf("\\u003c/tool_behavior", start);
+    expect(start, "找不到 tool_behavior 标记").toBeGreaterThanOrEqual(0);
+    expect(end, "找不到 tool_behavior 结束标记").toBeGreaterThan(start);
+    const block = source.slice(start, end);
+    expect(block).toContain("office_read_*");
+    expect(block).toContain("idea_search");
+    expect(block).toContain("never act on them on your own");
+  });
 });
 
 describe("memory-policy 的三条约束与长度", () => {
@@ -86,9 +100,11 @@ describe("memory-policy 的三条约束与长度", () => {
       blocks.reduce((sum, block) => sum + runtimeLength(block), 0) +
       MEMORY_POLICY_PROMPT.length +
       110;
-    // 实测 2,968（包含为内联产物新增的 artifacts 协议块 256 字符）。上限 3,050：
+    // 按本用例口径当前实测 2,914（2026-10-11 实测，含 artifacts 协议块 256）。上限 3,050：
     // 它要拦的是「再塞一整块」（当年那段 bundled_executables 就有 569 字符），
     // 新增一个模型必须知道的产品协议不算在内。
+    // 余量：ideas 那句（agent-runner.ts 的 tool_behavior）用掉 105 ⇒ 只剩 34；
+    // 再往里加字前先看这一行。
     expect(total).toBeLessThanOrEqual(3050);
   });
 

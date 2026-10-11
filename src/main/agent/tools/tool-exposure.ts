@@ -13,7 +13,14 @@ import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
  */
 export const CODEMODE_EXPOSURE = { exposure: "codemode" } as const;
 
-/** 把一组工具整体降到 codemode 层。 */
-export function codemodeOnly(tools: ToolDefinition[]): ToolDefinition[] {
+/**
+ * 把一组工具整体降到 codemode 层。
+ *
+ * 泛型（而不是返回 `ToolDefinition[]`）：后者会把参数类型擦成 SDK 的 `TSchema`，
+ * 而它与 TypeBox 的 `TSchema` 不是同一个类型 ⇒ 调用方自己的工具类型（如 idea 的
+ * `ToolDefinition<TSchema, unknown>`）接不住（TS2322，parameters 不兼容）。
+ * 泛型保留入参类型，调用方拿到什么类型还回去什么类型。
+ */
+export function codemodeOnly<T extends ToolDefinition>(tools: T[]): T[] {
   return tools.map((tool) => ({ ...tool, ...CODEMODE_EXPOSURE }));
 }

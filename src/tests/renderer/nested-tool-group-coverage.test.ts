@@ -15,6 +15,7 @@ describe("嵌套调用的分组覆盖", () => {
     "internal_browser_screenshot",
     "vision_describe",
     "ocr",
+    "idea_search",
     "tts",
   ])("嵌套调用的虚拟块仍走摘要分组：%s", (toolName) => {
     const parentId = "call-1";

@@ -9,6 +9,7 @@ import {
   MonitorPlay,
   Bot,
   Brain,
+  Lightbulb,
   Target,
   Wrench,
   Folder,
@@ -49,6 +50,9 @@ const PROCESS_ICON_MAP: Record<
   ),
   browse: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
   memory: <Brain className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  ideas: (
+    <Lightbulb className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+  ),
   command: (
     <MonitorPlay className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
   ),

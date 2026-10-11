@@ -19,6 +19,7 @@ import {
   Inbox,
   Send,
   Volume2,
+  Lightbulb,
 } from "lucide-react";
 
 /** Map a tool name to a small icon element */
@@ -52,6 +53,9 @@ export function getToolIcon(name: string) {
   if (n === "tts") return <Volume2 className="w-3.5 h-3.5" />;
   // 改声音（语音会话专属工具）：同域复用音量图标
   if (n === "set_voice") return <Volume2 className="w-3.5 h-3.5" />;
+  // 想法三件套（经 codemode 调用）：与 rail 的 ideas 图标一致
+  if (n === "idea_search" || n === "idea_read" || n === "idea_add")
+    return <Lightbulb className="w-3.5 h-3.5" />;
   if (n === "office_read_xlsx") return <Table className="w-3.5 h-3.5" />;
   if (n === "office_read_docx") return <FileText className="w-3.5 h-3.5" />;
   if (n === "office_read_pptx") return <Presentation className="w-3.5 h-3.5" />;
@@ -274,6 +278,28 @@ export function getToolLabel(
           text: text.length > 30 ? text.slice(0, 27) + "…" : text,
         })
       : t("tool.actionTextToSpeech");
+  }
+
+  // --- Idea tools（用户自己的笔记，经 codemode 调用） ---
+  if (nameLower === "idea_search") {
+    const query = String(inp.query || "");
+    return query
+      ? t("tool.labelIdeaSearch", { query })
+      : t("tool.actionIdeaSearch");
+  }
+  if (nameLower === "idea_read") {
+    const ideaName = String(inp.name || "");
+    return ideaName
+      ? t("tool.labelIdeaRead", { name: ideaName })
+      : t("tool.actionIdeaRead");
+  }
+  if (nameLower === "idea_add") {
+    const content = String(inp.content || "");
+    return content
+      ? t("tool.labelIdeaAdd", {
+          content: content.length > 30 ? content.slice(0, 27) + "…" : content,
+        })
+      : t("tool.actionIdeaAdd");
   }
 
   // --- Vision tools ---
