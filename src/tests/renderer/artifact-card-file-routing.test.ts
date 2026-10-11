@@ -7,6 +7,7 @@ import "../../renderer/i18n/config";
 import { ArtifactCard } from "../../renderer/components/message/ArtifactCard";
 import { useAppStore } from "../../renderer/store";
 import type { Session } from "../../renderer/types";
+import { resetIsGitRepoCacheForTests } from "../../renderer/hooks/use-is-git-repo";
 
 vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => ({ isElectron: true }),
@@ -70,6 +71,8 @@ describe("ArtifactCard edited-file routing", () => {
   let navigate: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    // 探测结果在模块级缓存里（同 cwd 10s），不乱清会让下一个用例拿到上一个的结论
+    resetIsGitRepoCacheForTests();
     useAppStore.setState(useAppStore.getInitialState());
     useAppStore.setState({
       activeSessionId: "session-1",

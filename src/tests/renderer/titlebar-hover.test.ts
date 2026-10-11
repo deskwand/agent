@@ -10,6 +10,7 @@ vi.mock("react-i18next", () => ({
 
 import { Titlebar } from "../../renderer/components/Titlebar";
 import { useAppStore } from "../../renderer/store";
+import { resetIsGitRepoCacheForTests } from "../../renderer/hooks/use-is-git-repo";
 
 // 用真实挂载而不是 renderToStaticMarkup：zustand v5 的 useSyncExternalStore 在
 // SSR 下用的是 getInitialState() 作为 server snapshot，setState 对 SSR 结果无效，
@@ -26,8 +27,13 @@ async function mountTitlebar(): Promise<HTMLDivElement> {
 
 beforeEach(() => {
   useAppStore.setState(useAppStore.getInitialState());
+  // 探测结果在模块级缓存里（同 cwd 10s），不乱清会让下一个用例拿到上一个的结论
+  resetIsGitRepoCacheForTests();
   window.electronAPI = {
     window: { onFullScreenChanged: () => () => {} },
+    git: {
+      hasChanges: async () => ({ isRepo: true, changeCount: 1 }),
+    },
   } as unknown as typeof window.electronAPI;
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -42,7 +48,24 @@ afterEach(async () => {
 describe("标题栏操作按钮", () => {
   beforeEach(() => {
     // showSessionHeader = Boolean(activeSessionId) && !showSettings
-    useAppStore.setState({ activeSessionId: "s1" });
+    // 代码审查那档还需要「活动会话有 cwd」且该 cwd 是 git 仓库（见 hasChanges stub）
+    useAppStore.setState({
+      activeSessionId: "s1",
+      sessions: [
+        {
+          id: "s1",
+          title: "s1",
+          status: "idle",
+          cwd: "/repo-titlebar-hover",
+          mountedPaths: [],
+          allowedTools: [],
+          memoryEnabled: false,
+          isProjectMode: true,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    });
   });
 
   it("整个标题栏不输出任何原生 title 属性", async () => {
@@ -53,6 +76,10 @@ describe("标题栏操作按钮", () => {
 
   it("5 个操作按钮都有 aria-label", async () => {
     const el = await mountTitlebar();
+    // 代码审查那颗要等 git 探针落地才渲染（前提由本文件的两个 beforeEach 给齐）
+    await act(async () => {
+      await Promise.resolve();
+    });
     // store 初始值下的实际文案 key：
     //   sidebarCollapsed=false    → context.collapsePanel（左簇开合按钮）
     //   rightPanelMode=null       → titlebar.fileBrowser / titlebar.builtInBrowser

@@ -19,6 +19,7 @@ import { TitlebarButton } from "./TitlebarButton";
 import { VoiceMiniButton } from "./voice-mode/VoiceMiniButton";
 import { FeedListenButton } from "./FeedListenButton";
 import { Button } from "./app-button";
+import { useIsGitRepo } from "../hooks/use-is-git-repo";
 
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin";
@@ -41,6 +42,16 @@ export function Titlebar() {
   const activeView = useAppStore((s) => s.activeView);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
   const isReviewOpen = useAppStore((s) => s.rightPanelMode === "review");
+  // 代码审查的数据源是 cwd 上的 git diff（ReviewPanel → review.getDiffFiles）：
+  // 没有工作目录、或那个目录不是仓库时，这颗按钮点开必然是一块空面板，于是不渲染。
+  // 不是仓库的判据必须来自真实探测（git.hasChanges.isRepo），不能用 isProjectMode ——
+  // 后者只表示「cwd 不是内置的 default_working_dir」，非 git 的项目目录也是 true。
+  const activeSessionCwd = useAppStore((s) => {
+    const sid = s.activeSessionId;
+    if (!sid) return undefined;
+    return s.sessions.find((ses) => ses.id === sid)?.cwd || undefined;
+  });
+  const isGitRepo = useIsGitRepo(activeSessionCwd);
   const toggleFileBrowser = useAppStore((s) => s.toggleFileBrowser);
   const toggleReviewPanel = useAppStore((s) => s.toggleReviewPanel);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
@@ -102,13 +113,18 @@ export function Titlebar() {
       >
         <Globe className="w-3.5 h-3.5" />
       </TitlebarButton>
-      <TitlebarButton
-        label={isReviewOpen ? t("reviewPanel.close") : t("reviewPanel.title")}
-        isOn={isReviewOpen}
-        onClick={toggleReviewPanel}
-      >
-        <Diff className="w-3.5 h-3.5" />
-      </TitlebarButton>
+      {/* 探测中（`null`）不渲染：先占一格再抹掉并不比直接不渲染更安静 —— Chromium 实测
+          丢掉这一格的 30px 会把前三颗整体推右 30px，占位只是把那次跳动挪到了非仓库那一边。
+          已探过的 cwd 首帧就命中 hook 的缓存，所以切会话不会闪。 */}
+      {isGitRepo === true && (
+        <TitlebarButton
+          label={isReviewOpen ? t("reviewPanel.close") : t("reviewPanel.title")}
+          isOn={isReviewOpen}
+          onClick={toggleReviewPanel}
+        >
+          <Diff className="w-3.5 h-3.5" />
+        </TitlebarButton>
+      )}
     </div>
   );
 
@@ -171,7 +187,8 @@ export function Titlebar() {
           <div className="flex items-center titlebar-no-drag h-full">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={handleMinimize}
                   aria-label={t("window.minimize")}
@@ -188,7 +205,8 @@ export function Titlebar() {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={handleMaximize}
                   aria-label={
@@ -210,7 +228,8 @@ export function Titlebar() {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={handleClose}
                   aria-label={t("window.close")}

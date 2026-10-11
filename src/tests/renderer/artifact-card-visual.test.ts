@@ -8,6 +8,7 @@ import { ArtifactCard } from "../../renderer/components/message/ArtifactCard";
 import { useAppStore } from "../../renderer/store";
 import type { Session } from "../../renderer/types";
 import type { ResultFileEntry } from "../../renderer/utils/tool-display-blocks";
+import { resetIsGitRepoCacheForTests } from "../../renderer/hooks/use-is-git-repo";
 import {
   globalToken,
   paddingYRem,
@@ -72,6 +73,8 @@ describe("ArtifactCard visual hierarchy", () => {
 
   beforeEach(() => {
     useAppStore.setState(useAppStore.getInitialState());
+    // 探测结果在模块级缓存里（同 cwd 10s），不乱清会让下一个用例拿到上一个的结论
+    resetIsGitRepoCacheForTests();
     useAppStore.setState({
       activeSessionId: "session-1",
       sessions: [makeSession()],
@@ -210,6 +213,7 @@ describe("ArtifactCard compact scale", () => {
 
   beforeEach(() => {
     useAppStore.setState(useAppStore.getInitialState());
+    resetIsGitRepoCacheForTests();
     useAppStore.setState({
       activeSessionId: "session-1",
       sessions: [makeSession()],

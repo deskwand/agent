@@ -8,6 +8,7 @@ import { useAppStore } from "../../renderer/store";
 import type { Session } from "../../renderer/types";
 import type { ResultFileEntry } from "../../renderer/utils/tool-display-blocks";
 import type { VideoReference } from "../../renderer/utils/video-reference";
+import { resetIsGitRepoCacheForTests } from "../../renderer/hooks/use-is-git-repo";
 
 vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => ({ isElectron: true }),
@@ -39,6 +40,8 @@ function makeSession(): Session {
 
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  // 探测结果在模块级缓存里（同 cwd 10s），不乱清会让下一个用例拿到上一个的结论
+  resetIsGitRepoCacheForTests();
   useAppStore.setState(useAppStore.getInitialState());
   useAppStore.setState({
     activeSessionId: "session-1",

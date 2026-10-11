@@ -21,6 +21,7 @@ import { openOfficePreview } from "../../utils/office-preview-runner";
 import { openFilePathInBrowser } from "../../utils/open-in-browser";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { Button } from "../app-button";
+import { useIsGitRepo } from "../../hooks/use-is-git-repo";
 
 interface ArtifactCardProps {
   files: ResultFileEntry[];
@@ -128,23 +129,12 @@ export const ArtifactCard = memo(function ArtifactCard({
     null,
   );
   const [revertError, setRevertError] = useState<string | null>(null);
-  const [isGitRepo, setIsGitRepo] = useState(true);
-
-  useEffect(() => {
-    if (!isElectron || !activeSessionCwd) return;
-    const gitApi = window.electronAPI?.git;
-    if (!gitApi?.hasChanges) {
-      setIsGitRepo(false);
-      return;
-    }
-    (
-      gitApi.hasChanges as (
-        cwd: string,
-      ) => Promise<{ isRepo: boolean; changeCount: number }>
-    )(activeSessionCwd)
-      .then((r) => setIsGitRepo(r.isRepo))
-      .catch(() => setIsGitRepo(false));
-  }, [activeSessionCwd, isElectron]);
+  // 与顶栏的代码审查入口共用同一支探针（同一个 cwd 只 spawn 一次 `git status`）。
+  // `?? true` 是有意的：探针的 null 表示「没有 cwd」或「结论还没回来」，这两种情况下
+  // 本文件原先的乐观默认就是 true —— 点击路由与回退按钮的行为因此不变。
+  // 唯一的差异在浏览器模式（没有 git 桥 ⇒ 探针给 false）：点编辑过的文件行走预览，
+  // 而不是今天那条打不开的审查路径。
+  const isGitRepo = useIsGitRepo(activeSessionCwd) ?? true;
 
   const resolvePath = (filePath: string) =>
     activeSessionCwd
