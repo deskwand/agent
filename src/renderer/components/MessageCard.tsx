@@ -35,6 +35,12 @@ import { splitArtifactBlocks } from "../utils/inline-artifacts";
 import type { ArtifactExpansion } from "../types";
 import { useAppStore } from "../store";
 import { useReadAloud } from "../hooks/useReadAloud";
+import { getCapabilityGate } from "../capabilities/capability-gate";
+import {
+  isLatestReadIntent,
+  nextReadIntent,
+  shouldAutoStartReadAloud,
+} from "../utils/voice/read-aloud-gate";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import {
   projectNestedToolBlocks,
@@ -303,6 +309,11 @@ export const MessageCard = memo(function MessageCard({
   // 朗读：正文容器的 ref。切句与高亮都只读这份 DOM，不改 markdown。
   const bodyRef = useRef<HTMLDivElement>(null);
   const reader = useReadAloud();
+  // 朗读前的能力门（缺 TTS → 确认下载 → 装好自动开始）。与麦克风那条路无关。
+  //
+  // **取动作、不订阅**：`useCapabilityGate()` 会订阅整片 gate 状态，而每张消息卡
+  // 都调一次 —— 下载期间进度事件每 ~100ms 一条，那会把整条消息列表重渲染。
+  const gate = getCapabilityGate();
   // 语音运行时独占音频：全屏在放回答、后台也在听，两路声音不能同时响。
   const voiceRuntimeActive = useAppStore((s) => s.voiceModeOpen);
   const readingThis = reader.messageId === message.id;
@@ -344,7 +355,8 @@ export const MessageCard = memo(function MessageCard({
         <p className="text-sm text-foreground">
           {t("topUp.insufficientCredits")}
         </p>
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           className="w-fit rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground h-auto hover:bg-transparent hover:text-current"
           onClick={() => useAppStore.getState().setTopUpOpen(true)}
         >
@@ -426,7 +438,8 @@ export const MessageCard = memo(function MessageCard({
             </span>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   size="iconSm"
                   onClick={handleCopy}
                   aria-label={t("messageCard.copyMessage")}
@@ -450,7 +463,8 @@ export const MessageCard = memo(function MessageCard({
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost"
+                    <Button
+                      variant="ghost"
                       type="button"
                       size="iconSm"
                       data-testid="read-aloud-button"
@@ -459,9 +473,9 @@ export const MessageCard = memo(function MessageCard({
                       }
                       aria-label={readAloudLabel}
                       onClick={() => {
-                        // 删掉停止键后，这颗键是唯一入口 ⇒ 两条「点了没反应」的路必须补上：
-                        // ① preparing（首块音频还没到，`toggle()` 是 no-op）⇒ 这一下是取消；
-                        // ② error（图标回落到音量、tooltip 写着「朗读这条回复」）⇒ 这一下是重试。
+                        // 这颗键是朗读的唯一入口（停止键已删）⇒ 四条「点了没反应」的路
+                        // 都必须补上：preparing → 取消；其它非 error → 暂停/继续；
+                        // error → 重试；缺 TTS 模型 → 先装（装好由下面的门续上自动开始）。
                         if (readingThis && reader.status === "preparing") {
                           reader.stop();
                           return;
@@ -470,10 +484,43 @@ export const MessageCard = memo(function MessageCard({
                           reader.toggle();
                           return;
                         }
-                        if (bodyRef.current) {
+                        if (!bodyRef.current) return;
+                        const attempt = nextReadIntent();
+                        const start = () => {
                           startKeyRef.current = getCopyContent();
-                          reader.start(message.id, bodyRef.current);
-                        }
+                          readerRef.current.start(message.id, bodyRef.current!);
+                        };
+                        void gate.ensureReady("voice").then((outcome) => {
+                          if (outcome === "ready") {
+                            start();
+                            return;
+                          }
+                          // busy / failed / unsupported：什么都不做（失败已由门报过）。
+                          if (outcome !== "cancelled") return;
+                          // 弹窗已打开：装好之后如果护栏还成立就自动开始，
+                          // 否则只给一条"再点一次"的提示（不自动出声）。
+                          void gate.whenReady("voice").then(() => {
+                            const ok = shouldAutoStartReadAloud({
+                              messageMounted: bodyRef.current !== null,
+                              messageStillCurrent: isLatestReadIntent(attempt),
+                              voiceRuntimeOpen:
+                                useAppStore.getState().voiceModeOpen,
+                              noReadStartedSince: !readerRef.current.messageId,
+                            });
+                            if (ok) {
+                              start();
+                              return;
+                            }
+                            // 四条护栏有一条不成立：不自动出声，只给一条"再点一次"
+                            // （spec §2.6）。静默什么都不说是不行的 —— 用户刚为它下了模型。
+                            useAppStore.getState().setGlobalNotice({
+                              id: `read-aloud-ready-${message.id}`,
+                              message: "",
+                              messageKey: "messageCard.readAloudReadyAgain",
+                              type: "info",
+                            });
+                          });
+                        });
                       }}
                       className="flex items-center justify-center hover:bg-transparent text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
                     >
@@ -512,7 +559,8 @@ export const MessageCard = memo(function MessageCard({
         {showFork ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 size="iconSm"
                 onClick={() => onForkMessage(message)}

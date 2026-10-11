@@ -1281,7 +1281,11 @@
     "unmuteMic": "Unmute the microphone",
     "endVoice": "End the voice session",
     "stateMuted": "Muted",
-    "endedPreviousSession": "Ended the previous voice session"
+    "endedPreviousSession": "Ended the previous voice session",
+    "ttsMissingHint": "Turn on voice to hear replies",
+    "ttsMissingAction": "Turn on",
+    "asrReadyHint": "Voice input is ready — tap the voice button again",
+    "micBusy": "Something else is recording — stop it before starting voice chat"
   },
   "messageCard": {
     "request": "Request",
@@ -1309,7 +1313,8 @@
     "stopReading": "Stop",
     "readAloudEmpty": "No readable text in this message",
     "readAloudFailed": "Read aloud failed. Check the speech model in Settings → Capabilities",
-    "readAloudBusy": "The voice session is running. End it before reading a message"
+    "readAloudBusy": "The voice session is running. End it before reading a message",
+    "readAloudReadyAgain": "Voice is ready — tap read-aloud again"
   },
   "schedule": {
     "createTitle": "Create Schedule",
@@ -2693,6 +2698,37 @@
       "expand": "Expand",
       "failed": "Artifact failed to load",
       "retry": "Retry"
+    }
+  },
+  "capabilityIntro": {
+    "collapsedLead": "Optional local features",
+    "collapsedSizes": "voice input · voice · OCR (up to ~335MB)",
+    "expand": "Show",
+    "dismiss": "Not now",
+    "dismissAll": "Not now — I'll set these up in Settings",
+    "voiceInput": {
+      "title": "Voice input",
+      "desc": "Hold to talk; the text lands in the input box. Needs microphone access; ~140MB."
+    },
+    "voice": {
+      "title": "Voice",
+      "desc": "Reads replies out loud and holds a spoken conversation. ~130MB."
+    },
+    "ocr": {
+      "title": "Text recognition",
+      "desc": "Pulls text out of images and screenshots, entirely on device. ~65MB."
+    },
+    "action": {
+      "enable": "Turn on"
+    },
+    "state": {
+      "ready": "Ready",
+      "downloading": "Downloading {{percent}}%",
+      "queued": "Waiting",
+      "retry": "Retry"
+    },
+    "confirm": {
+      "voice": "Reading replies aloud needs the voice model (~130MB). Download it now?"
     }
   }
 }

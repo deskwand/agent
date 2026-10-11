@@ -90,6 +90,8 @@ import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { toMicButtonProps } from "./VoiceMicButton";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
+import { getCapabilityGate } from "../capabilities/capability-gate";
+import { ensureVoiceModeStart } from "../utils/voice/voice-mode-gate";
 import { ChatInputQueueBar } from "./ChatInputQueueBar";
 import {
   ChatInputStatusBar,
@@ -2203,7 +2205,41 @@ export function ChatView() {
               <Button
                 variant="default"
                 type="button"
-                onClick={() => openVoiceMode(activeSessionId)}
+                onClick={() => {
+                  // 与 rail 同一道前置：别人在录音就不抢麦；缺 ASR 就地确认。
+                  const sessionId = activeSessionId;
+                  void ensureVoiceModeStart({
+                    ensureReady: () =>
+                      getCapabilityGate().ensureReady("voiceInput"),
+                    micBusy: () =>
+                      useAppStore.getState().voiceInputOwner !== null,
+                  }).then((start) => {
+                    if (start.status === "blocked") {
+                      if (start.reason === "mic-busy") {
+                        useAppStore.getState().setGlobalNotice({
+                          id: `voice-mic-busy-${Date.now()}`,
+                          message: "",
+                          messageKey: "voiceMode.micBusy",
+                          type: "info",
+                        });
+                      } else if (start.outcome === "cancelled") {
+                        // 与 rail 同一条收尾：装好之后回来再点一次（spec §2.5）。
+                        void getCapabilityGate()
+                          .whenReady("voiceInput")
+                          .then(() => {
+                            useAppStore.getState().setGlobalNotice({
+                              id: `voice-asr-ready-${Date.now()}`,
+                              message: "",
+                              messageKey: "voiceMode.asrReadyHint",
+                              type: "info",
+                            });
+                          });
+                      }
+                      return;
+                    }
+                    openVoiceMode(sessionId);
+                  });
+                }}
                 className="rounded-2xl px-4 py-2 h-auto shadow-none"
               >
                 {t(

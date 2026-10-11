@@ -933,6 +933,12 @@ export interface VoiceEngineConfig {
 export interface ReadAloudConfig {
   enabled: boolean;
 }
+
+/** 首屏「本机能力清单」的一次性标记。没有这个字段 = 没看过。 */
+export interface CapabilityIntroConfig {
+  /** 用户第一次与那块交互（展开 / 开启任一 / 不用了）的时间戳。 */
+  dismissedAt?: number;
+}
 export type AppTheme = "dark" | "light" | "system";
 export type { ThemePreset };
 export type ProviderProfileKey = string;
@@ -1020,6 +1026,8 @@ export interface AppConfig {
   ocr?: OcrConfig;
   readAloud?: ReadAloudConfig;
   voiceMode?: VoiceModeConfig;
+  /** 首屏「本机能力清单」的一次性标记：写过就不再出现（见 capabilities/catalog）。 */
+  capabilityIntro?: CapabilityIntroConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports

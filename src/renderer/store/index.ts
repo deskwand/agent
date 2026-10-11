@@ -1,8 +1,5 @@
 import { create } from "zustand";
-import {
-  DEFAULT_THEME_ACCENT,
-  DEFAULT_THEME_PRESET,
-} from "../../shared/theme";
+import { DEFAULT_THEME_ACCENT, DEFAULT_THEME_PRESET } from "../../shared/theme";
 import type { NestedToolRuntimeUi } from "../../shared/nested-tool-calls";
 import type { IdeaSummary } from "../../shared/ideas";
 import type { SubagentActivity } from "../../shared/subagent-activity";
@@ -42,6 +39,8 @@ import { pruneDrafts, removeDraft } from "../utils/chat-draft-store";
 // 必须是类型 import：hook 那边要真的 import 本模块的 useAppStore，
 // 两边都用真值 import 就是循环依赖。类型 import 编译后会被抹掉，不成环。
 import type { ReadAloudState } from "../hooks/useReadAloud";
+// 类型 import（不是值）：controller 会 import 本模块，两边都用真值 import 就是循环依赖。
+import type { CapabilityGateState } from "../capabilities/capability-gate";
 // 同上一条：类型 import 编译后会被抹掉，与 hook 那边的真值 import 不成环。
 import type { ConversationState } from "../hooks/useVoiceConversation";
 
@@ -587,6 +586,11 @@ interface AppState {
   // Read aloud actions
   readAloud: ReadAloudState;
   /**
+   * 本机能力清单的门：三路安装态、确认弹窗该显示哪一行、队列快照。
+   * controller 是模块单例（见 capabilities/capability-gate），这里只是它推过来的视图。
+   */
+  capabilityGate: CapabilityGateState;
+  /**
    * 语音运行时是否开启（浮层打开或最小化成小球）。
    *
    * 放 store 而不是组件 state：欢迎页也可以用语音模式，而创建会话后
@@ -629,6 +633,7 @@ interface AppState {
   openVoiceMode: (sessionId: string) => void;
   closeVoiceMode: () => void;
   setReadAloud: (patch: Partial<ReadAloudState>) => void;
+  setCapabilityGate: (patch: Partial<CapabilityGateState>) => void;
 }
 
 const defaultSettings: Settings = {
@@ -792,6 +797,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     currentIndex: 0,
     total: 0,
   } as ReadAloudState,
+  capabilityGate: {
+    installs: { voiceInput: null, voice: null, ocr: null },
+    prompt: null,
+    running: null,
+    positions: {},
+  },
 
   // Session actions
   setSessions: (sessions) => {
@@ -2095,6 +2106,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Read aloud actions：每次都是新对象，zustand 的引用比较才能触发重渲染。
   setReadAloud: (patch) =>
     set((s) => ({ readAloud: { ...s.readAloud, ...patch } })),
+  setCapabilityGate: (patch) =>
+    set((s) => ({ capabilityGate: { ...s.capabilityGate, ...patch } })),
 
   // Browser fullscreen actions
   enterBrowserFullscreen: () =>

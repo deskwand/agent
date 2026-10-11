@@ -43,6 +43,7 @@ import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { usePushToTalk } from "../hooks/usePushToTalk";
 import { ConnectCards } from "./welcome/connect-cards";
+import { CapabilityIntro } from "./welcome/CapabilityIntro";
 import { connectionNoticeValues } from "./welcome/connection-notice";
 import {
   connectCodingSubscription,
@@ -468,7 +469,8 @@ export function WelcomeView() {
         {visibleEntries.length > 0 && !showConnectCards && (
           <div className="flex flex-wrap justify-center gap-2">
             {visibleEntries.map((entry) => (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 key={entry.id}
                 type="button"
                 onClick={() => handleQuickEntry(entry)}
@@ -486,6 +488,9 @@ export function WelcomeView() {
             {t("connect.capabilitySummary")}
           </p>
         )}
+
+        {/* 本机能力清单：只在未配置首屏出现，默认折叠成一行（设计 §2.3） */}
+        {showConnectCards && <CapabilityIntro />}
 
         {/* Chat Input — same as ChatView */}
         <ChatInput

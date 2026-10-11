@@ -14,6 +14,16 @@ vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
+
+// 开语音模式的前置门：本文件判的是历史/续接，门本身有自己的测试。
+vi.mock("../../renderer/capabilities/capability-gate", () => ({
+  getCapabilityGate: () => ({
+    ensureReady: async () => "ready",
+    whenReady: async () => {},
+    startInstall: async () => {},
+    refresh: async () => {},
+  }),
+}));
 vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => ({ ...ipc, isElectron: false }),
 }));

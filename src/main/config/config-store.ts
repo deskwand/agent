@@ -169,6 +169,8 @@ export interface AppConfig {
   ocr?: OcrConfig;
   readAloud?: ReadAloudConfig;
   voiceMode?: VoiceModeConfig;
+  /** 首屏「本机能力清单」的一次性标记。没有这个字段 = 没看过。 */
+  capabilityIntro?: CapabilityIntroConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
@@ -203,6 +205,8 @@ export interface StoredConfig {
   ocr?: OcrConfig;
   readAloud?: ReadAloudConfig;
   voiceMode?: VoiceModeConfig;
+  /** 首屏「本机能力清单」的一次性标记。没有这个字段 = 没看过。 */
+  capabilityIntro?: CapabilityIntroConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
@@ -992,6 +996,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     ocr: normalizeOcrConfig(stored.ocr),
     readAloud: normalizeReadAloudConfig(stored.readAloud),
     voiceMode: normalizeVoiceModeConfig(stored.voiceMode),
+    capabilityIntro: normalizeCapabilityIntro(stored.capabilityIntro),
     webAccess: normalizeWebAccessConfig(stored.webAccess),
     codemode: normalizeCodemodeConfig(stored.codemode),
     subagent: stored.subagent,
@@ -1164,6 +1169,10 @@ export class ConfigStore {
       stored.readAloud = normalizeReadAloudConfig(updates.readAloud);
     if (updates.voiceMode !== undefined)
       stored.voiceMode = normalizeVoiceModeConfig(updates.voiceMode);
+    if (updates.capabilityIntro !== undefined)
+      stored.capabilityIntro = normalizeCapabilityIntro(
+        updates.capabilityIntro,
+      );
     if (updates.webAccess !== undefined)
       stored.webAccess = normalizeWebAccessConfig(updates.webAccess);
     // 注意：删掉 `codemode.enabled` 时**不能连这个分支一起删** —— 少了它
@@ -1482,4 +1491,23 @@ export function normalizeFeedConfig(raw: unknown): FeedConfig {
 /** 读处用这个；永远返回完整对象，调用方不用写 ?. 兜底。 */
 export function getFeedConfig(): FeedConfig {
   return normalizeFeedConfig(configStore.getAll().feed);
+}
+
+/**
+ * 首屏「本机能力清单」的一次性标记。
+ *
+ * 没有字段 = 没看过（显示）。写标记 ≠ 装成功：用户展开看过、或点了「不用了」，
+ * 都算"告知过一次"，此后不再出现 —— 重试在设置 → 能力或入口处。
+ */
+export interface CapabilityIntroConfig {
+  dismissedAt?: number;
+}
+
+/** 脏数据回退成"没看过"，不抛错（与其余能力开关同一条规矩）。 */
+export function normalizeCapabilityIntro(raw: unknown): CapabilityIntroConfig {
+  const dismissedAt = (raw as { dismissedAt?: unknown } | undefined)
+    ?.dismissedAt;
+  return typeof dismissedAt === "number" && Number.isFinite(dismissedAt)
+    ? { dismissedAt }
+    : {};
 }

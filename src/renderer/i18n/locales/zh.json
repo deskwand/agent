@@ -1280,7 +1280,11 @@
     "unmuteMic": "恢复麦克风",
     "endVoice": "结束语音",
     "stateMuted": "已静音",
-    "endedPreviousSession": "已结束上一个语音会话"
+    "endedPreviousSession": "已结束上一个语音会话",
+    "ttsMissingHint": "装上语音就能听见回答",
+    "ttsMissingAction": "装上",
+    "asrReadyHint": "语音输入已就绪，再点一次语音按钮开始",
+    "micBusy": "还有一处正在录音，先停下再开语音对话"
   },
   "messageCard": {
     "request": "请求",
@@ -1308,7 +1312,8 @@
     "stopReading": "停止",
     "readAloudEmpty": "这条没有可读的文字",
     "readAloudFailed": "朗读失败，去设置 → 能力里检查语音模型",
-    "readAloudBusy": "语音会话正在运行，先结束语音再朗读"
+    "readAloudBusy": "语音会话正在运行，先结束语音再朗读",
+    "readAloudReadyAgain": "语音已就绪，再点一次朗读"
   },
   "schedule": {
     "createTitle": "新建定时任务",
@@ -2690,6 +2695,37 @@
       "expand": "展开",
       "failed": "产物未能加载",
       "retry": "重试"
+    }
+  },
+  "capabilityIntro": {
+    "collapsedLead": "顺手装上本机能力",
+    "collapsedSizes": "语音输入 · 语音 · 文字识别（最多约 335MB）",
+    "expand": "看看",
+    "dismiss": "不用了",
+    "dismissAll": "不用了，去设置里再说",
+    "voiceInput": {
+      "title": "语音输入",
+      "desc": "按住说话，文字写进输入框。需要麦克风权限，模型约 140MB。"
+    },
+    "voice": {
+      "title": "语音",
+      "desc": "回复能念出来，也能整轮对话说。需要下载语音模型约 130MB。"
+    },
+    "ocr": {
+      "title": "文字识别",
+      "desc": "从图片与截图里取文字。本机识别，图像不出本机。约 65MB。"
+    },
+    "action": {
+      "enable": "开启"
+    },
+    "state": {
+      "ready": "已就绪",
+      "downloading": "下载中 {{percent}}%",
+      "queued": "等待中",
+      "retry": "重试"
+    },
+    "confirm": {
+      "voice": "朗读需要先装语音模型，约 130MB。现在下载吗？"
     }
   }
 }

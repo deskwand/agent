@@ -4,11 +4,24 @@ import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { useAppStore } from "../../renderer/store";
 import type { Session } from "../../renderer/types";
+import type { EnsureOutcome } from "../../renderer/capabilities/capability-gate";
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   continue: vi.fn(),
   captures: vi.fn(),
   question: undefined as ((text: string, turnId: string) => void) | undefined,
+  /** 开语音模式的前置门（本文件判的是路由，不是门本身）。 */
+  ensureReady: vi.fn<() => Promise<EnsureOutcome>>(async () => "ready"),
+  /** 「装好再点一次」那条提示靠它（whenReady 一 resolve 就该发 notice）。 */
+  whenReady: vi.fn<() => Promise<void>>(async () => {}),
+}));
+vi.mock("../../renderer/capabilities/capability-gate", () => ({
+  getCapabilityGate: () => ({
+    ensureReady: mocks.ensureReady,
+    whenReady: mocks.whenReady,
+    startInstall: vi.fn(async () => {}),
+    refresh: vi.fn(async () => {}),
+  }),
 }));
 vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
@@ -128,6 +141,9 @@ beforeEach(async () => {
   useAppStore.setState(useAppStore.getInitialState(), true);
   useAppStore.getState().addSession(session("ordinary", "ordinary"));
   useAppStore.getState().setActiveSession("ordinary");
+  mocks.ensureReady.mockReset().mockResolvedValue("ready");
+  mocks.whenReady.mockReset().mockResolvedValue(undefined);
+  useAppStore.setState({ globalNotice: null });
   container = document.createElement("div");
   root = createRoot(container);
   await act(async () => root.render(<App />));
@@ -328,4 +344,30 @@ it("does not open capture on failed creation", async () => {
   });
   expect(mocks.captures).not.toHaveBeenCalled();
   expect(useAppStore.getState().activeSessionId).toBe("ordinary");
+});
+
+it("门前置没过（缺能力的确认弹窗已经摆出来）：不建会话、也不开浮层", async () => {
+  mocks.ensureReady.mockResolvedValue("cancelled");
+  await act(async () => entry().click());
+  expect(mocks.create).not.toHaveBeenCalled();
+  expect(useAppStore.getState().voiceModeOpen).toBe(false);
+});
+
+it("别人正在录音：不抢麦、不建会话", async () => {
+  useAppStore.getState().setVoiceInputOwner("ask-user:t1:text:0");
+  await act(async () => entry().click());
+  expect(mocks.create).not.toHaveBeenCalled();
+  expect(useAppStore.getState().voiceModeOpen).toBe(false);
+});
+
+it("能力确认弹窗已经摆出来（cancelled）：装好之后给一条「再点一次」的提示", async () => {
+  mocks.ensureReady.mockResolvedValue("cancelled");
+  await act(async () => entry().click());
+  expect(mocks.create).not.toHaveBeenCalled();
+
+  // 装好那一刻（whenReady resolve）→ 发提示，而不是静默
+  await act(async () => {});
+  expect(useAppStore.getState().globalNotice?.messageKey).toBe(
+    "voiceMode.asrReadyHint",
+  );
 });

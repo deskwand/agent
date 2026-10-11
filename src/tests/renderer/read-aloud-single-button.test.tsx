@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../renderer/i18n/config";
 import { MessageCard } from "../../renderer/components/MessageCard";
 import type { Message } from "../../renderer/types";
+import type { EnsureOutcome } from "../../renderer/capabilities/capability-gate";
+import { useAppStore } from "../../renderer/store";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
@@ -35,6 +37,26 @@ vi.mock("../../renderer/hooks/useReadAloud", () => ({
   stopReadAloud: vi.fn(),
 }));
 
+/**
+ * 能力门也用替身：本文件判的是「这颗键点下去调谁」，不是「缺不缺模型」
+ * （门自己有两处测试：`capabilities/capability-gate.test.ts` + `voice/read-aloud-gate.test.ts`）。
+ * 默认 ready = 已装好，按下即读；两条新用例把它调成 cancelled 看"先装再读"那一路。
+ */
+const g = vi.hoisted(() => ({
+  gate: {
+    // 类型必须写形状不能用 `as const` 收窄：后面要 mockResolvedValue("cancelled")。
+    ensureReady: vi.fn<() => Promise<EnsureOutcome>>(async () => "ready"),
+    whenReady: vi.fn<() => Promise<void>>(async () => {}),
+  },
+}));
+// 替身点是**模块**（MessageCard 取的是 `getCapabilityGate()` 的动作，不订阅状态）。
+vi.mock("../../renderer/capabilities/capability-gate", () => ({
+  getCapabilityGate: () => ({
+    ensureReady: g.gate.ensureReady,
+    whenReady: g.gate.whenReady,
+  }),
+}));
+
 const message: Message = {
   id: "m1",
   role: "assistant",
@@ -58,6 +80,8 @@ beforeEach(() => {
   h.reader.start.mockClear();
   h.reader.toggle.mockClear();
   h.reader.stop.mockClear();
+  g.gate.ensureReady.mockReset().mockResolvedValue("ready");
+  g.gate.whenReady.mockReset().mockResolvedValue(undefined);
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -136,10 +160,10 @@ describe("朗读收成一个图标", () => {
     }
   });
 
-  it("播放/暂停二态：点它走 toggle，永不碰 stop", () => {
-    // ① 没在读 → start(messageId, 正文容器)
+  it("播放/暂停二态：点它走 toggle，永不碰 stop", async () => {
+    // ① 没在读 → 先过能力门（异步），门说 ready 就 start(messageId, 正文容器)
     renderCard();
-    act(() => readAloudButton().click());
+    await act(async () => readAloudButton().click());
     expect(h.reader.start).toHaveBeenCalledTimes(1);
     expect(h.reader.start.mock.calls[0][0]).toBe("m1");
     expect(h.reader.toggle).not.toHaveBeenCalled();
@@ -164,7 +188,7 @@ describe("朗读收成一个图标", () => {
     // ⇒ 正文变化那条 effect 不会触发 stop。若你改了 message.content，这条会假红。
   });
 
-  it("两条死路补齐：preparing 点一下取消，error 点一下重试", () => {
+  it("两条死路补齐：preparing 点一下取消，error 点一下重试", async () => {
     // preparing：首块音频还没到，`toggle()` 是 no-op ⇒ 这一下必须是 stop（旧版此时有停止键）
     h.reader.messageId = "m1";
     h.reader.status = "preparing";
@@ -177,7 +201,7 @@ describe("朗读收成一个图标", () => {
     // error：图标已回落成音量、tooltip 写着「朗读这条回复」⇒ 这一下必须是 start（重试）
     h.reader.status = "error";
     renderCard();
-    act(() => readAloudButton().click());
+    await act(async () => readAloudButton().click());
     expect(h.reader.start).toHaveBeenCalledTimes(1);
     expect(h.reader.start.mock.calls[0][0]).toBe("m1");
     expect(h.reader.toggle).not.toHaveBeenCalled();
@@ -208,4 +232,68 @@ describe("朗读收成一个图标", () => {
       container.querySelector('[data-testid="stop-reading-button"]'),
     ).toBeNull();
   });
+});
+
+it("缺语音模型：这一下不读，弹确认；装好之后条件成立才自动开始", async () => {
+  g.gate.ensureReady.mockResolvedValue("cancelled");
+  let release!: () => void;
+  g.gate.whenReady.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  renderCard();
+  await act(async () => {
+    readAloudButton().click();
+  });
+  // 确认弹窗已经摆出来，但这一下不读
+  expect(h.reader.start).not.toHaveBeenCalled();
+
+  // 装好了 → 四条护栏都成立 → 自动开始
+  await act(async () => release());
+  expect(h.reader.start).toHaveBeenCalledTimes(1);
+  expect(h.reader.start.mock.calls[0][0]).toBe("m1");
+});
+
+it("正在装 / 装失败：什么都不做（既不读，也不去弹第二个窗）", async () => {
+  for (const outcome of ["busy", "failed", "unsupported"] as const) {
+    h.reader.start.mockClear();
+    g.gate.ensureReady.mockResolvedValue(outcome);
+    renderCard();
+    await act(async () => {
+      readAloudButton().click();
+    });
+    expect(h.reader.start).not.toHaveBeenCalled();
+    act(() => root.unmount());
+    container.remove();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+  }
+});
+
+it("装好了但护栏不成立（期间用户读了别的）：不自动出声，改发一条「再点一次」", async () => {
+  g.gate.ensureReady.mockResolvedValue("cancelled");
+  let release!: () => void;
+  g.gate.whenReady.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  renderCard();
+  await act(async () => {
+    readAloudButton().click();
+  });
+
+  // 等待期间用户去读了别的消息：`noReadStartedSince` 不成立
+  h.reader.messageId = "m2";
+  await act(async () => release());
+
+  expect(h.reader.start).not.toHaveBeenCalled();
+  expect(useAppStore.getState().globalNotice?.messageKey).toBe(
+    "messageCard.readAloudReadyAgain",
+  );
+  h.reader.messageId = null;
 });

@@ -10,7 +10,7 @@
  * **最小化只在跳变上改**：进入语音会话展开、离开语音会话收起。写成「active
  * 为真就展开」的话，用户显式点了最小化会立刻被撤销。
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
 import { useVoiceMode } from "../../hooks/useVoiceMode";
@@ -18,6 +18,35 @@ import { VoiceModeOverlay } from "../VoiceModeOverlay";
 import { CAPTION_KEY } from "./orb-state";
 import { VOICE_MESSAGE_KEYS } from "../../hooks/useVoiceInput";
 import { voiceCaptionLine } from "../../utils/voice/voice-caption";
+import { getCapabilityGate } from "../../capabilities/capability-gate";
+import { resolveTtsSource } from "../../../shared/voice-mode";
+import type { TtsInstallStates } from "../../../shared/ipc-types";
+
+/** tts 三档的安装态。事件只带一个模型，所以整份重读一次，省得自己拼三个键。 */
+function useTtsInstalls(): TtsInstallStates | null {
+  const [installs, setInstalls] = useState<TtsInstallStates | null>(null);
+  useEffect(() => {
+    const tts = window.electronAPI?.tts;
+    if (!tts) return;
+    const unsubscribe = tts.onEvent((event) => {
+      if (event.type !== "install") return;
+      void tts
+        .getInstallState()
+        .then(setInstalls)
+        .catch(() => {
+          /* 未知态 */
+        });
+    });
+    void tts
+      .getInstallState()
+      .then(setInstalls)
+      .catch(() => {
+        /* 未知态 */
+      });
+    return unsubscribe;
+  }, []);
+  return installs;
+}
 
 export interface VoiceModeHostProps {
   sessionId: string;
@@ -51,6 +80,16 @@ export function VoiceModeHost({
     muted,
     sendQuestion: onSendQuestion,
   });
+
+  const ttsInstalls = useTtsInstalls();
+  const voiceMode = useAppStore((s) => s.appConfig?.voiceMode);
+  // 云端来源不需要下载；本机来源且三档都没装时，回答只会有字幕没有声音。
+  const ttsMissing =
+    resolveTtsSource(voiceMode) === "local" &&
+    ttsInstalls !== null &&
+    !ttsInstalls.zh.installed &&
+    !ttsInstalls.matcha.installed &&
+    !ttsInstalls.en.installed;
 
   const wasActive = useRef(active);
   useEffect(() => {
@@ -87,6 +126,8 @@ export function VoiceModeHost({
       view={view}
       onClose={closeVoiceMode}
       onMinimize={() => setMinimized(true)}
+      ttsMissing={ttsMissing}
+      onInstallTts={() => void getCapabilityGate().startInstall("voice")}
     />
   );
 }

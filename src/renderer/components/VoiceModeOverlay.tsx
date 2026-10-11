@@ -28,12 +28,18 @@ export interface VoiceModeOverlayProps {
   view: VoiceModeView;
   onClose(): void;
   onMinimize(): void;
+  /** 本机来源且语音模型一个都没装：回答只有字幕、没有声音（宿主算好传进来）。 */
+  ttsMissing?: boolean;
+  /** 点「装上」：宿主转给能力门的队列。 */
+  onInstallTts?: () => void;
 }
 
 export function VoiceModeOverlay({
   view,
   onClose,
   onMinimize,
+  ttsMissing = false,
+  onInstallTts,
 }: VoiceModeOverlayProps): JSX.Element {
   const { t } = useTranslation();
   // 主题决定球怎么画：深浅两支持久常量，组件自己不认主题色（沿用 star-orb 的规矩）。
@@ -132,6 +138,27 @@ export function VoiceModeOverlay({
       >
         {text}
       </div>
+
+      {/* 缺 TTS 的那一行提示：主题化的浮层，所以全部用语义 token
+          （舞台 bg-background / 卡片 bg-card / 文字 text-muted-foreground）。
+          今天这一行不存在：没有模型时合成失败被静默吞掉，用户看到的是
+          "有字幕、没声音、什么都不说"。 */}
+      {ttsMissing ? (
+        <div className="mt-5 flex items-center gap-2.5 rounded-full border border-border bg-card py-1.5 pr-1.5 pl-3.5">
+          <span className="text-sm text-muted-foreground">
+            {t("voiceMode.ttsMissingHint")}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            data-testid="voice-tts-install"
+            onClick={onInstallTts}
+          >
+            {t("voiceMode.ttsMissingAction")}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

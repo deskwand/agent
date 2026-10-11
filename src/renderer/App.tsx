@@ -51,6 +51,9 @@ import { Titlebar } from "./components/Titlebar";
 import { SandboxSetupDialog } from "./components/SandboxSetupDialog";
 import { SandboxSyncToast } from "./components/SandboxSyncToast";
 import { GlobalNoticeToast } from "./components/GlobalNoticeToast";
+import { CapabilityDownloadConfirm } from "./components/CapabilityDownloadConfirm";
+import { getCapabilityGate } from "./capabilities/capability-gate";
+import { ensureVoiceModeStart } from "./utils/voice/voice-mode-gate";
 import { IdeaCaptureOverlay } from "./components/IdeaCaptureOverlay";
 import { IdeasView } from "./components/IdeasView";
 import { useIdeaCaptureShortcut } from "./hooks/useIdeaCaptureShortcut";
@@ -218,6 +221,37 @@ function App() {
     setVoiceCreating(true);
     const epoch = voiceNavigationEpoch.current;
     try {
+      // 两条前置：别人在录音就不抢麦；缺 ASR 就地弹一次确认（下载 140MB）。
+      // 缺 TTS 不拦 —— 浮层里有提示行（见 VoiceModeOverlay）。
+      const start = await ensureVoiceModeStart({
+        ensureReady: () => getCapabilityGate().ensureReady("voiceInput"),
+        micBusy: () => useAppStore.getState().voiceInputOwner !== null,
+      });
+      if (start.status === "blocked") {
+        if (start.reason === "mic-busy") {
+          useAppStore.getState().setGlobalNotice({
+            id: `voice-mic-busy-${Date.now()}`,
+            message: "",
+            messageKey: "voiceMode.micBusy",
+            type: "info",
+          });
+        } else if (start.outcome === "cancelled") {
+          // 确认弹窗已经摆出来了：装完之后告诉用户回来再点一次 ——
+          // 用户刚为它下了 140MB，不能什么都不说（spec §2.5）。
+          void getCapabilityGate()
+            .whenReady("voiceInput")
+            .then(() => {
+              if (!appLive.current) return;
+              useAppStore.getState().setGlobalNotice({
+                id: `voice-asr-ready-${Date.now()}`,
+                message: "",
+                messageKey: "voiceMode.asrReadyHint",
+                type: "info",
+              });
+            });
+        }
+        return;
+      }
       const record = await createVoiceSession();
       // 主进程已经发过「需要配置」提示，返回 null 不再叠加第二条。
       if (!record) return;
@@ -844,6 +878,9 @@ function App() {
         onDismiss={clearGlobalNotice}
         onAction={handleGlobalNoticeAction}
       />
+
+      {/* 两条开语音模式的路共用的下载确认（单例 prompt ⇒ 只在这里渲染一次） */}
+      <CapabilityDownloadConfirm />
 
       {/* Image Lightbox */}
       <ImageLightbox {...lightboxState} />
