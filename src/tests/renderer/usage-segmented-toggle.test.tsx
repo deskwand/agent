@@ -88,13 +88,17 @@ describe("SegmentedToggle", () => {
     expect(item("今天").getAttribute("aria-checked")).toBe("true");
   });
 
-  it("没有灰底导轨，只给未选中项一档更浅的 hover", async () => {
+  it("皮肤全部来自官方原语：不再手写尺寸与 hover", async () => {
     await render();
-    // 旧实现是「灰底圆角导轨 + 白药丸」；方案 A 去掉导轨（2026-10-10 用户选定）
+    // 官方 ToggleGroup 本身就没有灰底导轨（只有 flex + gap），这条继续成立
     expect(group().className).not.toMatch(/(?:^|\s)bg-muted(?:\s|$)/);
-    // hover 必须比选中态（bg-accent）浅：官方主题里 --muted 与 --accent 同值
-    expect(item("7 天").className).toContain(
+    // 选中态来自 ui/toggle.tsx 的官方 base
+    expect(item("7 天").className).toContain("data-[state=on]:bg-accent");
+    // 调用点不得再手写尺寸档或自造 hover（曾经是 h-8 px-2 text-xs + data-[state=off]:hover:bg-muted/60）
+    expect(item("7 天").className).not.toContain(
       "data-[state=off]:hover:bg-muted/60",
     );
+    expect(item("7 天").className).not.toContain("text-xs");
+    expect(item("7 天").className).toContain("h-8"); // 官方 size="sm"
   });
 });

@@ -90,7 +90,15 @@ describe("常规页的控件形态", () => {
   it("布尔项用开关，枚举项用下拉，主题三选一内联在那一行", () => {
     expect(general).toContain("<SettingsSwitch");
     expect(general).toContain("<SettingsSelect");
-    expect(general).toContain("aria-pressed={settings.theme === option.value}");
+    // 计划 13 Task7b：主题三选一从手绘 Button + aria-pressed 迁到 ui/toggle-group
+    // （Radix 单选渲染 role=radiogroup/radio + aria-checked，不再有 aria-pressed）。
+    // 守卫的意图不变：它必须仍是**内联在那一行**的三选一，且三个取值齐全。
+    expect(general).toContain("<ToggleGroup");
+    expect(general).toContain("<ToggleGroupItem");
+    // 三个取值来自单一真源数组（ToggleGroupItem 的 value 由它派生）。
+    expect(general).toContain('{ value: "light"');
+    expect(general).toContain('{ value: "dark"');
+    expect(general).toContain('{ value: "system"');
     expect(general).toContain('t("general.telemetry")');
     expect(general).toContain('t("general.autoSkillLearning")');
   });

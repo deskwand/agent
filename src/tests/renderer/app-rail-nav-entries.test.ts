@@ -108,7 +108,8 @@ describe("账号簇在图标栏上", () => {
   const appRail = read("components/AppRail.tsx");
 
   it("renders the cluster inside the rail", () => {
-    expect(appRail).toContain("<AccountCluster />");
+    // Task2 fix3：账号簇多了一个 optional 回焦 callback 透传，形态从自闭合变为带 prop
+    expect(appRail).toContain("<AccountCluster onOpenTopUp={onOpenTopUp} />");
   });
 
   it("owns the account menu and every dialog it opens", () => {
@@ -143,7 +144,7 @@ describe("账号簇在图标栏上", () => {
 
   it("hosts the help menu and the account cluster, and no longer has a settings gear", () => {
     expect(appRail).toContain("<HelpMenu />");
-    expect(appRail).toContain("<AccountCluster />");
+    expect(appRail).toContain("<AccountCluster onOpenTopUp={onOpenTopUp} />");
     // 设置入口已移到头像弹层；图标栏不再直接跳设置
     expect(appRail).not.toContain('setActiveView("settings")');
   });

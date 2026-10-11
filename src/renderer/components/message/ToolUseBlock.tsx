@@ -35,6 +35,11 @@ import {
 } from "../../utils/subagent-card";
 import { MessageMarkdown } from "../MessageMarkdown";
 import { Button } from "../app-button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 
 /**
  * 输出要按「元信息头 + Markdown 正文」拆开渲染的子代理工具。
@@ -330,7 +335,9 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   ].filter((value): value is string => Boolean(value));
 
   return (
-    <div
+    <Collapsible
+      open={expanded}
+      onOpenChange={setExpanded}
       className={`rounded-2xl overflow-hidden transition-colors ${
         effectiveError
           ? "bg-destructive/5"
@@ -340,299 +347,308 @@ export const ToolUseBlock = memo(function ToolUseBlock({
       }`}
     >
       {/* Header — always visible */}
-      <Button variant="ghost"
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
-      >
-        {/* Status icon — goal tools are status queries, no execution indicator needed */}
-        {!isGoalTool && (
-          <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
-            {effectiveError ? (
-              <XCircle className="w-3.5 h-3.5" />
-            ) : effectiveRunning ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            )}
-          </div>
-        )}
-
-        {/* Tool icon */}
-        {showIcon ? (
-          <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
-            {getToolIcon(block.name)}
-          </div>
-        ) : null}
-
-        {/* Content cluster */}
-        <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-          <span className="min-w-0 truncate text-xs font-mono text-muted-foreground">
-            {displayLabel}
-          </span>
-          {!isRunning && collapsedSummary.kind === "diff" && (
-            <span className="whitespace-nowrap text-xs text-muted-foreground inline-flex items-center gap-1">
-              ·{" "}
-              <span className="diff-add rounded-sm px-0.5">
-                +{collapsedSummary.added}
-              </span>
-              <span className="diff-del rounded-sm px-0.5">
-                -{collapsedSummary.removed}
-              </span>
-            </span>
-          )}
-          {(!isRunning || isAgentTool) &&
-            collapsedSummary.kind !== "diff" &&
-            collapsedSummaryText && (
-              <span
-                className={`whitespace-nowrap text-xs ${
-                  isError ? "text-destructive" : "text-muted-foreground"
-                }`}
-              >
-                · {collapsedSummaryText}
-              </span>
-            )}
-          <span
-            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
-              expanded
-                ? "opacity-100"
-                : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-            }`}
-          >
-            {expanded ? (
-              <ChevronDown className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5" />
-            )}
-          </span>
-        </div>
-      </Button>
-
-      {/* Expanded content */}
-      {expanded && (
-        <div className="animate-fade-in bg-background/35">
-          {expandedMetaItems.length > 0 && (
-            <div className="px-3 pt-2 text-xs text-muted-foreground">
-              {expandedMetaItems.join(" · ")}
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
+        >
+          {/* Status icon — goal tools are status queries, no execution indicator needed */}
+          {!isGoalTool && (
+            <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
+              {effectiveError ? (
+                <XCircle className="w-3.5 h-3.5" />
+              ) : effectiveRunning ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
             </div>
           )}
 
-          {/* Input section — hidden when diff is available, always hidden for vision_describe */}
-          {!toolResult?.diff && !isVisionDescribe && (
-            <div className="px-3 py-2">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
-                {t("tool.sectionInput")}
+          {/* Tool icon */}
+          {showIcon ? (
+            <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
+              {getToolIcon(block.name)}
+            </div>
+          ) : null}
+
+          {/* Content cluster */}
+          <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
+            <span className="min-w-0 truncate text-xs font-mono text-muted-foreground">
+              {displayLabel}
+            </span>
+            {!isRunning && collapsedSummary.kind === "diff" && (
+              <span className="whitespace-nowrap text-xs text-muted-foreground inline-flex items-center gap-1">
+                ·{" "}
+                <span className="diff-add rounded-sm px-0.5">
+                  +{collapsedSummary.added}
+                </span>
+                <span className="diff-del rounded-sm px-0.5">
+                  -{collapsedSummary.removed}
+                </span>
+              </span>
+            )}
+            {(!isRunning || isAgentTool) &&
+              collapsedSummary.kind !== "diff" &&
+              collapsedSummaryText && (
+                <span
+                  className={`whitespace-nowrap text-xs ${
+                    isError ? "text-destructive" : "text-muted-foreground"
+                  }`}
+                >
+                  · {collapsedSummaryText}
+                </span>
+              )}
+            <span
+              className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
+                expanded
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+              }`}
+            >
+              {expanded ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              )}
+            </span>
+          </div>
+        </Button>
+      </CollapsibleTrigger>
+
+      {/* Expanded content */}
+      {expanded && (
+        <CollapsibleContent>
+          <div className="animate-fade-in bg-background/35">
+            {expandedMetaItems.length > 0 && (
+              <div className="px-3 pt-2 text-xs text-muted-foreground">
+                {expandedMetaItems.join(" · ")}
               </div>
-              {isWebSearchTool ? (
-                <div className="space-y-1">
-                  {block.name === "get_search_content" ? (
-                    <div className="text-xs text-muted-foreground">
-                      responseId: {String(toolInput.responseId || "")}
-                    </div>
-                  ) : block.name === "fetch_content" ? (
-                    <>
-                      {(Array.isArray(toolInput.urls)
-                        ? (toolInput.urls as string[])
+            )}
+
+            {/* Input section — hidden when diff is available, always hidden for vision_describe */}
+            {!toolResult?.diff && !isVisionDescribe && (
+              <div className="px-3 py-2">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
+                  {t("tool.sectionInput")}
+                </div>
+                {isWebSearchTool ? (
+                  <div className="space-y-1">
+                    {block.name === "get_search_content" ? (
+                      <div className="text-xs text-muted-foreground">
+                        responseId: {String(toolInput.responseId || "")}
+                      </div>
+                    ) : block.name === "fetch_content" ? (
+                      <>
+                        {(Array.isArray(toolInput.urls)
+                          ? (toolInput.urls as string[])
+                          : []
+                        ).map((u, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                          >
+                            <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">{u}</span>
+                          </div>
+                        ))}
+                        {toolInput.url && !Array.isArray(toolInput.urls) && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">
+                              {String(toolInput.url)}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    ) : /* web_search / websearch / web_fetch / webfetch */
+                    (Array.isArray(toolInput.queries)
+                        ? (toolInput.queries as string[])
                         : []
-                      ).map((u, i) => (
+                      ).length > 0 ? (
+                      (toolInput.queries as string[]).map((q, i) => (
                         <div
                           key={i}
                           className="flex items-center gap-1.5 text-xs text-muted-foreground"
                         >
-                          <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                          <span className="truncate">{u}</span>
+                          <Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                          <span>{q}</span>
                         </div>
-                      ))}
-                      {toolInput.url && !Array.isArray(toolInput.urls) && (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                          <span className="truncate">
-                            {String(toolInput.url)}
-                          </span>
+                      ))
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                        <span>
+                          {String(toolInput.query || toolInput.url || "")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : isAgentTool ? (
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    {(toolInput.subagent_type as string) && (
+                      <div className="flex items-center gap-1.5">
+                        <span>{toolInput.subagent_type as string}</span>
+                      </div>
+                    )}
+                    {(toolInput.description as string) && (
+                      <div className="truncate">
+                        {toolInput.description as string}
+                      </div>
+                    )}
+                  </div>
+                ) : block.name === "get_subagent_result" ? (
+                  <div className="text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span>
+                        {resolvedName
+                          ? t("tool.subagentQuery", { name: resolvedName })
+                          : t("tool.actionGetSubagentResult")}
+                      </span>
+                      {toolInput.wait === true && (
+                        <span className="rounded bg-muted px-1 text-[11px] text-muted-foreground">
+                          {t("tool.subagentWait")}
+                        </span>
+                      )}
+                      {toolInput.verbose === true && (
+                        <span className="rounded bg-muted px-1 text-[11px] text-muted-foreground">
+                          {t("tool.subagentVerbose")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : block.name === "steer_subagent" ? (
+                  <div className="text-xs text-muted-foreground">
+                    <div>
+                      {resolvedName
+                        ? t("tool.subagentSteer", { name: resolvedName })
+                        : t("tool.actionSteerSubagent")}
+                    </div>
+                    {typeof toolInput.message === "string" &&
+                      toolInput.message.length > 0 && (
+                        <div className="mt-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-2.5 text-muted-foreground">
+                          {toolInput.message}
                         </div>
                       )}
-                    </>
-                  ) : /* web_search / websearch / web_fetch / webfetch */
-                  (Array.isArray(toolInput.queries)
-                      ? (toolInput.queries as string[])
-                      : []
-                    ).length > 0 ? (
-                    (toolInput.queries as string[]).map((q, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                      >
-                        <Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                        <span>{q}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                      <span>
-                        {String(toolInput.query || toolInput.url || "")}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ) : isAgentTool ? (
-                <div className="text-xs text-muted-foreground space-y-1">
-                  {(toolInput.subagent_type as string) && (
-                    <div className="flex items-center gap-1.5">
-                      <span>{toolInput.subagent_type as string}</span>
-                    </div>
-                  )}
-                  {(toolInput.description as string) && (
-                    <div className="truncate">
-                      {toolInput.description as string}
-                    </div>
-                  )}
-                </div>
-              ) : block.name === "get_subagent_result" ? (
-                <div className="text-xs text-muted-foreground">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span>
-                      {resolvedName
-                        ? t("tool.subagentQuery", { name: resolvedName })
-                        : t("tool.actionGetSubagentResult")}
-                    </span>
-                    {toolInput.wait === true && (
-                      <span className="rounded bg-muted px-1 text-[11px] text-muted-foreground">
-                        {t("tool.subagentWait")}
-                      </span>
-                    )}
-                    {toolInput.verbose === true && (
-                      <span className="rounded bg-muted px-1 text-[11px] text-muted-foreground">
-                        {t("tool.subagentVerbose")}
-                      </span>
-                    )}
                   </div>
-                </div>
-              ) : block.name === "steer_subagent" ? (
-                <div className="text-xs text-muted-foreground">
-                  <div>
-                    {resolvedName
-                      ? t("tool.subagentSteer", { name: resolvedName })
-                      : t("tool.actionSteerSubagent")}
-                  </div>
-                  {typeof toolInput.message === "string" &&
-                    toolInput.message.length > 0 && (
-                      <div className="mt-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-2.5 text-muted-foreground">
-                        {toolInput.message}
-                      </div>
-                    )}
-                </div>
-              ) : (
-                <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all bg-muted rounded-lg p-2.5">
-                  {JSON.stringify(block.input, null, 2)}
-                </pre>
-              )}
-            </div>
-          )}
-
-          {/* 有活动快照时显示实时步骤，替代上游那句 "N tool uses..." */}
-          {subagentActivity && <SubagentSteps activity={subagentActivity} />}
-
-          {/* Streaming output when tool is running */}
-          {!subagentActivity &&
-            isRunning &&
-            partialToolResult &&
-            partialToolResult.content && (
-              <div className="px-3 py-2">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center gap-1.5">
-                  <Loader2 className="w-3 h-3 animate-spin text-primary-text" />
-                  {t("tool.sectionStreaming")}
-                </div>
-                <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted">
-                  {partialToolResult.content}
-                </pre>
+                ) : (
+                  <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all bg-muted rounded-lg p-2.5">
+                    {JSON.stringify(block.input, null, 2)}
+                  </pre>
+                )}
               </div>
             )}
 
-          {/* Output section */}
-          {toolResult && (
-            <div className="px-3 py-2">
-              {!toolResult.diff && !isVisionDescribe && (
-                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
-                  {t("tool.sectionOutput")}
-                </div>
-              )}
-              {preferImageOutput &&
-                validImages.map((image, index) => (
-                  <div key={index} className="mt-2 rounded-lg overflow-hidden">
-                    <img
-                      src={`data:${image.mimeType};base64,${image.data}`}
-                      alt={`Output ${index + 1}`}
-                      className="w-full h-auto"
-                      style={{ maxHeight: "400px", objectFit: "contain" }}
-                    />
+            {/* 有活动快照时显示实时步骤，替代上游那句 "N tool uses..." */}
+            {subagentActivity && <SubagentSteps activity={subagentActivity} />}
+
+            {/* Streaming output when tool is running */}
+            {!subagentActivity &&
+              isRunning &&
+              partialToolResult &&
+              partialToolResult.content && (
+                <div className="px-3 py-2">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin text-primary-text" />
+                    {t("tool.sectionStreaming")}
                   </div>
-                ))}
-              {toolResult.diff ? (
-                <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted leading-snug">
-                  {toolResult.diff.split("\n").map((line, i) => {
-                    const prefix = line[0];
-                    const bgClass =
-                      prefix === "+"
-                        ? "diff-add"
-                        : prefix === "-"
-                          ? "diff-del"
-                          : "text-muted-foreground";
-                    return (
-                      <div key={i} className={bgClass}>
-                        {line}
-                      </div>
-                    );
-                  })}
-                </pre>
-              ) : (isWebSearchTool || isAgentTool || isSubagentOutputTool) &&
-                typeof toolResult.content === "string" ? (
-                <div className="text-xs text-muted-foreground max-h-[400px] overflow-y-auto">
-                  {subagentOutput?.header && (
-                    <div className="mb-2 whitespace-pre-wrap rounded-lg bg-muted p-2.5">
-                      {subagentOutput.header}
-                    </div>
-                  )}
-                  {subagentOutput ? (
-                    subagentOutput.body && (
-                      <MessageMarkdown normalizedText={subagentOutput.body} />
-                    )
-                  ) : (
-                    <MessageMarkdown
-                      normalizedText={agentResultText ?? toolResult.content}
-                    />
-                  )}
-                </div>
-              ) : (
-                shouldShowOutputText && (
-                  <pre
-                    className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
-                      isError
-                        ? "text-destructive bg-destructive/5"
-                        : "text-muted-foreground bg-muted"
-                    } ${preferImageOutput ? "mt-2" : ""}`}
-                  >
-                    {isVisionDescribe && visionDescriptionText !== null
-                      ? visionDescriptionText
-                      : toolResult.content}
+                  <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted">
+                    {partialToolResult.content}
                   </pre>
-                )
+                </div>
               )}
-              {!preferImageOutput &&
-                validImages.map((image, index) => (
-                  <div key={index} className="mt-2 rounded-lg overflow-hidden">
-                    <img
-                      src={`data:${image.mimeType};base64,${image.data}`}
-                      alt={`Output ${index + 1}`}
-                      className="w-full h-auto"
-                      style={{ maxHeight: "400px", objectFit: "contain" }}
-                    />
+
+            {/* Output section */}
+            {toolResult && (
+              <div className="px-3 py-2">
+                {!toolResult.diff && !isVisionDescribe && (
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
+                    {t("tool.sectionOutput")}
                   </div>
-                ))}
-            </div>
-          )}
-        </div>
+                )}
+                {preferImageOutput &&
+                  validImages.map((image, index) => (
+                    <div
+                      key={index}
+                      className="mt-2 rounded-lg overflow-hidden"
+                    >
+                      <img
+                        src={`data:${image.mimeType};base64,${image.data}`}
+                        alt={`Output ${index + 1}`}
+                        className="w-full h-auto"
+                        style={{ maxHeight: "400px", objectFit: "contain" }}
+                      />
+                    </div>
+                  ))}
+                {toolResult.diff ? (
+                  <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted leading-snug">
+                    {toolResult.diff.split("\n").map((line, i) => {
+                      const prefix = line[0];
+                      const bgClass =
+                        prefix === "+"
+                          ? "diff-add"
+                          : prefix === "-"
+                            ? "diff-del"
+                            : "text-muted-foreground";
+                      return (
+                        <div key={i} className={bgClass}>
+                          {line}
+                        </div>
+                      );
+                    })}
+                  </pre>
+                ) : (isWebSearchTool || isAgentTool || isSubagentOutputTool) &&
+                  typeof toolResult.content === "string" ? (
+                  <div className="text-xs text-muted-foreground max-h-[400px] overflow-y-auto">
+                    {subagentOutput?.header && (
+                      <div className="mb-2 whitespace-pre-wrap rounded-lg bg-muted p-2.5">
+                        {subagentOutput.header}
+                      </div>
+                    )}
+                    {subagentOutput ? (
+                      subagentOutput.body && (
+                        <MessageMarkdown normalizedText={subagentOutput.body} />
+                      )
+                    ) : (
+                      <MessageMarkdown
+                        normalizedText={agentResultText ?? toolResult.content}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  shouldShowOutputText && (
+                    <pre
+                      className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
+                        isError
+                          ? "text-destructive bg-destructive/5"
+                          : "text-muted-foreground bg-muted"
+                      } ${preferImageOutput ? "mt-2" : ""}`}
+                    >
+                      {isVisionDescribe && visionDescriptionText !== null
+                        ? visionDescriptionText
+                        : toolResult.content}
+                    </pre>
+                  )
+                )}
+                {!preferImageOutput &&
+                  validImages.map((image, index) => (
+                    <div
+                      key={index}
+                      className="mt-2 rounded-lg overflow-hidden"
+                    >
+                      <img
+                        src={`data:${image.mimeType};base64,${image.data}`}
+                        alt={`Output ${index + 1}`}
+                        className="w-full h-auto"
+                        style={{ maxHeight: "400px", objectFit: "contain" }}
+                      />
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
       )}
-    </div>
+    </Collapsible>
   );
 });

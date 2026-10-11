@@ -119,6 +119,17 @@ describe("SettingsAPI catalog integration", () => {
     await flush();
   };
 
+  /**
+   * API 编辑弹窗外壳迁到 shadcn Dialog 后经 portal 挂到 document.body，
+   * 不再位于测试的 container 内：弹窗内查询收窄到当前 dialog；
+   * 页面级节点（目录瓦片、已配置角标）仍查 container。
+   */
+  const editorDialog = (): HTMLElement => {
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    if (!dialog) throw new Error("api editor dialog not open");
+    return dialog;
+  };
+
   it("只有主模型子 tab 吃宽栏，其余三个表单子 tab 保持 720", () => {
     // 外壳对 api tab 不封顶，宽度由 SettingsAPI 按子 tab 各自封：
     // 主模型是目录网格（1080），视觉/搜索/轻量是表单（720）。
@@ -202,13 +213,14 @@ describe("SettingsAPI catalog integration", () => {
 
     await clickEntry("plan:custom:subscription-bailian-coding");
 
+    // 套餐弹窗迁到 shadcn Dialog 后经 portal 挂到 body，不再位于测试 container 内。
     expect(
-      container.querySelector(
+      document.body.querySelector(
         '[data-testid="custom:subscription-bailian-coding-card"]',
       ),
     ).not.toBeNull();
     expect(
-      container.querySelector(
+      document.body.querySelector(
         '[data-testid="custom:subscription-ark-coding-card"]',
       ),
     ).not.toBeNull();
@@ -224,14 +236,18 @@ describe("SettingsAPI catalog integration", () => {
     await clickEntry("provider:openrouter");
 
     // 编辑器弹窗打开：出现 API Key 输入框
-    expect(container.querySelector('input[type="password"]')).not.toBeNull();
-    expect(container.textContent).toContain("OpenRouter");
+    expect(
+      editorDialog().querySelector('input[type="password"]'),
+    ).not.toBeNull();
+    expect(editorDialog().textContent).toContain("OpenRouter");
   });
 
   it("点未配置的供应商瓦片也进编辑器", async () => {
     await render();
     await clickEntry("provider:deepseek");
-    expect(container.querySelector('input[type="password"]')).not.toBeNull();
+    expect(
+      editorDialog().querySelector('input[type="password"]'),
+    ).not.toBeNull();
   });
 
   it("Coding Plan 配好之后也能拿到已配置角标", async () => {

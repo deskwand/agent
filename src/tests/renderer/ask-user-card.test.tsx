@@ -280,15 +280,15 @@ describe("AskUserCard", () => {
     );
     act(() => {
       (
-        Array.from(container.querySelectorAll("button")).find((el) =>
+        Array.from(container.querySelectorAll("button, label")).find((el) =>
           el.textContent?.includes("zod"),
-        ) as HTMLButtonElement
+        ) as HTMLElement
       )?.click();
     });
     act(() => {
       buttonByText(container, "tool.askUser.other")?.click();
     });
-    const input = container.querySelector("input");
+    const input = container.querySelector('input[type="text"]');
     expect(input).toBeTruthy();
     act(() => {
       if (input) typeInto(input, "zustand");
@@ -531,5 +531,204 @@ describe("AskUserCard", () => {
       }),
     );
     expect(micButtons(container)).toHaveLength(0);
+  });
+
+  // —— Task 6b：选择控件走可访问原语 ——
+  // choice = ui/radio-group 的 RadioGroup（radiogroup 的可访问名是题面，方向键移动并选中）；
+  // multiSelect = 原生 input[type=checkbox]（ui/checkbox.tsx 由另一任务提供，本轮不越界新建）。
+  // 契约不变：choice 回传 string、multiSelect 回传 string[]（按选项顺序）。
+
+  const seedPending = (questions: unknown[]) =>
+    useAppStore.setState({
+      pendingAskUsers: {
+        "t-1": { sessionId: "s-1", toolCallId: "t-1", questions },
+      } as never,
+    });
+
+  const rowByText = (container: HTMLElement, text: string): HTMLElement =>
+    Array.from(container.querySelectorAll("label")).find((el) =>
+      el.textContent?.includes(text),
+    ) as HTMLElement;
+
+  const pressArrow = async (el: HTMLElement, key: string) => {
+    // Radix 的 roving focus 把移动放在 setTimeout(0) 里（不是同步 focus），不冲掉这个
+    // 宏任务焦点不会动；反过来，"方向键=选中"依赖的 document keydown 标记在分派期间就已置位。
+    await act(async () => {
+      el.focus();
+      el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  };
+
+  const releaseArrow = (key: string) =>
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent("keyup", { key, bubbles: true }),
+      );
+    });
+
+  it("choice 题用 radiogroup：可访问名是题面，ArrowRight 移动焦点并选中，提交值仍是字符串", async () => {
+    seedPending([question]);
+    const { container } = renderCard(CARD());
+
+    const group = container.querySelector('[role="radiogroup"]');
+    expect(group).not.toBeNull();
+    expect(group?.getAttribute("aria-label")).toBe("数据库用哪个？");
+
+    const radios = [
+      ...container.querySelectorAll<HTMLElement>('[role="radio"]'),
+    ];
+    expect(radios).toHaveLength(2);
+    expect(
+      radios.every((el) => el.getAttribute("aria-checked") === "false"),
+    ).toBe(true);
+    // 选项的 value 就是原选项 label（onValueChange 收到的也是它）
+    expect(radios.map((el) => el.getAttribute("value"))).toEqual([
+      "PostgreSQL",
+      "SQLite",
+    ]);
+    // 控件与文案同一行：label[for] → radio.id
+    expect(radios[0].id).not.toBe("");
+    expect(
+      container.querySelector(`label[for="${radios[0].id}"]`),
+    ).not.toBeNull();
+    // 「其他…」是普通按钮且在组外：radiogroup 只应拥有 radio
+    const other = buttonByText(container, "tool.askUser.other");
+    expect(other).toBeTruthy();
+    expect(group?.contains(other)).toBe(false);
+
+    await pressArrow(radios[0], "ArrowRight");
+
+    expect(document.activeElement).toBe(radios[1]);
+    expect(radios[1].getAttribute("aria-checked")).toBe("true");
+    // 单选：前一个必须被取消（radiogroup 里不可能有两个 checked）
+    expect(radios[0].getAttribute("aria-checked")).toBe("false");
+    releaseArrow("ArrowRight");
+
+    act(() => {
+      buttonByText(container, "tool.askUser.submit")?.click();
+    });
+    expect(submitAskUserMock).toHaveBeenCalledWith("s-1", "t-1", {
+      "0": "SQLite",
+    });
+    // 形状不变：choice 回传 string，不是数组
+    const payload = submitAskUserMock.mock.calls[0]?.[2] as Record<
+      string,
+      unknown
+    >;
+    expect(typeof payload["0"]).toBe("string");
+  });
+
+  it("choice 题 ArrowDown 同样移动并选中", async () => {
+    seedPending([question]);
+    const { container } = renderCard(CARD());
+    const radios = [
+      ...container.querySelectorAll<HTMLElement>('[role="radio"]'),
+    ];
+
+    await pressArrow(radios[0], "ArrowDown");
+
+    expect(document.activeElement).toBe(radios[1]);
+    expect(radios[1].getAttribute("aria-checked")).toBe("true");
+    releaseArrow("ArrowDown");
+  });
+
+  it("choice 题点选项行也选中（label 与控件同属一行）", () => {
+    seedPending([question]);
+    const { container } = renderCard(CARD());
+
+    act(() => {
+      rowByText(container, "SQLite").click();
+    });
+
+    expect(
+      container
+        .querySelectorAll('[role="radio"]')[1]
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(container.textContent).toContain("轻量");
+  });
+
+  it("multiSelect 勾两个选项：提交值是字符串数组（顺序按选项顺序）", () => {
+    const multiQuestions = [
+      {
+        question: "用哪些库？",
+        header: "依赖",
+        type: "multiSelect",
+        options: [{ label: "zod" }, { label: "zundo" }],
+      },
+    ];
+    const multiBlock = {
+      type: "tool_use",
+      id: "t-1",
+      name: "ask_user",
+      input: { questions: multiQuestions },
+    } as never;
+    seedPending(multiQuestions);
+    const { container } = renderCard(
+      <AskUserCard
+        block={multiBlock}
+        allBlocks={[] as never}
+        allMessages={[] as never}
+      />,
+    );
+
+    const boxes = [
+      ...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+    ];
+    expect(boxes).toHaveLength(2);
+    // 仍是原生 checkbox，不是另造一套 role=checkbox 的按钮
+    expect(container.querySelector('[role="checkbox"]')).toBeNull();
+
+    // 倒着勾（先 zundo 再 zod）：回传顺序按选项顺序，不是点击顺序
+    act(() => {
+      rowByText(container, "zundo").click();
+    });
+    act(() => {
+      rowByText(container, "zod").click();
+    });
+    expect(boxes.map((box) => box.checked)).toEqual([true, true]);
+    act(() => {
+      buttonByText(container, "tool.askUser.submit")?.click();
+    });
+
+    expect(submitAskUserMock).toHaveBeenCalledWith("s-1", "t-1", {
+      "0": ["zod", "zundo"],
+    });
+    // 形状不变：multiSelect 回传 string[]
+    const payload = submitAskUserMock.mock.calls[0]?.[2] as Record<
+      string,
+      unknown
+    >;
+    expect(Array.isArray(payload["0"])).toBe(true);
+  });
+
+  it("answered 只读卡没有任何可交互选择控件", () => {
+    const { container } = renderCard(
+      CARD({
+        allBlocks: [
+          {
+            type: "tool_result",
+            toolUseId: "t-1",
+            content: '{"answers":{"0":"SQLite"}}',
+          },
+        ],
+      }),
+    );
+
+    expect(container.textContent).toContain("tool.askUser.answered");
+    expect(container.querySelector('[role="radiogroup"]')).toBeNull();
+    expect(container.querySelector('[role="radio"]')).toBeNull();
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+    expect(buttonByText(container, "tool.askUser.submit")).toBeUndefined();
+  });
+
+  it("interrupted 卡也没有可交互选择控件", () => {
+    const { container } = renderCard(CARD());
+
+    expect(container.textContent).toContain("tool.askUser.interrupted");
+    expect(container.querySelector('[role="radiogroup"]')).toBeNull();
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull();
   });
 });

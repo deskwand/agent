@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { formatMicroUsd } from "../utils/topup";
 import {
@@ -37,6 +37,12 @@ interface AccountMenuProps {
   onOpenLogin: () => void;
   onOpenSettings: () => void;
   onLogout: () => void;
+  /**
+   * 打开充值弹窗的可选交接：余额行被激活时，把**即将随菜单退场的原 Trigger 按钮**交给
+   * 上层暂存，供 TopUpModal 打开时用作回焦目标（原生缺陷：否则回不到账号入口）。
+   * 不传时退回原来的 store.setTopUpOpen(true)，行为不变。
+   */
+  onOpenTopUp?: (target: HTMLButtonElement | null) => void;
 }
 
 export function AccountMenu({
@@ -48,10 +54,15 @@ export function AccountMenu({
   onOpenLogin,
   onOpenSettings,
   onLogout,
+  onOpenTopUp,
 }: AccountMenuProps) {
   const { t } = useTranslation();
   const petEnabled = useAppStore((s) => s.settings.petEnabled);
   const updateSettings = useAppStore((s) => s.updateSettings);
+  // 原生焦点：ref 直接挂在现有的 DropdownMenuTrigger 上（asChild 会把它交给真实 Trigger
+  // 元素，不插包装）。openingTopUpRef 标记「这次退场是余额行 → 充值弹窗」这一次转场。
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const openingTopUpRef = useRef(false);
 
   useEffect(() => {
     if (!open || cloudRestoring || !cloudConfig?.token) return;
@@ -84,8 +95,23 @@ export function AccountMenu({
           onPointerDown / aria-* / ref 交给它的**直接子元素**，中间再插任何不透传
           props/ref 的包装组件都会让菜单**打不开且不报错**（旧 Tooltip 就这么栽过）。
           回归闸：src/tests/renderer/account-menu-structure.test.ts 的 aria-haspopup 断言。 */}
-      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="right" className="w-64">
+      <DropdownMenuTrigger asChild ref={triggerRef}>
+        {trigger}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="right"
+        className="w-64"
+        onCloseAutoFocus={(event) => {
+          // 只有「余额行 → 充值弹窗」这一次退场抑制 Radix 默认的回焦：Dialog 的 FocusScope
+          // 会把这次抢回 Trigger 的焦点弹回去（一次无意义抢焦），且原 Trigger 已被交给
+          // TopUpModal 回焦。其它菜单动作（设置/退出/宠物开关）语义完全不变。
+          if (openingTopUpRef.current) {
+            openingTopUpRef.current = false;
+            event.preventDefault();
+          }
+        }}
+      >
         {isLoggedIn && cloudConfig ? (
           <>
             {/* 身份区：首字母头像 + 完整邮箱。触发行截断长邮箱，这里是完整版。 */}
@@ -112,14 +138,20 @@ export function AccountMenu({
           <DropdownMenuItem
             className="h-7 gap-2"
             onSelect={() => {
-              useAppStore.getState().setTopUpOpen(true);
+              // 先记下「这是打开充值的转场」，再把被关闭菜单的原 Trigger 交给父级；
+              // 没有父级回调（standalone）时保持原来的 store 打开路径。
+              openingTopUpRef.current = true;
+              if (onOpenTopUp) onOpenTopUp(triggerRef.current);
+              else useAppStore.getState().setTopUpOpen(true);
               onOpenChange(false);
             }}
           >
             <span className="shrink-0 text-muted-foreground">
               <Coins className="w-4 h-4" />
             </span>
-            <span className="text-muted-foreground">{t("accountMenu.balance")}</span>
+            <span className="text-muted-foreground">
+              {t("accountMenu.balance")}
+            </span>
             <span className="min-w-0 truncate font-medium">
               {formatMicroUsd(cloudConfig.balanceMicroUsd)}
             </span>

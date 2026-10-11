@@ -34,6 +34,7 @@ import type {
   VaultSnapshotItem,
 } from "../../shared/vault";
 import { Input } from "./ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 type Filter = "files" | "skills" | "sessions";
 type SyncFeedback = "idle" | "syncing" | "success" | "error";
@@ -857,377 +858,397 @@ export function VaultView(): JSX.Element {
 
       {showFiles ? (
         <>
-          <div className="mt-5 flex gap-1 border-b border-border/40">
-            {FILTERS.map((item) => (
-              <button
-                type="button"
-                key={item}
-                onClick={() => setFilter(item)}
-                className={`border-b-2 px-3 py-2 text-sm ${
-                  filter === item
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-muted-foreground"
-                }`}
-              >
-                {t(`vault.filter.${item}`)}
-              </button>
-            ))}
-          </div>
-
-          {showFiles && filter === "skills" && selectedSkills.size > 0 && (
-            <div
-              data-testid="skills-action-bar"
-              className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl border border-primary bg-primary/10 px-3 py-2"
-            >
-              <span className="text-xs font-medium text-foreground">
-                {t("vault.skills.selectedCount", {
-                  count: selectedSkills.size,
-                })}
-              </span>
-              <span className="flex-1" />
-              <button
-                type="button"
-                className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-accent"
-                onClick={() => setSelectedSkills(new Set())}
-              >
-                {t("vault.skills.clearSelection")}
-              </button>
-              <button
-                type="button"
-                className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={busy}
-                onClick={() => void runAddSkills([...selectedSkills], false)}
-              >
-                {t("vault.skills.addSelected", { count: selectedSkills.size })}
-              </button>
-            </div>
-          )}
-
-          {pendingLinkConfirm && (
-            <div className="mt-3 rounded-xl border border-warning bg-warning/10 p-3">
-              <p className="text-sm font-medium text-foreground">
-                {t("vault.skills.addNeedsConfirm")}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t("vault.skills.addNeedsConfirmHint", {
-                  count: pendingLinkConfirm.reduce(
-                    (total, entry) => total + entry.symlinkedEntries.length,
-                    0,
-                  ),
-                })}
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {t("vault.skills.symlinked")}
-              </p>
-              <ul className="mb-2 list-inside list-disc text-xs text-muted-foreground">
-                {pendingLinkConfirm.map((entry) => (
-                  <li key={entry.name}>
-                    {entry.name} · {entry.symlinkedEntries.length}
-                  </li>
-                ))}
-              </ul>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  disabled={busy}
-                  className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => setPendingLinkConfirm(null)}
+          <Tabs
+            value={filter}
+            onValueChange={(next) => {
+              if (
+                next === "files" ||
+                next === "skills" ||
+                next === "sessions"
+              ) {
+                setFilter(next);
+              }
+            }}
+            // flex-1 + min-h-0 + flex-col：页签根必须把父级的高度链传下去，
+            // 否则里面的 `min-h-0 flex-1 overflow-y-auto` 拿不到可滚动高度 ——
+            // 列表就会「撑开但滚不动」（2026-10-11 用户报障）。
+            className="mt-5 flex min-h-0 flex-1 flex-col"
+          >
+            {/* 官方皮肤来自 ui/tabs.tsx（药丸轨道 + 选中项 background/shadow）。
+                Radix 的 Trigger 只在 mousedown 激活，补一条 onClick 让程序化
+                .click()（既有用例与合成事件）同样能切换 —— 与 SettingsAPI 同款做法。 */}
+            <TabsList className="self-start">
+              {FILTERS.map((item) => (
+                <TabsTrigger
+                  key={item}
+                  value={item}
+                  onClick={() => setFilter(item)}
                 >
-                  {t("vault.skills.cancelAdd")}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() =>
-                    void runAddSkills(
-                      pendingLinkConfirm.map((entry) => entry.name),
-                      true,
-                    )
-                  }
-                >
-                  {t("vault.skills.addConfirm")}
-                </button>
-              </div>
-            </div>
-          )}
+                  {t(`vault.filter.${item}`)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {filter === "skills" && skillAddResult && (
-            <div className="mt-3 flex items-center justify-between rounded-lg border border-border/40 px-3 py-2 text-xs text-muted-foreground">
-              <span>{skillAddResult}</span>
-              <button
-                type="button"
-                className="ml-3 text-xs hover:underline"
-                onClick={() => setSkillAddResult(null)}
+            {showFiles && filter === "skills" && selectedSkills.size > 0 && (
+              <div
+                data-testid="skills-action-bar"
+                className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl border border-primary bg-primary/10 px-3 py-2"
               >
-                {t("vault.dismiss")}
-              </button>
-            </div>
-          )}
-
-          {filter === "files" && (
-            <div className="flex items-center justify-between py-3">
-              <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-                <span>
-                  {t("vault.fileCount", { count: visibleItems.length })}
-                </span>
-                <span>
-                  {t("vault.localUsage", {
-                    used: formatSize(snapshot?.usedBytes ?? 0),
+                <span className="text-xs font-medium text-foreground">
+                  {t("vault.skills.selectedCount", {
+                    count: selectedSkills.size,
                   })}
                 </span>
-                {backupUsage && (
-                  <span>
-                    {t(
-                      backupUsage.quotaBytes === null
-                        ? "vault.backupUsageNoQuota"
-                        : "vault.backupUsage",
-                      {
-                        used: formatSize(backupUsage.usedBytes),
-                        quota: formatSize(backupUsage.quotaBytes ?? 0),
-                      },
-                    )}
-                  </span>
-                )}
+                <span className="flex-1" />
+                <button
+                  type="button"
+                  className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-accent"
+                  onClick={() => setSelectedSkills(new Set())}
+                >
+                  {t("vault.skills.clearSelection")}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => void runAddSkills([...selectedSkills], false)}
+                >
+                  {t("vault.skills.addSelected", {
+                    count: selectedSkills.size,
+                  })}
+                </button>
               </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
+            )}
+
+            {pendingLinkConfirm && (
+              <div className="mt-3 rounded-xl border border-warning bg-warning/10 p-3">
+                <p className="text-sm font-medium text-foreground">
+                  {t("vault.skills.addNeedsConfirm")}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("vault.skills.addNeedsConfirmHint", {
+                    count: pendingLinkConfirm.reduce(
+                      (total, entry) => total + entry.symlinkedEntries.length,
+                      0,
+                    ),
+                  })}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t("vault.skills.symlinked")}
+                </p>
+                <ul className="mb-2 list-inside list-disc text-xs text-muted-foreground">
+                  {pendingLinkConfirm.map((entry) => (
+                    <li key={entry.name}>
+                      {entry.name} · {entry.symlinkedEntries.length}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex justify-end gap-2">
                   <button
                     type="button"
-                    aria-label={t("vault.upload")}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={handleUpload}
-                    disabled={uploadDisabled}
+                    disabled={busy}
+                    className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => setPendingLinkConfirm(null)}
                   >
-                    <Upload className="h-4 w-4" />
+                    {t("vault.skills.cancelAdd")}
                   </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {t("vault.upload")}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          )}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() =>
+                      void runAddSkills(
+                        pendingLinkConfirm.map((entry) => entry.name),
+                        true,
+                      )
+                    }
+                  >
+                    {t("vault.skills.addConfirm")}
+                  </button>
+                </div>
+              </div>
+            )}
 
-          <div className="min-h-0 flex-1 overflow-y-auto py-3">
-            {filter === "skills" && (
-              <div className="flex flex-col gap-2 py-3">
-                <Input
-                  type="search"
-                  value={skillQuery}
-                  onChange={(event) => setSkillQuery(event.target.value)}
-                  placeholder={t("vault.skills.searchPlaceholder")}
-                  className="w-full rounded-lg border border-border/40 bg-card px-2.5 py-1.5 text-xs text-foreground h-auto shadow-none"
-                />
+            {filter === "skills" && skillAddResult && (
+              <div className="mt-3 flex items-center justify-between rounded-lg border border-border/40 px-3 py-2 text-xs text-muted-foreground">
+                <span>{skillAddResult}</span>
+                <button
+                  type="button"
+                  className="ml-3 text-xs hover:underline"
+                  onClick={() => setSkillAddResult(null)}
+                >
+                  {t("vault.dismiss")}
+                </button>
+              </div>
+            )}
 
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {t("vault.skills.groupVault", {
-                      count: vaultSkillRows.length,
+            <TabsContent value="files" className="mt-0">
+              <div className="flex items-center justify-between py-3">
+                <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                  <span>
+                    {t("vault.fileCount", { count: visibleItems.length })}
+                  </span>
+                  <span>
+                    {t("vault.localUsage", {
+                      used: formatSize(snapshot?.usedBytes ?? 0),
                     })}
-                  </p>
-                  {vaultSkillRows.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">
-                      {t("vault.skills.empty")}
-                    </p>
-                  ) : (
-                    <div className="divide-y divide-border/40 rounded-xl border border-border/40">
-                      {vaultSkillRows.map((skill) => (
-                        <article
-                          key={skill.name}
-                          className="flex select-none items-center gap-4 px-4 py-3"
-                        >
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-foreground">
-                              {skill.name}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {t("vault.skills.summary", {
-                                count: skill.fileCount,
-                                size: formatSize(skill.totalBytes),
-                              })}{" "}
-                              · {statusText(skill.syncStatus, t)}
-                            </p>
-                            {skill.syncStatus === "pending" && (
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                {t("vault.skills.pendingHint")}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            aria-label={t("vault.skills.delete", {
-                              name: skill.name,
-                            })}
-                            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
-                            onClick={() =>
-                              setPendingConfirmation({
-                                kind: "delete-skill",
-                                name: skill.name,
-                              })
-                            }
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </article>
-                      ))}
-                    </div>
+                  </span>
+                  {backupUsage && (
+                    <span>
+                      {t(
+                        backupUsage.quotaBytes === null
+                          ? "vault.backupUsageNoQuota"
+                          : "vault.backupUsage",
+                        {
+                          used: formatSize(backupUsage.usedBytes),
+                          quota: formatSize(backupUsage.quotaBytes ?? 0),
+                        },
+                      )}
+                    </span>
                   )}
                 </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={t("vault.upload")}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={handleUpload}
+                      disabled={uploadDisabled}
+                    >
+                      <Upload className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {t("vault.upload")}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </TabsContent>
 
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {t("vault.skills.groupAddable", {
-                      count: addableRows.length,
-                    })}
-                  </p>
-                  {addableRows.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">
-                      {skillQuery
-                        ? t("vault.skills.noMatch")
-                        : t("vault.skills.noAddable")}
+            <div className="min-h-0 flex-1 overflow-y-auto py-3">
+              <TabsContent value="skills">
+                <div className="flex flex-col gap-2 py-3">
+                  <Input
+                    type="search"
+                    value={skillQuery}
+                    onChange={(event) => setSkillQuery(event.target.value)}
+                    placeholder={t("vault.skills.searchPlaceholder")}
+                    className="w-full rounded-lg border border-border/40 bg-card px-2.5 py-1.5 text-xs text-foreground h-auto shadow-none"
+                  />
+
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {t("vault.skills.groupVault", {
+                        count: vaultSkillRows.length,
+                      })}
                     </p>
-                  ) : (
-                    <div className="divide-y divide-border/40 rounded-xl border border-border/40">
-                      {addableRows.map((skill) => {
-                        const isSelected = selectedSkills.has(skill.name);
-                        return (
-                          <label
+                    {vaultSkillRows.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-muted-foreground">
+                        {t("vault.skills.empty")}
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-border/40 rounded-xl border border-border/40">
+                        {vaultSkillRows.map((skill) => (
+                          <article
                             key={skill.name}
-                            className={`flex select-none items-center gap-3 px-4 py-3 ${
-                              isSelected ? "bg-primary/10" : ""
-                            }`}
+                            className="flex select-none items-center gap-4 px-4 py-3"
                           >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleSkillSelection(skill.name)}
-                              className="h-4 w-4 shrink-0 accent-primary"
-                            />
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium text-foreground">
                                 {skill.name}
                               </p>
-                              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                {skill.description ||
-                                  t("vault.skills.missingDescription")}
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {t("vault.skills.summary", {
+                                  count: skill.fileCount,
+                                  size: formatSize(skill.totalBytes),
+                                })}{" "}
+                                · {statusText(skill.syncStatus, t)}
                               </p>
+                              {skill.syncStatus === "pending" && (
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {t("vault.skills.pendingHint")}
+                                </p>
+                              )}
                             </div>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {filter === "sessions" && (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                {t("vault.comingSoon")}
-              </p>
-            )}
-
-            {filter === "files" &&
-              (visibleItems.length === 0 ? (
-                <p className="py-12 text-center text-sm text-muted-foreground">
-                  {t("vault.empty")}
-                </p>
-              ) : (
-                <div className="divide-y divide-border/40 rounded-xl border border-border/40">
-                  {visibleItems.map((item) => (
-                    <article
-                      key={item.path}
-                      className="flex select-none items-center gap-4 px-4 py-3"
-                      onDoubleClick={() => handleOpen(item)}
-                    >
-                      <FileTypeIcon kind={getFileKind(item.path)} size={24} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          <VaultPathLabel path={item.path} />
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {formatSize(item.size)} ·{" "}
-                          {statusText(item.syncStatus, t)}
-                        </p>
-                      </div>
-                      <div
-                        className="relative flex shrink-0 items-center gap-1"
-                        onDoubleClick={(event) => event.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          aria-label={t("vault.action.export", {
-                            name: item.path,
-                          })}
-                          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                          onClick={(event) => {
-                            if (event.detail > 1) return;
-                            void runAction(() =>
-                              window.electronAPI.vault.exportFile(item.path),
-                            );
-                          }}
-                        >
-                          <Download className="h-4 w-4" />
-                        </button>
-                        {/* ⚠️ 「每行各自一个菜单」的原状保留 ✓ —— 只把 open 改成**派生式**
-                            （计划 8 同形 ✓），不要去动「一个共享菜单 + 记坐标」那种重写 ✗。 */}
-                        <DropdownMenu
-                          open={openMenu === item.path}
-                          onOpenChange={(next: boolean) =>
-                            setOpenMenu(next ? item.path : null)
-                          }
-                        >
-                          <DropdownMenuTrigger asChild>
                             <button
                               type="button"
-                              aria-label={t("vault.action.more", {
-                                name: item.path,
+                              disabled={busy}
+                              aria-label={t("vault.skills.delete", {
+                                name: skill.name,
                               })}
-                              className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                              className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
+                              onClick={() =>
+                                setPendingConfirmation({
+                                  kind: "delete-skill",
+                                  name: skill.name,
+                                })
+                              }
                             >
-                              <MoreHorizontal className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            id={`vault-menu-${item.path}`}
-                            align="end"
-                            // 宽度压回原值（原 min-w-32 ✗，Radix 默认 w-72 ✗）
-                            className="min-w-32"
-                          >
-                            <DropdownMenuItem
-                              className="h-7 gap-2"
-                              onClick={() => {
-                                setOpenMenu(null);
-                                void runAction(() =>
-                                  window.electronAPI.vault.revealFile(
-                                    item.path,
-                                  ),
-                                );
-                              }}
-                            >
-                              {t("vault.action.reveal")}
-                            </DropdownMenuItem>
-                            {/* 危险动作：逐字照抄原 MENU_ITEM_DANGER_CLASS ✓ */}
-                            <DropdownMenuItem
-                              className="h-7 gap-2 text-destructive hover:bg-destructive/10"
-                              onClick={() => {
-                                setOpenMenu(null);
-                                handleDelete(item);
-                              }}
-                            >
-                              {t("vault.action.delete")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                          </article>
+                        ))}
                       </div>
-                    </article>
-                  ))}
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {t("vault.skills.groupAddable", {
+                        count: addableRows.length,
+                      })}
+                    </p>
+                    {addableRows.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-muted-foreground">
+                        {skillQuery
+                          ? t("vault.skills.noMatch")
+                          : t("vault.skills.noAddable")}
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-border/40 rounded-xl border border-border/40">
+                        {addableRows.map((skill) => {
+                          const isSelected = selectedSkills.has(skill.name);
+                          return (
+                            <label
+                              key={skill.name}
+                              className={`flex select-none items-center gap-3 px-4 py-3 ${
+                                isSelected ? "bg-primary/10" : ""
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() =>
+                                  toggleSkillSelection(skill.name)
+                                }
+                                className="h-4 w-4 shrink-0 accent-primary"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-foreground">
+                                  {skill.name}
+                                </p>
+                                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                  {skill.description ||
+                                    t("vault.skills.missingDescription")}
+                                </p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ))}
-          </div>
+              </TabsContent>
+
+              <TabsContent value="sessions">
+                <p className="py-12 text-center text-sm text-muted-foreground">
+                  {t("vault.comingSoon")}
+                </p>
+              </TabsContent>
+
+              <TabsContent value="files">
+                {visibleItems.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-muted-foreground">
+                    {t("vault.empty")}
+                  </p>
+                ) : (
+                  <div className="divide-y divide-border/40 rounded-xl border border-border/40">
+                    {visibleItems.map((item) => (
+                      <article
+                        key={item.path}
+                        className="flex select-none items-center gap-4 px-4 py-3"
+                        onDoubleClick={() => handleOpen(item)}
+                      >
+                        <FileTypeIcon kind={getFileKind(item.path)} size={24} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            <VaultPathLabel path={item.path} />
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {formatSize(item.size)} ·{" "}
+                            {statusText(item.syncStatus, t)}
+                          </p>
+                        </div>
+                        <div
+                          className="relative flex shrink-0 items-center gap-1"
+                          onDoubleClick={(event) => event.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            aria-label={t("vault.action.export", {
+                              name: item.path,
+                            })}
+                            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                            onClick={(event) => {
+                              if (event.detail > 1) return;
+                              void runAction(() =>
+                                window.electronAPI.vault.exportFile(item.path),
+                              );
+                            }}
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                          {/* ⚠️ 「每行各自一个菜单」的原状保留 ✓ —— 只把 open 改成**派生式**
+                            （计划 8 同形 ✓），不要去动「一个共享菜单 + 记坐标」那种重写 ✗。 */}
+                          <DropdownMenu
+                            open={openMenu === item.path}
+                            onOpenChange={(next: boolean) =>
+                              setOpenMenu(next ? item.path : null)
+                            }
+                          >
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                aria-label={t("vault.action.more", {
+                                  name: item.path,
+                                })}
+                                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              id={`vault-menu-${item.path}`}
+                              align="end"
+                              // 宽度压回原值（原 min-w-32 ✗，Radix 默认 w-72 ✗）
+                              className="min-w-32"
+                            >
+                              <DropdownMenuItem
+                                className="h-7 gap-2"
+                                onClick={() => {
+                                  setOpenMenu(null);
+                                  void runAction(() =>
+                                    window.electronAPI.vault.revealFile(
+                                      item.path,
+                                    ),
+                                  );
+                                }}
+                              >
+                                {t("vault.action.reveal")}
+                              </DropdownMenuItem>
+                              {/* 危险动作：逐字照抄原 MENU_ITEM_DANGER_CLASS ✓ */}
+                              <DropdownMenuItem
+                                className="h-7 gap-2 text-destructive hover:bg-destructive/10"
+                                onClick={() => {
+                                  setOpenMenu(null);
+                                  handleDelete(item);
+                                }}
+                              >
+                                {t("vault.action.delete")}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </div>
+          </Tabs>
 
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border/40 pt-4">
             {snapshot?.hasLocalMek ? (
@@ -1398,7 +1419,9 @@ function renderEmptyState(
   if (mode === "resetting") {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-        <p className="text-sm text-muted-foreground">{t("vault.reset.inProgress")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t("vault.reset.inProgress")}
+        </p>
         <button
           type="button"
           className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1445,7 +1468,9 @@ function renderEmptyState(
   if (mode === "restore-error") {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-        <p className="text-sm text-muted-foreground">{t("vault.restore.failed")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t("vault.restore.failed")}
+        </p>
         <button
           type="button"
           className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90"
@@ -1489,7 +1514,9 @@ function renderEmptyState(
         <h2 className="text-sm font-semibold text-foreground">
           {t("vault.firstSetup.title")}
         </h2>
-        <p className="text-sm text-muted-foreground">{t("vault.firstSetup.body")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t("vault.firstSetup.body")}
+        </p>
         {!h.recoveryCode && (
           <button
             type="button"
@@ -1533,7 +1560,9 @@ function renderEmptyState(
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
         <p className="text-sm text-muted-foreground">{t("vault.empty")}</p>
         {!h.token && (
-          <p className="text-xs text-muted-foreground">{t("vault.loginHint")}</p>
+          <p className="text-xs text-muted-foreground">
+            {t("vault.loginHint")}
+          </p>
         )}
         <button
           type="button"

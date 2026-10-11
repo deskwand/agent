@@ -113,6 +113,49 @@ async function render() {
   });
 }
 
+/** 菜单内容经 Radix Portal 挂到 document.body —— 不在本文件的 container 里。 */
+function menu(): Element | null {
+  return document.body.querySelector('[role="menu"]');
+}
+
+function bodyTestId(testId: string): HTMLElement | null {
+  return document.body.querySelector(`[data-testid="${testId}"]`);
+}
+
+/** Radix 的菜单触发器只认左键 pointerdown（无 ctrl）—— 旧的 onClick toggle 已删。 */
+async function pointerDown(el: HTMLElement): Promise<void> {
+  await act(async () => {
+    el.dispatchEvent(
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        ctrlKey: false,
+      }),
+    );
+  });
+}
+
+/** 打开 ⋯ 菜单（portal 在 body）。 */
+async function openMoreMenu(): Promise<void> {
+  await pointerDown(
+    container.querySelector('[data-testid="feed-more"]') as HTMLElement,
+  );
+}
+
+async function keyDown(el: Element, key: string): Promise<void> {
+  await act(async () => {
+    el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  });
+}
+
+/** Radix 的焦点移动/回焦都在 setTimeout(0) 里 —— 断言前得把这批任务跑完。 */
+async function flush(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
 describe("未启用（默认状态）", () => {
   it("显示引导与「打开动态」，且没有刷新按钮、没有筛选条", async () => {
     setWindowApi(snapshot(false));
@@ -231,14 +274,8 @@ describe("已启用且有条目", () => {
     ).toBeNull();
     expect(container.textContent).not.toContain("feed.markAllRead");
 
-    await act(async () => {
-      (
-        container.querySelector('[data-testid="feed-more"]') as HTMLElement
-      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    const entry = container.querySelector(
-      '[data-testid="feed-mark-all-read"]',
-    ) as HTMLElement;
+    await openMoreMenu();
+    const entry = bodyTestId("feed-mark-all-read") as HTMLElement;
     expect(entry).not.toBeNull();
     await act(async () => {
       entry.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -391,47 +428,103 @@ describe("已启用且有条目", () => {
     const setEnabled = vi.fn(async () => ({ enabled: true, started: false }));
     setWindowApi(snapshot(true, [makeItem()], makeRun()), { setEnabled });
     await render();
+    await openMoreMenu();
     await act(async () => {
-      (
-        container.querySelector('[data-testid="feed-more"]') as HTMLElement
-      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    await act(async () => {
-      (
-        container.querySelector(
-          '[data-testid="feed-toggle-auto"]',
-        ) as HTMLElement
-      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      (bodyTestId("feed-toggle-auto") as HTMLElement).dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
     });
     expect(setEnabled).toHaveBeenCalledWith(false);
   });
 
-  it("清空要二次确认", async () => {
+  it("清空要二次确认：弹窗在 body 且焦点可达，确认一次、取消零次", async () => {
     const clearAll = vi.fn(async () => ({ unreadCount: 0 }));
     setWindowApi(snapshot(true, [makeItem()], makeRun()), { clearAll });
     await render();
+    await openMoreMenu();
     await act(async () => {
-      (
-        container.querySelector('[data-testid="feed-more"]') as HTMLElement
-      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    await act(async () => {
-      (
-        container.querySelector('[data-testid="feed-clear-all"]') as HTMLElement
-      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      (bodyTestId("feed-clear-all") as HTMLElement).dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
     });
     expect(clearAll).not.toHaveBeenCalled();
-    expect(
-      container.querySelector('[data-testid="feed-clear-confirm"]'),
-    ).toBeTruthy();
+    const dialog = document.body.querySelector('[role="alertdialog"]');
+    expect(dialog).toBeTruthy();
+    // 确认框的初始焦点落在自己的取消键上（可键盘操作）
+    expect(dialog?.contains(document.activeElement)).toBe(true);
+    // 取消：关窗、不调 clearAll
+    const cancel = bodyTestId("feed-clear-cancel") as HTMLElement;
     await act(async () => {
-      (
-        container.querySelector(
-          '[data-testid="feed-clear-confirm"]',
-        ) as HTMLElement
-      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      cancel.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(clearAll).toHaveBeenCalled();
+    expect(document.body.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(clearAll).not.toHaveBeenCalled();
+    // 确认：关窗、clearAll 一次
+    await openMoreMenu();
+    await act(async () => {
+      (bodyTestId("feed-clear-all") as HTMLElement).dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    await act(async () => {
+      (bodyTestId("feed-clear-confirm") as HTMLElement).dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    expect(clearAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("⋯ 菜单：键盘只派发 ArrowDown 就能打开，ArrowDown/Enter 让动作恰一次", async () => {
+    const markAllRead = vi.fn(async () => 0);
+    setWindowApi(snapshot(true, [makeItem()], makeRun()), { markAllRead });
+    await render();
+    const trigger = container.querySelector(
+      '[data-testid="feed-more"]',
+    ) as HTMLElement;
+    await act(async () => {
+      trigger.focus();
+      trigger.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(menu()).not.toBeNull();
+    // 打开即聚焦首项（全部已读）
+    expect(document.activeElement?.textContent?.trim()).toBe(
+      "feed.markAllRead",
+    );
+    // ArrowDown 移到第二项，再回到首项，Enter 执行它 —— 恰好一次
+    await keyDown(document.activeElement as Element, "ArrowDown");
+    await flush();
+    expect(document.activeElement?.textContent?.trim()).toBe("feed.pauseAuto");
+    await keyDown(document.activeElement as Element, "ArrowUp");
+    await flush();
+    expect(document.activeElement?.textContent?.trim()).toBe(
+      "feed.markAllRead",
+    );
+    await keyDown(document.activeElement as Element, "Enter");
+    await act(async () => {});
+    expect(markAllRead).toHaveBeenCalledTimes(1);
+  });
+
+  it("⋯ 菜单：Escape 关闭并把焦点还给触发器", async () => {
+    setWindowApi(snapshot(true, [makeItem()], makeRun()));
+    await render();
+    const trigger = container.querySelector(
+      '[data-testid="feed-more"]',
+    ) as HTMLElement;
+    await pointerDown(trigger);
+    expect(menu()).not.toBeNull();
+    await act(async () => {
+      (document.activeElement ?? document.body).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    await flush();
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("生成中能显示「写摘录」这个阶段名", async () => {
@@ -490,29 +583,23 @@ describe("筛选后的空列表不能说成「还没有内容」", () => {
     ).toBeTruthy();
   });
 
-  it("清空确认框的取消键与确认键内边距一致（此前取消键白吃 base 的 px-4 py-2）", async () => {
+  it("清空确认框的确认键保留危险皮肤（迁移前锁的是内边距，改锁变体）", async () => {
     // 2026-10-10：取消键原先只写 `h-auto` ⇒ `cn` 合并后 base 的 `px-4 py-2` 留下 ⇒ 32px 高，
     // 而确认键是 `px-3 py-1.5`（28px）⇒ 两个键不齐 ✗。修法是给取消键补同样的内边距 ✓。
-    // jsdom 量不到高度 ⇒ 锁「两个键的内边距类一致」这个等价条件 ✓。
+    // 迁到 Radix AlertDialog 后两键的尺寸由同一套变体控制 ⇒ 内边距不再是可守的等价条件，
+    // 改锁「确认键仍是危险变体」这个语义。
     setWindowApi(snapshot(true, [makeItem()], makeRun()));
     await render();
-    for (const id of ["feed-more", "feed-clear-all"]) {
-      await act(async () => {
-        (
-          container.querySelector(`[data-testid="${id}"]`) as HTMLElement
-        ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      });
-    }
-    const pad = (id: string) =>
-      (
-        container.querySelector(`[data-testid="${id}"]`) as HTMLElement
-      ).className
-        .split(/\s+/)
-        .filter((token) => /^(p|px|py)-/.test(token))
-        .sort()
-        .join(" ");
-    expect(pad("feed-clear-cancel"), "取消键的内边距").toBe("px-3 py-1.5");
-    expect(pad("feed-clear-confirm"), "确认键的内边距").toBe("px-3 py-1.5");
+    await openMoreMenu();
+    await act(async () => {
+      (bodyTestId("feed-clear-all") as HTMLElement).dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    const confirm = bodyTestId("feed-clear-confirm") as HTMLElement;
+    const cancel = bodyTestId("feed-clear-cancel") as HTMLElement;
+    expect(confirm.className).toContain("bg-destructive");
+    expect(cancel.className).not.toContain("bg-destructive");
   });
 });
 

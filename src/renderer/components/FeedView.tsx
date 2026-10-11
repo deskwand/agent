@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 
@@ -7,6 +7,22 @@ import { useAppStore } from "../store";
 import { FeedItemRow } from "./FeedItemRow";
 import { FeedReaderPane, FeedReaderPlaceholder } from "./FeedReaderPane";
 import { Button } from "./app-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { OccludingAlertDialog } from "./ui/occluding-dialog";
+import {
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -48,6 +64,10 @@ export function FeedView(): JSX.Element {
   const [reasonsOpen, setReasonsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  /** ⋯ 触发按钮：菜单退场与清空确认框关闭后的回焦目标。 */
+  const moreTriggerRef = useRef<HTMLButtonElement | null>(null);
+  /** 菜单项正要打开清空确认：退场时不许菜单把焦点抢回 Trigger。 */
+  const openingClearRef = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [showActionsOnFirstRow, setShowActionsOnFirstRow] = useState(true);
 
@@ -135,7 +155,8 @@ export function FeedView(): JSX.Element {
         className="flex h-full flex-col bg-background"
       >
         <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
             data-testid="feed-back"
             onClick={() => setActiveView("chat")}
@@ -150,7 +171,10 @@ export function FeedView(): JSX.Element {
           <div className="mb-2 text-base font-semibold">
             {t("feed.onboardingTitle")}
           </div>
-          <div className="text-sm text-muted-foreground" style={{ lineHeight: 1.8 }}>
+          <div
+            className="text-sm text-muted-foreground"
+            style={{ lineHeight: 1.8 }}
+          >
             {t("feed.onboardingBody")}
           </div>
           <ul
@@ -161,11 +185,13 @@ export function FeedView(): JSX.Element {
             <li>· {t("feed.onboardingBullet2")}</li>
             <li>· {t("feed.onboardingBullet3")}</li>
           </ul>
-          <Button variant="ghost"
+          {/* 主操作走 default 变体（Task11 收敛）：皮肤不再手写实心主色。 */}
+          <Button
+            variant="default"
             type="button"
             data-testid="feed-enable"
             onClick={() => void setFeedEnabled(true)}
-            className="rounded-md bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground h-auto hover:bg-transparent hover:text-current"
+            className="rounded-md px-4 py-1.5 text-xs font-semibold h-auto"
           >
             {t("feed.onboardingCta")}
           </Button>
@@ -181,7 +207,8 @@ export function FeedView(): JSX.Element {
       <style>{`.feed-row:hover [data-testid="feed-actions"],.feed-row:focus-within [data-testid="feed-actions"]{opacity:1 !important}`}</style>
 
       <div className="flex items-start gap-3 border-b border-border/40 px-4 pb-2.5 pt-3.5">
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           data-testid="feed-back"
           onClick={() => setActiveView("chat")}
@@ -204,7 +231,8 @@ export function FeedView(): JSX.Element {
         </div>
         <span className="flex-1" />
         <div className="flex items-center gap-2 pt-0.5">
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
             data-testid="feed-refresh"
             disabled={Boolean(phase)}
@@ -213,7 +241,8 @@ export function FeedView(): JSX.Element {
           >
             {t("feed.refresh")}
           </Button>
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
             data-testid="feed-listen-all"
             onClick={() => void startFeedListen()}
@@ -222,53 +251,55 @@ export function FeedView(): JSX.Element {
             {t("feed.listenAll")}
           </Button>
           <div className="relative">
-            <Button variant="ghost"
-              type="button"
-              data-testid="feed-more"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((open) => !open)}
-              className="px-1 text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
-            >
-              ⋯
-            </Button>
-            {menuOpen ? (
-              <div className="absolute right-0 top-6 z-10 w-[154px] rounded-md border border-border bg-card p-1 shadow-elevated">
-                <Button variant="ghost"
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger asChild ref={moreTriggerRef}>
+                <Button
+                  variant="ghost"
                   type="button"
+                  data-testid="feed-more"
+                  className="px-1 text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
+                >
+                  ⋯
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-[154px]"
+                onCloseAutoFocus={(event) => {
+                  // 正要开清空确认：让确认框接管焦点（与 Ideas 的删除确认同一处理）
+                  if (openingClearRef.current) {
+                    openingClearRef.current = false;
+                    event.preventDefault();
+                  }
+                }}
+              >
+                <DropdownMenuItem
                   data-testid="feed-mark-all-read"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void markAllFeedRead();
-                  }}
-                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent h-auto"
+                  className="text-xs"
+                  onSelect={() => void markAllFeedRead()}
                 >
                   {t("feed.markAllRead")}
-                </Button>
-                <Button variant="ghost"
-                  type="button"
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   data-testid="feed-toggle-auto"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void setFeedEnabled(!enabled);
-                  }}
-                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent h-auto"
+                  className="text-xs"
+                  onSelect={() => void setFeedEnabled(!enabled)}
                 >
                   {enabled ? t("feed.pauseAuto") : t("feed.resumeAuto")}
-                </Button>
-                <Button variant="ghost"
-                  type="button"
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   data-testid="feed-clear-all"
-                  onClick={() => {
-                    setMenuOpen(false);
+                  className="text-xs"
+                  onSelect={() => {
+                    // 清空不直达：先开确认框（护栏仍在）
+                    openingClearRef.current = true;
                     setConfirmClear(true);
                   }}
-                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent h-auto"
                 >
                   {t("feed.clearAll")}
-                </Button>
-              </div>
-            ) : null}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -280,7 +311,11 @@ export function FeedView(): JSX.Element {
         >
           <span>{t("feed.errorSearchFailed")}</span>
           <span className="flex-1" />
-          <Button variant="ghost" type="button" onClick={() => void refreshNow()}>
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={() => void refreshNow()}
+          >
             {t("feed.errorRetry")}
           </Button>
         </div>
@@ -302,23 +337,29 @@ export function FeedView(): JSX.Element {
         data-testid="feed-filters"
         className="flex items-center gap-3 px-4 pt-2 text-xs"
       >
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           onClick={() => {
             setFilter("all");
             setShowActionsOnFirstRow(false);
           }}
-          className={filter === "all" ? "text-primary-text" : "text-muted-foreground"}
+          className={
+            filter === "all" ? "text-primary-text" : "text-muted-foreground"
+          }
         >
           {t("feed.filterAll")}
         </Button>
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           onClick={() => {
             setFilter("unread");
             setShowActionsOnFirstRow(false);
           }}
-          className={filter === "unread" ? "text-primary-text" : "text-muted-foreground"}
+          className={
+            filter === "unread" ? "text-primary-text" : "text-muted-foreground"
+          }
         >
           {t("feed.filterUnread", { count: unread })}
         </Button>
@@ -419,46 +460,8 @@ export function FeedView(): JSX.Element {
       </div>
 
       <div className="relative border-t border-border/40 px-4 py-2 text-xs text-muted-foreground">
-        {confirmClear ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40">
-            <div className="w-[360px] rounded-lg border border-border bg-card p-4">
-              <div className="mb-1 text-base font-semibold">
-                {t("feed.clearAllConfirmTitle")}
-              </div>
-              <div
-                className="mb-3 text-sm text-muted-foreground"
-                style={{ lineHeight: 1.8 }}
-              >
-                {t("feed.clearAllConfirmBody")}
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost"
-                  type="button"
-                  data-testid="feed-clear-cancel"
-                  onClick={() => setConfirmClear(false)}
-                  className="text-xs text-muted-foreground h-auto px-3 py-1.5 hover:bg-transparent hover:text-current"
-                >
-                  {t("feed.cancel")}
-                </Button>
-                <Button variant="ghost"
-                  type="button"
-                  data-testid="feed-clear-confirm"
-                  onClick={() => {
-                    setConfirmClear(false);
-                    void window.electronAPI.feed
-                      .clearAll()
-                      .then(() => refreshFeed());
-                  }}
-                  className="rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold  h-auto hover:bg-transparent hover:text-current"
-                >
-                  {t("feed.clearAllConfirm")}
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           data-testid="feed-reasons-toggle"
           onClick={() => setReasonsOpen((open) => !open)}
@@ -488,7 +491,8 @@ export function FeedView(): JSX.Element {
                     {query.reason || t("feed.reasonsFromMemory")}
                   </span>
                   <span className="flex-1" />
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     data-testid={`feed-block-${query.topic}`}
                     onClick={() =>
@@ -500,7 +504,9 @@ export function FeedView(): JSX.Element {
                           : [...blockedTopics, query.topic],
                       )
                     }
-                    className={blocked ? "text-muted-foreground" : "text-primary-text"}
+                    className={
+                      blocked ? "text-muted-foreground" : "text-primary-text"
+                    }
                   >
                     {blocked
                       ? t("feed.reasonsBlocked")
@@ -512,6 +518,64 @@ export function FeedView(): JSX.Element {
           </div>
         ) : null}
       </div>
+
+      {/* 清空确认：外壳交给 Radix AlertDialog（occlusion 由包装层负责）。
+          关闭矩阵：遮罩外部点击由 AlertDialog 自己拦、Escape 在 Content 上显式拦；
+          没有 X，也不新增。确认键自己调 handler（先关窗再清），不经 onOpenChange。 */}
+      <OccludingAlertDialog
+        open={confirmClear}
+        onOpenChange={(open) => {
+          if (!open) setConfirmClear(false);
+        }}
+      >
+        <AlertDialogContent
+          data-testid="feed-clear-dialog"
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => {
+            // 回焦到 ⋯ 触发器：菜单项已随 portal 卸载，Radix 的默认目标不在 DOM 里
+            event.preventDefault();
+            const trigger = moreTriggerRef.current;
+            if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("feed.clearAllConfirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("feed.clearAllConfirmBody")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              data-testid="feed-clear-cancel"
+              // 与确认键同一个契约：不让 Radix 的自动关闭替我们改 state，
+              // 关闭只由本键自己的 handler 负责（单一来源，后续逻辑不会被隐式关闭打断）。
+              onClick={(event) => {
+                event.preventDefault();
+                setConfirmClear(false);
+              }}
+              className="border-transparent bg-transparent shadow-none text-xs text-muted-foreground h-auto px-3 py-1.5 hover:bg-transparent hover:text-current"
+            >
+              {t("feed.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="feed-clear-confirm"
+              onClick={(event) => {
+                // 阻止 Radix 的隐式关闭，保留「先关窗再 clearAll」的原有顺序
+                event.preventDefault();
+                setConfirmClear(false);
+                void window.electronAPI.feed
+                  .clearAll()
+                  .then(() => refreshFeed());
+              }}
+              className="bg-destructive text-destructive-foreground shadow-none px-3 py-1.5 text-xs font-semibold h-auto hover:bg-destructive/90"
+            >
+              {t("feed.clearAllConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </OccludingAlertDialog>
     </div>
   );
 }

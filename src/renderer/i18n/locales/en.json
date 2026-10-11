@@ -109,7 +109,8 @@
         "notInstalled": "Not installed",
         "failed": "Download failed",
         "delete": "Delete",
-        "retry": "Retry"
+        "retry": "Retry",
+        "progressLabel": "Download progress"
       },
       "voice": {
         "title": "Voice input",
@@ -1387,6 +1388,7 @@
     "today": "Today",
     "create": "Create",
     "viewDay": "Day",
+    "viewLabel": "Calendar view",
     "viewWeek": "Week",
     "viewMonth": "Month",
     "toolbarPrev": "Previous",
@@ -1976,7 +1978,8 @@
     "marketRepository": "Repository",
     "marketHomepage": "Homepage",
     "marketActionFailed": "Operation failed",
-    "marketDetailFailed": "Failed to load plugin details"
+    "marketDetailFailed": "Failed to load plugin details",
+    "viewSwitcher": "Plugin views"
   },
   "vault": {
     "title": "Vault",

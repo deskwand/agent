@@ -17,6 +17,11 @@ import type {
   Message,
 } from "../../types";
 import { Button } from "../app-button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 
 // Only allow safe image MIME types for data: URI rendering
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -139,121 +144,126 @@ export const ToolResultBlock = memo(function ToolResultBlock({
   ].filter((value): value is string => Boolean(value));
 
   return (
-    <div
+    <Collapsible
+      open={expanded}
+      onOpenChange={setExpanded}
       className={`rounded-2xl overflow-hidden ${
         block.isError ? "bg-destructive/5" : "bg-background/40"
       }`}
     >
-      <Button variant="ghost"
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
-      >
-        {block.isError ? (
-          <XCircle className="w-3.5 h-3.5 pt-0.5 text-muted-foreground flex-shrink-0" />
-        ) : (
-          <CheckCircle2 className="w-3.5 h-3.5 pt-0.5 text-muted-foreground flex-shrink-0" />
-        )}
-        <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-          <span
-            className={`min-w-0 flex-1 truncate text-xs font-mono ${
-              block.isError ? "text-destructive" : "text-muted-foreground"
-            }`}
-          >
-            {displayName}
-          </span>
-          {collapsedSummaryText && (
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
+        >
+          {block.isError ? (
+            <XCircle className="w-3.5 h-3.5 pt-0.5 text-muted-foreground flex-shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-3.5 h-3.5 pt-0.5 text-muted-foreground flex-shrink-0" />
+          )}
+          <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
             <span
-              className={`whitespace-nowrap text-xs ${
+              className={`min-w-0 flex-1 truncate text-xs font-mono ${
                 block.isError ? "text-destructive" : "text-muted-foreground"
               }`}
             >
-              · {collapsedSummaryText}
+              {displayName}
             </span>
-          )}
-          <span
-            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
-              expanded
-                ? "opacity-100"
-                : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-            }`}
-          >
-            {expanded ? (
-              <ChevronDown className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5" />
+            {collapsedSummaryText && (
+              <span
+                className={`whitespace-nowrap text-xs ${
+                  block.isError ? "text-destructive" : "text-muted-foreground"
+                }`}
+              >
+                · {collapsedSummaryText}
+              </span>
             )}
-          </span>
-        </div>
-      </Button>
+            <span
+              className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
+                expanded
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+              }`}
+            >
+              {expanded ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              )}
+            </span>
+          </div>
+        </Button>
+      </CollapsibleTrigger>
 
       {expanded && (
-        <div className="animate-fade-in px-3 py-2">
-          {expandedMetaItems.length > 0 && (
-            <div className="pb-2 text-xs text-muted-foreground">
-              {expandedMetaItems.join(" · ")}
-            </div>
-          )}
-          {preferImageOutput && hasImages && (
-            <div className="space-y-2">
-              {validImages.map((image, index) => (
-                <div key={index} className="rounded-lg overflow-hidden">
-                  <img
-                    src={`data:${image.mimeType};base64,${image.data}`}
-                    alt={`Screenshot ${index + 1}`}
-                    className="w-full h-auto"
-                    style={{ maxHeight: "400px", objectFit: "contain" }}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-          {block.diff ? (
-            <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted leading-snug">
-              {block.diff.split("\n").map((line, i) => {
-                const prefix = line[0];
-                const bgClass =
-                  prefix === "+"
-                    ? "diff-add"
-                    : prefix === "-"
-                      ? "diff-del"
-                      : "text-muted-foreground";
-                return (
-                  <div key={i} className={bgClass}>
-                    {line}
+        <CollapsibleContent>
+          <div className="animate-fade-in px-3 py-2">
+            {expandedMetaItems.length > 0 && (
+              <div className="pb-2 text-xs text-muted-foreground">
+                {expandedMetaItems.join(" · ")}
+              </div>
+            )}
+            {preferImageOutput && hasImages && (
+              <div className="space-y-2">
+                {validImages.map((image, index) => (
+                  <div key={index} className="rounded-lg overflow-hidden">
+                    <img
+                      src={`data:${image.mimeType};base64,${image.data}`}
+                      alt={`Screenshot ${index + 1}`}
+                      className="w-full h-auto"
+                      style={{ maxHeight: "400px", objectFit: "contain" }}
+                    />
                   </div>
-                );
-              })}
-            </pre>
-          ) : (
-            shouldShowOutputText && (
-              <pre
-                className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
-                  block.isError
-                    ? "text-destructive bg-destructive/5"
-                    : "text-muted-foreground bg-muted"
-                } ${preferImageOutput ? "mt-2" : ""}`}
-              >
-                {block.content}
+                ))}
+              </div>
+            )}
+            {block.diff ? (
+              <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted leading-snug">
+                {block.diff.split("\n").map((line, i) => {
+                  const prefix = line[0];
+                  const bgClass =
+                    prefix === "+"
+                      ? "diff-add"
+                      : prefix === "-"
+                        ? "diff-del"
+                        : "text-muted-foreground";
+                  return (
+                    <div key={i} className={bgClass}>
+                      {line}
+                    </div>
+                  );
+                })}
               </pre>
-            )
-          )}
-          {!preferImageOutput && hasImages && (
-            <div className="mt-2 space-y-2">
-              {validImages.map((image, index) => (
-                <div key={index} className="rounded-lg overflow-hidden">
-                  <img
-                    src={`data:${image.mimeType};base64,${image.data}`}
-                    alt={`Screenshot ${index + 1}`}
-                    className="w-full h-auto"
-                    style={{ maxHeight: "400px", objectFit: "contain" }}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+            ) : (
+              shouldShowOutputText && (
+                <pre
+                  className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
+                    block.isError
+                      ? "text-destructive bg-destructive/5"
+                      : "text-muted-foreground bg-muted"
+                  } ${preferImageOutput ? "mt-2" : ""}`}
+                >
+                  {block.content}
+                </pre>
+              )
+            )}
+            {!preferImageOutput && hasImages && (
+              <div className="mt-2 space-y-2">
+                {validImages.map((image, index) => (
+                  <div key={index} className="rounded-lg overflow-hidden">
+                    <img
+                      src={`data:${image.mimeType};base64,${image.data}`}
+                      alt={`Screenshot ${index + 1}`}
+                      className="w-full h-auto"
+                      style={{ maxHeight: "400px", objectFit: "contain" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
       )}
-    </div>
+    </Collapsible>
   );
 });

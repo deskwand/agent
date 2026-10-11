@@ -489,6 +489,14 @@ function App() {
     }
   }, [rightPanelMode, browserWidthManual, calcHalfWidth, setContextPanelWidth]);
 
+  // 事件类弹窗（充值 / 扩展队列）关闭时的回焦 fallback：入口按钮/菜单项可能已经卸载，
+  // 或无有效返回目标，此时回到内容区根容器（tabIndex=-1，不进 Tab 顺序）。
+  const mainRef = useRef<HTMLElement>(null);
+  // 账号菜单余额行打开充值时，把被关闭菜单的原 Trigger 暂存在这里；TopUpModal 打开瞬间通过
+  // takeReturnFocusTarget 读取并立即清空 —— 关闭后回焦到这个真实入口，而不是 <main> fallback。
+  // （纯局部 ref，不进 store / 不做全局 focus 模块）
+  const topUpTriggerRef = useRef<HTMLElement | null>(null);
+
   // Keep browser at 50% on window resize when in auto mode.
   // Uses refs to avoid re-binding the listener on every sidebar change.
   const resizeGuardRef = useRef<{
@@ -566,6 +574,10 @@ function App() {
           <AppRail
             onCreateVoiceSession={() => void handleCreateVoiceSession()}
             voiceCreating={voiceCreating}
+            onOpenTopUp={(target) => {
+              topUpTriggerRef.current = target;
+              useAppStore.getState().setTopUpOpen(true);
+            }}
           />
 
           {/* 会话列表只在聊天视图出现：其余视图由图标栏承担导航，侧栏连同
@@ -598,7 +610,11 @@ function App() {
           )}
 
           {/* Main Content Area */}
-          <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden bg-background relative">
+          <main
+            ref={mainRef}
+            tabIndex={-1}
+            className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden bg-background relative"
+          >
             {activeView === "settings" ? (
               <Suspense fallback={<MainPanelFallback />}>
                 <SettingsPanel onClose={() => setActiveView("chat")} />
@@ -706,9 +722,7 @@ function App() {
                 name="BrowserPanel"
                 fallback={<div className="flex-1 bg-muted" />}
               >
-                <Suspense
-                  fallback={<div className="flex-1 bg-muted" />}
-                >
+                <Suspense fallback={<div className="flex-1 bg-muted" />}>
                   <BrowserPanel width={contextPanelWidth} />
                 </Suspense>
               </PanelErrorBoundary>
@@ -727,11 +741,7 @@ function App() {
                   resetKey={activePreviewTab ?? undefined}
                   fallback={<div className="flex-1 bg-muted" />}
                 >
-                  <Suspense
-                    fallback={
-                      <div className="flex-1 bg-muted" />
-                    }
-                  >
+                  <Suspense fallback={<div className="flex-1 bg-muted" />}>
                     <FilePreviewPanel visible={previewPanelActive} />
                   </Suspense>
                 </PanelErrorBoundary>
@@ -747,11 +757,7 @@ function App() {
                   resetKey={activeSessionId ?? undefined}
                   fallback={<div className="flex-1 bg-muted" />}
                 >
-                  <Suspense
-                    fallback={
-                      <div className="flex-1 bg-muted" />
-                    }
-                  >
+                  <Suspense fallback={<div className="flex-1 bg-muted" />}>
                     <ReviewPanel
                       key={activeSessionId ?? "none"}
                       visible={reviewPanelActive}
@@ -773,11 +779,7 @@ function App() {
                   name="FileBrowser"
                   fallback={<div className="flex-1 bg-muted" />}
                 >
-                  <Suspense
-                    fallback={
-                      <div className="flex-1 bg-muted" />
-                    }
-                  >
+                  <Suspense fallback={<div className="flex-1 bg-muted" />}>
                     <FileBrowser width={panelWidth} />
                   </Suspense>
                 </PanelErrorBoundary>
@@ -791,13 +793,22 @@ function App() {
       {pendingPermission && <PermissionDialog permission={pendingPermission} />}
 
       {/* Pi Extension dialogs (ui requests + trust prompt) */}
-      <ExtensionDialogs />
+      <ExtensionDialogs
+        onRestoreFocus={() => mainRef.current?.focus({ preventScroll: true })}
+      />
 
       {/* Pi TUI Modal (custom components) */}
       <PiTuiModal />
 
       {/* Top Up Modal (crypto top-up) */}
-      <TopUpModal />
+      <TopUpModal
+        takeReturnFocusTarget={() => {
+          const target = topUpTriggerRef.current;
+          topUpTriggerRef.current = null;
+          return target;
+        }}
+        onRestoreFocus={() => mainRef.current?.focus({ preventScroll: true })}
+      />
 
       {/* Sudo Password Dialog */}
       {pendingSudoPassword && (

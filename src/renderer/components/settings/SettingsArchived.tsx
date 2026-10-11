@@ -5,6 +5,7 @@ import { useIPC } from "../../hooks/useIPC";
 import { Search as SearchIcon, RotateCcw, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { Input } from "../ui/input";
+import { Checkbox } from "../ui/checkbox";
 import { Button } from "../app-button";
 
 export function SettingsArchived() {
@@ -124,29 +125,15 @@ export function SettingsArchived() {
               }`}
             >
               <div className="flex items-center gap-2">
-                <div
-                  className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-                    isSelected
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-border/60 bg-background"
-                  }`}
-                >
-                  {isSelected && (
-                    <svg
-                      className="w-2.5 h-2.5"
-                      viewBox="0 0 10 10"
-                      fill="none"
-                    >
-                      <path
-                        d="M2 5l2 2 4-4"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                </div>
+                {/* 方块复选框：语义（role=checkbox、aria-checked、Space、焦点）由
+                    新原语提供。父行仍有 onClick，所以这里必须 stopPropagation ——
+                    否则 Radix 的 click 会冒泡到行，行与控件各切一次。 */}
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => toggleSelect(session.id)}
+                  onClick={(event) => event.stopPropagation()}
+                  aria-label={session.title}
+                />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium text-foreground truncate">
                     {session.title}

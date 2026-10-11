@@ -66,7 +66,18 @@ async function flush(): Promise<void> {
   });
 }
 
-/** 弹窗渲染在整个页面最后；OAuth 卡片里也有叫「Connect」的按钮，取最后一个匹配项 */
+/**
+ * API 编辑弹窗外壳迁到 shadcn Dialog 后经 portal 挂到 document.body，
+ * 不再位于测试的 container 内：弹窗内查询收窄到当前 dialog；
+ * 页面级节点（目录瓦片、已配置行的 Edit）仍查 container。
+ */
+function editorDialog(): HTMLElement {
+  const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+  if (!dialog) throw new Error("api editor dialog not open");
+  return dialog;
+}
+
+/** OAuth 卡片里也有叫「Connect」的按钮，取最后一个匹配项 */
 function clickButton(container: HTMLElement, text: string): void {
   const matches = Array.from(container.querySelectorAll("button")).filter(
     (element) => element.textContent?.trim() === text,
@@ -172,12 +183,12 @@ describe("SettingsAPI connect flow", () => {
   it("connects a preset provider, discovers models and persists them", async () => {
     await openProviderModal("Anthropic");
     await act(async () => {
-      setInput(inputNearLabel(container, "API Key"), "sk-ant-test");
+      setInput(inputNearLabel(editorDialog(), "API Key"), "sk-ant-test");
     });
     await flush();
 
     await act(async () => {
-      clickButton(container, "Connect");
+      clickButton(editorDialog(), "Connect");
     });
     await flush();
 
@@ -197,8 +208,8 @@ describe("SettingsAPI connect flow", () => {
     expect(lastPayload.config.defaultModel).toBeTruthy();
 
     // 3) 进入已连接态
-    expect(container.textContent).toContain("Connected");
-    expect(container.textContent).toContain("Done");
+    expect(editorDialog().textContent).toContain("Connected");
+    expect(editorDialog().textContent).toContain("Done");
   });
 
   it("keeps a custom provider unsaved when the endpoint cannot list models", async () => {
@@ -212,23 +223,23 @@ describe("SettingsAPI connect flow", () => {
 
     await openProviderModal("Other Provider");
     await act(async () => {
-      setInput(inputNearLabel(container, "API Key"), "sk-test");
+      setInput(inputNearLabel(editorDialog(), "API Key"), "sk-test");
       setInput(
-        inputNearLabel(container, "Base URL"),
+        inputNearLabel(editorDialog(), "Base URL"),
         "https://relay.example.com/v1",
       );
     });
     await flush();
 
     await act(async () => {
-      clickButton(container, "Connect");
+      clickButton(editorDialog(), "Connect");
     });
     await flush();
 
     // 自定义供应商不先落盘，端点也不支持列表 → 一次 saveProvider 都没发
     expect(saveProvider).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Save");
-    expect(container.textContent).toContain(
+    expect(editorDialog().textContent).toContain("Save");
+    expect(editorDialog().textContent).toContain(
       "This endpoint does not list models; enter model IDs manually",
     );
   });
@@ -236,16 +247,16 @@ describe("SettingsAPI connect flow", () => {
   it("persists checkbox toggles and blocks disabling the last model", async () => {
     await openProviderModal("Anthropic");
     await act(async () => {
-      setInput(inputNearLabel(container, "API Key"), "sk-ant-test");
+      setInput(inputNearLabel(editorDialog(), "API Key"), "sk-ant-test");
     });
     await flush();
     await act(async () => {
-      clickButton(container, "Connect");
+      clickButton(editorDialog(), "Connect");
     });
     await flush();
 
     const before = saveProvider.mock.calls.length;
-    const row = container.querySelector(
+    const row = editorDialog().querySelector(
       '[data-testid="model-row-claude-opus-4-7"]',
     ) as HTMLInputElement;
     expect(row).toBeTruthy();
@@ -311,7 +322,7 @@ describe("SettingsAPI connect flow", () => {
     await flush();
 
     // 打开编辑即后台刷新；刷新失败时本地列表照常显示，且不写回
-    const rows = container.querySelectorAll('[data-testid^="model-row-"]');
+    const rows = editorDialog().querySelectorAll('[data-testid^="model-row-"]');
     expect(rows.length).toBe(2);
     expect(saveProvider).not.toHaveBeenCalled();
   });
@@ -339,22 +350,22 @@ describe("SettingsAPI connect flow", () => {
 
     await openProviderModal("Anthropic");
     await act(async () => {
-      setInput(inputNearLabel(container, "API Key"), "sk-ant-bad");
+      setInput(inputNearLabel(editorDialog(), "API Key"), "sk-ant-bad");
     });
     await flush();
     await act(async () => {
-      clickButton(container, "Connect");
+      clickButton(editorDialog(), "Connect");
     });
     await flush();
 
     // 面板渲染五步流水线，且不渲染它自己的动作按钮
-    expect(container.textContent).toContain("Auth");
-    expect(container.textContent).not.toContain("Deep Inference Check");
+    expect(editorDialog().textContent).toContain("Auth");
+    expect(editorDialog().textContent).not.toContain("Deep Inference Check");
     // 失败态给「保存」（保住刚填的 Key）+ 「重试」
-    expect(container.textContent).toContain("Retry");
-    const saveButton = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent?.trim() === "Save",
-    );
+    expect(editorDialog().textContent).toContain("Retry");
+    const saveButton = Array.from(
+      editorDialog().querySelectorAll("button"),
+    ).find((b) => b.textContent?.trim() === "Save");
     expect(saveButton).toBeTruthy();
   });
 
@@ -400,12 +411,12 @@ describe("SettingsAPI connect flow", () => {
     await flush();
 
     // 静默刷新：保留本地列表、只留一行提示，不弹诊断面板、按钮栏仍是「连接」
-    expect(container.textContent).toContain(
+    expect(editorDialog().textContent).toContain(
       "Refresh failed; showing the local list",
     );
-    expect(container.textContent).not.toContain("Auth");
+    expect(editorDialog().textContent).not.toContain("Auth");
     expect(
-      Array.from(container.querySelectorAll("button")).some(
+      Array.from(editorDialog().querySelectorAll("button")).some(
         (b) => b.textContent?.trim() === "Connect",
       ),
     ).toBe(true);

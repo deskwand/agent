@@ -6,6 +6,7 @@ import { PiMarketDetail } from "./PiMarketDetail";
 import { PiMarketList } from "./PiMarketList";
 import { Input } from "./ui/input";
 import { Button } from "./app-button";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 
 /**
  * Pi 扩展管理视图：展示兼容 SDK 版本、已安装包与已加载扩展，
@@ -33,7 +34,11 @@ export function PiExtensionManagerView() {
     refresh();
     return window.electronAPI.on((event: ServerEvent) => {
       if (event.type === "pi.package-progress") {
-        const p = event.payload as { action?: string; source?: string; message?: string };
+        const p = event.payload as {
+          action?: string;
+          source?: string;
+          message?: string;
+        };
         if (p.action === "complete" || p.action === "error") {
           refresh();
         }
@@ -62,23 +67,23 @@ export function PiExtensionManagerView() {
   const install = () => {
     const source = sourceInput.trim();
     if (!source) return;
-    run(() => window.electronAPI.piExtensions.installPackage(source)).then(() => {
-      setSourceInput("");
-    });
+    run(() => window.electronAPI.piExtensions.installPackage(source)).then(
+      () => {
+        setSourceInput("");
+      },
+    );
   };
 
   if (!state) {
     return (
-      <div className="text-sm text-muted-foreground">
-        {t("common.loading")}
-      </div>
+      <div className="text-sm text-muted-foreground">{t("common.loading")}</div>
     );
   }
 
   const installedNames = normalizeInstalledSources(state.packages);
   const selectedInstalled = selectedName
-    ? state.packages.find(
-        (pkg) => isInstalled(normalizeInstalledSources([pkg]), selectedName),
+    ? state.packages.find((pkg) =>
+        isInstalled(normalizeInstalledSources([pkg]), selectedName),
       )
     : undefined;
 
@@ -91,30 +96,28 @@ export function PiExtensionManagerView() {
         </span>
       </div>
 
-      <div className="mb-4 inline-flex rounded-lg border border-border bg-muted/50 p-0.5">
-        <Button variant="ghost"
-          type="button"
-          className={
-            view === "market"
-              ? "rounded-md bg-background px-3 py-1 text-sm font-medium shadow-sm"
-              : "rounded-md px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
-          }
-          onClick={() => setView("market")}
-        >
-          {t("piExtensions.viewMarket")}
-        </Button>
-        <Button variant="ghost"
-          type="button"
-          className={
-            view === "installed"
-              ? "rounded-md bg-background px-3 py-1 text-sm font-medium shadow-sm"
-              : "rounded-md px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
-          }
-          onClick={() => setView("installed")}
-        >
-          {t("piExtensions.viewInstalled")}
-        </Button>
-      </div>
+      {/* 分段选择走 Radix ToggleGroup（与 Task7b 的日程工具条同一惯例），不再手绘选中态。 */}
+      <ToggleGroup
+        type="single"
+        value={view}
+        onValueChange={(next) => {
+          if (next === "market" || next === "installed") setView(next);
+        }}
+        aria-label={t("piExtensions.viewSwitcher")}
+        className="mb-4 inline-flex rounded-lg border border-border bg-muted/50 p-0.5"
+      >
+        {(["market", "installed"] as const).map((value) => (
+          <ToggleGroupItem
+            key={value}
+            value={value}
+            className="h-auto rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-transparent hover:text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+          >
+            {value === "market"
+              ? t("piExtensions.viewMarket")
+              : t("piExtensions.viewInstalled")}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
 
       {view === "market" ? (
         <div className="flex items-start gap-4">
@@ -145,113 +148,124 @@ export function PiExtensionManagerView() {
             </div>
           )}
 
-      <div className="mb-6 flex gap-2">
-        <Input
-          className="h-auto flex-1 rounded-lg border border-border bg-background px-3 py-2 shadow-none"
-          placeholder={t("piExtensions.installPlaceholder")}
-          value={sourceInput}
-          onChange={(e) => setSourceInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") install();
-          }}
-        />
-        <Button variant="ghost"
-          className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50 h-auto hover:bg-transparent hover:text-current"
-          disabled={busy || !sourceInput.trim()}
-          onClick={install}
-        >
-          {t("piExtensions.install")}
-        </Button>
-      </div>
-      <p className="mb-6 text-xs text-muted-foreground">
-        {t("piExtensions.installWarning")}
-      </p>
-
-      <div className="mb-6">
-        <h3 className="mb-2 font-medium">{t("piExtensions.packages")}</h3>
-        {state.packages.length === 0 ? (
-          <p className="text-muted-foreground">{t("piExtensions.noPackages")}</p>
-        ) : (
-          <ul className="divide-y divide-border rounded-lg border border-border">
-            {state.packages.map((pkg) => (
-              <li
-                key={pkg.source}
-                className="flex items-center justify-between px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <div className="truncate font-mono text-xs">{pkg.source}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {pkg.type} · {pkg.scope}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost"
-                    className="rounded-md border border-border px-2 py-1 text-xs h-auto hover:bg-transparent hover:text-current"
-                    disabled={busy}
-                    onClick={() =>
-                      run(() =>
-                        window.electronAPI.piExtensions.updatePackage(pkg.source),
-                      )
-                    }
-                  >
-                    {t("piExtensions.update")}
-                  </Button>
-                  <Button variant="ghost"
-                    className="rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive h-auto hover:bg-transparent hover:text-current"
-                    disabled={busy}
-                    onClick={() =>
-                      run(() =>
-                        window.electronAPI.piExtensions.removePackage(
-                          pkg.source,
-                          pkg.scope === "project",
-                        ),
-                      )
-                    }
-                  >
-                    {t("piExtensions.remove")}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="mb-6 rounded-lg border border-border/50 px-3 py-2 text-xs text-muted-foreground">
-        {t("piExtensions.unsupportedNote")}
-      </div>
-
-      <div>
-        <h3 className="mb-2 font-medium">{t("piExtensions.extensions")}</h3>
-        {state.extensions.length === 0 ? (
-          <p className="text-muted-foreground">
-            {t("piExtensions.noExtensions")}
+          <div className="mb-6 flex gap-2">
+            <Input
+              className="h-auto flex-1 rounded-lg border border-border bg-background px-3 py-2 shadow-none"
+              placeholder={t("piExtensions.installPlaceholder")}
+              value={sourceInput}
+              onChange={(e) => setSourceInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") install();
+              }}
+            />
+            <Button
+              variant="ghost"
+              className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50 h-auto hover:bg-transparent hover:text-current"
+              disabled={busy || !sourceInput.trim()}
+              onClick={install}
+            >
+              {t("piExtensions.install")}
+            </Button>
+          </div>
+          <p className="mb-6 text-xs text-muted-foreground">
+            {t("piExtensions.installWarning")}
           </p>
-        ) : (
-          <ul className="divide-y divide-border rounded-lg border border-border">
-            {state.extensions.map((ext) => (
-              <li key={ext.path} className="px-3 py-2">
-                <div className="truncate font-mono text-xs">{ext.path}</div>
-                <div className="text-xs text-muted-foreground">
-                  {ext.source} · {ext.scope}
-                  {ext.error ? (
-                    <span className="ml-2 text-destructive">{ext.error}</span>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {state.errors.length > 0 && (
-          <ul className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {state.errors.map((err) => (
-              <li key={err.path}>
-                <span className="font-mono">{err.path}</span>: {err.error}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+
+          <div className="mb-6">
+            <h3 className="mb-2 font-medium">{t("piExtensions.packages")}</h3>
+            {state.packages.length === 0 ? (
+              <p className="text-muted-foreground">
+                {t("piExtensions.noPackages")}
+              </p>
+            ) : (
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {state.packages.map((pkg) => (
+                  <li
+                    key={pkg.source}
+                    className="flex items-center justify-between px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-mono text-xs">
+                        {pkg.source}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {pkg.type} · {pkg.scope}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        className="rounded-md border border-border px-2 py-1 text-xs h-auto hover:bg-transparent hover:text-current"
+                        disabled={busy}
+                        onClick={() =>
+                          run(() =>
+                            window.electronAPI.piExtensions.updatePackage(
+                              pkg.source,
+                            ),
+                          )
+                        }
+                      >
+                        {t("piExtensions.update")}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive h-auto hover:bg-transparent hover:text-current"
+                        disabled={busy}
+                        onClick={() =>
+                          run(() =>
+                            window.electronAPI.piExtensions.removePackage(
+                              pkg.source,
+                              pkg.scope === "project",
+                            ),
+                          )
+                        }
+                      >
+                        {t("piExtensions.remove")}
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="mb-6 rounded-lg border border-border/50 px-3 py-2 text-xs text-muted-foreground">
+            {t("piExtensions.unsupportedNote")}
+          </div>
+
+          <div>
+            <h3 className="mb-2 font-medium">{t("piExtensions.extensions")}</h3>
+            {state.extensions.length === 0 ? (
+              <p className="text-muted-foreground">
+                {t("piExtensions.noExtensions")}
+              </p>
+            ) : (
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {state.extensions.map((ext) => (
+                  <li key={ext.path} className="px-3 py-2">
+                    <div className="truncate font-mono text-xs">{ext.path}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {ext.source} · {ext.scope}
+                      {ext.error ? (
+                        <span className="ml-2 text-destructive">
+                          {ext.error}
+                        </span>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {state.errors.length > 0 && (
+              <ul className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {state.errors.map((err) => (
+                  <li key={err.path}>
+                    <span className="font-mono">{err.path}</span>: {err.error}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </>
       )}
     </div>

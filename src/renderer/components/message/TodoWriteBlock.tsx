@@ -15,6 +15,11 @@ import { normalizePlanDone, rejectTodoList } from "../../../shared/todos";
 import type { ToolUseContent } from "../../types";
 import type { TodoItem } from "./types";
 import { Button } from "../app-button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 
 interface TodoWriteBlockProps {
   block: ToolUseContent;
@@ -96,34 +101,40 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
   }
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden bg-card">
-      {/* Header */}
-      <Button variant="ghost"
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center gap-3 bg-muted hover:bg-accent transition-colors h-auto"
-      >
-        <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
-          <ListTodo className="w-3.5 h-3.5 text-primary-text" />
-        </div>
-        <div className="flex-1 text-left">
-          <span className="font-medium text-sm text-foreground">
-            {t("messageCard.taskProgress")}
-          </span>
-          {inProgressItem && (
-            <span className="text-xs text-muted-foreground ml-2">
-              — {inProgressItem.activeForm || inProgressItem.content}
+    <Collapsible
+      open={expanded}
+      onOpenChange={setExpanded}
+      className="rounded-xl border border-border overflow-hidden bg-card"
+    >
+      {/* Header：展开/折叠由 Radix Trigger 独占（aria-expanded/aria-controls 由原语提供）。 */}
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          className="w-full px-4 py-3 flex items-center gap-3 bg-muted hover:bg-accent transition-colors h-auto"
+        >
+          <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+            <ListTodo className="w-3.5 h-3.5 text-primary-text" />
+          </div>
+          <div className="flex-1 text-left">
+            <span className="font-medium text-sm text-foreground">
+              {t("messageCard.taskProgress")}
             </span>
+            {inProgressItem && (
+              <span className="text-xs text-muted-foreground ml-2">
+                — {inProgressItem.activeForm || inProgressItem.content}
+              </span>
+            )}
+          </div>
+          <span className="text-xs font-medium text-muted-foreground mr-2">
+            {completedCount}/{totalCount}
+          </span>
+          {expanded ? (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
           )}
-        </div>
-        <span className="text-xs font-medium text-muted-foreground mr-2">
-          {completedCount}/{totalCount}
-        </span>
-        {expanded ? (
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        )}
-      </Button>
+        </Button>
+      </CollapsibleTrigger>
 
       {/* Progress bar */}
       <div className="h-0.5 bg-muted">
@@ -135,7 +146,7 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
 
       {/* Todo list */}
       {expanded && (
-        <div className="p-3 space-y-1">
+        <CollapsibleContent className="p-3 space-y-1">
           {todos.map((todo, index) => (
             <div
               key={todo.id || index}
@@ -153,8 +164,8 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
               </span>
             </div>
           ))}
-        </div>
+        </CollapsibleContent>
       )}
-    </div>
+    </Collapsible>
   );
 });

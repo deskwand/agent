@@ -11,6 +11,7 @@
  * 辅助的「技能 / 插件」子视图按惯例 mock 掉（本用例从不切到那两个 tab，
  * 但模块加载仍会 import 它们）。i18n 同样整模块 mock：`t(key) => key`。
  */
+import fs from "node:fs";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -45,12 +46,14 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// 面板内容换成 marker：切页签要能断言「换的是哪一个面板的内容」。
+// 刻意不渲染文字 —— 其余用例按 textContent 断言卡片名/分类名，别让 marker 混进去。
 vi.mock("../../renderer/components/settings/SettingsSkills", () => ({
-  SettingsSkills: () => null,
+  SettingsSkills: () => <div data-testid="skills-panel" />,
 }));
 
 vi.mock("../../renderer/components/PiExtensionManagerView", () => ({
-  PiExtensionManagerView: () => null,
+  PiExtensionManagerView: () => <div data-testid="plugins-panel" />,
 }));
 
 const CONNECT = "connectors.action.connect";
@@ -173,6 +176,25 @@ function addedFilter(): HTMLButtonElement {
 function cardCount(): number {
   return container.querySelectorAll('[data-testid="card-avatar"]').length;
 }
+
+it("分类 chip 与「已接入」走官方 Toggle：带 data-state，且不再手写药丸皮肤", async () => {
+  await mount();
+  const chip = container.querySelector<HTMLElement>(
+    '[data-testid="category-chip"]',
+  );
+  const added = container.querySelector<HTMLElement>(
+    '[data-testid="added-filter"]',
+  );
+  expect(chip, "分类 chip 必须存在").not.toBeNull();
+  expect(added, "已接入开关必须存在").not.toBeNull();
+  // Radix Toggle 会带 data-state；手写的 aria-pressed + 条件类不会有它。
+  for (const node of [chip!, added!]) {
+    expect(node.getAttribute("data-state")).not.toBeNull();
+    expect(node.className, "皮肤必须来自 ui/toggle.tsx").not.toContain(
+      "rounded-full",
+    );
+  }
+});
 
 /** 分类 chip 标签末尾的数字。 */
 function chipCount(category: string): string | undefined {
@@ -807,6 +829,186 @@ describe("已接入筛选", () => {
     expect(cardCount()).toBe(1);
     expect(container.textContent).toContain("connectors.catalog.notion");
     expect(addedFilter().getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+describe("页签语义（ui/tabs）", () => {
+  // 迁移前页签是三个手绘 Button + `tab === id` 条件类：没有 role=tablist/tab、
+  // 没有 aria-selected、没有方向键语义。这里锁原语接管后的行为，同时保住旧行为：
+  // 切页签仍只挂载当前页内容（技能 / 插件面板按值惰性挂载）。
+  const TAB_KEYS = [
+    "connectors.tab.connect",
+    "connectors.tab.skills",
+    "connectors.tab.plugins",
+  ];
+
+  const tabs = (): HTMLElement[] => [
+    ...document.body.querySelectorAll<HTMLElement>('[role="tab"]'),
+  ];
+  const tabByKey = (key: string): HTMLElement => {
+    const tab = tabs().find((el) => (el.textContent ?? "").includes(key));
+    expect(tab, `页签「${key}」必须存在`).toBeTruthy();
+    return tab!;
+  };
+  /** Radix 把非当前值面板留在 DOM 里但打 `hidden` 且不渲染 children。 */
+  const panels = (): HTMLElement[] => [
+    ...document.body.querySelectorAll<HTMLElement>(
+      '[role="tabpanel"]:not([hidden])',
+    ),
+  ];
+  const hiddenPanels = (): HTMLElement[] => [
+    ...document.body.querySelectorAll<HTMLElement>('[role="tabpanel"][hidden]'),
+  ];
+  const selected = (): HTMLElement[] =>
+    tabs().filter((el) => el.getAttribute("aria-selected") === "true");
+
+  /** Radix 的 TabsTrigger 在 mousedown（主键、非 ctrl）上激活，不是 click。 */
+  const pressTab = async (el: Element): Promise<void> => {
+    await act(async () => {
+      el.dispatchEvent(
+        new MouseEvent("mousedown", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        }),
+      );
+      el.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true }),
+      );
+    });
+  };
+
+  const pressKey = async (el: Element, key: string): Promise<void> => {
+    await act(async () => {
+      el.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+      );
+    });
+    // RovingFocusGroup 在 setTimeout(0) 里落焦（与 ui/tabs 的 manual 激活无关）
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  };
+
+  it("唯一 tablist + 三个 tab + aria-selected/aria-controls 对应当前值", async () => {
+    await mount();
+
+    expect(
+      document.body.querySelectorAll('[role="tablist"]'),
+      "页签容器必须唯一",
+    ).toHaveLength(1);
+    expect(tabs().map((el) => (el.textContent ?? "").trim())).toEqual(TAB_KEYS);
+    expect(selected()).toEqual([tabByKey("connectors.tab.connect")]);
+
+    const panel = panels();
+    expect(panel, "当前值只有一个可见面板").toHaveLength(1);
+    expect(
+      hiddenPanels().map((el) => el.childElementCount),
+      "非当前值的面板只留 hidden 壳，children 不挂载",
+    ).toEqual([0, 0]);
+    const active = tabByKey("connectors.tab.connect");
+    expect(active.getAttribute("aria-controls")).toBe(panel[0].id);
+    expect(panel[0].getAttribute("aria-labelledby")).toBe(active.id);
+    // 连接页内容仍在原滚动容器里
+    expect(
+      container.querySelector('[data-testid="catalog-toolbar"]'),
+    ).not.toBeNull();
+  });
+
+  it("方向键只移焦点（manual），Enter 激活；点击切回连接页", async () => {
+    await mount();
+
+    const connect = tabByKey("connectors.tab.connect");
+    connect.focus();
+    await pressKey(connect, "ArrowRight");
+    const skills = tabByKey("connectors.tab.skills");
+    expect(document.activeElement).toBe(skills);
+    expect(
+      selected(),
+      "manual 模式下箭头只移焦点，不得切换（技能页会立刻发查询）",
+    ).toEqual([connect]);
+
+    await pressKey(skills, "Enter");
+    expect(selected()).toEqual([skills]);
+    expect(panels()).toHaveLength(1);
+    expect(panels()[0].getAttribute("aria-labelledby")).toBe(skills.id);
+    expect(
+      container.querySelector('[data-testid="catalog-toolbar"]'),
+      "切走后连接页内容卸载",
+    ).toBeNull();
+
+    const plugins = tabByKey("connectors.tab.plugins");
+    await pressTab(plugins);
+    expect(selected()).toEqual([plugins]);
+    expect(panels()[0].getAttribute("aria-labelledby")).toBe(plugins.id);
+
+    await pressTab(tabByKey("connectors.tab.connect"));
+    expect(selected()).toEqual([tabByKey("connectors.tab.connect")]);
+    expect(
+      container.querySelector('[data-testid="catalog-toolbar"]'),
+    ).not.toBeNull();
+  });
+
+  it("切换后面板内容跟手：技能 / 插件各自渲染，连接页计数不漂移", async () => {
+    entries = [notion(), customEntry("my-tools")];
+    await mount();
+
+    // 连接页：两张卡片；合计 2、已接入 1（工具栏 chip 与开关上的数字）
+    expect(cardCount()).toBe(2);
+    expect(chipCount("all")).toBe("2");
+    expect(addedCount()).toBe("1");
+    expect(
+      panels()[0].closest(".overflow-y-auto"),
+      "面板仍挂在原来的滚动容器里（切页签不改滚动语义）",
+    ).not.toBeNull();
+
+    await pressTab(tabByKey("connectors.tab.skills"));
+    const skills = tabByKey("connectors.tab.skills");
+    expect(skills.getAttribute("aria-selected")).toBe("true");
+    expect(
+      tabByKey("connectors.tab.connect").getAttribute("aria-selected"),
+      "旧页签必须让出选中态",
+    ).toBe("false");
+    const skillsPanel = panels()[0];
+    expect(skillsPanel.id).toBe(skills.getAttribute("aria-controls"));
+    expect(
+      skillsPanel.querySelector('[data-testid="skills-panel"]'),
+      "选中的面板要交出属于它的内容",
+    ).not.toBeNull();
+    expect(cardCount(), "连接页 children 随面板卸载，计数不得残留").toBe(0);
+
+    await pressTab(tabByKey("connectors.tab.plugins"));
+    expect(
+      panels()[0].querySelector('[data-testid="plugins-panel"]'),
+    ).not.toBeNull();
+    expect(
+      panels()[0].querySelector('[data-testid="skills-panel"]'),
+    ).toBeNull();
+
+    await pressTab(tabByKey("connectors.tab.connect"));
+    expect(cardCount(), "切回后计数不漂移").toBe(2);
+    expect(chipCount("all")).toBe("2");
+    expect(addedCount()).toBe("1");
+  });
+
+  it("onValueChange 只写回 union 里的值：未知值 / 空串不落地", () => {
+    // jsdom 里没有「未知值的触发器」可点（Radix 只回 string，触发器值都来自本文件的
+    // union），所以这一条锁源码：setTab 必须落在显式合法值分支里，
+    // 不得用 `value as TabId` 之类 unchecked cast 蒙混过关。
+    const source = fs.readFileSync(
+      "src/renderer/components/connectors/ConnectorsView.tsx",
+      "utf8",
+    );
+    expect(source, "setTab 必须在显式合法值分支里").toMatch(
+      /if \([\s\S]{0,240}?\)\s*\{?\s*setTab\(value\)/,
+    );
+    expect(source, "不得用 unchecked cast 写回任意 string").not.toMatch(
+      /setTab\(value as /,
+    );
+    expect(source, "三个合法值必须逐个列出").toMatch(
+      /value === "connect" \|\|[\s\S]{0,160}?value === "skills" \|\|[\s\S]{0,160}?value === "plugins"/,
+    );
+    expect(source, "受控：显示值只来自 state").toMatch(/value=\{tab\}/);
   });
 });
 

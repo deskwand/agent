@@ -2,6 +2,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CODING_SUBSCRIPTIONS } from "../../../shared/coding-subscriptions";
 import { Input } from "../ui/input";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 import { Button } from "../app-button";
 
 export interface ConnectCardsProps {
@@ -120,9 +125,14 @@ export function ConnectCards({
     ) : null;
 
   return (
-    <div className="space-y-3">
+    <Collapsible
+      open={expanded}
+      onOpenChange={setExpanded}
+      className="space-y-3"
+    >
       <div className="flex gap-2">
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           data-testid="connect-card-cloud"
           onClick={onOpenCloud}
@@ -135,21 +145,23 @@ export function ConnectCards({
             {t("connect.cloudDesc")}
           </span>
         </Button>
-        <Button variant="ghost"
-          type="button"
-          data-testid="connect-card-subscription"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((value) => !value)}
-          className={CARD_CLASS}
-        >
-          <span className="block text-sm font-medium text-foreground h-auto hover:bg-transparent hover:text-current">
-            {t("connect.subscribeTitle")} {expanded ? "▴" : "▾"}
-          </span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">
-            {t("connect.subscribeDesc")}
-          </span>
-        </Button>
-        <Button variant="ghost"
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            type="button"
+            data-testid="connect-card-subscription"
+            className={CARD_CLASS}
+          >
+            <span className="block text-sm font-medium text-foreground h-auto hover:bg-transparent hover:text-current">
+              {t("connect.subscribeTitle")} {expanded ? "▴" : "▾"}
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              {t("connect.subscribeDesc")}
+            </span>
+          </Button>
+        </CollapsibleTrigger>
+        <Button
+          variant="ghost"
           type="button"
           data-testid="connect-card-api-key"
           onClick={onOpenApiKey}
@@ -164,84 +176,92 @@ export function ConnectCards({
         </Button>
       </div>
 
-      {expanded && (
-        <div className="space-y-2">
-          <div className="rounded-xl border border-border/60 p-2">
-            <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-              {t("connect.groupOAuth")}
-            </p>
-            {OAUTH_ROWS.map((row) => (
-              <div key={row.id}>
-                <Button variant="ghost"
-                  type="button"
-                  data-testid={`connect-row-${row.id}`}
-                  disabled={pending !== null}
-                  onClick={() => void runOAuth(row)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
-                >
-                  <span className="truncate">
-                    {t(row.labelKey)}
-                    {pending === row.id ? ` — ${t("connect.loggingIn")}` : ""}
-                  </span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {t(row.tagKey)}
-                  </span>
-                </Button>
-                {rowError(row.id)}
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-xl border border-border/60 p-2">
-            <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-              {t("connect.groupSubscriptionKey")}
-            </p>
-            {CODING_SUBSCRIPTIONS.map((plan) => (
-              <div key={plan.profileKey}>
-                <Button variant="ghost"
-                  type="button"
-                  data-testid={`connect-row-${plan.profileKey}`}
-                  disabled={pending !== null}
-                  aria-expanded={keyRow === plan.profileKey}
-                  onClick={() =>
-                    setKeyRow((current) =>
-                      current === plan.profileKey ? null : plan.profileKey,
-                    )
-                  }
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
-                >
-                  <span className="truncate">{plan.name}</span>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {t("connect.tagPasteKey")}
-                  </span>
-                </Button>
-                {keyRow === plan.profileKey && (
-                  <div className="flex gap-1 px-2 pb-1">
-                    <Input
-                      data-testid={`connect-key-input-${plan.profileKey}`}
-                      value={keyDraft}
-                      disabled={pending !== null}
-                      onChange={(event) => setKeyDraft(event.target.value)}
-                      placeholder={t("connect.keyPlaceholder")}
-                      className="h-auto min-w-0 flex-1 rounded-lg border border-border/40 bg-background px-2 py-1 text-xs text-foreground shadow-none outline-none focus:border-primary"
-                    />
-                    <Button variant="ghost"
-                      type="button"
-                      data-testid={`connect-key-save-${plan.profileKey}`}
-                      disabled={pending !== null}
-                      onClick={() => void runSubscription(plan.profileKey)}
-                      className="rounded-lg border border-primary px-2 py-1 text-xs text-primary-text disabled:opacity-40"
-                    >
-                      {t("common.save")}
-                    </Button>
-                  </div>
-                )}
-                {rowError(plan.profileKey)}
-              </div>
-            ))}
-          </div>
+      <CollapsibleContent className="space-y-2">
+        <div className="rounded-xl border border-border/60 p-2">
+          <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+            {t("connect.groupOAuth")}
+          </p>
+          {OAUTH_ROWS.map((row) => (
+            <div key={row.id}>
+              <Button
+                variant="ghost"
+                type="button"
+                data-testid={`connect-row-${row.id}`}
+                disabled={pending !== null}
+                onClick={() => void runOAuth(row)}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
+              >
+                <span className="truncate">
+                  {t(row.labelKey)}
+                  {pending === row.id ? ` — ${t("connect.loggingIn")}` : ""}
+                </span>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {t(row.tagKey)}
+                </span>
+              </Button>
+              {rowError(row.id)}
+            </div>
+          ))}
         </div>
-      )}
-    </div>
+
+        <div className="rounded-xl border border-border/60 p-2">
+          <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+            {t("connect.groupSubscriptionKey")}
+          </p>
+          {CODING_SUBSCRIPTIONS.map((plan) => (
+            <div key={plan.profileKey}>
+              <Collapsible
+                open={keyRow === plan.profileKey}
+                onOpenChange={(open) =>
+                  setKeyRow((current) =>
+                    open
+                      ? plan.profileKey
+                      : current === plan.profileKey
+                        ? null
+                        : current,
+                  )
+                }
+              >
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    data-testid={`connect-row-${plan.profileKey}`}
+                    disabled={pending !== null}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
+                  >
+                    <span className="truncate">{plan.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {t("connect.tagPasteKey")}
+                    </span>
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="flex gap-1 px-2 pb-1">
+                  <Input
+                    data-testid={`connect-key-input-${plan.profileKey}`}
+                    value={keyDraft}
+                    disabled={pending !== null}
+                    onChange={(event) => setKeyDraft(event.target.value)}
+                    placeholder={t("connect.keyPlaceholder")}
+                    className="h-auto min-w-0 flex-1 rounded-lg border border-border/40 bg-background px-2 py-1 text-xs text-foreground shadow-none outline-none focus:border-primary"
+                  />
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    data-testid={`connect-key-save-${plan.profileKey}`}
+                    disabled={pending !== null}
+                    onClick={() => void runSubscription(plan.profileKey)}
+                    className="rounded-lg border border-primary px-2 py-1 text-xs text-primary-text disabled:opacity-40"
+                  >
+                    {t("common.save")}
+                  </Button>
+                </CollapsibleContent>
+              </Collapsible>
+              {rowError(plan.profileKey)}
+            </div>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

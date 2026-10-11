@@ -18,9 +18,11 @@ import { KeyDialog } from "./KeyDialog";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { SettingsSkills } from "../settings/SettingsSkills";
 import { PiExtensionManagerView } from "../PiExtensionManagerView";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../../store";
 import { Button } from "../app-button";
+import { Toggle } from "../ui/toggle";
 
 type TabId = "connect" | "skills" | "plugins";
 
@@ -359,231 +361,252 @@ export function ConnectorsView() {
     ["plugins", t("connectors.tab.plugins")],
   ];
 
+  const handleTabChange = (value: string) => {
+    if (value === "connect" || value === "skills" || value === "plugins") {
+      setTab(value);
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden bg-background">
-      <div className="flex items-center gap-3 px-5 pt-4 flex-none">
-        <Button variant="ghost"
-          type="button"
-          onClick={() => setActiveView("chat")}
-          aria-label={t("common.back")}
-          className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent h-auto"
-        >
-          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-        </Button>
-        <h2 className="text-xl font-semibold text-foreground">
-          {t("connectors.title")}
-        </h2>
-        <span className="text-xs text-muted-foreground">
-          {t("connectors.subtitle")}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-0.5 px-5 pt-3 border-b border-border/60 flex-none">
-        {tabs.map(([id, label]) => (
-          <Button variant="ghost"
-            key={id}
+    // asChild：Tabs Root 就是原来的外层脊柱（flex 列 + 全高），
+    // 不额外插一层 div —— 插一层会把页签条/滚动区的 flex 关系抽断。
+    <Tabs
+      asChild
+      value={tab}
+      activationMode="manual"
+      onValueChange={handleTabChange}
+    >
+      <div className="flex flex-col h-full w-full overflow-hidden bg-background">
+        <div className="flex items-center gap-3 px-5 pt-4 flex-none">
+          <Button
+            variant="ghost"
             type="button"
-            onClick={() => setTab(id)}
-            className={`px-3 py-1.5 text-sm -mb-px border-b-2 transition-colors ${
-              tab === id
-                ? "border-primary text-foreground font-semibold"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
+            onClick={() => setActiveView("chat")}
+            aria-label={t("common.back")}
+            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent h-auto"
           >
-            {label}
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Button>
-        ))}
-      </div>
+          <h2 className="text-xl font-semibold text-foreground">
+            {t("connectors.title")}
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            {t("connectors.subtitle")}
+          </span>
+        </div>
 
-      {/* 外层相对定位：报错/提示用**浮层**呈现 —— 既不会留一片永久空白
+        {/* 皮肤完全来自 ui/tabs.tsx（shadcn 的默认分段外观）；这里只给页面级间距。 */}
+        <TabsList className="mx-5 mt-3 flex-none self-start">
+          {tabs.map(([id, label]) => (
+            <TabsTrigger key={id} value={id}>
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {/* 外层相对定位：报错/提示用**浮层**呈现 —— 既不会留一片永久空白
           （固定槽位试过，用户否掉了），也不会在出现时把整个列表推下去。 */}
-      <div className="flex-1 relative min-h-0">
-        {(error || notice) && (
-          <div
-            role={error ? "alert" : "status"}
-            className={`absolute top-3 left-5 right-5 z-20 px-4 py-2.5 rounded-lg shadow-elevated text-sm ${
-              error
-                ? "bg-destructive/10 text-destructive"
-                : "bg-accent text-muted-foreground"
-            }`}
-          >
-            {error || notice}
-          </div>
-        )}
-        <div className="h-full overflow-y-auto p-5">
-          {tab === "connect" && (
-            <>
-              {/* 吸顶工具栏：左 = 分类 chip 条（可点 = 过滤），右 = 添加。
+        <div className="flex-1 relative min-h-0">
+          {(error || notice) && (
+            <div
+              role={error ? "alert" : "status"}
+              className={`absolute top-3 left-5 right-5 z-20 px-4 py-2.5 rounded-lg shadow-elevated text-sm ${
+                error
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-accent text-muted-foreground"
+              }`}
+            >
+              {error || notice}
+            </div>
+          )}
+          <div className="h-full overflow-y-auto p-5">
+            {/* 面板内容仍按原值条件渲染：Radix 会把非当前值面板留在 DOM 里（hidden 空壳），
+                不补这层守卫的话「技能 / 插件」两个重组件会在视图一打开就挂载并发请求 ——
+                迁移前它们是切到才挂载的。面板壳保留，只为 a11y（role=tabpanel + aria 关联）。 */}
+            <TabsContent value="connect">
+              {tab === "connect" && (
+                <>
+                  {/* 吸顶工具栏：左 = 分类 chip 条（可点 = 过滤），右 = 添加。
                 吸顶让「添加」永远可见，不随列表滚出视野。 */}
-              <div
-                data-testid="catalog-toolbar"
-                className="sticky top-0 z-10 -mx-1 px-1 pb-3 bg-background flex items-center gap-1.5 flex-wrap"
-              >
-                <CategoryChip
-                  id="all"
-                  label={t("connectors.category.all")}
-                  count={shown.length}
-                  active={activeCategory}
-                  onSelect={setCategory}
-                />
-                {groups.map((g) => (
-                  <CategoryChip
-                    key={g.id}
-                    id={g.id}
-                    label={t(`connectors.category.${g.id}`)}
-                    count={g.entries.length}
-                    active={activeCategory}
-                    onSelect={setCategory}
-                  />
-                ))}
-                <span className="flex-1" />
-                <Button variant="ghost"
-                  type="button"
-                  data-testid="added-filter"
-                  aria-pressed={addedOnly}
-                  onClick={() => setAddedOnly((v) => !v)}
-                  className={`text-xs px-3 py-1 rounded-full border whitespace-nowrap transition-colors ${
-                    addedOnly
-                      ? "bg-primary/10 text-primary-text border-transparent"
-                      : "border-border/60 text-muted-foreground hover:bg-accent"
-                  }`}
-                >
-                  {t("connectors.filter.added")}
-                  <span className="text-[11px] opacity-75 ml-1">
-                    {added.length}
-                  </span>
-                </Button>
-                <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost"
-                      type="button"
-                      className="px-3 py-1 rounded-control bg-primary text-white hover:bg-primary/90 text-xs font-medium transition-colors h-auto"
+                  <div
+                    data-testid="catalog-toolbar"
+                    className="sticky top-0 z-10 -mx-1 px-1 pb-3 bg-background flex items-center gap-1.5 flex-wrap"
+                  >
+                    <CategoryChip
+                      id="all"
+                      label={t("connectors.category.all")}
+                      count={shown.length}
+                      active={activeCategory}
+                      onSelect={setCategory}
+                    />
+                    {groups.map((g) => (
+                      <CategoryChip
+                        key={g.id}
+                        id={g.id}
+                        label={t(`connectors.category.${g.id}`)}
+                        count={g.entries.length}
+                        active={activeCategory}
+                        onSelect={setCategory}
+                      />
+                    ))}
+                    <span className="flex-1" />
+                    <Toggle
+                      pressed={addedOnly}
+                      onPressedChange={setAddedOnly}
+                      variant="outline"
+                      size="sm"
+                      data-testid="added-filter"
+                      className="gap-1 whitespace-nowrap text-xs"
                     >
-                      {t("connectors.action.add")}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  {/* ⚠️ 根必须同时包住触发器与内容 ✗（计划 8 ✓）。
+                      {t("connectors.filter.added")}
+                      <span className="text-[11px] opacity-75">
+                        {added.length}
+                      </span>
+                    </Toggle>
+                    <DropdownMenu
+                      open={addMenuOpen}
+                      onOpenChange={setAddMenuOpen}
+                    >
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          type="button"
+                          className="px-3 py-1 rounded-control bg-primary text-white hover:bg-primary/90 text-xs font-medium transition-colors h-auto"
+                        >
+                          {t("connectors.action.add")}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      {/* ⚠️ 根必须同时包住触发器与内容 ✗（计划 8 ✓）。
                       原实现手写在 `<div className="relative">` 里并自己绝对定位 ✓
                       —— 注释里那条「参与布局会把 chip 挤下去」的理由是为了**绝对定位** ✓，
                       而 Radix 的 content 经 portal 挂 body ✓ 根本不参与布局 ✓，那个 wrapper 已删 ✗。
                       `align="end"` 保持原来的右对齐 ✓；`w-[210px]` 压回原宽度 ✓（Radix 默认 w-72 ✗）。
                       `onCloseAutoFocus` 阻止把焦点还给触发器 ✓ —— 两条项都开对话框 ✓，
                       不阻止就会**抢走对话框输入框的焦点** ✗（本会话在 `Sidebar` 上实测过 ✓）。 */}
-                  <DropdownMenuContent
-                    align="end"
-                    className="w-[210px]"
-                    onCloseAutoFocus={(event) => event.preventDefault()}
-                  >
-                    <DropdownMenuItem
-                      data-testid="add-mcp"
-                      onClick={() => {
-                        setAddMenuOpen(false);
-                        setAddOpen(true);
-                      }}
-                      className="flex-col items-start gap-0 px-3 py-2.5"
-                    >
-                      <span className="block text-sm font-semibold text-foreground">
-                        {t("connectors.addMenu.server")}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {t("connectors.addMenu.serverHint")}
-                      </span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      data-testid="add-mail"
-                      onClick={() => {
-                        setAddMenuOpen(false);
-                        setMailOpen(true);
-                      }}
-                      className="flex-col items-start gap-0 rounded-none border-t border-border/60 px-3 py-2.5"
-                    >
-                      <span className="block text-sm font-semibold text-foreground">
-                        {t("connectors.addMenu.mailbox")}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {t("connectors.addMenu.mailboxHint")}
-                      </span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              {/* 筛选开着且一条都没有：必须给出口 —— 此时既没有卡片可点，
-                  也没有任何「连接」按钮可达，没有出口就是死路（见设计文档 F6）。 */}
-              {addedOnly && added.length === 0 && (
-                <div className="flex flex-col items-center gap-3 py-12">
-                  {/* role="status"：屏幕阅读器要听到列表已空 —— 否则开关的 aria-pressed
-                      变了、内容却静默换了。 */}
-                  <p role="status" className="text-sm text-muted-foreground">
-                    {t("connectors.filter.empty")}
-                  </p>
-                  <Button variant="ghost"
-                    type="button"
-                    data-testid="added-filter-show-all"
-                    onClick={() => setAddedOnly(false)}
-                    className="text-xs px-3 py-1 rounded-full border border-border/60 text-muted-foreground hover:bg-accent transition-colors h-auto"
-                  >
-                    {t("connectors.filter.showAll")}
-                  </Button>
-                </div>
-              )}
-
-              {visibleGroups.map((g) => (
-                <section key={g.id} className="mb-5 last:mb-0">
-                  <h3
-                    data-testid="section-title"
-                    className="text-sm font-semibold text-muted-foreground mb-2 flex items-baseline gap-2"
-                  >
-                    {t(`connectors.category.${g.id}`)}
-                    <span className="text-[11px] font-normal text-muted-foreground">
-                      {g.entries.length}
-                    </span>
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {g.entries.map((entry) => (
-                      <ConnectorCard
-                        key={entry.key}
-                        entry={entry}
-                        authorizing={authPending[entry.serverName] === true}
-                        onConnect={onConnect}
-                        onDisconnect={onDisconnect}
-                        onAuthorize={onAuthorize}
-                        onCancel={onCancel}
-                        onToggle={onToggle}
-                        onTestMailbox={onTestMailbox}
-                        onRemoveMailbox={onRemoveMailbox}
-                      />
-                    ))}
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-[210px]"
+                        onCloseAutoFocus={(event) => event.preventDefault()}
+                      >
+                        <DropdownMenuItem
+                          data-testid="add-mcp"
+                          onClick={() => {
+                            setAddMenuOpen(false);
+                            setAddOpen(true);
+                          }}
+                          className="flex-col items-start gap-0 px-3 py-2.5"
+                        >
+                          <span className="block text-sm font-semibold text-foreground">
+                            {t("connectors.addMenu.server")}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {t("connectors.addMenu.serverHint")}
+                          </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          data-testid="add-mail"
+                          onClick={() => {
+                            setAddMenuOpen(false);
+                            setMailOpen(true);
+                          }}
+                          className="flex-col items-start gap-0 rounded-none border-t border-border/60 px-3 py-2.5"
+                        >
+                          <span className="block text-sm font-semibold text-foreground">
+                            {t("connectors.addMenu.mailbox")}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {t("connectors.addMenu.mailboxHint")}
+                          </span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                </section>
-              ))}
-            </>
-          )}
 
-          {tab === "skills" && <SettingsSkills isActive={true} />}
-          {tab === "plugins" && <PiExtensionManagerView />}
+                  {/* 筛选开着且一条都没有：必须给出口 —— 此时既没有卡片可点，
+                  也没有任何「连接」按钮可达，没有出口就是死路（见设计文档 F6）。 */}
+                  {addedOnly && added.length === 0 && (
+                    <div className="flex flex-col items-center gap-3 py-12">
+                      {/* role="status"：屏幕阅读器要听到列表已空 —— 否则开关的 aria-pressed
+                      变了、内容却静默换了。 */}
+                      <p
+                        role="status"
+                        className="text-sm text-muted-foreground"
+                      >
+                        {t("connectors.filter.empty")}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        data-testid="added-filter-show-all"
+                        onClick={() => setAddedOnly(false)}
+                        className="text-xs px-3 py-1 rounded-full border border-border/60 text-muted-foreground hover:bg-accent transition-colors h-auto"
+                      >
+                        {t("connectors.filter.showAll")}
+                      </Button>
+                    </div>
+                  )}
+
+                  {visibleGroups.map((g) => (
+                    <section key={g.id} className="mb-5 last:mb-0">
+                      <h3
+                        data-testid="section-title"
+                        className="text-sm font-semibold text-muted-foreground mb-2 flex items-baseline gap-2"
+                      >
+                        {t(`connectors.category.${g.id}`)}
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          {g.entries.length}
+                        </span>
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                        {g.entries.map((entry) => (
+                          <ConnectorCard
+                            key={entry.key}
+                            entry={entry}
+                            authorizing={authPending[entry.serverName] === true}
+                            onConnect={onConnect}
+                            onDisconnect={onDisconnect}
+                            onAuthorize={onAuthorize}
+                            onCancel={onCancel}
+                            onToggle={onToggle}
+                            onTestMailbox={onTestMailbox}
+                            onRemoveMailbox={onRemoveMailbox}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="skills">
+              {tab === "skills" && <SettingsSkills isActive={true} />}
+            </TabsContent>
+            <TabsContent value="plugins">
+              {tab === "plugins" && <PiExtensionManagerView />}
+            </TabsContent>
+          </div>
         </div>
-      </div>
 
-      <AddServerDialog
-        isOpen={addOpen}
-        onClose={() => setAddOpen(false)}
-        onAdded={() => void refresh()}
-      />
-      <MailAccountDialog
-        isOpen={mailOpen}
-        onClose={() => setMailOpen(false)}
-        onAdded={() => void refresh()}
-      />
-      <KeyDialog
-        entry={keyEntry}
-        onClose={() => setKeyEntry(null)}
-        onConnected={onKeyConnected}
-      />
+        <AddServerDialog
+          isOpen={addOpen}
+          onClose={() => setAddOpen(false)}
+          onAdded={() => void refresh()}
+        />
+        <MailAccountDialog
+          isOpen={mailOpen}
+          onClose={() => setMailOpen(false)}
+          onAdded={() => void refresh()}
+        />
+        <KeyDialog
+          entry={keyEntry}
+          onClose={() => setKeyEntry(null)}
+          onConnected={onKeyConnected}
+        />
 
-      {/* 删除邮箱的确认框。内联渲染在这里（而不是卡片里）——
+        {/* 删除邮箱的确认框。内联渲染在这里（而不是卡片里）——
           一个页面同时只会有一个待删邮箱，状态放视图层就不会有多份。 */}
-      {/* 删邮箱的确认框。内联渲染在这里（而不是卡片里）——
+        {/* 删邮箱的确认框。内联渲染在这里（而不是卡片里）——
           一个页面同时只会有一个待删邮箱，状态放视图层就不会有多份。
 
           外壳走已迁移的 ConfirmDialog（计划 4 Task 1 给它加了 description 槽位），
@@ -591,21 +614,22 @@ export function ConnectorsView() {
           顺带修掉一个既有缺陷：本组件不调 useBrowserOcclusion，所以这个确认框
           从来没有遮挡过内置浏览器面板；ConfirmDialog 内部是
           OccludingAlertDialog，迁过去就遮挡了。 */}
-      <ConfirmDialog
-        isOpen={pendingRemove !== null}
-        title={t("connectors.mail.removeConfirmTitle")}
-        description={
-          pendingRemove
-            ? t("connectors.mail.removeConfirmBody", { email: pendingRemove })
-            : undefined
-        }
-        confirmLabel={t("connectors.action.removeMailbox")}
-        onConfirm={() => {
-          if (pendingRemove) void confirmRemoveMailbox(pendingRemove);
-        }}
-        onCancel={() => setPendingRemove(null)}
-      />
-    </div>
+        <ConfirmDialog
+          isOpen={pendingRemove !== null}
+          title={t("connectors.mail.removeConfirmTitle")}
+          description={
+            pendingRemove
+              ? t("connectors.mail.removeConfirmBody", { email: pendingRemove })
+              : undefined
+          }
+          confirmLabel={t("connectors.action.removeMailbox")}
+          onConfirm={() => {
+            if (pendingRemove) void confirmRemoveMailbox(pendingRemove);
+          }}
+          onCancel={() => setPendingRemove(null)}
+        />
+      </div>
+    </Tabs>
   );
 }
 
@@ -625,20 +649,17 @@ function CategoryChip({
 }) {
   const isActive = active === id;
   return (
-    <Button variant="ghost"
-      type="button"
+    <Toggle
+      pressed={isActive}
+      onPressedChange={() => onSelect(id)}
+      variant="outline"
+      size="sm"
       data-testid="category-chip"
       data-category={id}
-      aria-pressed={isActive}
-      onClick={() => onSelect(id)}
-      className={`text-xs px-3 py-1 rounded-full border whitespace-nowrap transition-colors ${
-        isActive
-          ? "bg-primary/10 text-primary-text border-transparent"
-          : "border-border/60 text-muted-foreground hover:bg-accent"
-      }`}
+      className="gap-1 whitespace-nowrap text-xs"
     >
       {label}
-      <span className="text-[11px] opacity-75 ml-1">{count}</span>
-    </Button>
+      <span className="text-[11px] opacity-75">{count}</span>
+    </Toggle>
   );
 }

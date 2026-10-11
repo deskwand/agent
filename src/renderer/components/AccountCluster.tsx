@@ -19,7 +19,16 @@ import { Button } from "./app-button";
  * 的 isSidebarAllowed）——若留在侧栏，切到设置/用量页时账号入口和弹窗会一起消失。
  * 应用级的帮助 / 更新 / 关于在 HelpMenu，不在这里。
  */
-export function AccountCluster() {
+export function AccountCluster({
+  onOpenTopUp,
+}: {
+  /**
+   * 打开充值弹窗的可选交接：账号菜单的余额行会把被关闭菜单的原 Trigger 按钮带出来，
+   * 供上层（App 经 AppRail）暂存并在 TopUpModal 打开时用作回焦目标。
+   * 不传时行为不变（standalone 下仍由 store.setTopUpOpen 打开）。
+   */
+  onOpenTopUp?: (target: HTMLButtonElement | null) => void;
+} = {}) {
   const { t } = useTranslation();
   const cloudConfig = useAppStore((s) => s.cloudConfig);
   const showLoginModal = useAppStore((s) => s.showLoginModal);
@@ -107,7 +116,8 @@ export function AccountCluster() {
              菜单根本打不开（而且不会有任何报错）。
              ⚠️ 账号槽位**不再挂气泡**（2026-10-10，与 HelpMenu 的「?」一致）：
              可访问名由下面这颗 button 的 aria-label 给，不再有 Tooltip 了。 */
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
             aria-label={t("sidebar.user")}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary-text transition-colors hover:bg-primary/25"
@@ -132,6 +142,7 @@ export function AccountCluster() {
           setAccountMenuOpen(false);
           setConfirmLogoutOpen(true);
         }}
+        onOpenTopUp={onOpenTopUp}
       />
 
       <LoginModal

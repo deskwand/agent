@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertCircle,
@@ -76,6 +76,18 @@ import { ConfiguredProviderList } from "./configured-provider-list";
 import { ProviderCatalogGrid } from "./provider-catalog-grid";
 import { Input } from "../ui/input";
 import { Button } from "../app-button";
+import { DialogClose, DialogContent, DialogTitle } from "../ui/dialog";
+import {
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import { OccludingAlertDialog, OccludingDialog } from "../ui/occluding-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 type ProviderChoice = ProviderType;
 
@@ -404,11 +416,69 @@ function searchAddInheritedDefaults(appConfig: AppConfig): WebAccessConfig {
   return draft;
 }
 
+/**
+ * Occluding 弹窗的回焦配方：打开时记住来源，关闭时还原（API 编辑外壳同款配方）。
+ *
+ * 必须是 per-dialog 的：叠层时若两层共用一份 returnFocusRef，打开顶层会覆写
+ * 底层记住的 opener，关闭底层时目标已卸载 → 丢掉原 opener。五个弹窗各调一次。
+ * rootRef 在还原失败（目标卸载 / disabled / focus 不生效）时兜底。
+ */
+function useReturnFocus(root: { readonly current: HTMLElement | null }): {
+  returnFocusRef: { readonly current: HTMLElement | null };
+  focusHandlers: {
+    onOpenAutoFocus: () => void;
+    onCloseAutoFocus: (event: Event) => void;
+  };
+} {
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const focusHandlers = useMemo(
+    () => ({
+      onOpenAutoFocus: () => {
+        const active = document.activeElement;
+        returnFocusRef.current =
+          active instanceof HTMLElement && active !== document.body
+            ? active
+            : null;
+      },
+      onCloseAutoFocus: (event: Event) => {
+        event.preventDefault();
+        const target = returnFocusRef.current;
+        if (target?.isConnected && !target.matches(":disabled")) {
+          target.focus({ preventScroll: true });
+          if (document.activeElement !== target) {
+            root.current?.focus({ preventScroll: true });
+          }
+        } else {
+          root.current?.focus({ preventScroll: true });
+        }
+      },
+    }),
+    [root],
+  );
+  return { returnFocusRef, focusHandlers };
+}
+
+/**
+ * 页签条的皮肤（原手绘 Button 的等效类：ghost 底 + 下划线选中态）。
+ * ui/tabs.tsx 只给结构与焦点环，选中/未选中样式由调用点用 `data-[state=*]` 表达 ——
+ * 这样页签的视觉仍由本文件掌握，不再靠 `activeTab === x` 拼条件类。
+ */
+// 页签皮肤由 ui/tabs.tsx（shadcn 默认）提供，调用点只补图标与文字的间距 ——
+// 不再手写 border-b-2 / data-[state=active]:border-primary 那套下划线指示条。
+const TAB_TRIGGER_CLASS = "gap-1.5";
+
 export function SettingsAPI({
   embedded = false,
   onSaved,
 }: SettingsAPIProps = {}) {
   const { t } = useTranslation();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  // 五个弹窗各自一份回焦状态：共用一份会在叠层时覆写 opener（Task 3 review）。
+  const visionDialogReturnFocus = useReturnFocus(rootRef);
+  const oauthDisconnectReturnFocus = useReturnFocus(rootRef);
+  const deleteDialogReturnFocus = useReturnFocus(rootRef);
+  const planDialogReturnFocus = useReturnFocus(rootRef);
+  const editorDialogReturnFocus = useReturnFocus(rootRef);
   const setAppConfig = useAppStore((state) => state.setAppConfig);
   const setIsConfigured = useAppStore((state) => state.setIsConfigured);
   const [presets, setPresets] = useState<ProviderPresets>(
@@ -1407,298 +1477,288 @@ export function SettingsAPI({
     );
   }
 
+  // 页签切换回调：Radix 只回 string，显式列合法值才算写回（未知值/空串一律忽略，
+  // 不用 unchecked cast）—— activeTab 是四个子视图的挂载开关，写错值只会静默渲染空白。
+  const handleTabChange = (value: string) => {
+    if (
+      value === "main" ||
+      value === "vision" ||
+      value === "search" ||
+      value === "utility"
+    ) {
+      setActiveTab(value);
+    }
+  };
+
   return (
-    <>
-      {!embedded && (
-        <div className="flex gap-1 border-b border-border/60 mb-5">
-          <Button variant="ghost"
-            type="button"
-            onClick={() => setActiveTab("main")}
-            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === "main"
-                ? "border-primary text-primary-text"
-                : "border-transparent text-muted-foreground hover:text-muted-foreground"
-            }`}
-          >
-            <Bot className="h-3.5 w-3.5" />
-            {t("api.mainModelTab")}
-          </Button>
-          <Button variant="ghost"
-            type="button"
-            onClick={() => setActiveTab("vision")}
-            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === "vision"
-                ? "border-primary text-primary-text"
-                : "border-transparent text-muted-foreground hover:text-muted-foreground"
-            }`}
-          >
-            <Eye className="h-3.5 w-3.5" />
-            {t("api.visionModelTab")}
-          </Button>
-          <Button variant="ghost"
-            type="button"
-            onClick={() => setActiveTab("search")}
-            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === "search"
-                ? "border-primary text-primary-text"
-                : "border-transparent text-muted-foreground hover:text-muted-foreground"
-            }`}
-          >
-            <Globe2 className="h-3.5 w-3.5" />
-            {t("api.searchModelTab")}
-          </Button>
-          <Button variant="ghost"
-            type="button"
-            onClick={() => setActiveTab("utility")}
-            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === "utility"
-                ? "border-primary text-primary-text"
-                : "border-transparent text-muted-foreground hover:text-muted-foreground"
-            }`}
-          >
-            <Zap className="h-3.5 w-3.5" />
-            {t("api.utilityModelTab")}
-          </Button>
-        </div>
-      )}
-
-      {(activeTab === "main" || embedded) && (
-        <div className="max-w-[1080px] space-y-5">
-          {!embedded && (
-            <SettingsSection
-              title={t("api.configuredListTitle")}
-              description={t("api.configuredListDesc")}
+    <div ref={rootRef} tabIndex={-1}>
+      {/* 受控 Tabs 包住页签条与全部面板。embedded 时不渲染页签条，但内容照常显示：
+          旧代码是「embedded ⇒ 恒显示 main 面板」，所以这里把值也钉到 main，
+          而不是让嵌人态跟着残留的 activeTab 走。 */}
+      <Tabs
+        value={embedded ? "main" : activeTab}
+        activationMode="manual"
+        onValueChange={handleTabChange}
+      >
+        {!embedded && (
+          <TabsList className="flex-none self-start">
+            {/* Radix 的 TabsTrigger 只在 mousedown 上激活；这里补一条 onClick，
+                让不带 mousedown 的合成 click（程序化 .click() 与既有用例）也能切换。
+                真实浏览器里 mousedown 先切同一个值，重复写 state 会被 React 拒收。 */}
+            <TabsTrigger
+              value="main"
+              className={TAB_TRIGGER_CLASS}
+              onClick={() => handleTabChange("main")}
             >
-              {configuredList}
-            </SettingsSection>
+              <Bot className="h-3.5 w-3.5" />
+              {t("api.mainModelTab")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="vision"
+              className={TAB_TRIGGER_CLASS}
+              onClick={() => handleTabChange("vision")}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              {t("api.visionModelTab")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="search"
+              className={TAB_TRIGGER_CLASS}
+              onClick={() => handleTabChange("search")}
+            >
+              <Globe2 className="h-3.5 w-3.5" />
+              {t("api.searchModelTab")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="utility"
+              className={TAB_TRIGGER_CLASS}
+              onClick={() => handleTabChange("utility")}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              {t("api.utilityModelTab")}
+            </TabsTrigger>
+          </TabsList>
+        )}
+
+        {/* 面板内容仍按原值条件渲染：Radix 把非当前值面板留在 DOM 里（hidden 空壳），
+            不补这层守卫的话四个子视图会同时挂载并各自拉数据 —— 迁移前是切到才挂载。
+            面板壳保留，只为 a11y（role=tabpanel + aria 关联）；非当前值面板不保留状态。 */}
+        <TabsContent value="main" className="max-w-[1080px] space-y-5">
+          {(activeTab === "main" || embedded) && (
+            <>
+              {!embedded && (
+                <SettingsSection
+                  title={t("api.configuredListTitle")}
+                  description={t("api.configuredListDesc")}
+                >
+                  {configuredList}
+                </SettingsSection>
+              )}
+
+              {embedded && configuredList}
+
+              {embedded && (
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => openCreate()}
+                  className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("api.addApi")}
+                </Button>
+              )}
+
+              <SettingsSection title={t("api.addApi")}>
+                <ProviderCatalogGrid
+                  presets={presets}
+                  configuredProfileKeys={configuredProfileKeys}
+                  oauthStatuses={oauthStatuses}
+                  oauthLoading={oauthLoading}
+                  oauthErrors={oauthErrors}
+                  onCreateProvider={openCreate}
+                  onCreatePlan={() => setPlanDialogOpen(true)}
+                  onOAuthLogin={handleOAuthLogin}
+                  onOAuthDisconnect={(providerId) =>
+                    setPendingOAuthLogoutProviderId(providerId)
+                  }
+                />
+              </SettingsSection>
+            </>
           )}
+        </TabsContent>
 
-          {embedded && configuredList}
-
-          {embedded && (
-            <Button variant="ghost"
-              type="button"
-              onClick={() => openCreate()}
-              className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {t("api.addApi")}
-            </Button>
-          )}
-
-          <SettingsSection title={t("api.addApi")}>
-            <ProviderCatalogGrid
-              presets={presets}
-              configuredProfileKeys={configuredProfileKeys}
-              oauthStatuses={oauthStatuses}
-              oauthLoading={oauthLoading}
-              oauthErrors={oauthErrors}
-              onCreateProvider={openCreate}
-              onCreatePlan={() => setPlanDialogOpen(true)}
-              onOAuthLogin={handleOAuthLogin}
-              onOAuthDisconnect={(providerId) =>
-                setPendingOAuthLogoutProviderId(providerId)
-              }
-            />
-          </SettingsSection>
-        </div>
-      )}
-
-      {activeTab === "vision" && !embedded && (
-        <div className="max-w-[720px] space-y-5">
-          {!isVisionConfigured ? (
-            /* ── Empty state ── */
-            <div className="rounded-2xl border border-dashed border-border/60 px-6 py-10 text-center">
-              <div className="text-3xl mb-3">🔮</div>
-              <h3 className="text-sm font-medium text-foreground">
-                {t("api.visionModelNotConfigured")}
-              </h3>
-              <p className="mt-1 text-xs text-muted-foreground max-w-xs mx-auto">
-                {t("api.visionModelNotConfiguredDesc")}
-              </p>
-              <Button variant="ghost"
-                type="button"
-                onClick={openVisionEditor}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 h-auto"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {t("api.visionModelConfigureButton")}
-              </Button>
-            </div>
-          ) : (
-            /* ── Configured card ── */
-            <div
-              className={`rounded-2xl border border-border/60 bg-background px-4 py-3 shadow-card ${
-                !visionDraft.enabled ? "opacity-60" : ""
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
-                    <ProviderBrandIcon
-                      brand={
-                        resolveProviderBrand(
-                          visionDraft.provider,
-                          visionDraft.customProtocol,
-                        ) ?? "custom"
-                      }
-                      className="h-4 w-4 flex-shrink-0"
-                    />
-                    <span className="truncate">
-                      {visionProviderName(
-                        visionDraft.provider,
-                        visionDraft.customProtocol,
-                        presets,
-                        t,
-                      )}
-                      {" / "}
-                      {visionDraft.model}
-                    </span>
+        {/* 面板内容仍按原值条件渲染：Radix 把非当前值面板留在 DOM 里（hidden 空壳），
+            不补这层守卫的话四个子视图会同时挂载并各自拉数据 —— 迁移前是切到才挂载。
+            面板壳保留，只为 a11y（role=tabpanel + aria 关联）；非当前值面板不保留状态。 */}
+        <TabsContent value="vision" className="max-w-[720px] space-y-5">
+          {activeTab === "vision" && !embedded && (
+            <>
+              {!isVisionConfigured ? (
+                /* ── Empty state ── */
+                <div className="rounded-2xl border border-dashed border-border/60 px-6 py-10 text-center">
+                  <div className="text-3xl mb-3">🔮</div>
+                  <h3 className="text-sm font-medium text-foreground">
+                    {t("api.visionModelNotConfigured")}
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground max-w-xs mx-auto">
+                    {t("api.visionModelNotConfiguredDesc")}
                   </p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    API Key: {maskApiKey(visionDraft.apiKey)}
-                    {!visionDraft.enabled && (
-                      <span className="ml-1">
-                        — {t("api.visionModelDisabledHint")}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <SettingsSwitch
-                    checked={visionDraft.enabled}
-                    onChange={(next) => {
-                      void handleVisionToggle(next);
-                    }}
-                    label={t("api.visionModelEnable")}
-                    testId="vision-model-enabled"
-                  />
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={openVisionEditor}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 h-auto"
                   >
-                    <Pencil className="h-3 w-3" />
-                    {t("api.editApi")}
+                    <Plus className="h-3.5 w-3.5" />
+                    {t("api.visionModelConfigureButton")}
                   </Button>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Search tab ── */}
-      {activeTab === "search" && !embedded && searchDraft && (
-        <div className="max-w-[720px] space-y-5">
-          <SettingsContentSection
-            title={t("webAccess.groupTitle")}
-            description={t("webAccess.groupDescription")}
-          >
-            <fieldset
-              disabled={isSearchSaving}
-              className="m-0 min-w-0 space-y-3 border-0 p-0"
-            >
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t("webAccess.defaultProvider")}
-                </span>
-                <SettingsFormSelect
-                  value={searchDraft.defaultProvider}
-                  onChange={(next) => {
-                    setSearchDraft({
-                      ...searchDraft,
-                      defaultProvider: next,
-                    });
-                    setSearchMessage(null);
-                  }}
-                  label={t("webAccess.defaultProvider")}
-                  testId="web-access-default-provider"
-                  options={WEB_SEARCH_PROVIDERS.map((provider) => ({
-                    value: provider,
-                    label: t(`webAccess.providers.${provider}`),
-                  }))}
-                />
-              </label>
-
-              {(["openai", "gemini", "deepseek"] as const).map((provider) => {
-                const credential = searchDraft[provider];
-                const isOpen = searchExpanded === provider;
-                return (
-                  <div
-                    key={provider}
-                    className="rounded-xl border border-border/60"
-                  >
-                    <Button variant="ghost"
-                      type="button"
-                      onClick={() =>
-                        setSearchExpanded((c) =>
-                          c === provider ? null : provider,
-                        )
-                      }
-                      aria-expanded={isOpen}
-                      aria-controls={`web-access-${provider}-settings`}
-                      className="flex w-full items-center justify-between px-4 py-3 text-left"
-                    >
-                      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+              ) : (
+                /* ── Configured card ── */
+                <div
+                  className={`rounded-2xl border border-border/60 bg-background px-4 py-3 shadow-card ${
+                    !visionDraft.enabled ? "opacity-60" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
                         <ProviderBrandIcon
-                          brand={provider}
+                          brand={
+                            resolveProviderBrand(
+                              visionDraft.provider,
+                              visionDraft.customProtocol,
+                            ) ?? "custom"
+                          }
                           className="h-4 w-4 flex-shrink-0"
                         />
-                        {t(`webAccess.providers.${provider}`)}
-                      </span>
-                      {isOpen ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </Button>
-                    {isOpen && (
-                      <div
-                        id={`web-access-${provider}-settings`}
-                        className="space-y-3 border-t border-border/60 px-4 py-3"
-                      >
-                        <label className="block space-y-1">
-                          <span className="text-xs text-muted-foreground">
-                            {t("webAccess.credentialSource")}
+                        <span className="truncate">
+                          {visionProviderName(
+                            visionDraft.provider,
+                            visionDraft.customProtocol,
+                            presets,
+                            t,
+                          )}
+                          {" / "}
+                          {visionDraft.model}
+                        </span>
+                      </p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        API Key: {maskApiKey(visionDraft.apiKey)}
+                        {!visionDraft.enabled && (
+                          <span className="ml-1">
+                            — {t("api.visionModelDisabledHint")}
                           </span>
-                          <SettingsFormSelect
-                            value={credential.source}
-                            onChange={(next) => {
-                              setSearchDraft((c) =>
-                                c
-                                  ? {
-                                      ...c,
-                                      [provider]: {
-                                        ...c[provider],
-                                        source: next as "inherit" | "dedicated",
-                                      },
-                                    }
-                                  : c,
-                              );
-                              setSearchMessage(null);
-                            }}
-                            label={t("webAccess.credentialSource")}
-                            testId={`web-access-${provider}-source`}
-                            options={[
-                              {
-                                value: "inherit",
-                                label: t("webAccess.inherit"),
-                              },
-                              {
-                                value: "dedicated",
-                                label: t("webAccess.dedicated"),
-                              },
-                            ]}
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <SettingsSwitch
+                        checked={visionDraft.enabled}
+                        onChange={(next) => {
+                          void handleVisionToggle(next);
+                        }}
+                        label={t("api.visionModelEnable")}
+                        testId="vision-model-enabled"
+                      />
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={openVisionEditor}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                      >
+                        <Pencil className="h-3 w-3" />
+                        {t("api.editApi")}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        {/* ── Search tab ── */}
+        {/* 面板内容仍按原值条件渲染：Radix 把非当前值面板留在 DOM 里（hidden 空壳），
+            不补这层守卫的话四个子视图会同时挂载并各自拉数据 —— 迁移前是切到才挂载。
+            面板壳保留，只为 a11y（role=tabpanel + aria 关联）；非当前值面板不保留状态。 */}
+        <TabsContent value="search" className="max-w-[720px] space-y-5">
+          {activeTab === "search" && !embedded && searchDraft && (
+            <SettingsContentSection
+              title={t("webAccess.groupTitle")}
+              description={t("webAccess.groupDescription")}
+            >
+              <fieldset
+                disabled={isSearchSaving}
+                className="m-0 min-w-0 space-y-3 border-0 p-0"
+              >
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t("webAccess.defaultProvider")}
+                  </span>
+                  <SettingsFormSelect
+                    value={searchDraft.defaultProvider}
+                    onChange={(next) => {
+                      setSearchDraft({
+                        ...searchDraft,
+                        defaultProvider: next,
+                      });
+                      setSearchMessage(null);
+                    }}
+                    label={t("webAccess.defaultProvider")}
+                    testId="web-access-default-provider"
+                    options={WEB_SEARCH_PROVIDERS.map((provider) => ({
+                      value: provider,
+                      label: t(`webAccess.providers.${provider}`),
+                    }))}
+                  />
+                </label>
+
+                {(["openai", "gemini", "deepseek"] as const).map((provider) => {
+                  const credential = searchDraft[provider];
+                  const isOpen = searchExpanded === provider;
+                  return (
+                    <div
+                      key={provider}
+                      className="rounded-xl border border-border/60"
+                    >
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={() =>
+                          setSearchExpanded((c) =>
+                            c === provider ? null : provider,
+                          )
+                        }
+                        aria-expanded={isOpen}
+                        aria-controls={`web-access-${provider}-settings`}
+                        className="flex w-full items-center justify-between px-4 py-3 text-left"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                          <ProviderBrandIcon
+                            brand={provider}
+                            className="h-4 w-4 flex-shrink-0"
                           />
-                        </label>
-                        {credential.source === "inherit" ? (
+                          {t(`webAccess.providers.${provider}`)}
+                        </span>
+                        {isOpen ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                      {isOpen && (
+                        <div
+                          id={`web-access-${provider}-settings`}
+                          className="space-y-3 border-t border-border/60 px-4 py-3"
+                        >
                           <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">
-                              {t("webAccess.profile")}
+                              {t("webAccess.credentialSource")}
                             </span>
                             <SettingsFormSelect
-                              value={credential.profileKey}
+                              value={credential.source}
                               onChange={(next) => {
                                 setSearchDraft((c) =>
                                   c
@@ -1706,357 +1766,426 @@ export function SettingsAPI({
                                         ...c,
                                         [provider]: {
                                           ...c[provider],
-                                          profileKey: next,
+                                          source: next as
+                                            | "inherit"
+                                            | "dedicated",
                                         },
                                       }
                                     : c,
                                 );
+                                setSearchMessage(null);
                               }}
-                              label={t("webAccess.profile")}
-                              testId={`web-access-${provider}-profile`}
+                              label={t("webAccess.credentialSource")}
+                              testId={`web-access-${provider}-source`}
                               options={[
                                 {
-                                  value: "",
-                                  label: t("webAccess.unavailable"),
+                                  value: "inherit",
+                                  label: t("webAccess.inherit"),
                                 },
-                                ...searchMatchingProfiles(
-                                  appConfig || ({ providers: {} } as AppConfig),
-                                  provider,
-                                ).map((profile) => ({
-                                  value: profile.key,
-                                  label:
-                                    resolveProviderDisplayName(
-                                      profile.key,
-                                      profile.name,
-                                      t,
-                                    ) || profile.key,
-                                })),
+                                {
+                                  value: "dedicated",
+                                  label: t("webAccess.dedicated"),
+                                },
                               ]}
                             />
                           </label>
-                        ) : (
-                          <>
+                          {credential.source === "inherit" ? (
                             <label className="block space-y-1">
                               <span className="text-xs text-muted-foreground">
-                                {t("webAccess.apiKey")}
+                                {t("webAccess.profile")}
                               </span>
-                              <Input
-                                type="password"
-                                autoComplete="new-password"
-                                value={credential.apiKey}
-                                onChange={(event) => {
+                              <SettingsFormSelect
+                                value={credential.profileKey}
+                                onChange={(next) => {
                                   setSearchDraft((c) =>
                                     c
                                       ? {
                                           ...c,
                                           [provider]: {
                                             ...c[provider],
-                                            apiKey: event.target.value,
+                                            profileKey: next,
                                           },
                                         }
                                       : c,
                                   );
                                 }}
-                                className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm h-auto shadow-none"
-                              />
-                            </label>
-                            <label className="block space-y-1">
-                              <span className="text-xs text-muted-foreground">
-                                {t("webAccess.baseUrl")}
-                              </span>
-                              <Input
-                                value={credential.baseUrl}
-                                onChange={(event) => {
-                                  setSearchDraft((c) =>
-                                    c
-                                      ? {
-                                          ...c,
-                                          [provider]: {
-                                            ...c[provider],
-                                            baseUrl: event.target.value,
-                                          },
-                                        }
-                                      : c,
-                                  );
-                                }}
-                                className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm h-auto shadow-none"
-                              />
-                            </label>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {(
-                [
-                  ["exa", "exaApiKey"],
-                  ["brave", "braveApiKey"],
-                  ["parallel", "parallelApiKey"],
-                  ["tavily", "tavilyApiKey"],
-                  ["perplexity", "perplexityApiKey"],
-                ] as const
-              ).map(([provider, field]) => {
-                const isOpen = searchExpanded === provider;
-                return (
-                  <div
-                    key={provider}
-                    className="rounded-xl border border-border/60"
-                  >
-                    <Button variant="ghost"
-                      type="button"
-                      onClick={() =>
-                        setSearchExpanded((c) =>
-                          c === provider ? null : provider,
-                        )
-                      }
-                      aria-expanded={isOpen}
-                      aria-controls={`web-access-${provider}-settings`}
-                      className="flex w-full items-center justify-between px-4 py-3 text-left"
-                    >
-                      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <Search className="h-4 w-4 flex-shrink-0" />
-                        {t(`webAccess.providers.${provider}`)}
-                      </span>
-                      {isOpen ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </Button>
-                    {isOpen && (
-                      <div
-                        id={`web-access-${provider}-settings`}
-                        className="space-y-2 border-t border-border/60 px-4 py-3"
-                      >
-                        <label className="block space-y-1">
-                          <span className="text-xs text-muted-foreground">
-                            {t("webAccess.apiKey")}
-                          </span>
-                          <Input
-                            type="password"
-                            autoComplete="new-password"
-                            value={String(searchDraft[field])}
-                            onChange={(event) => {
-                              setSearchDraft({
-                                ...searchDraft,
-                                [field]: event.target.value,
-                              });
-                              setSearchMessage(null);
-                            }}
-                            className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm h-auto shadow-none"
-                          />
-                        </label>
-                        {provider === "exa" && (
-                          <p className="text-xs text-muted-foreground">
-                            {t("webAccess.exaZeroConfig")}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              <div className="flex items-center gap-3 pt-2">
-                <Button variant="ghost"
-                  type="button"
-                  onClick={async () => {
-                    if (!searchDraft || !window.electronAPI) return;
-                    setIsSearchSaving(true);
-                    setSearchMessage(null);
-                    try {
-                      const saved = await window.electronAPI.config.save({
-                        webAccess: searchDraft,
-                      });
-                      applyConfig(saved.config);
-                      setSearchDraft(searchAddInheritedDefaults(saved.config));
-                      setSearchMessage("saved");
-                    } catch {
-                      setSearchMessage("error");
-                    } finally {
-                      setIsSearchSaving(false);
-                    }
-                  }}
-                  disabled={isSearchSaving}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
-                >
-                  {isSearchSaving ? t("common.saving") : t("common.save")}
-                </Button>
-                {searchMessage && (
-                  <span
-                    className={`text-xs ${searchMessage === "saved" ? "text-success" : "text-destructive"}`}
-                  >
-                    {t(
-                      searchMessage === "saved"
-                        ? "webAccess.saveSuccess"
-                        : "webAccess.saveError",
-                    )}
-                  </span>
-                )}
-              </div>
-            </fieldset>
-          </SettingsContentSection>
-        </div>
-      )}
-
-      {/* ── Utility model tab ── */}
-      {activeTab === "utility" && !embedded && (
-        <div className="max-w-[720px] space-y-5">
-          <SettingsContentSection
-            title={t("api.utilityModelTitle")}
-            description={t("api.utilityModelDesc")}
-          >
-            <fieldset
-              disabled={isUtilitySaving}
-              className="m-0 min-w-0 space-y-4 border-0 p-0"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t("api.utilityInheritActive")}
-                </span>
-                <SettingsSwitch
-                  checked={utilityDraft.inheritFromActive}
-                  onChange={(next) => {
-                    setUtilityDraft((prev) => ({
-                      ...prev,
-                      inheritFromActive: next,
-                    }));
-                    setUtilityMessage(null);
-                  }}
-                  label={t("api.utilityInheritActive")}
-                  testId="utility-inherit-active"
-                />
-              </div>
-
-              {!utilityDraft.inheritFromActive && (
-                <>
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {t("api.utilityProvider")}
-                    </span>
-                    <SettingsFormSelect
-                      value={utilityDraft.providerProfileKey || ""}
-                      onChange={(key) => {
-                        const profileKey = key || undefined;
-                        const profile = profileKey
-                          ? appConfig?.providers?.[profileKey]
-                          : undefined;
-                        setUtilityDraft((prev) => ({
-                          ...prev,
-                          providerProfileKey: profileKey,
-                          model: profile?.defaultModel || "",
-                        }));
-                        setUtilityMessage(null);
-                      }}
-                      label={t("api.utilityProvider")}
-                      testId="utility-provider"
-                      options={[
-                        {
-                          value: "",
-                          label: t("api.utilityProviderPlaceholder"),
-                        },
-                        ...Object.entries(appConfig?.providers || {}).flatMap(
-                          ([key, cfg]) =>
-                            cfg
-                              ? [
+                                label={t("webAccess.profile")}
+                                testId={`web-access-${provider}-profile`}
+                                options={[
                                   {
-                                    value: key,
+                                    value: "",
+                                    label: t("webAccess.unavailable"),
+                                  },
+                                  ...searchMatchingProfiles(
+                                    appConfig ||
+                                      ({ providers: {} } as AppConfig),
+                                    provider,
+                                  ).map((profile) => ({
+                                    value: profile.key,
                                     label:
                                       resolveProviderDisplayName(
-                                        key,
-                                        cfg.name,
+                                        profile.key,
+                                        profile.name,
                                         t,
-                                      ) || key,
-                                  },
-                                ]
-                              : [],
-                        ),
-                      ]}
-                    />
-                  </label>
+                                      ) || profile.key,
+                                  })),
+                                ]}
+                              />
+                            </label>
+                          ) : (
+                            <>
+                              <label className="block space-y-1">
+                                <span className="text-xs text-muted-foreground">
+                                  {t("webAccess.apiKey")}
+                                </span>
+                                <Input
+                                  type="password"
+                                  autoComplete="new-password"
+                                  value={credential.apiKey}
+                                  onChange={(event) => {
+                                    setSearchDraft((c) =>
+                                      c
+                                        ? {
+                                            ...c,
+                                            [provider]: {
+                                              ...c[provider],
+                                              apiKey: event.target.value,
+                                            },
+                                          }
+                                        : c,
+                                    );
+                                  }}
+                                  className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm h-auto shadow-none"
+                                />
+                              </label>
+                              <label className="block space-y-1">
+                                <span className="text-xs text-muted-foreground">
+                                  {t("webAccess.baseUrl")}
+                                </span>
+                                <Input
+                                  value={credential.baseUrl}
+                                  onChange={(event) => {
+                                    setSearchDraft((c) =>
+                                      c
+                                        ? {
+                                            ...c,
+                                            [provider]: {
+                                              ...c[provider],
+                                              baseUrl: event.target.value,
+                                            },
+                                          }
+                                        : c,
+                                    );
+                                  }}
+                                  className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm h-auto shadow-none"
+                                />
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {t("api.utilityModel")}
+                {(
+                  [
+                    ["exa", "exaApiKey"],
+                    ["brave", "braveApiKey"],
+                    ["parallel", "parallelApiKey"],
+                    ["tavily", "tavilyApiKey"],
+                    ["perplexity", "perplexityApiKey"],
+                  ] as const
+                ).map(([provider, field]) => {
+                  const isOpen = searchExpanded === provider;
+                  return (
+                    <div
+                      key={provider}
+                      className="rounded-xl border border-border/60"
+                    >
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={() =>
+                          setSearchExpanded((c) =>
+                            c === provider ? null : provider,
+                          )
+                        }
+                        aria-expanded={isOpen}
+                        aria-controls={`web-access-${provider}-settings`}
+                        className="flex w-full items-center justify-between px-4 py-3 text-left"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                          <Search className="h-4 w-4 flex-shrink-0" />
+                          {t(`webAccess.providers.${provider}`)}
+                        </span>
+                        {isOpen ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                      {isOpen && (
+                        <div
+                          id={`web-access-${provider}-settings`}
+                          className="space-y-2 border-t border-border/60 px-4 py-3"
+                        >
+                          <label className="block space-y-1">
+                            <span className="text-xs text-muted-foreground">
+                              {t("webAccess.apiKey")}
+                            </span>
+                            <Input
+                              type="password"
+                              autoComplete="new-password"
+                              value={String(searchDraft[field])}
+                              onChange={(event) => {
+                                setSearchDraft({
+                                  ...searchDraft,
+                                  [field]: event.target.value,
+                                });
+                                setSearchMessage(null);
+                              }}
+                              className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm h-auto shadow-none"
+                            />
+                          </label>
+                          {provider === "exa" && (
+                            <p className="text-xs text-muted-foreground">
+                              {t("webAccess.exaZeroConfig")}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div className="flex items-center gap-3 pt-2">
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={async () => {
+                      if (!searchDraft || !window.electronAPI) return;
+                      setIsSearchSaving(true);
+                      setSearchMessage(null);
+                      try {
+                        const saved = await window.electronAPI.config.save({
+                          webAccess: searchDraft,
+                        });
+                        applyConfig(saved.config);
+                        setSearchDraft(
+                          searchAddInheritedDefaults(saved.config),
+                        );
+                        setSearchMessage("saved");
+                      } catch {
+                        setSearchMessage("error");
+                      } finally {
+                        setIsSearchSaving(false);
+                      }
+                    }}
+                    disabled={isSearchSaving}
+                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
+                  >
+                    {isSearchSaving ? t("common.saving") : t("common.save")}
+                  </Button>
+                  {searchMessage && (
+                    <span
+                      className={`text-xs ${searchMessage === "saved" ? "text-success" : "text-destructive"}`}
+                    >
+                      {t(
+                        searchMessage === "saved"
+                          ? "webAccess.saveSuccess"
+                          : "webAccess.saveError",
+                      )}
                     </span>
-                    <SettingsFormSelect
-                      value={utilityDraft.model || ""}
+                  )}
+                </div>
+              </fieldset>
+            </SettingsContentSection>
+          )}
+        </TabsContent>
+
+        {/* ── Utility model tab ── */}
+        {/* 面板内容仍按原值条件渲染：Radix 把非当前值面板留在 DOM 里（hidden 空壳），
+            不补这层守卫的话四个子视图会同时挂载并各自拉数据 —— 迁移前是切到才挂载。
+            面板壳保留，只为 a11y（role=tabpanel + aria 关联）；非当前值面板不保留状态。 */}
+        <TabsContent value="utility" className="max-w-[720px] space-y-5">
+          {activeTab === "utility" && !embedded && (
+            <>
+              <SettingsContentSection
+                title={t("api.utilityModelTitle")}
+                description={t("api.utilityModelDesc")}
+              >
+                <fieldset
+                  disabled={isUtilitySaving}
+                  className="m-0 min-w-0 space-y-4 border-0 p-0"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {t("api.utilityInheritActive")}
+                    </span>
+                    <SettingsSwitch
+                      checked={utilityDraft.inheritFromActive}
                       onChange={(next) => {
                         setUtilityDraft((prev) => ({
                           ...prev,
-                          model: next,
+                          inheritFromActive: next,
                         }));
                         setUtilityMessage(null);
                       }}
-                      label={t("api.utilityModel")}
-                      testId="utility-model"
-                      options={[
-                        { value: "", label: t("api.utilityModelPlaceholder") },
-                        ...(
-                          appConfig?.providers?.[
-                            utilityDraft.providerProfileKey || ""
-                          ]?.models || []
-                        ).map((m) => ({
-                          value: m.id,
-                          label: m.label || m.id,
-                        })),
-                      ]}
+                      label={t("api.utilityInheritActive")}
+                      testId="utility-inherit-active"
                     />
-                  </label>
-                </>
-              )}
+                  </div>
 
-              <Button variant="ghost"
-                type="button"
-                onClick={async () => {
-                  if (!window.electronAPI) return;
-                  setIsUtilitySaving(true);
-                  setUtilityMessage(null);
-                  try {
-                    const saved = await window.electronAPI.config.save({
-                      utilityRuntime: utilityDraft,
-                    });
-                    applyConfig(saved.config);
-                    setUtilityMessage("saved");
-                  } catch {
-                    setUtilityMessage("error");
-                  } finally {
-                    setIsUtilitySaving(false);
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
-              >
-                {t("api.saveUtilityModel")}
-              </Button>
-              {utilityMessage === "saved" && (
-                <p className="text-xs text-success">{t("common.saved")}</p>
-              )}
-              {utilityMessage === "error" && (
-                <p className="text-xs text-destructive">{t("api.saveFailed")}</p>
-              )}
-            </fieldset>
-          </SettingsContentSection>
-        </div>
-      )}
+                  {!utilityDraft.inheritFromActive && (
+                    <>
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {t("api.utilityProvider")}
+                        </span>
+                        <SettingsFormSelect
+                          value={utilityDraft.providerProfileKey || ""}
+                          onChange={(key) => {
+                            const profileKey = key || undefined;
+                            const profile = profileKey
+                              ? appConfig?.providers?.[profileKey]
+                              : undefined;
+                            setUtilityDraft((prev) => ({
+                              ...prev,
+                              providerProfileKey: profileKey,
+                              model: profile?.defaultModel || "",
+                            }));
+                            setUtilityMessage(null);
+                          }}
+                          label={t("api.utilityProvider")}
+                          testId="utility-provider"
+                          options={[
+                            {
+                              value: "",
+                              label: t("api.utilityProviderPlaceholder"),
+                            },
+                            ...Object.entries(
+                              appConfig?.providers || {},
+                            ).flatMap(([key, cfg]) =>
+                              cfg
+                                ? [
+                                    {
+                                      value: key,
+                                      label:
+                                        resolveProviderDisplayName(
+                                          key,
+                                          cfg.name,
+                                          t,
+                                        ) || key,
+                                    },
+                                  ]
+                                : [],
+                            ),
+                          ]}
+                        />
+                      </label>
+
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {t("api.utilityModel")}
+                        </span>
+                        <SettingsFormSelect
+                          value={utilityDraft.model || ""}
+                          onChange={(next) => {
+                            setUtilityDraft((prev) => ({
+                              ...prev,
+                              model: next,
+                            }));
+                            setUtilityMessage(null);
+                          }}
+                          label={t("api.utilityModel")}
+                          testId="utility-model"
+                          options={[
+                            {
+                              value: "",
+                              label: t("api.utilityModelPlaceholder"),
+                            },
+                            ...(
+                              appConfig?.providers?.[
+                                utilityDraft.providerProfileKey || ""
+                              ]?.models || []
+                            ).map((m) => ({
+                              value: m.id,
+                              label: m.label || m.id,
+                            })),
+                          ]}
+                        />
+                      </label>
+                    </>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={async () => {
+                      if (!window.electronAPI) return;
+                      setIsUtilitySaving(true);
+                      setUtilityMessage(null);
+                      try {
+                        const saved = await window.electronAPI.config.save({
+                          utilityRuntime: utilityDraft,
+                        });
+                        applyConfig(saved.config);
+                        setUtilityMessage("saved");
+                      } catch {
+                        setUtilityMessage("error");
+                      } finally {
+                        setIsUtilitySaving(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
+                  >
+                    {t("api.saveUtilityModel")}
+                  </Button>
+                  {utilityMessage === "saved" && (
+                    <p className="text-xs text-success">{t("common.saved")}</p>
+                  )}
+                  {utilityMessage === "error" && (
+                    <p className="text-xs text-destructive">
+                      {t("api.saveFailed")}
+                    </p>
+                  )}
+                </fieldset>
+              </SettingsContentSection>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* ── Vision model editor modal ── */}
       {visionEditorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 max-h-[88vh] w-full max-w-[560px] overflow-hidden rounded-2xl border border-border/60 bg-background">
+        <OccludingDialog
+          open={visionEditorOpen}
+          onOpenChange={(open) => {
+            if (!open) closeVisionEditor();
+          }}
+        >
+          <DialogContent
+            className="mx-4 max-h-[88vh] w-full max-w-[560px] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-background p-0 [&>button]:hidden"
+            aria-describedby={undefined}
+            onInteractOutside={(event) => event.preventDefault()}
+            onEscapeKeyDown={(event) => event.preventDefault()}
+            {...visionDialogReturnFocus.focusHandlers}
+          >
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-              <h3 className="text-sm font-medium text-foreground">
+              <DialogTitle className="text-sm font-medium text-foreground">
                 {t("api.visionModelEditTitle")}
-              </h3>
-              <Button variant="ghost"
-                type="button"
-                onClick={closeVisionEditor}
-                className="rounded-lg p-2 hover:bg-accent h-auto"
-              >
-                <X className="h-4 w-4 text-muted-foreground" />
-              </Button>
+              </DialogTitle>
+              <DialogClose asChild>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  aria-label={t("common.close")}
+                  className="rounded-lg p-2 hover:bg-accent h-auto"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DialogClose>
             </div>
             <div className="max-h-[calc(88vh-64px)] overflow-y-auto p-5">
               <div className="space-y-5">
@@ -2083,7 +2212,8 @@ export function SettingsAPI({
                   </label>
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                     {VISION_PROVIDER_ORDER.map((provider) => (
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         key={provider}
                         type="button"
                         onClick={() => {
@@ -2129,7 +2259,8 @@ export function SettingsAPI({
                     <div className="grid grid-cols-3 gap-2">
                       {(["anthropic", "openai", "gemini"] as const).map(
                         (protocol) => (
-                          <Button variant="ghost"
+                          <Button
+                            variant="ghost"
                             key={protocol}
                             type="button"
                             onClick={() => {
@@ -2168,7 +2299,8 @@ export function SettingsAPI({
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {ZHIPU_REGIONS.map((region) => (
-                        <Button variant="ghost"
+                        <Button
+                          variant="ghost"
                           key={region.id}
                           type="button"
                           onClick={() =>
@@ -2203,7 +2335,8 @@ export function SettingsAPI({
                     {appConfig?.activeProviderKey &&
                       appConfig?.providers?.[appConfig.activeProviderKey]
                         ?.apiKey && (
-                        <Button variant="ghost"
+                        <Button
+                          variant="ghost"
                           type="button"
                           size="xs"
                           onClick={reuseActiveProviderApiKey}
@@ -2277,7 +2410,8 @@ export function SettingsAPI({
                         )[visionDraft.provider];
                         if (!preset?.models) return null;
                         return preset.models.slice(0, 5).map((m) => (
-                          <Button variant="ghost"
+                          <Button
+                            variant="ghost"
                             key={m.id}
                             type="button"
                             onClick={() =>
@@ -2316,14 +2450,16 @@ export function SettingsAPI({
 
                 {/* Buttons */}
                 <div className="flex items-center justify-end gap-2">
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={closeVisionEditor}
                     className="rounded-lg border border-border/60 px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                   >
                     {t("common.cancel")}
                   </Button>
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => {
                       void handleVisionSave();
@@ -2346,8 +2482,8 @@ export function SettingsAPI({
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </OccludingDialog>
       )}
 
       {pendingOAuthLogoutProviderId &&
@@ -2355,71 +2491,89 @@ export function SettingsAPI({
           const pid = pendingOAuthLogoutProviderId;
           const p = OAUTH_PROVIDERS.find((pp) => pp.id === pid);
           return (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-              <div className="mx-4 w-full max-w-md rounded-2xl border border-border/60 bg-background shadow-xl">
-                <div className="border-b border-border/60 px-5 py-4">
-                  <h3 className="text-sm font-medium text-foreground">
+            <OccludingAlertDialog
+              open
+              onOpenChange={(open) => {
+                if (!open) closeOAuthDisconnectDialog();
+              }}
+            >
+              <AlertDialogContent
+                className="mx-4 w-full max-w-md gap-0 overflow-hidden rounded-2xl border border-border/60 bg-background p-0 shadow-xl"
+                // AlertDialog 原语不接受 onInteractOutside：遮罩点击本就不触发关闭。
+                onEscapeKeyDown={(event) => event.preventDefault()}
+                {...oauthDisconnectReturnFocus.focusHandlers}
+              >
+                <AlertDialogHeader className="border-b border-border/60 px-5 py-4 text-left">
+                  <AlertDialogTitle className="text-sm font-medium text-foreground">
                     {t("api.oauthDisconnect")}
-                  </h3>
-                </div>
+                  </AlertDialogTitle>
+                </AlertDialogHeader>
                 <div className="space-y-4 px-5 py-4">
-                  <p className="text-sm text-muted-foreground">
+                  <AlertDialogDescription className="text-sm text-muted-foreground">
                     {t("api.oauthDisconnectConfirm", {
                       name: p?.name || pid,
                     })}
-                  </p>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost"
-                      type="button"
+                  </AlertDialogDescription>
+                  <AlertDialogFooter className="flex justify-end gap-2">
+                    <AlertDialogCancel
                       onClick={closeOAuthDisconnectDialog}
                       className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                     >
                       {t("common.cancel")}
-                    </Button>
-                    <Button variant="ghost"
-                      type="button"
-                      onClick={() => {
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(event) => {
+                        event.preventDefault();
                         void confirmDisconnectOAuth(pid);
                       }}
                       className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90 h-auto"
                     >
                       {t("api.oauthDisconnect")}
-                    </Button>
-                  </div>
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
                 </div>
-              </div>
-            </div>
+              </AlertDialogContent>
+            </OccludingAlertDialog>
           );
         })()}
 
       {pendingDeleteProfileKey && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-md rounded-2xl border border-border/60 bg-background shadow-xl">
-            <div className="border-b border-border/60 px-5 py-4">
-              <h3 className="text-sm font-medium text-foreground">
+        <OccludingAlertDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) closeDeleteDialog();
+          }}
+        >
+          <AlertDialogContent
+            className="mx-4 w-full max-w-md gap-0 overflow-hidden rounded-2xl border border-border/60 bg-background p-0 shadow-xl"
+            // AlertDialog 原语不接受 onInteractOutside：遮罩点击本就不触发关闭。
+            onEscapeKeyDown={(event) => event.preventDefault()}
+            {...deleteDialogReturnFocus.focusHandlers}
+          >
+            <AlertDialogHeader className="border-b border-border/60 px-5 py-4 text-left">
+              <AlertDialogTitle className="text-sm font-medium text-foreground">
                 {t("api.deleteApi")}
-              </h3>
-            </div>
+              </AlertDialogTitle>
+            </AlertDialogHeader>
             <div className="space-y-4 px-5 py-4">
-              <p className="text-sm text-muted-foreground">
+              <AlertDialogDescription className="text-sm text-muted-foreground">
                 {t("api.deleteApiConfirm", {
                   name:
                     appConfig?.providers?.[pendingDeleteProfileKey]?.name ||
                     providerLabel(pendingDeleteProfileKey, presets, t),
                 })}
-              </p>
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost"
-                  type="button"
+              </AlertDialogDescription>
+              <AlertDialogFooter className="flex justify-end gap-2">
+                <AlertDialogCancel
                   onClick={closeDeleteDialog}
                   disabled={isDeleting}
                   className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                 >
                   {t("common.cancel")}
-                </Button>
-                <Button variant="ghost"
-                  type="button"
-                  onClick={() => {
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(event) => {
+                    event.preventDefault();
                     void confirmDelete();
                   }}
                   disabled={isDeleting}
@@ -2431,20 +2585,31 @@ export function SettingsAPI({
                     <Trash2 className="h-4 w-4" />
                   )}
                   {t("api.deleteApi")}
-                </Button>
-              </div>
+                </AlertDialogAction>
+              </AlertDialogFooter>
             </div>
-          </div>
-        </div>
+          </AlertDialogContent>
+        </OccludingAlertDialog>
       )}
 
       {planDialogOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-2xl rounded-2xl border border-border/60 bg-background shadow-xl">
+        <OccludingDialog
+          open={planDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) setPlanDialogOpen(false);
+          }}
+        >
+          <DialogContent
+            className="mx-4 w-full max-w-2xl gap-0 overflow-hidden rounded-2xl border border-border/60 bg-background p-0 [&>button]:hidden"
+            aria-describedby={undefined}
+            onInteractOutside={(event) => event.preventDefault()}
+            onEscapeKeyDown={(event) => event.preventDefault()}
+            {...planDialogReturnFocus.focusHandlers}
+          >
             <div className="border-b border-border/60 px-5 py-4">
-              <h3 className="text-sm font-medium text-foreground">
+              <DialogTitle className="text-sm font-medium text-foreground">
                 {t("api.planDialogTitle")}
-              </h3>
+              </DialogTitle>
             </div>
             <div className="space-y-3 px-5 py-4">
               <CodingSubscriptionCards
@@ -2453,7 +2618,8 @@ export function SettingsAPI({
                 onDelete={handleSubscriptionDelete}
               />
               <div className="flex justify-end">
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => setPlanDialogOpen(false)}
                   className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
@@ -2462,24 +2628,38 @@ export function SettingsAPI({
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </OccludingDialog>
       )}
 
-      {editorOpen && draft && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 max-h-[88vh] w-full max-w-[900px] overflow-hidden rounded-2xl border border-border/60 bg-background">
+      {draft && (
+        <OccludingDialog
+          open={editorOpen && !!draft}
+          onOpenChange={(open) => {
+            if (!open) closeEditor();
+          }}
+        >
+          <DialogContent
+            className="mx-4 max-h-[88vh] w-full max-w-[900px] overflow-hidden rounded-2xl border border-border/60 bg-background p-0 gap-0 [&>button]:hidden"
+            aria-describedby={undefined}
+            onInteractOutside={(event) => event.preventDefault()}
+            onEscapeKeyDown={(event) => event.preventDefault()}
+            {...editorDialogReturnFocus.focusHandlers}
+          >
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-              <h3 className="text-sm font-medium text-foreground">
+              <DialogTitle className="text-sm font-medium text-foreground">
                 {isCreating ? t("api.addApi") : t("api.editApi")}
-              </h3>
-              <Button variant="ghost"
-                type="button"
-                onClick={closeEditor}
-                className="rounded-lg p-2 hover:bg-accent h-auto"
-              >
-                <X className="h-4 w-4 text-muted-foreground" />
-              </Button>
+              </DialogTitle>
+              <DialogClose asChild>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  aria-label={t("common.close")}
+                  className="rounded-lg p-2 hover:bg-accent h-auto"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DialogClose>
             </div>
             <div className="max-h-[calc(88vh-64px)] overflow-y-auto p-5">
               <div className="space-y-5">
@@ -2490,7 +2670,8 @@ export function SettingsAPI({
                   </label>
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
                     {PROVIDER_ORDER.map((provider) => (
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         key={provider}
                         type="button"
                         onClick={() => selectProvider(provider)}
@@ -2519,7 +2700,8 @@ export function SettingsAPI({
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {OPENCODE_PLANS.map((plan) => (
-                        <Button variant="ghost"
+                        <Button
+                          variant="ghost"
                           key={plan.id}
                           type="button"
                           onClick={() => selectProvider(plan.provider)}
@@ -2548,7 +2730,8 @@ export function SettingsAPI({
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                       {(["anthropic", "openai", "gemini"] as const).map(
                         (protocol) => (
-                          <Button variant="ghost"
+                          <Button
+                            variant="ghost"
                             key={protocol}
                             type="button"
                             onClick={() => selectCustomProtocol(protocol)}
@@ -2647,7 +2830,8 @@ export function SettingsAPI({
                             ? t("api.customModelsManual")
                             : t("api.models")}
                         </label>
-                        <Button variant="ghost"
+                        <Button
+                          variant="ghost"
                           type="button"
                           onClick={addModel}
                           className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
@@ -2712,7 +2896,8 @@ export function SettingsAPI({
                               />
                               {t("api.supportsImage")}
                             </label>
-                            <Button variant="ghost"
+                            <Button
+                              variant="ghost"
                               type="button"
                               onClick={() => removeModel(index)}
                               className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-auto"
@@ -2795,7 +2980,8 @@ export function SettingsAPI({
                                 {t("api.modelsNew")}
                               </span>
                             )}
-                            <Button variant="ghost"
+                            <Button
+                              variant="ghost"
                               type="button"
                               onClick={() => setDefaultModelRow(row.id)}
                               disabled={!row.enabled}
@@ -2840,7 +3026,8 @@ export function SettingsAPI({
 
                 <div className="flex items-center justify-end gap-2">
                   {isOpencodeDraft ? (
-                    <Button variant="ghost"
+                    <Button
+                      variant="ghost"
                       type="button"
                       onClick={() => {
                         void handleSave();
@@ -2862,14 +3049,16 @@ export function SettingsAPI({
                     </Button>
                   ) : connectState === "connected" ? (
                     <>
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
                         onClick={handleConnect}
                         className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                       >
                         {t("api.reconnect")}
                       </Button>
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
                         onClick={closeEditor}
                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary/90 h-auto"
@@ -2880,7 +3069,8 @@ export function SettingsAPI({
                     </>
                   ) : connectState === "failed" ? (
                     <>
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
                         onClick={() => {
                           void handleSaveDraft();
@@ -2889,7 +3079,8 @@ export function SettingsAPI({
                       >
                         {t("common.save")}
                       </Button>
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
                         onClick={handleConnect}
                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary/90 h-auto"
@@ -2899,14 +3090,16 @@ export function SettingsAPI({
                     </>
                   ) : (
                     <>
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
                         onClick={closeEditor}
                         className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                       >
                         {t("common.cancel")}
                       </Button>
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
                         onClick={handleConnect}
                         disabled={connectState === "connecting"}
@@ -2929,9 +3122,9 @@ export function SettingsAPI({
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </OccludingDialog>
       )}
-    </>
+    </div>
   );
 }

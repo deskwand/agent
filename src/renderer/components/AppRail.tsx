@@ -23,9 +23,12 @@ import { RailMoreMenu } from "./RailMoreMenu";
 export function AppRail({
   onCreateVoiceSession,
   voiceCreating = false,
+  onOpenTopUp,
 }: {
   onCreateVoiceSession?: () => void;
   voiceCreating?: boolean;
+  /** 打开充值弹窗的可选交接（账号菜单余额行的原 Trigger 回焦目标），透传给 AccountCluster。 */
+  onOpenTopUp?: (target: HTMLButtonElement | null) => void;
 }) {
   const { t } = useTranslation();
   // 「点了就把卡片收起来」的状态：见下面灵感那一格里的说明。声明在顶层是因为
@@ -307,7 +310,7 @@ export function AppRail({
 
       <HelpMenu />
 
-      <AccountCluster />
+      <AccountCluster onOpenTopUp={onOpenTopUp} />
     </nav>
   );
 }

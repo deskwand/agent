@@ -5,6 +5,7 @@ import type { ContextStatusDetails } from "./ChatInputBottomBar";
 import { formatResetTime } from "../utils/i18n-format";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Button } from "./app-button";
+import { AppProgress } from "./app-progress";
 
 export interface StatusPopoverProps {
   contextUsagePercentage: number;
@@ -67,7 +68,8 @@ export function StatusPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <span className="relative inline-flex items-center justify-center">
         <PopoverTrigger asChild>
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
             // onClick / aria-haspopup / aria-expanded 三样都由 Radix 的 Trigger 管 ——
             // 手写会和它打架（两边各切一次 = 等于不切换）
@@ -77,9 +79,7 @@ export function StatusPopover({
             // Chromium + 构建 CSS 实测 16px，写回后 20px == 迁移前的原生 `<button>`（`67889f23^`）。
             // 这个触发器里只有环一个 svg，所以 `size-5` 不会误伤别处。
             className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-2xl border border-border/40 transition-colors [&_svg]:size-5 ${
-              open
-                ? "bg-accent"
-                : "bg-background/60 hover:bg-accent"
+              open ? "bg-accent" : "bg-background/60 hover:bg-accent"
             }`}
           >
             <svg
@@ -131,12 +131,12 @@ export function StatusPopover({
           <span className="w-[60px] shrink-0 text-muted-foreground">
             {t("statusPopover.context")}
           </span>
-          <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-accent">
-            <span
-              className="absolute inset-y-0 left-0 rounded-sm bg-primary"
-              style={{ width: `${contextUsagePercentage}%` }}
-            />
-          </span>
+          <AppProgress
+            value={contextUsagePercentage}
+            max={100}
+            aria-label={t("statusPopover.context")}
+            className="h-2 flex-1 rounded-sm bg-accent [&>div]:rounded-sm"
+          />
           <span className="w-[38px] shrink-0 text-right font-medium tabular-nums text-foreground">
             {Math.round(contextUsagePercentage)}%
           </span>
@@ -168,12 +168,16 @@ export function StatusPopover({
                           ? t("statusPopover.windowSession")
                           : t("statusPopover.windowWeekly")}
                       </span>
-                      <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-accent">
-                        <span
-                          className="absolute inset-y-0 left-0 rounded-sm bg-primary"
-                          style={{ width: `${window.usedPercent}%` }}
-                        />
-                      </span>
+                      <AppProgress
+                        value={window.usedPercent}
+                        max={100}
+                        aria-label={
+                          window.kind === "session"
+                            ? t("statusPopover.windowSession")
+                            : t("statusPopover.windowWeekly")
+                        }
+                        className="h-2 flex-1 rounded-sm bg-accent [&>div]:rounded-sm"
+                      />
                       <span className="w-[38px] shrink-0 text-right font-medium tabular-nums text-foreground">
                         {Math.round(window.usedPercent)}%
                       </span>

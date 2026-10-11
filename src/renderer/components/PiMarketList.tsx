@@ -152,7 +152,8 @@ export function PiMarketList({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 overflow-y-auto"
+        // p-1.5：行按 shadcn 惯例内缩，左缘不再与面板圆角打架
+        className="min-h-0 flex-1 overflow-y-auto p-1.5"
       >
         {loading && items.length === 0 ? (
           <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
@@ -161,7 +162,8 @@ export function PiMarketList({
         ) : error !== null && items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-10">
             <p className="text-center text-sm text-muted-foreground">{error}</p>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               type="button"
               className="rounded-lg border border-border bg-card px-3 py-1 text-sm text-foreground hover:bg-accent h-auto"
               onClick={retry}
@@ -181,14 +183,14 @@ export function PiMarketList({
                 const installed = installedNames.includes(pkg.name);
                 return (
                   <li key={pkg.name}>
-                    <Button variant="ghost"
+                    <Button
+                      variant="ghost"
                       type="button"
                       onClick={() => onSelect(pkg)}
-                      className={`flex w-full flex-col items-start gap-0.5 border-l-2 px-3 py-2 text-left transition-colors ${
-                        selected
-                          ? "border-primary bg-primary/10"
-                          : "border-transparent hover:bg-accent"
-                      }`}
+                      // shadcn 条目惯例（与 ui/dropdown-menu.tsx 的条目同源）：
+                      // 选中态用 accent 底色表达，靠 data-[selected=true] 而不是自造左竖条。
+                      data-selected={selected}
+                      className="flex w-full flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-accent/50 data-[selected=true]:bg-accent data-[selected=true]:hover:bg-accent"
                     >
                       <span className="flex w-full min-w-0 items-center gap-2">
                         <span className="min-w-0 truncate text-sm font-semibold text-foreground">

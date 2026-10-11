@@ -3,7 +3,9 @@
 // 第 40 项只钉**视图级**挂载淡入：ArtifactPanel / WelcomeView。
 // 内容级 animate-fade-in（ThinkingBlock、ToolResultBlock、BashToolBlock、FileToolBlock、
 // ToolUseBlock 共 12 处）是刻意的流式渐显，不在本项口径内 —— 所以**不能**全仓扫描。
-// ScheduleEditModal 的遮罩淡入也刻意保留：那是弹层出现动效，不是视图/路由转场。
+// ScheduleEditModal 的遮罩淡入也刻意保留；Task 2 迁移后它的外壳（含遮罩淡入/缩放）
+// 由 Radix Dialog 的 `data-[state=open]:animate-in` 提供（Schedule 弹层使用 Radix 动画，
+// 不再是本仓的 animate-fade-in / animate-slide-up 类）。
 //
 // ⚠️ 本文件在 tailwind content 扫描范围内 ⇒ 字面量拆开拼（见 focus-ring-css.test.ts 文件头）。
 //

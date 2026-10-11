@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
+const read = (p: string) =>
+  fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
 
 describe("USD-only top-up display", () => {
   it("removes the credit conversion helpers from topup.ts", () => {
@@ -26,8 +27,11 @@ describe("USD-only top-up display", () => {
     expect(modal).not.toContain("creditedMicroUsd ??");
     expect(modal).toContain("formatMicroUsd(creditedMicroUsd)");
     expect(modal).toContain("topUp.confirmedAmountPending");
-    // 轮询被取消后不得写入状态
-    expect(modal).toContain("!cancelled && o.status === \"confirmed\"");
+    // 轮询被取消、或弹窗已关闭/重开（代际已换）时都不得写入状态：
+    // 计划 13 Task2 的取消修复把「同一代际」也加进了同一处门里。
+    expect(modal).toContain("generation === generationRef.current");
+    expect(modal).toContain("!cancelled");
+    expect(modal).toContain('o.status === "confirmed"');
   });
 
   it("drops the credit wording from both locales", () => {

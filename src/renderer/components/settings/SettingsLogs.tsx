@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { formatAppDateTime } from "../../utils/i18n-format";
 import { ConfirmDialog } from "../ConfirmDialog";
-import { SettingsContentSection } from "./shared";
+import { SettingsContentSection, SettingsSwitch } from "./shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { Button } from "../app-button";
 
@@ -184,20 +184,17 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
               {t("logs.enableDevLogsDesc")}
             </p>
           </div>
-          <Button
-            variant="ghost"
-            onClick={handleToggleDevLogs}
+          {/* 轨道/圆点由 vendored Switch（Radix）绘制，role=switch 与 aria-checked
+              由原语提供；handleToggleDevLogs 仍负责设置写入、错误与乐观更新，
+              这里只把点击转成一次调用（不传 Radix 的下一值，避免两套真值来源）。 */}
+          <SettingsSwitch
+            checked={devLogsEnabled}
+            onChange={() => {
+              void handleToggleDevLogs();
+            }}
+            label={t("logs.enableDevLogs")}
             disabled={isLoading}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 flex-shrink-0 ${
-              devLogsEnabled ? "bg-primary hover:bg-primary/90" : "bg-muted"
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
-                devLogsEnabled ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </Button>
+          />
         </div>
       </section>
 

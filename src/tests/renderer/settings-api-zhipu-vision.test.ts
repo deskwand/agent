@@ -128,14 +128,15 @@ describe("SettingsAPI Zhipu vision model", () => {
     });
     await flush();
 
+    // 视觉编辑弹窗已改用 shadcn Dialog：内容经 portal 挂到 body。
     // 选择「智谱」provider（预设 name 为硬编码中文）
     await act(async () => {
-      clickButton(container, "智谱");
+      clickButton(document.body, "智谱");
     });
     await flush();
 
     // 区域切换按钮出现（模型自动为 glm-4.6v-flash）
-    const regionButtons = Array.from(container.querySelectorAll("button"));
+    const regionButtons = Array.from(document.body.querySelectorAll("button"));
     expect(
       regionButtons.some((b) => b.textContent?.includes("open.bigmodel.cn")),
     ).toBe(true);
@@ -146,7 +147,7 @@ describe("SettingsAPI Zhipu vision model", () => {
     // 切换到国际站
     await act(async () => {
       const globalBtn =
-        Array.from(container.querySelectorAll("button")).find((b) =>
+        Array.from(document.body.querySelectorAll("button")).find((b) =>
           b.textContent?.includes("api.z.ai"),
         ) || null;
       globalBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -154,7 +155,7 @@ describe("SettingsAPI Zhipu vision model", () => {
     await flush();
 
     // 填写 API Key（受控输入需 native setter + input 事件）
-    const keyInput = container.querySelector('input[type="password"]');
+    const keyInput = document.body.querySelector('input[type="password"]');
     expect(keyInput).not.toBeNull();
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
@@ -168,7 +169,7 @@ describe("SettingsAPI Zhipu vision model", () => {
 
     // 保存
     await act(async () => {
-      clickButton(container, "Save Settings");
+      clickButton(document.body, "Save Settings");
     });
     await flush();
 

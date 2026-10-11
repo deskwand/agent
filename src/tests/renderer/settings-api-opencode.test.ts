@@ -57,6 +57,17 @@ function clickButton(container: HTMLElement, text: string): void {
   button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 }
 
+/**
+ * API 编辑弹窗外壳迁到 shadcn Dialog 后经 portal 挂到 document.body，
+ * 不再位于测试的 container 内：弹窗内查询收窄到当前 dialog；
+ * 页面级节点（目录瓦片）仍查 container。
+ */
+function editorDialog(): HTMLElement {
+  const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+  if (!dialog) throw new Error("api editor dialog not open");
+  return dialog;
+}
+
 describe("SettingsAPI OpenCode provider", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -113,7 +124,7 @@ describe("SettingsAPI OpenCode provider", () => {
     await flush();
 
     // Zen/Go 切换按钮出现（测试环境为英文 locale：Zen · Pay as you go / Go · $10/mo subscription）
-    const planButtons = Array.from(container.querySelectorAll("button"));
+    const planButtons = Array.from(editorDialog().querySelectorAll("button"));
     expect(
       planButtons.some((b) => b.textContent?.includes("Pay as you go")),
     ).toBe(true);
@@ -128,12 +139,12 @@ describe("SettingsAPI OpenCode provider", () => {
     });
     await flush();
 
-    const afterSwitch = Array.from(container.querySelectorAll("button"));
+    const afterSwitch = Array.from(editorDialog().querySelectorAll("button"));
     const goActive = afterSwitch.find((b) => b.textContent?.includes("$10/mo"));
     expect(goActive?.className).toContain("border-primary");
 
     // 填写 API Key 并切换回 Zen，Key 保留
-    const keyInput = container.querySelector('input[type="password"]');
+    const keyInput = editorDialog().querySelector('input[type="password"]');
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
@@ -145,14 +156,14 @@ describe("SettingsAPI OpenCode provider", () => {
     await flush();
 
     await act(async () => {
-      const zenBtn = Array.from(container.querySelectorAll("button")).find(
+      const zenBtn = Array.from(editorDialog().querySelectorAll("button")).find(
         (b) => b.textContent?.includes("Pay as you go"),
       );
       zenBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await flush();
 
-    const keyAfterSwitch = container.querySelector(
+    const keyAfterSwitch = editorDialog().querySelector(
       'input[type="password"]',
     ) as HTMLInputElement | null;
     expect(keyAfterSwitch?.value).toBe("sk-opencode-test");
@@ -183,15 +194,15 @@ describe("SettingsAPI OpenCode provider", () => {
 
     // 切换到 Go
     await act(async () => {
-      const goBtn = Array.from(container.querySelectorAll("button")).find((b) =>
-        b.textContent?.includes("$10/mo"),
+      const goBtn = Array.from(editorDialog().querySelectorAll("button")).find(
+        (b) => b.textContent?.includes("$10/mo"),
       );
       goBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await flush();
 
     // 填写 Key 并保存
-    const keyInput = container.querySelector('input[type="password"]');
+    const keyInput = editorDialog().querySelector('input[type="password"]');
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
@@ -202,7 +213,7 @@ describe("SettingsAPI OpenCode provider", () => {
     });
     await flush();
     await act(async () => {
-      clickButton(container, "Save Settings");
+      clickButton(editorDialog(), "Save Settings");
     });
     await flush();
 

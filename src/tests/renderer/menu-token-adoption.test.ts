@@ -23,6 +23,10 @@ const MENU_FILES = [
   "src/renderer/components/Sidebar.tsx",
   "src/renderer/components/VaultView.tsx",
   "src/renderer/components/ScheduleEditModal.tsx",
+  // 计划 13 Task5：Ideas/Feed 的「⋯」动作菜单从手绘面板迁到 Radix DropdownMenu，
+  // 仍然「用了外壳」，所以仍然登记 —— 继续受「不许内联阴影 / 必须有入场动画」检查。
+  "src/renderer/components/IdeasView.tsx",
+  "src/renderer/components/FeedView.tsx",
   "src/renderer/components/StatusPopover.tsx",
   "src/renderer/components/ChatInputStatusBar.tsx",
   "src/renderer/components/HelpMenu.tsx",

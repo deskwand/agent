@@ -15,6 +15,7 @@ import {
   SettingsSwitch,
 } from "./shared";
 import { Input } from "../ui/input";
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { Button } from "../app-button";
 import {
   accentSwatchColor,
@@ -120,28 +121,35 @@ export function SettingsGeneral() {
             title={t("general.theme")}
             control={
               // 只有一个调用点，所以不抽成公共原语。
-              <div
-                role="group"
+              //
+              // 单选语义（role=radiogroup/radio、aria-checked、方向键漫游）交给 Radix。
+              // ⚠️ 再点当前档位时 Radix 会回传 `""`（取消选中）；主题是必选项，空串必须
+              // 丢掉，其余值也用显式分支收窄回 AppTheme 联合，未知值一律不写回。
+              <ToggleGroup
+                type="single"
+                value={settings.theme}
+                onValueChange={(next) => {
+                  if (
+                    next === "light" ||
+                    next === "dark" ||
+                    next === "system"
+                  ) {
+                    updateSettings({ theme: next });
+                  }
+                }}
                 aria-label={t("general.theme")}
-                className="flex overflow-hidden rounded-control border border-border"
+                className="flex gap-0 overflow-hidden rounded-control border border-border"
               >
                 {themeOptions.map((option) => (
-                  <Button
-                    variant="ghost"
+                  <ToggleGroupItem
                     key={option.value}
-                    type="button"
-                    aria-pressed={settings.theme === option.value}
-                    onClick={() => updateSettings({ theme: option.value })}
-                    className={`px-2.5 py-1 text-xs transition-colors ${
-                      settings.theme === option.value
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:bg-accent"
-                    }`}
+                    value={option.value}
+                    className="h-auto min-w-0 rounded-none px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=on]:bg-accent data-[state=on]:text-foreground"
                   >
                     {option.label}
-                  </Button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
             }
           />
           <SettingsRow

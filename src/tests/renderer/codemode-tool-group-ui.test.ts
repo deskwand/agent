@@ -117,16 +117,20 @@ describe("codemode tool group UI", () => {
   }
 
   /**
-   * 卡片自身的开合开关。
-   * 排除两样东西：外层摘要行（它不是工具卡）和 Collapsible 触发器（自带 data-state，
-   * 只是个开关，不算卡片）——这样计数在迁移前后同口径。
+   * 卡片自身的开合开关（工具卡 / 脚本卡 / 子调用卡）。
+   *
+   * 迁移后口径变了：HEAD 上三张卡的卡片头是**裸 Button + aria-expanded**（没有
+   * data-state），只有「脚本详情」那个开关是 Radix 触发器；计划 13 把卡片头全部换成
+   * Radix CollapsibleTrigger（自带 data-state），旧判据 `:not([data-state])` 于是
+   * 数到 0。这里改成「按 aria-expanded 数所有开关」，再排除外层摘要行（用 data-state
+   * 区分不出来，所以按 aria-controls 是否存在来区分：卡片触发器都指向自己的内容区）。
    */
   function cardToggles(): HTMLButtonElement[] {
-    return [
-      ...container.querySelectorAll<HTMLButtonElement>(
-        "button[aria-expanded]:not([data-state])",
-      ),
+    const all = [
+      ...container.querySelectorAll<HTMLButtonElement>("button[aria-expanded]"),
     ];
+    // 第 0 个是外层摘要行自己的开合（ProcessSummaryBlock 先渲染它），不算工具卡。
+    return all.slice(1);
   }
 
   it("结果组折叠时不再显示失败提示，外部高亮请求仍展开并高亮失败子项", () => {

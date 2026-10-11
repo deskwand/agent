@@ -5,9 +5,11 @@
  * Reuses useScheduleForm hook — same state/logic as SettingsSchedule.
  */
 
-import { useEffect, useCallback, useMemo, useState } from "react";
+import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X, ChevronDown, Check } from "lucide-react";
+import { OccludingDialog } from "./ui/occluding-dialog";
+import { DialogClose, DialogContent, DialogTitle } from "./ui/dialog";
 import type { ScheduleTask } from "../types";
 import { useAppStore } from "../store";
 import {
@@ -38,6 +40,11 @@ export interface ScheduleEditModalProps {
   prefillTime?: string;
   onClose: () => void;
   onSaved: () => void;
+  /**
+   * 关闭时回不到原入口（入口已被移除）的兜底：父级（ScheduleView）把自己的根容器聚焦。
+   * 只在本地返回目标失效时调用，不是关闭业务回调（见 constraints.md 回焦方案）。
+   */
+  onRestoreFocus?: () => void;
 }
 
 const WEEKDAY_OPTIONS: { value: ScheduleWeekday; labelKey: string }[] = [
@@ -57,9 +64,21 @@ export function ScheduleEditModal({
   prefillTime,
   onClose,
   onSaved,
+  onRestoreFocus,
 }: ScheduleEditModalProps) {
   const { t } = useTranslation();
-  const form = useScheduleForm({ workingDir, onSaved });
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  /**
+   * 真成功信号：`useScheduleForm` 只在 create/update/delete 成功后调 `onSaved`
+   *（校验失败、服务 reject 都只写 `form.error`，不会调它）。
+   * 关闭由这里驱动，而不是 `await submitTask()` 之后无条件 `onClose()` ⇒ 失败不丢输入。
+   * 不新增 hook 返回值 / 外部 API / 全局状态。
+   */
+  const handleSaved = useCallback(() => {
+    onSaved();
+    onClose();
+  }, [onSaved, onClose]);
+  const form = useScheduleForm({ workingDir, onSaved: handleSaved });
   const { prompt, isLoading, cwd, setCwd, deleteTask, submitTask } = form;
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,27 +129,27 @@ export function ScheduleEditModal({
   const handleSubmit = useCallback(async () => {
     setIsSubmitting(true);
     try {
+      // 关闭交给 handler 的成功回调（handleSaved）；失败时保持弹窗与输入
       await submitTask();
-      onClose();
     } catch {
       // error surfaced in form
     } finally {
       setIsSubmitting(false);
     }
-  }, [submitTask, onClose]);
+  }, [submitTask]);
 
   const handleDelete = useCallback(async () => {
     if (!task) return;
     setIsDeleting(true);
     try {
+      // 同上：只有真成功（hook 的 onSaved）才关闭
       await deleteTask(task.id);
-      onClose();
     } catch {
       // error surfaced in form
     } finally {
       setIsDeleting(false);
     }
-  }, [deleteTask, task, onClose]);
+  }, [deleteTask, task]);
 
   const busy = isSubmitting || isDeleting || isLoading;
   const modeOptions: { value: ScheduleFormMode; label: string }[] = [
@@ -140,29 +159,55 @@ export function ScheduleEditModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/30 animate-fade-in"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-card rounded-xl shadow-xl border border-border mx-4 animate-slide-up">
+    <OccludingDialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        // 宽度 / 最大高 / 滚动 / 底色 / 圆角 / 阴影保持原面板的值（vendored 的
+        // `grid gap-4 p-6 w-full max-w-lg` 由 cn 合并掉：`p-0 gap-0` 让内边距仍由
+        // header / body / footer 自己控制）。
+        className="w-[calc(100%-2rem)] max-w-lg max-h-[85vh] overflow-y-auto bg-card rounded-xl sm:rounded-xl shadow-xl border border-border p-0 gap-0 [&>button]:hidden"
+        aria-describedby={undefined}
+        // 矩阵：Escape 禁止关闭外层（嵌套 Popover 的 Escape 由 Popover 自己处理 ——
+        // Radix 只把 Escape 交给最高层的 DismissableLayer）。
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onOpenAutoFocus={() => {
+          const active = document.activeElement;
+          returnFocusRef.current =
+            active instanceof HTMLElement && active !== document.body
+              ? active
+              : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          const target = returnFocusRef.current;
+          if (target?.isConnected && !target.matches(":disabled")) {
+            target.focus({ preventScroll: true });
+            // 连接且非 disabled 仍可能不可聚焦，落焦不成功才用父级 fallback
+            if (document.activeElement !== target) onRestoreFocus?.();
+          } else onRestoreFocus?.();
+        }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
-          <h3 className="text-sm font-semibold text-foreground">
+          <DialogTitle className="text-sm font-semibold text-foreground">
             {task
               ? t("schedule.calendarEditTitle")
               : t("schedule.calendarCreateTitle")}
-          </h3>
-          <Button variant="ghost"
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors h-auto"
-          >
-            <X size={16} />
-          </Button>
+          </DialogTitle>
+          <DialogClose asChild>
+            <Button
+              variant="ghost"
+              type="button"
+              aria-label={t("common.close")}
+              className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors h-auto"
+            >
+              <X size={16} />
+            </Button>
+          </DialogClose>
         </div>
 
         {/* Body */}
@@ -175,21 +220,34 @@ export function ScheduleEditModal({
               <p className="text-xs text-muted-foreground">
                 {t("schedule.deleteConfirmDesc")}
               </p>
+              {/* 删除失败时 `showDeleteConfirm` 仍为 true，而错误横幅原先只在表单分支
+                  ⇒ 失败原因不可见。复用同一份 form.error + 语义 token。 */}
+              {form.error && (
+                <div
+                  role="alert"
+                  className="flex items-center justify-center gap-2 px-3 py-2 text-xs rounded-lg bg-destructive/10 text-destructive"
+                >
+                  {renderLocalizedBannerMessage(form.error, t)}
+                </div>
+              )}
             </div>
             {/* Footer */}
             <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border/60">
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
                 className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-accent transition-colors h-auto"
               >
                 {t("common.cancel")}
               </Button>
-              <Button variant="ghost"
+              {/* 危险动作走 destructive 变体：皮肤不再手写实心红（Task11 收敛）。 */}
+              <Button
+                variant="destructive"
                 type="button"
                 onClick={handleDelete}
                 disabled={busy}
-                className="px-4 py-2 text-xs font-medium rounded-lg bg-destructive text-white hover:bg-destructive/90 disabled:opacity-50 transition-colors h-auto"
+                className="px-4 py-2 text-xs font-medium rounded-lg disabled:opacity-50 transition-colors h-auto"
               >
                 {t("schedule.confirmDelete")}
               </Button>
@@ -218,7 +276,8 @@ export function ScheduleEditModal({
                 </span>
                 <Popover open={isProjectOpen} onOpenChange={setIsProjectOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost"
+                    <Button
+                      variant="ghost"
                       type="button"
                       className="inline-flex h-9 items-center max-w-[16rem] px-2 rounded-full border border-border/40 bg-background/60 text-xs text-muted-foreground transition-colors hover:border-border"
                     >
@@ -242,7 +301,8 @@ export function ScheduleEditModal({
                     ].map(({ value, label }) => {
                       const selected = cwd === value;
                       return (
-                        <Button variant="ghost"
+                        <Button
+                          variant="ghost"
                           key={value}
                           type="button"
                           className={`${MENU_ITEM_CLASS} ${
@@ -271,7 +331,8 @@ export function ScheduleEditModal({
                 </label>
                 <div className="flex gap-1 bg-muted rounded-lg p-0.5 border border-border">
                   {modeOptions.map((m) => (
-                    <Button variant="ghost"
+                    <Button
+                      variant="ghost"
                       key={m.value}
                       type="button"
                       onClick={() => form.setScheduleMode(m.value)}
@@ -339,7 +400,8 @@ export function ScheduleEditModal({
                       {WEEKDAY_OPTIONS.map((wd) => {
                         const active = form.selectedWeekdays.includes(wd.value);
                         return (
-                          <Button variant="ghost"
+                          <Button
+                            variant="ghost"
                             key={wd.value}
                             type="button"
                             onClick={() => {
@@ -383,7 +445,10 @@ export function ScheduleEditModal({
 
               {/* Status banners */}
               {form.error && (
-                <div className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg bg-destructive/10 text-destructive">
+                <div
+                  role="alert"
+                  className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg bg-destructive/10 text-destructive"
+                >
                   {renderLocalizedBannerMessage(form.error, t)}
                 </div>
               )}
@@ -398,7 +463,8 @@ export function ScheduleEditModal({
             <div className="flex items-center justify-between px-5 py-3 border-t border-border/60">
               <div>
                 {task && (
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => setShowDeleteConfirm(true)}
                     disabled={busy}
@@ -409,18 +475,21 @@ export function ScheduleEditModal({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={onClose}
                   className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-accent transition-colors h-auto"
                 >
                   {t("common.cancel")}
                 </Button>
-                <Button variant="ghost"
+                {/* 主操作走 default 变体：皮肤不再手写实心主色（Task11 收敛）。 */}
+                <Button
+                  variant="default"
                   type="button"
                   onClick={handleSubmit}
                   disabled={busy || !prompt.trim()}
-                  className="px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors h-auto"
+                  className="px-4 py-2 text-xs font-medium rounded-lg disabled:opacity-50 transition-colors h-auto"
                 >
                   {isSubmitting
                     ? t("common.saving")
@@ -432,8 +501,8 @@ export function ScheduleEditModal({
             </div>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </OccludingDialog>
   );
 }
 
@@ -553,7 +622,8 @@ function TimePicker({
               className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-primary/10 text-primary-text"
             >
               {t}
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 size="iconSm"
                 onClick={() => remove(t)}
@@ -575,7 +645,8 @@ function TimePicker({
           maxLength={5}
           className="h-auto flex-1 rounded-md border border-border bg-muted px-2 py-1 text-xs text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
         />
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           onClick={addCustom}
           className="px-3 py-1 text-xs font-medium rounded-md bg-muted border border-border text-muted-foreground hover:bg-accent transition-colors h-auto"
@@ -587,14 +658,17 @@ function TimePicker({
         {TIMES_30MIN.map((time) => {
           const isSelected = selected.includes(time);
           return (
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               key={time}
               type="button"
               onClick={() => toggle(time)}
               className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-accent ${isSelected ? "text-primary-text bg-primary/5" : "text-muted-foreground"}`}
             >
               <span>{time}</span>
-              {isSelected && <span className="text-primary-text font-bold">✓</span>}
+              {isSelected && (
+                <span className="text-primary-text font-bold">✓</span>
+              )}
             </Button>
           );
         })}

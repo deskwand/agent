@@ -15,6 +15,14 @@ import { selectVisibleIdeas, useAppStore } from "../store";
 import { captureShortcutLabel } from "../utils/capture-shortcut-label";
 import { formatAppDateTime } from "../utils/i18n-format";
 import { Button } from "./app-button";
+import { Toggle } from "./ui/toggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { MessageMarkdown } from "./MessageMarkdown";
@@ -92,6 +100,19 @@ export function IdeasView(): JSX.Element {
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const [processingOpen, setProcessingOpen] = useState(false);
+  /**
+   * ⋯ 触发按钮的 ref：菜单退场时的回焦目标（Radix 默认回它，确认框那条路径显式用它）。
+   * 不要改用「打开时聚焦的元素」—— 那在菜单项上，菜单一关就随 portal 卸载。
+   */
+  const moreTriggerRef = useRef<HTMLButtonElement | null>(null);
+  /** 菜单项正要打开删除确认：退场时不许菜单把焦点抢回 Trigger（让确认框接管）。 */
+  const openingConfirmRef = useRef(false);
+  /**
+   * 确认框退场后的回焦目标。菜单入口记为 ⋯ 触发器（菜单项届时已随 portal 卸载，
+   * Radix 默认的「回打开时聚焦的元素」会落到空处）；行内 hover 入口不记 ——
+   * 那颗键一直在 DOM 里，默认回焦就是对的。
+   */
+  const confirmReturnFocusRef = useRef<HTMLElement | null>(null);
   /** 待确认删除的那一条：行内 hover 与 ⋯ 菜单都走它，护栏只有一处。 */
   const [pendingDeleteName, setPendingDeleteName] = useState<string | null>(
     null,
@@ -128,6 +149,21 @@ export function IdeasView(): JSX.Element {
       window.clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
+  }, []);
+
+  /**
+   * 确认框退场后把焦点还给菜单触发器。共享的 ConfirmDialog 不带返回目标 API（本任务不改它），
+   * 且 Radix 自己的退场回焦也是延迟任务 ⇒ 用两跳定时器排在它之后。
+   */
+  const restoreConfirmFocus = useCallback(() => {
+    const target = confirmReturnFocusRef.current;
+    confirmReturnFocusRef.current = null;
+    if (!target) return;
+    window.setTimeout(() => {
+      window.setTimeout(() => {
+        if (target.isConnected) target.focus({ preventScroll: true });
+      }, 0);
+    }, 0);
   }, []);
 
   /** 读盘。显式刷新与"选中项变了"共用它。 */
@@ -489,19 +525,17 @@ export function IdeasView(): JSX.Element {
               })}
             </TooltipContent>
           </Tooltip>
-          <button
-            type="button"
-            onClick={() => setShowArchivedIdeas(!showArchivedIdeas)}
-            aria-pressed={showArchivedIdeas}
-            className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs transition-colors ${
-              showArchivedIdeas
-                ? "border-transparent bg-accent text-foreground"
-                : "border-border text-muted-foreground hover:bg-accent"
-            }`}
+          {/* 二态筛选走官方 Toggle（皮肤来自 ui/toggle.tsx，别在调用点手写 aria-pressed 与条件类）。 */}
+          <Toggle
+            pressed={showArchivedIdeas}
+            onPressedChange={setShowArchivedIdeas}
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
           >
             {t("ideas.showArchived", { count: ideasArchived.length })}
             <ChevronDown className="h-3.5 w-3.5" />
-          </button>
+          </Toggle>
         </div>
       </header>
 
@@ -624,6 +658,8 @@ export function IdeasView(): JSX.Element {
                         className="grid h-6 w-6 place-items-center rounded-md text-destructive hover:bg-accent"
                         onClick={(event) => {
                           event.stopPropagation();
+                          // 行内入口：回焦目标不记（Radix 的默认值就是这颗键）
+                          confirmReturnFocusRef.current = null;
                           setPendingDeleteName(idea.name);
                         }}
                       >
@@ -661,96 +697,113 @@ export function IdeasView(): JSX.Element {
                     <span className="flex-1" />
 
                     <div className="relative">
-                      <Button
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setProcessingOpen((open) => !open);
+                      <DropdownMenu
+                        open={processingOpen}
+                        // 单一来源：打开就关掉另一个（保留原互斥关系）；
+                        // 不再有 onClick toggle，click 不会再叠加一次开关。
+                        onOpenChange={(open) => {
+                          setProcessingOpen(open);
+                          if (open) setMenuOpen(false);
                         }}
                       >
-                        <Plus className="h-3.5 w-3.5" />
-                        {t("ideas.handOff")}
-                      </Button>
-                      {processingOpen ? (
-                        <div className="absolute right-0 top-9 z-10 w-40 rounded-md border border-border bg-card p-1 shadow-lg">
-                          <button
-                            type="button"
-                            className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
-                            onClick={() => handOff("new")}
+                        <DropdownMenuTrigger asChild>
+                          <Button>
+                            <Plus className="h-3.5 w-3.5" />
+                            {t("ideas.handOff")}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem
+                            className="text-xs"
+                            onSelect={() => handOff("new")}
                           >
                             {t("ideas.handOffNew")}
-                          </button>
-                          <button
-                            type="button"
-                            className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
-                            onClick={() => handOff("current")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-xs"
+                            onSelect={() => handOff("current")}
                           >
                             {t("ideas.handOffCurrent")}
-                          </button>
-                        </div>
-                      ) : null}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
                     <div className="relative">
-                      <Button
-                        variant="ghost"
-                        aria-label={t("ideas.moreActions")}
-                        className="px-2"
-                        onClick={() => {
-                          setProcessingOpen(false);
-                          setMenuOpen((open) => !open);
+                      <DropdownMenu
+                        open={menuOpen}
+                        onOpenChange={(open) => {
+                          setMenuOpen(open);
+                          if (open) setProcessingOpen(false);
                         }}
                       >
-                        <Ellipsis className="h-4 w-4" />
-                      </Button>
-                      {menuOpen ? (
-                        <div className="absolute right-0 top-9 z-10 w-40 rounded-md border border-border bg-card p-1 shadow-lg">
-                          <button
-                            type="button"
+                        <DropdownMenuTrigger asChild ref={moreTriggerRef}>
+                          <Button
+                            variant="ghost"
+                            aria-label={t("ideas.moreActions")}
+                            className="px-2"
+                          >
+                            <Ellipsis className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-40"
+                          onCloseAutoFocus={(event) => {
+                            // 正要开删除确认：退场不许把焦点抢回 Trigger，
+                            // 否则 modal 的确认框会把它再弹回去（一次无意义抢焦）。
+                            if (openingConfirmRef.current) {
+                              openingConfirmRef.current = false;
+                              event.preventDefault();
+                            }
+                          }}
+                        >
+                          <DropdownMenuItem
                             disabled={ideasLoading}
                             data-testid="ideas-refresh"
-                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent disabled:opacity-50"
-                            onClick={reload}
+                            className="text-xs"
+                            onSelect={() => reload()}
                           >
                             <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
                             {t("ideas.refresh")}
-                          </button>
+                          </DropdownMenuItem>
                           {selected.status === "inbox" ? (
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
-                              onClick={() =>
+                            <DropdownMenuItem
+                              className="text-xs"
+                              onSelect={() =>
                                 void setStatus(selected.name, "archived")
                               }
                             >
                               <Archive className="h-3.5 w-3.5 text-muted-foreground" />
                               {t("ideas.archive")}
-                            </button>
+                            </DropdownMenuItem>
                           ) : (
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
-                              onClick={() =>
+                            <DropdownMenuItem
+                              className="text-xs"
+                              onSelect={() =>
                                 void setStatus(selected.name, "inbox")
                               }
                             >
                               <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
                               {t("ideas.restore")}
-                            </button>
+                            </DropdownMenuItem>
                           )}
-                          <div className="my-1 h-px bg-border" />
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-destructive hover:bg-accent"
-                            onClick={() => {
-                              setMenuOpen(false);
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-xs text-destructive focus:text-destructive"
+                            onSelect={() => {
+                              // 删除不能直达：先开确认框（护栏仍只有一处）
+                              openingConfirmRef.current = true;
+                              confirmReturnFocusRef.current =
+                                moreTriggerRef.current;
                               setPendingDeleteName(selected.name);
                             }}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             {t("ideas.remove")}
-                          </button>
-                        </div>
-                      ) : null}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
 
@@ -849,10 +902,14 @@ export function IdeasView(): JSX.Element {
         isOpen={pendingDeleteName !== null}
         title={t("ideas.removeConfirmTitle")}
         description={t("ideas.removeConfirmBody")}
-        onCancel={() => setPendingDeleteName(null)}
+        onCancel={() => {
+          setPendingDeleteName(null);
+          restoreConfirmFocus();
+        }}
         onConfirm={() => {
           const name = pendingDeleteName;
           setPendingDeleteName(null);
+          restoreConfirmFocus();
           if (name) void remove(name);
         }}
       />

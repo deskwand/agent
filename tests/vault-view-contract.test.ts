@@ -814,6 +814,39 @@ describe("VaultView", () => {
     ).toBeNull();
   });
 
+  it("keeps the scroll chain intact (页签根不得切断 flex 高度链)", async () => {
+    await renderVault();
+    // 回归守卫：页签根换成 Tabs 后必须继续把高度传下去，否则列表「撑开但滚不动」
+    // （2026-10-11 实际发生过：Tabs 根只有 mt-5，里面的 overflow-y-auto 拿不到可滚动高度）。
+    const scroller = container.querySelector<HTMLElement>(".overflow-y-auto");
+    expect(scroller, "滚动容器必须存在").not.toBeNull();
+    expect(scroller!.className).toContain("min-h-0");
+    expect(scroller!.className).toContain("flex-1");
+    let node: HTMLElement | null = scroller!.parentElement;
+    const chain: string[] = [];
+    for (let i = 0; i < 4 && node; i += 1) {
+      chain.push(node.className);
+      node = node.parentElement;
+    }
+    // 页签根（Tabs）与视图根都必须是 flex 列容器，且页签根参与伸展
+    expect(
+      chain.some((c) => c.includes("flex-col") && c.includes("flex-1")),
+    ).toBe(true);
+    expect(
+      chain.filter((c) => c.includes("flex-col")).length,
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("renders no source-code text (面板表达式必须真的求值)", async () => {
+    await renderVault();
+    // 回归守卫：页签面板改成 TabsContent 时，若三元/条件表达式被写坏，
+    // 源码片段会当文本渲染出来（2026-10-11 实际发生过：`visibleItems.length === 0 ? (`）。
+    const text = screenText();
+    expect(text).not.toContain("visibleItems.length");
+    expect(text).not.toContain(") : (");
+    expect(text).not.toContain("? (");
+  });
+
   it("renders only file, skill, and session categories", async () => {
     await renderVault();
 

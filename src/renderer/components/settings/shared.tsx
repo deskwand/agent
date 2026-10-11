@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
   DropdownMenu,
@@ -14,6 +15,7 @@ import type { VoiceInstallPhase } from "../../../shared/ipc-types";
 import type { ScheduleWeekday } from "../../types";
 import { Switch } from "../ui/switch";
 import { Button } from "../app-button";
+import { AppProgress } from "../app-progress";
 
 // ==================== Shared Types ====================
 
@@ -534,20 +536,17 @@ export function InstallProgress({
   percent: number;
   testId?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="px-4 pb-3" data-testid={testId}>
-      <div
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-        className="h-1.5 w-full overflow-hidden rounded-full bg-accent"
-      >
-        <div
-          className="h-full bg-primary transition-all"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+      <AppProgress
+        value={percent}
+        max={100}
+        // 名称只能由本组件自己给：调用点（语音/朗读/OCR 三张卡）不传 id，
+        // 旁边的徽标文案是它们的节点，这里够不着。
+        aria-label={t("settings.capabilities.install.progressLabel")}
+        className="h-1.5 bg-accent"
+      />
     </div>
   );
 }

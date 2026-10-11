@@ -121,28 +121,33 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
   }, [files, block.items, allBlocks, allMessages]);
 
   return (
-    <div className="overflow-hidden">
+    <Collapsible
+      open={expanded}
+      onOpenChange={setExpanded}
+      className="overflow-hidden"
+    >
       <div className="flex items-center gap-2">
-        <Button variant="ghost"
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-          className={`group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] transition-colors hover:bg-accent/40 ${
-            highlighted ? "ring-2 ring-primary/40" : ""
-          }`}
-        >
-          <span className="inline-flex items-center gap-1 min-w-0 truncate font-medium text-foreground">
-            <Pencil className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-            {formatResultSummaryLabel(block.summary, t)}
-          </span>
-          <span className="inline-flex w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground">
-            {expanded ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
-            )}
-          </span>
-        </Button>
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            type="button"
+            className={`group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] transition-colors hover:bg-accent/40 ${
+              highlighted ? "ring-2 ring-primary/40" : ""
+            }`}
+          >
+            <span className="inline-flex items-center gap-1 min-w-0 truncate font-medium text-foreground">
+              <Pencil className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+              {formatResultSummaryLabel(block.summary, t)}
+            </span>
+            <span className="inline-flex w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground">
+              {expanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </span>
+          </Button>
+        </CollapsibleTrigger>
       </div>
 
       {files.length > 0 ? (
@@ -171,8 +176,8 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
         </div>
       ) : null}
 
-      {expanded ? (
-        <div className="mt-0.5 space-y-1 pl-5">
+      {expanded && (
+        <CollapsibleContent className="mt-0.5 space-y-1 pl-5">
           {block.scripts?.map((script) => (
             <div
               key={script.id}
@@ -180,7 +185,8 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
             >
               <Collapsible>
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     className="text-xs text-muted-foreground h-auto px-0 hover:bg-transparent hover:text-current"
                   >
@@ -224,8 +230,8 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
               )}
             </div>
           ))}
-        </div>
-      ) : null}
-    </div>
+        </CollapsibleContent>
+      )}
+    </Collapsible>
   );
 });

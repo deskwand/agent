@@ -3,7 +3,7 @@
  * Supports light/dark theme
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SandboxSetupProgress, SandboxSetupPhase } from "../types";
 import { getSandboxSetupDisplayText } from "../utils/sandbox-i18n";
@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 import { Button } from "./app-button";
+import { AppProgress } from "./app-progress";
 
 interface Props {
   progress: SandboxSetupProgress | null;
@@ -53,6 +54,8 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
   const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(true);
   const [isRetrying, setIsRetrying] = useState(false);
+  /** 进度条的无障碍名指向下方那条固定的「进度」文案（不用会随阶段变的 message）。 */
+  const progressLabelId = useId();
 
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -188,16 +191,16 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
           {/* Progress Bar */}
           {progress.progress !== undefined && !isError && (
             <div className="mt-4">
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-500 ease-out rounded-full ${
-                    isComplete ? "bg-success" : "bg-primary"
-                  }`}
-                  style={{ width: `${progress.progress}%` }}
-                />
-              </div>
+              <AppProgress
+                value={progress.progress}
+                max={100}
+                aria-labelledby={progressLabelId}
+                className={`h-2 rounded-full bg-muted [&>div]:rounded-full [&>div]:duration-500 [&>div]:ease-out ${
+                  isComplete ? "[&>div]:bg-success" : ""
+                }`}
+              />
               <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                <span>{t("sandbox.progressLabel")}</span>
+                <span id={progressLabelId}>{t("sandbox.progressLabel")}</span>
                 <span>{progress.progress}%</span>
               </div>
             </div>
@@ -217,17 +220,20 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
           {isError && (
             <div className="mt-4 flex flex-col gap-3">
               {isMac && (
-                <Button variant="ghost"
+                // 主操作走 default 变体（Task11 收敛）：皮肤不再手写实心主色。
+                <Button
+                  variant="default"
                   onClick={handleRetryLima}
                   disabled={isRetrying}
-                  className="w-full py-2.5 px-4 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed h-auto"
+                  className="w-full py-2.5 px-4 rounded-xl font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed h-auto"
                 >
                   {isRetrying
                     ? t("sandbox.retryingLima")
                     : t("sandbox.retryLima")}
                 </Button>
               )}
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 onClick={handleClose}
                 className={`w-full py-2.5 px-4 rounded-xl font-medium transition-colors ${
                   isMac

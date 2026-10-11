@@ -18,6 +18,11 @@ import type {
   Message,
 } from "../../types";
 import { Button } from "../app-button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 
 interface BashToolBlockProps {
   block: ToolUseContent;
@@ -141,127 +146,135 @@ export const BashToolBlock = memo(function BashToolBlock({
   if (!cmd.trim()) return null;
 
   return (
-    <div
+    <Collapsible
+      open={expanded}
+      onOpenChange={setExpanded}
       className={`rounded-2xl overflow-hidden transition-colors ${
-        isError ? "bg-destructive/5" : isRunning ? "bg-primary/5" : "bg-background/40"
+        isError
+          ? "bg-destructive/5"
+          : isRunning
+            ? "bg-primary/5"
+            : "bg-background/40"
       }`}
     >
       {/* Collapsed header */}
-      <Button variant="ghost"
-        onClick={() => {
-          setExpanded(!expanded);
-        }}
-        aria-expanded={expanded}
-        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
-      >
-        {/* Status icon */}
-        <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
-          {isRunning ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : isError ? (
-            <XCircle className="w-3.5 h-3.5" />
-          ) : (
-            <CheckCircle2 className="w-3.5 h-3.5" />
-          )}
-        </div>
-
-        {/* Tool icon */}
-        {showIcon ? (
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
+        >
+          {/* Status icon */}
           <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
-            {getToolIcon(block.name)}
+            {isRunning ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : isError ? (
+              <XCircle className="w-3.5 h-3.5" />
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            )}
           </div>
-        ) : null}
 
-        {/* Label: $ command · exit N */}
-        <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-          <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
-            $ {cmd}
-          </span>
-          {isRunning ? (
-            <span className="whitespace-nowrap text-xs text-muted-foreground">
-              · {t("tool.bashRunning")}
-            </span>
+          {/* Tool icon */}
+          {showIcon ? (
+            <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
+              {getToolIcon(block.name)}
+            </div>
           ) : null}
-          <span
-            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
-              expanded
-                ? "opacity-100"
-                : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-            }`}
-          >
-            {expanded ? (
-              <ChevronDown className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5" />
-            )}
-          </span>
-        </div>
-      </Button>
 
-      {/* Expanded content — streaming during execution, terminal after */}
-      {expanded &&
-        isRunning &&
-        partialToolResult &&
-        partialToolResult.content && (
-          <div className="animate-fade-in px-3 py-2">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center gap-1.5">
-              <Loader2 className="w-3 h-3 animate-spin text-primary-text" />
-              {t("tool.sectionStreaming")}
-            </div>
-            <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted">
-              {partialToolResult.content}
-            </pre>
-          </div>
-        )}
-
-      {expanded && !isRunning && (
-        <div className="animate-fade-in mx-3 mb-3 rounded-lg overflow-hidden border border-muted">
-          {/* Command + output */}
-          <div
-            className="px-3 py-2 font-mono text-xs leading-snug"
-            style={{ backgroundColor: "var(--terminal-bg)" }}
-          >
-            {/* Shell + duration meta line (no macOS traffic lights) */}
-            <div
-              className="mb-2 flex items-center gap-2 border-b pb-2 text-[11px]"
-              style={{
-                color: "var(--terminal-titlebar-text)",
-                borderColor: "var(--terminal-divider)",
-              }}
-            >
-              <span className="font-medium">bash</span>
-              {durationText && <span className="ml-auto">{durationText}</span>}
-            </div>
-
-            {/* Command line: $ cmd (green for success, red for error) */}
-            <div
-              className="mb-1.5"
-              style={{
-                color: isError
-                  ? "var(--terminal-error)"
-                  : "var(--terminal-success)",
-              }}
-            >
+          {/* Label: $ command · exit N */}
+          <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
+            <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
               $ {cmd}
-            </div>
-
-            {/* Output with ANSI coloring (fg applied by ansi-to-html converter) */}
-            {outputHtml ? (
-              <div
-                className="whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto"
-                dangerouslySetInnerHTML={{ __html: outputHtml }}
-              />
-            ) : (
-              <div
-                className="italic"
-                style={{ color: "var(--terminal-dim)" }}
-              >
-                {t("tool.bashNoOutput")}
-              </div>
-            )}
+            </span>
+            {isRunning ? (
+              <span className="whitespace-nowrap text-xs text-muted-foreground">
+                · {t("tool.bashRunning")}
+              </span>
+            ) : null}
+            <span
+              className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
+                expanded
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+              }`}
+            >
+              {expanded ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              )}
+            </span>
           </div>
-        </div>
+        </Button>
+      </CollapsibleTrigger>
+
+      {expanded && (
+        <CollapsibleContent>
+          {/* Expanded content — streaming during execution, terminal after */}
+          {isRunning && partialToolResult && partialToolResult.content && (
+            <div className="animate-fade-in px-3 py-2">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center gap-1.5">
+                <Loader2 className="w-3 h-3 animate-spin text-primary-text" />
+                {t("tool.sectionStreaming")}
+              </div>
+              <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted">
+                {partialToolResult.content}
+              </pre>
+            </div>
+          )}
+
+          {!isRunning && (
+            <div className="animate-fade-in mx-3 mb-3 rounded-lg overflow-hidden border border-muted">
+              {/* Command + output */}
+              <div
+                className="px-3 py-2 font-mono text-xs leading-snug"
+                style={{ backgroundColor: "var(--terminal-bg)" }}
+              >
+                {/* Shell + duration meta line (no macOS traffic lights) */}
+                <div
+                  className="mb-2 flex items-center gap-2 border-b pb-2 text-[11px]"
+                  style={{
+                    color: "var(--terminal-titlebar-text)",
+                    borderColor: "var(--terminal-divider)",
+                  }}
+                >
+                  <span className="font-medium">bash</span>
+                  {durationText && (
+                    <span className="ml-auto">{durationText}</span>
+                  )}
+                </div>
+
+                {/* Command line: $ cmd (green for success, red for error) */}
+                <div
+                  className="mb-1.5"
+                  style={{
+                    color: isError
+                      ? "var(--terminal-error)"
+                      : "var(--terminal-success)",
+                  }}
+                >
+                  $ {cmd}
+                </div>
+
+                {/* Output with ANSI coloring (fg applied by ansi-to-html converter) */}
+                {outputHtml ? (
+                  <div
+                    className="whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto"
+                    dangerouslySetInnerHTML={{ __html: outputHtml }}
+                  />
+                ) : (
+                  <div
+                    className="italic"
+                    style={{ color: "var(--terminal-dim)" }}
+                  >
+                    {t("tool.bashNoOutput")}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CollapsibleContent>
       )}
-    </div>
+    </Collapsible>
   );
 });

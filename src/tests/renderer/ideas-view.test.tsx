@@ -52,6 +52,47 @@ function buttonByLabel(label: string): HTMLButtonElement {
   return el as HTMLButtonElement;
 }
 
+/** 菜单内容经 Radix Portal 挂到 document.body —— 不在本文件的 container 里。 */
+function menu(): Element | null {
+  return document.body.querySelector('[role="menu"]');
+}
+
+function menuItemByText(text: string): HTMLElement {
+  const el = [...document.body.querySelectorAll('[role="menuitem"]')].find(
+    (item) => item.textContent?.trim() === text,
+  );
+  expect(el, `菜单项「${text}」必须存在`).toBeTruthy();
+  return el as HTMLElement;
+}
+
+/** Radix 的菜单触发器只认左键 pointerdown（无 ctrl）—— 旧的 onClick toggle 已删。 */
+async function pointerDown(el: HTMLElement): Promise<void> {
+  await act(async () => {
+    el.dispatchEvent(
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        ctrlKey: false,
+      }),
+    );
+  });
+}
+
+async function keyDown(el: Element, key: string): Promise<void> {
+  await act(async () => {
+    el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  });
+}
+
+/** Radix 的焦点移动/回焦都在 setTimeout(0) 里 —— 断言前得把这批任务跑完。 */
+async function flush(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 async function render(): Promise<void> {
   await act(async () => {
     root.render(<IdeasView />);
@@ -101,6 +142,16 @@ describe("灵感视图", () => {
     expect(container.textContent).not.toContain("ideas.archivedGroup");
   });
 
+  it("「显示已归档」走官方 Toggle：带 data-state，皮肤不手写", async () => {
+    await render();
+    const toggle = buttonByText("ideas.showArchived");
+    // Radix Toggle 的标记；手写 aria-pressed + 条件类不会有 data-state
+    expect(toggle.getAttribute("data-state")).not.toBeNull();
+    expect(toggle.className, "皮肤来自 ui/toggle.tsx").not.toContain(
+      "bg-accent text-foreground",
+    );
+  });
+
   it("开关打开后归档项附在末尾，并带一个组标题", async () => {
     await render();
     act(() => buttonByText("ideas.showArchived").click());
@@ -135,8 +186,8 @@ describe("灵感视图", () => {
 
   it("详情头部：交给 AI 的两项都只是把正文填进输入框", async () => {
     await render();
-    act(() => buttonByText("ideas.handOff").click());
-    act(() => buttonByText("ideas.handOffCurrent").click());
+    await pointerDown(buttonByText("ideas.handOff"));
+    await act(async () => menuItemByText("ideas.handOffCurrent").click());
     expect(useAppStore.getState().pendingEditorAppend).toBe("正文一");
     expect(useAppStore.getState().activeView).toBe("chat");
   });
@@ -144,30 +195,39 @@ describe("灵感视图", () => {
   it("新会话处理：清掉当前会话再填输入框", async () => {
     useAppStore.setState({ activeSessionId: "s1" });
     await render();
-    act(() => buttonByText("ideas.handOff").click());
-    act(() => buttonByText("ideas.handOffNew").click());
+    await pointerDown(buttonByText("ideas.handOff"));
+    await act(async () => menuItemByText("ideas.handOffNew").click());
     expect(useAppStore.getState().activeSessionId).toBeNull();
     expect(useAppStore.getState().pendingEditorAppend).toBe("正文一");
   });
 
   it("⋯ 菜单：归档项走确认框才删", async () => {
     await render();
-    act(() => buttonByLabel("ideas.moreActions").click());
-    act(() => buttonByText("ideas.remove").click());
+    await pointerDown(buttonByLabel("ideas.moreActions"));
+    await act(async () => menuItemByText("ideas.remove").click());
     expect(remove).not.toHaveBeenCalled();
 
     const confirm = document.body.querySelector('[role="alertdialog"]');
     expect(confirm).toBeTruthy();
     await act(async () => buttonByText("common.delete", confirm!).click());
     expect(remove).toHaveBeenCalledWith("a");
+    // 关闭确认后焦点回到 ⋯ 触发器，而不是已卸载的菜单项。
+    // 两跳：本视图的显式回焦排在 Radix 确认框自己的退场回焦之后。
+    await flush();
+    expect(document.activeElement).toBe(buttonByLabel("ideas.moreActions"));
   });
 
   it("⋯ 里的刷新在加载中禁用（v1 的 ideasLoading 不再是孤儿）", async () => {
     await render();
     // 渲染完成之后再置「加载中」：否则挂载那次 loadIdeas 会把它写回 false。
     act(() => useAppStore.setState({ ideasLoading: true }));
-    act(() => buttonByLabel("ideas.moreActions").click());
-    expect(buttonByText("ideas.refresh").disabled).toBe(true);
+    await pointerDown(buttonByLabel("ideas.moreActions"));
+    // Radix 的菜单项是 div（不是 button）—— 禁用态是 data/aria，不是 `disabled` 属性
+    expect(
+      document
+        .querySelector('[data-testid="ideas-refresh"]')
+        ?.getAttribute("aria-disabled"),
+    ).toBe("true");
   });
 
   it("来源还在 → 显示会话标题，点它切回那次会话", async () => {
@@ -273,5 +333,97 @@ describe("灵感视图", () => {
   it("打开视图时重拉列表", async () => {
     await render();
     expect(list).toHaveBeenCalled();
+  });
+
+  it("⋯ 菜单：键盘只派发 ArrowDown 就能打开，ArrowDown/Enter 让动作恰好执行一次", async () => {
+    await render();
+    const trigger = buttonByLabel("ideas.moreActions");
+    // 键盘入口：只派发 ArrowDown，**不**派发 pointerdown
+    await act(async () => {
+      trigger.focus();
+      trigger.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
+    });
+    await flush();
+    expect(menu()).not.toBeNull();
+    // 打开即聚焦首项（刷新）
+    expect(document.activeElement?.textContent?.trim()).toBe("ideas.refresh");
+    // ArrowDown 移到第二项（归档），Enter 执行它 —— 恰好一次
+    await keyDown(document.activeElement as Element, "ArrowDown");
+    await flush();
+    expect(document.activeElement?.textContent?.trim()).toBe("ideas.archive");
+    await keyDown(document.activeElement as Element, "Enter");
+    await act(async () => {});
+    expect(setStatus).toHaveBeenCalledTimes(1);
+    expect(setStatus).toHaveBeenCalledWith("a", "archived");
+  });
+
+  it("⋯ 菜单：Escape 关闭并把焦点还给触发器", async () => {
+    await render();
+    const trigger = buttonByLabel("ideas.moreActions");
+    await pointerDown(trigger);
+    expect(menu()).not.toBeNull();
+    await act(async () => {
+      (document.activeElement ?? document.body).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    await flush();
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("⋯ 菜单：左键 pointerdown 开、再 pointerdown 关，pointerdown→pointerup→click 不重复 toggle", async () => {
+    await render();
+    const trigger = buttonByLabel("ideas.moreActions");
+    await pointerDown(trigger);
+    expect(menu()).not.toBeNull();
+    // 一次真实点击的后继事件仍落在 trigger 上：click 上不再挂 toggle
+    await act(async () => {
+      trigger.dispatchEvent(
+        new MouseEvent("pointerup", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        }),
+      );
+      trigger.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }),
+      );
+    });
+    expect(menu()).not.toBeNull();
+    await pointerDown(trigger);
+    expect(menu()).toBeNull();
+  });
+
+  it("⋯ 菜单：切换选中灵感后，动作作用在新目标上", async () => {
+    await render();
+    const second = [...container.querySelectorAll('[role="option"]')].find(
+      (option) => option.textContent?.includes("第二条"),
+    );
+    expect(second, "列表里的第二条必须存在").toBeTruthy();
+    act(() => (second as HTMLElement).click());
+    await act(async () => {});
+    await pointerDown(buttonByLabel("ideas.moreActions"));
+    await act(async () => menuItemByText("ideas.archive").click());
+    await act(async () => {});
+    expect(setStatus).toHaveBeenCalledWith("b", "archived");
+  });
+
+  it("⋯ 菜单：已归档项显示「恢复」并调 setStatus(inbox)", async () => {
+    await render();
+    act(() => buttonByText("ideas.showArchived").click());
+    await act(async () => {});
+    const archived = [...container.querySelectorAll('[role="option"]')].find(
+      (option) => option.textContent?.includes("已归档的"),
+    );
+    expect(archived, "归档组里的那条必须可见").toBeTruthy();
+    act(() => (archived as HTMLElement).click());
+    await act(async () => {});
+    await pointerDown(buttonByLabel("ideas.moreActions"));
+    await act(async () => menuItemByText("ideas.restore").click());
+    await act(async () => {});
+    expect(setStatus).toHaveBeenCalledWith("c", "inbox");
   });
 });

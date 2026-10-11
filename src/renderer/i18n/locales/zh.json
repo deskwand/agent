@@ -109,7 +109,8 @@
         "notInstalled": "未安装",
         "failed": "下载失败",
         "delete": "删除",
-        "retry": "重试"
+        "retry": "重试",
+        "progressLabel": "下载进度"
       },
       "voice": {
         "title": "语音输入",
@@ -1386,6 +1387,7 @@
     "today": "今天",
     "create": "创建",
     "viewDay": "日",
+    "viewLabel": "日历视图",
     "viewWeek": "周",
     "viewMonth": "月",
     "toolbarPrev": "上一个",
@@ -1975,7 +1977,8 @@
     "marketRepository": "仓库",
     "marketHomepage": "主页",
     "marketActionFailed": "操作失败",
-    "marketDetailFailed": "无法加载插件详情"
+    "marketDetailFailed": "无法加载插件详情",
+    "viewSwitcher": "插件视图"
   },
   "vault": {
     "title": "密库",

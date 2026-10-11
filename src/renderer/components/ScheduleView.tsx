@@ -5,7 +5,7 @@
  * and a modal for create/edit. Falls back gracefully when electronAPI is absent.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
@@ -19,6 +19,7 @@ export function ScheduleView() {
   const { t } = useTranslation();
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
   const workingDir = useAppStore((s) => s.workingDir) || "";
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // ------- View state -------
   const [view, setView] = useState<CalendarView>("week");
@@ -102,10 +103,15 @@ export function ScheduleView() {
   }, []);
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-background">
+    <div
+      ref={rootRef}
+      tabIndex={-1}
+      className="flex-1 min-h-0 flex flex-col overflow-hidden bg-background"
+    >
       {/* Header */}
       <div className="bg-background/90 border-b border-border/40 px-5 py-4 lg:px-8">
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           onClick={() => setShowSchedule(false)}
           className="mb-1 p-1 -ml-1 rounded-lg hover:bg-accent transition-colors inline-flex h-auto"
         >
@@ -153,6 +159,7 @@ export function ScheduleView() {
           prefillTime={prefillTime}
           onClose={handleCloseModal}
           onSaved={handleSaved}
+          onRestoreFocus={() => rootRef.current?.focus({ preventScroll: true })}
         />
       )}
     </div>

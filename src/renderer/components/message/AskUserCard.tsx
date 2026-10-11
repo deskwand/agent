@@ -4,7 +4,7 @@
 // 无 result 且非 pending → interrupted（会话重启/历史重放）。
 // 视觉遵循已确认 mockup：左侧状态色竖条（pending 靛蓝语义 Token bg-primary、
 // answered/cancelled 灰）、header 彩色胶囊、题间虚线分隔、底部按钮区。
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { HelpCircle } from "lucide-react";
 import { ASK_USER_SKIPPED } from "../../../shared/ask-user";
@@ -19,6 +19,7 @@ import {
 } from "../../utils/voice/voice-owner";
 import { AskUserVoiceField } from "./AskUserVoiceField";
 import { Button } from "../app-button";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 
 interface AskUserCardProps {
   block: ToolUseContent;
@@ -36,6 +37,11 @@ export const OPTION_BASE =
   "w-full rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-default h-auto flex-col items-stretch gap-0 whitespace-normal";
 export const OPTION_IDLE = "border-border/40 bg-muted hover:bg-accent";
 export const OPTION_SELECTED = "border-primary bg-primary/10";
+// 选择控件的选项行（choice 的 RadioGroupItem、multiSelect 的原生 checkbox 共用）：
+// 外层是 <label>，点文案/描述与点控件等价；箭头和勾选框自己带 role="radio" / type="checkbox"。
+// 选项盒子沿用同一套 Token（OPTION_IDLE / OPTION_SELECTED），不新增硬编码色值。
+export const OPTION_ROW =
+  "flex w-full items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors";
 
 export function AskUserCard({
   block,
@@ -95,6 +101,8 @@ export function AskUserCard({
     isAskUserRecording(s.voiceInputOwner, block.id),
   );
   const voiceOwnerPrefix = askUserVoiceOwnerPrefix(block.id);
+  // 选项行 id 前缀：RadioGroupItem 与 <label htmlFor> 成对生成，点文案即选中。
+  const optionRowId = useId();
 
   if (questions.length === 0) return null;
 
@@ -116,15 +124,24 @@ export function AskUserCard({
         ? t("tool.askUser.questionsCount", { count: questions.length })
         : t("tool.askUser.interrupted");
 
+  /**
+   * 勾选的选项按**选项顺序**（不是点选顺序）排列：提交值稳定、与渲染次序一致，
+   * 回看答案和测试都不受用户点击先后影响。「其他…」的文本仍接在末尾。
+   */
+  function orderedMulti(index: number, question: AskUserQuestion): string[] {
+    const picked = multi[index] ?? [];
+    const ordered = (question.options ?? [])
+      .map((option) => option.label)
+      .filter((label) => picked.includes(label));
+    const other = otherText[index]?.trim();
+    if (other) ordered.push(other);
+    return ordered;
+  }
+
   function questionValue(index: number, question: AskUserQuestion): string {
     const type = question.type ?? "choice";
     if (type === "yesno") return choice[index] ?? "";
-    if (type === "multiSelect") {
-      const picked = [...(multi[index] ?? [])];
-      const other = otherText[index]?.trim();
-      if (other) picked.push(other);
-      return picked.join(", ");
-    }
+    if (type === "multiSelect") return orderedMulti(index, question).join(", ");
     if (type === "text") return textInput[index]?.trim() ?? "";
     const other = otherOpen[index] ? otherText[index]?.trim() : undefined;
     return other || choice[index] || "";
@@ -135,10 +152,7 @@ export function AskUserCard({
     questions.forEach((q, i) => {
       const type = q.type ?? "choice";
       if (type === "multiSelect") {
-        const picked = [...(multi[i] ?? [])];
-        const other = otherText[i]?.trim();
-        if (other) picked.push(other);
-        out[String(i)] = picked;
+        out[String(i)] = orderedMulti(i, q);
       } else {
         out[String(i)] = questionValue(i, q) || ASK_USER_SKIPPED;
       }
@@ -186,7 +200,8 @@ export function AskUserCard({
   function renderOther(index: number) {
     return (
       <>
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           disabled={!interactive}
           aria-pressed={Boolean(otherOpen[index])}
@@ -219,6 +234,10 @@ export function AskUserCard({
   function renderControls(index: number, question: AskUserQuestion) {
     const type = question.type ?? "choice";
     const options = question.options ?? [];
+    // 锁定/只读那一帧：控件自带 disabled，行本身也要看不出可点。
+    // 可点态**不加手型光标** —— 原生行不换光标（native-cursor-guard 口径），
+    // 悬停反馈由背景色承担。
+    const rowState = interactive ? "" : "cursor-default opacity-50";
     if (type === "text") {
       return (
         <AskUserVoiceField
@@ -238,7 +257,8 @@ export function AskUserCard({
       return (
         <div className="flex gap-2">
           {(["Yes", "No"] as const).map((value) => (
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               key={value}
               type="button"
               disabled={!interactive}
@@ -255,60 +275,89 @@ export function AskUserCard({
       );
     }
     if (type === "multiSelect") {
+      // 原生 checkbox：官方 `ui/checkbox.tsx` 由另一任务提供，本轮不越界新建。
+      // 提交值仍由 buildAnswers 产出 string[]（顺序 = 选项顺序，见 orderedMulti）。
       return (
         <div className="space-y-1.5">
           {options.map((option) => {
             const selected = (multi[index] ?? []).includes(option.label);
             return (
-              <Button variant="ghost"
+              <label
                 key={option.label}
-                type="button"
-                role="checkbox"
-                aria-checked={selected}
-                disabled={!interactive}
-                onClick={() => toggleMulti(index, option.label)}
-                className={`${OPTION_BASE} ${selected ? OPTION_SELECTED : OPTION_IDLE}`}
+                className={`${OPTION_ROW} ${rowState} ${
+                  selected ? OPTION_SELECTED : OPTION_IDLE
+                }`}
               >
-                <span className="text-sm text-foreground">
-                  {option.label}
-                </span>
-                {option.description && (
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    {option.description}
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  disabled={!interactive}
+                  onChange={() => toggleMulti(index, option.label)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm text-foreground">
+                    {option.label}
                   </span>
-                )}
-              </Button>
+                  {option.description && (
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {option.description}
+                    </span>
+                  )}
+                </span>
+              </label>
             );
           })}
           {renderOther(index)}
         </div>
       );
     }
+    // choice：单选交给 RadioGroup（radiogroup 的可访问名 = 题面，方向键移动并选中）。
+    // 不传 orientation —— 见 ui/radio-group.tsx 顶部注释（vertical 会吃掉 ArrowRight）。
+    // 「其他…」留在组外：radiogroup 只应拥有 radio，把按钮和输入框塞进组里
+    // 既破坏这条 ARIA 契约，也会被辅助技术当成组内容读。
     return (
       <div className="space-y-1.5">
-        {options.map((option) => (
-          <Button variant="ghost"
-            key={option.label}
-            type="button"
-            role="radio"
-            aria-checked={choice[index] === option.label}
-            disabled={!interactive}
-            onClick={() => {
-              setChoice((prev) => ({ ...prev, [index]: option.label }));
-              setOtherOpen((prev) => ({ ...prev, [index]: false }));
-            }}
-            className={`${OPTION_BASE} ${
-              choice[index] === option.label ? OPTION_SELECTED : OPTION_IDLE
-            }`}
-          >
-            <span className="text-sm text-foreground">{option.label}</span>
-            {option.description && (
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                {option.description}
-              </span>
-            )}
-          </Button>
-        ))}
+        <RadioGroup
+          value={choice[index] ?? ""}
+          aria-label={question.question}
+          disabled={!interactive}
+          onValueChange={(value) => {
+            setChoice((prev) => ({ ...prev, [index]: value }));
+            setOtherOpen((prev) => ({ ...prev, [index]: false }));
+          }}
+          className="gap-1.5"
+        >
+          {options.map((option, optionIndex) => {
+            const selected = choice[index] === option.label;
+            const radioId = `${optionRowId}-${index}-${optionIndex}`;
+            return (
+              <label
+                key={option.label}
+                htmlFor={radioId}
+                className={`${OPTION_ROW} ${rowState} ${
+                  selected ? OPTION_SELECTED : OPTION_IDLE
+                }`}
+              >
+                <RadioGroupItem
+                  id={radioId}
+                  value={option.label}
+                  className="mt-0.5"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm text-foreground">
+                    {option.label}
+                  </span>
+                  {option.description && (
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {option.description}
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
+        </RadioGroup>
         {renderOther(index)}
       </div>
     );
@@ -405,7 +454,8 @@ export function AskUserCard({
           {/* 底部按钮区：仅 pending 态 */}
           {isPending && (
             <div className="flex items-center justify-end gap-2 border-t border-border/40 px-4 py-2.5">
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 disabled={!interactive}
                 onClick={onSkip}
@@ -413,7 +463,8 @@ export function AskUserCard({
               >
                 {t("tool.askUser.skip")}
               </Button>
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 disabled={!canSubmit}
                 onClick={onSubmit}

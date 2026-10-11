@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import type { ServerEvent } from "../../types";
 import { SettingsCard, SettingsRow, SettingsSection } from "./shared";
+import { AppProgress } from "../app-progress";
 import appIconUrl from "../../../../resources/icon.png";
 import { Button } from "../app-button";
 
@@ -26,6 +27,8 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [updateProgress, setUpdateProgress] = useState(0);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  /** 进度条的无障碍名指向品牌头里那条可见的「下载中 n%」文案。 */
+  const downloadStatusId = useId();
 
   const handleServerEvent = useCallback((event: ServerEvent) => {
     switch (event.type) {
@@ -93,7 +96,10 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
         );
       case "downloading":
         return (
-          <span className="inline-flex items-center gap-1 text-xs text-primary-text">
+          <span
+            id={downloadStatusId}
+            className="inline-flex items-center gap-1 text-xs text-primary-text"
+          >
             <Download className="w-3 h-3 animate-pulse" />
             {t("about.downloading", { percent: updateProgress })}
           </span>
@@ -142,7 +148,8 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
 
           <div className="flex flex-none items-center gap-2">
             {updateStatus === "idle" && (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 onClick={handleCheckUpdate}
                 className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-lg
                   bg-card text-muted-foreground hover:bg-accent
@@ -155,7 +162,8 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
             )}
 
             {(updateStatus === "up-to-date" || updateStatus === "error") && (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 onClick={handleCheckUpdate}
                 className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-lg
                   bg-card text-muted-foreground hover:bg-accent
@@ -168,7 +176,8 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
             )}
 
             {updateStatus === "downloaded" && (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 onClick={handleRestart}
                 className="inline-flex items-center gap-2 text-xs px-5 py-2 rounded-lg
                   bg-primary text-primary-foreground hover:bg-primary/90
@@ -182,18 +191,12 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
 
         {/* 状态详情槽：进度条与错误详情互斥，共用同一位置 */}
         {updateStatus === "downloading" && (
-          <div
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={updateProgress}
-            className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted"
-          >
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-300"
-              style={{ width: `${updateProgress}%` }}
-            />
-          </div>
+          <AppProgress
+            value={updateProgress}
+            max={100}
+            aria-labelledby={downloadStatusId}
+            className="mt-3 h-1 bg-muted [&>div]:rounded-full [&>div]:duration-300"
+          />
         )}
 
         {updateStatus === "error" && updateError && (
@@ -223,7 +226,8 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
           不插分隔符 —— 4 个装饰字符不值一个 Fragment 导入 + index 条件。 */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {ABOUT_LINKS.map((link) => (
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             key={link.labelKey}
             type="button"
             onClick={() => void window.electronAPI?.openExternal(link.url)}

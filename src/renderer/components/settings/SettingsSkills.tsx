@@ -208,6 +208,9 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const categoriesCache = useRef<CategoriesCacheEntry | null>(
     loadCategoriesCache(),
   );
+  // 弹窗关闭后的回焦兜底目标：本视图根容器（见 SkillMdModal 的 onRestoreFocus）。
+  // tabIndex={-1} 让它可以被 .focus() 但不进入 Tab 顺序。
+  const rootRef = useRef<HTMLDivElement>(null);
 
   function toggleViewMode(mode: "cards" | "list") {
     setViewMode(mode);
@@ -1049,7 +1052,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   /* ─── render ─── */
 
   return (
-    <div className="space-y-4">
+    <div ref={rootRef} tabIndex={-1} className="space-y-4">
       {successMessage && (
         <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-success/10 text-success text-sm">
           <CheckCircle2 className="w-4 h-4" />
@@ -1073,7 +1076,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 flex-wrap">
           {filterChips.map((f) => (
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               key={f.key}
               onClick={() => setFilterKey(f.key)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -1099,7 +1103,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                 分隔由外层 div 的 overflow-hidden / border 继续负责。 */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   onClick={() => toggleViewMode("cards")}
                   aria-label={t("skillMarket.cardView")}
                   className={`p-1.5 transition-colors ${
@@ -1119,7 +1124,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   onClick={() => toggleViewMode("list")}
                   aria-label={t("skillMarket.listView")}
                   className={`p-1.5 transition-colors ${
@@ -1169,7 +1175,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
               <div className="flex items-center justify-end mb-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost"
+                    <Button
+                      variant="ghost"
                       onClick={handleRefreshMarketplace}
                       disabled={marketplaceLoading}
                       className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
@@ -1258,7 +1265,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                   </div>
                   {marketplaceSkills.length < marketplaceTotal && (
                     <div className="text-center mt-4">
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         onClick={loadMoreMarketplace}
                         disabled={marketplaceLoading}
                         className="px-4 py-2 rounded-lg bg-muted text-sm text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50 h-auto"
@@ -1284,7 +1292,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             <p className="text-sm text-muted-foreground mb-4">
               {t("skillMarket.loginPrompt")}
             </p>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               onClick={() => useAppStore.getState().setShowLoginModal(true)}
               className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors h-auto"
             >
@@ -1377,7 +1386,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                               </span>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost"
+                                  <Button
+                                    variant="ghost"
                                     onClick={() => handleUnshare(skill.name)}
                                     aria-label={t("skillMarket.unshare")}
                                     className="p-0.5 rounded hover:bg-accent hover:text-destructive transition-colors h-auto"
@@ -1391,7 +1401,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                               </Tooltip>
                             </span>
                           )}
-                        <Button variant="ghost"
+                        <Button
+                          variant="ghost"
                           onClick={() => handleDeleteCloud(skill.name)}
                           className="flex items-center gap-1 px-1 py-0.5 rounded text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors h-auto"
                           title={t("skillMarket.deleteCloud")}
@@ -1500,6 +1511,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         content={mdModal?.content ?? null}
         loading={detailLoading}
         onClose={() => setMdModal(null)}
+        onRestoreFocus={() => rootRef.current?.focus({ preventScroll: true })}
       />
     </div>
   );

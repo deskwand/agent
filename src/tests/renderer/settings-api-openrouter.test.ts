@@ -247,8 +247,9 @@ describe("SettingsAPI OpenRouter login flow", () => {
     });
     await flush();
 
+    // OAuth 断开已改用 shadcn AlertDialog：确认按钮经 portal 挂到 body。
     const confirmButtons = Array.from(
-      container.querySelectorAll("button"),
+      document.body.querySelectorAll("button"),
     ).filter((element) => element.textContent?.includes("Disconnect"));
     const confirmButton = confirmButtons[confirmButtons.length - 1] || null;
     expect(confirmButton).toBeTruthy();
