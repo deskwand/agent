@@ -69,11 +69,21 @@ export function ConfirmDialog({
         if (!next) onCancel();
       }}
     >
-      <AlertDialogContent>
+      {/* 框宽也回到迁移前的紧凑档：vendored 默认是 max-w-lg（512px），
+          而确认框通常只有一句话。 */}
+      <AlertDialogContent className="max-w-sm">
         <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          {/* 描述是可选的：不传时不渲染任何节点（既有的 11 个调用点就是这种，
-              所以它们的外观与扩展前逐字节相同）。传了就用它补充上下文 ——
+          {/* 字号用正文档（text-sm / 14px），不能用 vendored 的默认
+              `text-lg font-semibold`（18px）：迁移前这条文案就是 `text-sm`，
+              确认框问的是一句话，不是区块标题。刻意与同档小弹窗对齐
+              （AddServerDialog / KeyDialog / MailAccountDialog 都是
+              `DialogTitle text-sm font-medium`）。改之前先看
+              tests/renderer/confirm-dialog.test.tsx 里钉尺寸的那条。 */}
+          <AlertDialogTitle className="text-sm font-medium">
+            {title}
+          </AlertDialogTitle>
+          {/* 描述是可选的：不传时不渲染任何额外节点（大多数调用点就是这种）。
+              传了就用它补充上下文 ——
               但**不要**用它复述标题文案，那会让读屏经 aria-labelledby 与
               aria-describedby 把同一句话念两遍。 */}
           {description ? (
@@ -83,7 +93,9 @@ export function ConfirmDialog({
               // 为抹平它去加一个 descriptionClassName prop 是没必要的 API 面积 ——
               // D2 已授权「以 shadcn 默认观感为准」，差异记在 ledger 里。
               // 只有**语气**必须保留，因为那承载语义（告警 vs 说明）。
-              className={descriptionTone === "error" ? "text-destructive" : undefined}
+              className={
+                descriptionTone === "error" ? "text-destructive" : undefined
+              }
             >
               {description}
             </AlertDialogDescription>

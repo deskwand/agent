@@ -203,4 +203,27 @@ describe("ConfirmDialog", () => {
 
     expect(danger).not.toBe(primary);
   });
+
+  it("keeps the compact confirm scale (body-size title, max-w-sm box)", async () => {
+    // 用户实测反馈：确认框被 vendored 默认值顶成了「18px 粗标题 + 512px 宽框」，
+    // 而迁移前它是 `text-sm` 的字和 `max-w-sm` 的框。迁移计划 Task 6 的口径是
+    // 「内部内容与 i18n key 一个字不改，shadcn 只接管外壳」—— 尺寸属于内容。
+    //
+    // 这里**必须**断言类名（与上面 tone 那条「不断言类名」相反）：尺寸正是本次
+    // 要钉住的东西；vendored 组件升级把 `text-sm` / `max-w-sm` 换掉时，我们要知道。
+    await render(
+      <ConfirmDialog
+        isOpen
+        title="删除这个项目？"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+    const dialog = document.body.querySelector('[role="alertdialog"]');
+    const title = dialog?.querySelector("h2");
+    expect(title?.className).toContain("text-sm");
+    expect(title?.className).not.toContain("text-lg");
+    expect(dialog?.className).toContain("max-w-sm");
+    expect(dialog?.className).not.toContain("max-w-lg");
+  });
 });
