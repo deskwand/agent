@@ -7,7 +7,7 @@ const welcomeViewPath = path.resolve(process.cwd(), 'src/renderer/components/Wel
 describe('WelcomeView Agent-style layout', () => {
   it('uses a narrower editorial landing column with DeskWand eyebrow', () => {
     const source = fs.readFileSync(welcomeViewPath, 'utf8');
-    expect(source).toContain('max-w-[840px]');
+    expect(source).toContain('max-w-[52.5rem]');
     expect(source).toContain('t("welcome.title")');
   });
 

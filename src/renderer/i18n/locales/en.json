@@ -28,6 +28,13 @@
   "welcome": {
     "title": "How can I help you today?",
     "titleWithProject": "How can I help you today in project \"{{projectName}}\"?",
+    "projectMenu": {
+      "title": "Switch project",
+      "triggerLabel": "Switch project, current: {{name}}",
+      "defaultWorkspace": "Default workspace",
+      "empty": "No projects yet — create or open one in the sidebar",
+      "switchFailed": "Could not switch project. Please try again."
+    },
     "placeholder": "Describe what you'd like to do, press / for shortcuts...",
     "quick": {
       "brainstorm": "Add a feature",

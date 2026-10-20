@@ -44,6 +44,8 @@ import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { usePushToTalk } from "../hooks/usePushToTalk";
 import { ConnectCards } from "./welcome/connect-cards";
 import { CapabilityIntro } from "./welcome/CapabilityIntro";
+import { ProjectMenuChip } from "./welcome/ProjectMenuChip";
+import { listWorkspaceProjects } from "../utils/sidebar-session-groups";
 import { connectionNoticeValues } from "./welcome/connection-notice";
 import {
   connectCodingSubscription,
@@ -70,13 +72,15 @@ export function WelcomeView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
-  const { startSession } = useIPC();
+  const { startSession, invoke, isElectron } = useIPC();
   // 浮层开关放 store：欢迎页的第一句语音会创建会话，随后应用切到聊天视图，
   // 状态留着，浮层就能跟着过去接着用，而不是随本视图卸载而关掉。
   const voiceModeOpen = useAppStore((state) => state.voiceModeOpen);
   const ideaCaptureOpen = useAppStore((state) => state.ideaCaptureOpen);
   const isConfigured = useAppStore((state) => state.isConfigured);
   const workingDir = useAppStore((state) => state.workingDir);
+  const sessions = useAppStore((state) => state.sessions);
+  const setWorkingDir = useAppStore((state) => state.setWorkingDir);
   const setShowSettings = useAppStore((state) => state.setShowSettings);
   const setSettingsTab = useAppStore((state) => state.setSettingsTab);
   const setShowLoginModal = useAppStore((state) => state.setShowLoginModal);
@@ -138,6 +142,54 @@ export function WelcomeView() {
   })();
   const showProjectTitle =
     !!projectName && projectName !== DEFAULT_WORKDIR_DIRNAME;
+
+  // 项目列表与会话记录同源（灵感页「交给 AI」用的是同一个函数）。
+  // sessions 还没加载完时它是空数组 —— 所以 chip 的显示名绝不能取自它，只能取自 workingDir。
+  const projects = useMemo(() => listWorkspaceProjects(sessions), [sessions]);
+
+  /**
+   * 切换新会话的工作目录。形状与 `Sidebar.handleNewSessionInProject` /
+   * `IdeasView.handOffInProject` 逐字一致：`workdir.set` 是唯一的失败早退点
+   *（目录被删 / 路径在当前平台不支持时返回 success:false），成功才落 store。
+   * 不做乐观切换：失败的静默后果是新会话落到错目录。
+   */
+  const handleSelectProject = useCallback(
+    async (cwd: string | null) => {
+      // 默认工作区不需要校验目录，也就不需要 IPC —— 与标题栏「新建会话」后的初始态等价。
+      if (!cwd) {
+        setWorkingDir(null);
+        return;
+      }
+      const showFailureNotice = () =>
+        setGlobalNotice({
+          id: `notice-welcome-project-switch-${Date.now()}`,
+          type: "error",
+          message: t("welcome.projectMenu.switchFailed"),
+          // messageKey 让通知在切语言后仍能跟随（与上面连接成功那条同款）。
+          messageKey: "welcome.projectMenu.switchFailed",
+        });
+      let nextPath = cwd;
+      try {
+        if (isElectron) {
+          const result = await invoke<{
+            success: boolean;
+            path: string;
+            error?: string;
+          }>({ type: "workdir.set", payload: { path: cwd } });
+          if (!result?.success) {
+            showFailureNotice();
+            return;
+          }
+          nextPath = result.path; // 用主进程回传的 path —— 与侧边栏同形
+        }
+      } catch {
+        showFailureNotice();
+        return;
+      }
+      setWorkingDir(nextPath);
+    },
+    [invoke, isElectron, setGlobalNotice, setWorkingDir, t],
+  );
   const chatInputRef = useRef<ChatInputHandle>(null);
   const [attachedKeys, setAttachedKeys] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
@@ -261,7 +313,12 @@ export function WelcomeView() {
   }, [isConfigured, appConfig, setGlobalNotice, t]);
 
   // Model & thinking level — initialised from first available model, same source as ChatView
-  const [initialized, setInitialized] = useState(false);
+  // 按**目录**记初始化，而不是「只跑一次」：欢迎页里切项目不会重挂组件，一次性守卫
+  // 会让芯片留在上一个目录的模型上，而此刻手动选一个又会被写进新项目的记忆档
+  //（onSelectModel 按当前 workingDir 记）—— 两边串味。
+  const [initializedForDir, setInitializedForDir] = useState<string | null>(
+    null,
+  );
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedProviderProfileKey, setSelectedProviderProfileKey] =
     useState<ProviderProfileKey>("openrouter" as ProviderProfileKey);
@@ -325,9 +382,11 @@ export function WelcomeView() {
     }));
   }, [appConfig?.providers, t]);
 
+  const dirKey = workingDir ?? "";
+
   useEffect(() => {
     if (
-      initialized ||
+      initializedForDir === dirKey ||
       modelOptions.length === 0 ||
       modelOptions[0].items.length === 0
     )
@@ -337,10 +396,12 @@ export function WelcomeView() {
     let lastModel = appConfig?.model;
     let lastProvider = appConfig?.activeProviderKey;
     let lastThinkingLevel = appConfig?.thinkingLevel;
-    if (workingDir) {
+    // 读 dirKey 而不是 workingDir：两者同值（null → ""），但写成同一个标识符，
+    // 这个 effect 就只有一处输入了 —— 依赖数组里的 dirKey 是真的覆盖了它读的一切。
+    if (dirKey) {
       try {
         const raw = localStorage.getItem(
-          "deskwand.pm." + encodeURIComponent(workingDir),
+          "deskwand.pm." + encodeURIComponent(dirKey),
         );
         if (raw) {
           const pd = JSON.parse(raw);
@@ -375,9 +436,14 @@ export function WelcomeView() {
       thinkingLevelOptions.includes(lastThinkingLevel as ThinkingLevel)
     ) {
       setSelectedThinkingLevel(lastThinkingLevel as ThinkingLevel);
+    } else {
+      // 脏值 / 缺失一律落到中性档 —— 与上面模型档「回落到第一个可用模型」同一取向：
+      // 换目录后的结果不该取决于你从哪个目录切过来（记忆档由旧版本或手改 localStorage
+      // 写坏时，去掉这个 else 就会把上一个目录的档一路带过来）。
+      setSelectedThinkingLevel("medium");
     }
-    setInitialized(true);
-  }, [modelOptions, initialized, appConfig]);
+    setInitializedForDir(dirKey);
+  }, [modelOptions, initializedForDir, appConfig, dirKey]);
 
   const handleSubmit = async (data: ChatInputSubmitData) => {
     if (isSubmitting) return;
@@ -516,7 +582,19 @@ export function WelcomeView() {
           bottomSlot={
             showConnectCards ? undefined : (
               <ChatInputBottomBar
+                leadingSlot={
+                  <ProjectMenuChip
+                    workingDir={workingDir}
+                    projects={projects}
+                    onSelectProject={(cwd) => void handleSelectProject(cwd)}
+                  />
+                }
                 onAttach={() => chatInputRef.current?.selectFiles()}
+                // 把工作目录一并交给附件菜单：不然选了项目后它的「工作区」入口还是
+                // 置灰的（`attachMenu.disabled.noWorkspace` 只看 cwd），项目级 slash
+                // 命令也取不到 —— 那会让人觉得这枚 chip 是假的。ChatView 传的是
+                // `activeSessionCwd`，这里是同一个语义：本会话将要用哪个目录。
+                cwd={workingDir ?? undefined}
                 onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
                 attachedKeys={attachedKeys}
                 onAttachMenuDismiss={() => chatInputRef.current?.focus()}

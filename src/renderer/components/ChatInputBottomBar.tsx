@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ThinkingLevel, ProviderProfileKey } from "../types";
 import { ArrowUp, Square, Maximize2, Minimize2 } from "lucide-react";
@@ -24,6 +25,8 @@ export interface ContextStatusDetails {
 
 export interface ChatInputBottomBarProps {
   onAttach: () => void;
+  /** 左簇首位（附件按钮之前）的宿主自定义位。缺省 = 不渲染。 */
+  leadingSlot?: ReactNode;
   /** 当前会话工作目录，透传给 AttachMenu */
   cwd?: string;
   /** 选择器选出的附件 */
@@ -71,6 +74,7 @@ export interface ChatInputBottomBarProps {
 
 export function ChatInputBottomBar({
   onAttach,
+  leadingSlot,
   cwd,
   onAddFiles,
   attachedKeys,
@@ -109,7 +113,8 @@ export function ChatInputBottomBar({
 
   return (
     <div className="mt-3 flex items-center justify-between gap-2">
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex min-w-0 items-center gap-0.5">
+        {leadingSlot}
         <AttachMenu
           cwd={cwd}
           onPickLocalFiles={onAttach}
@@ -125,7 +130,8 @@ export function ChatInputBottomBar({
         {onToggleExpand && showExpandButton && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={onToggleExpand}
                 aria-label={expandLabel}
@@ -166,7 +172,8 @@ export function ChatInputBottomBar({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               type={canStop ? "button" : "submit"}
               onClick={canStop ? onStop : undefined}
               disabled={!canStop && (isSubmitting || submitDisabled)}
