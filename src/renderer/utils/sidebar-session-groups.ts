@@ -220,3 +220,29 @@ export function splitSunkSessions(
   }
   return { active, completed };
 }
+
+export interface WorkspaceProject {
+  name: string;
+  cwd: string;
+}
+
+/**
+ * 把会话记录折成「有哪些项目」—— 供灵感页「交给 AI」的项目入口使用。
+ *
+ * 判定与分组共用 `isProjectSession()`：项目模式 + 有 cwd + 目录名不是默认工作目录。
+ * 已归档会话在这里排除（调用方传原始 `sessions`，不必各记一套前提）。
+ * 同名目录只留先出现的那条：与侧边栏项目菜单的既有口径一致（见设计文档 §8.2）。
+ */
+export function listWorkspaceProjects(sessions: Session[]): WorkspaceProject[] {
+  const byName = new Map<string, string>();
+  for (const session of sessions) {
+    if (session.archived) continue;
+    if (!isProjectSession(session)) continue;
+    const cwd = normalizeWorkspacePath(session.cwd);
+    const name = workspaceName(cwd);
+    if (!byName.has(name)) byName.set(name, cwd);
+  }
+  return Array.from(byName, ([name, cwd]) => ({ name, cwd })).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+}

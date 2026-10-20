@@ -2394,6 +2394,8 @@
     "handOff": "Send to AI",
     "handOffNew": "In a new chat",
     "handOffCurrent": "Into this chat",
+    "handOffNewInProject": "New session in project",
+    "handOffNoProjects": "No projects yet — create one in the sidebar",
     "archive": "Archive",
     "restore": "Restore",
     "remove": "Delete",

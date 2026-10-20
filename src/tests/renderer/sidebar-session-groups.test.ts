@@ -4,6 +4,7 @@ import {
   buildSidebarSessionGroups,
   isSessionBusy,
   isSunkSession,
+  listWorkspaceProjects,
   splitSunkSessions,
 } from "../../renderer/utils/sidebar-session-groups";
 
@@ -384,5 +385,56 @@ describe("isSunkSession / splitSunkSessions", () => {
     );
     expect(active.map((s) => s.id)).toEqual(["running-done"]);
     expect(completed.map((s) => s.id)).toEqual(["idle-done"]);
+  });
+});
+
+describe("listWorkspaceProjects", () => {
+  it("忽略普通会话、无 cwd 与空白 cwd 的会话", () => {
+    const projects = listWorkspaceProjects([
+      session("chat", { cwd: "/work/plain" }),
+      session("no-cwd", { isProjectMode: true }),
+      session("blank-cwd", { isProjectMode: true, cwd: "   " }),
+    ]);
+
+    expect(projects).toEqual([]);
+  });
+
+  it("忽略已归档的项目会话", () => {
+    const projects = listWorkspaceProjects([
+      session("archived", {
+        isProjectMode: true,
+        cwd: "/work/old",
+        archived: true,
+      }),
+      session("live", { isProjectMode: true, cwd: "/work/alpha" }),
+    ]);
+
+    expect(projects).toEqual([{ name: "alpha", cwd: "/work/alpha" }]);
+  });
+
+  it("忽略默认工作目录，并把 cwd 的尾斜杠归一化掉", () => {
+    const projects = listWorkspaceProjects([
+      session("default-dir", {
+        isProjectMode: true,
+        cwd: "/app/default_working_dir",
+      }),
+      // 尾斜杠不归一化就会把 "/work/alpha/" 原样交给 workdir.set
+      session("live", { isProjectMode: true, cwd: "/work/alpha/" }),
+    ]);
+
+    expect(projects).toEqual([{ name: "alpha", cwd: "/work/alpha" }]);
+  });
+
+  it("按文件夹名去重（先到先得）并按名排序", () => {
+    const projects = listWorkspaceProjects([
+      session("beta", { isProjectMode: true, cwd: "/work/beta" }),
+      session("alpha-first", { isProjectMode: true, cwd: "/other/alpha" }),
+      session("alpha-second", { isProjectMode: true, cwd: "/work/alpha" }),
+    ]);
+
+    expect(projects).toEqual([
+      { name: "alpha", cwd: "/other/alpha" },
+      { name: "beta", cwd: "/work/beta" },
+    ]);
   });
 });

@@ -12,6 +12,7 @@ vi.mock("react-i18next", () => ({
 import { IdeasView } from "../../renderer/components/IdeasView";
 import { useAppStore } from "../../renderer/store";
 import type { IdeaSummary } from "../../shared/ideas";
+import type { Session } from "../../renderer/types";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -19,6 +20,21 @@ const setStatus = vi.fn();
 const remove = vi.fn();
 const list = vi.fn();
 const read = vi.fn();
+const invoke = vi.fn();
+
+/** 项目会话：本文件只关心 cwd / isProjectMode / archived 三个字段。 */
+const projectSession = (id: string, cwd: string): Session => ({
+  id,
+  title: id,
+  status: "idle",
+  mountedPaths: [],
+  allowedTools: [],
+  memoryEnabled: false,
+  isProjectMode: true,
+  cwd,
+  createdAt: Date.parse("2026-10-11T15:04:07+08:00"),
+  updatedAt: Date.parse("2026-10-11T15:04:07+08:00"),
+});
 
 const idea = (
   name: string,
@@ -119,8 +135,10 @@ beforeEach(() => {
   root = createRoot(container);
   (window as unknown as { electronAPI: unknown }).electronAPI = {
     platform: "darwin",
+    invoke,
     ideas: { list, read, setStatus, remove, update: vi.fn() },
   };
+  invoke.mockResolvedValue({ success: true, path: "/work/alpha" });
   useAppStore.setState({
     ...useAppStore.getInitialState(),
     activeView: "ideas",
@@ -425,5 +443,124 @@ describe("灵感视图", () => {
     await act(async () => menuItemByText("ideas.restore").click());
     await act(async () => {});
     expect(setStatus).toHaveBeenCalledWith("c", "inbox");
+  });
+});
+
+describe("灵感视图 · 交给 AI 选项目", () => {
+  it("列出现有项目：去重 + 按名排序，组标签在", async () => {
+    useAppStore.setState({
+      sessions: [
+        projectSession("p1", "/work/beta"),
+        projectSession("p2", "/work/alpha"),
+        projectSession("p3", "/work/alpha"),
+      ],
+    });
+    await render();
+    await pointerDown(buttonByText("ideas.handOff"));
+
+    const items = [...document.body.querySelectorAll('[role="menuitem"]')].map(
+      (item) => item.textContent?.trim(),
+    );
+    // 顺序也算契约：两条既有动作留在前，项目组跟在后面 ——
+    // 这不是"展示细节"，改顺序就是改这个视图的既有交互。
+    // （组标签是 `DropdownMenuLabel`，Radix 渲染成 div，没有 role=menuitem，所以不在这个数组里。）
+    expect(items).toEqual([
+      "ideas.handOffNew",
+      "ideas.handOffCurrent",
+      "alpha",
+      "beta",
+    ]);
+    expect(document.body.textContent).toContain("ideas.handOffNewInProject");
+  });
+
+  it("选中项目：先 workdir.set，再清会话、设目录、填正文、切到聊天页", async () => {
+    invoke.mockResolvedValue({ success: true, path: "/work/alpha" });
+    useAppStore.setState({
+      activeSessionId: "s1",
+      workingDir: "/work/before",
+      sessions: [projectSession("p1", "/work/alpha/")],
+    });
+    await render();
+    await pointerDown(buttonByText("ideas.handOff"));
+    await act(async () => menuItemByText("alpha").click());
+    await flush();
+
+    // 只发一次 IPC ⇒ 没有顺手发消息（不自动发送）
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith({
+      type: "workdir.set",
+      payload: { path: "/work/alpha" },
+    });
+    expect(useAppStore.getState().activeSessionId).toBeNull();
+    expect(useAppStore.getState().workingDir).toBe("/work/alpha");
+    expect(useAppStore.getState().pendingEditorAppend).toBe("正文一");
+    expect(useAppStore.getState().activeView).toBe("chat");
+  });
+
+  it("workdir.set 返回失败：不开新会话、不动草稿、出全局提示", async () => {
+    invoke.mockResolvedValue({
+      success: false,
+      path: "",
+      error: "Directory does not exist",
+    });
+    useAppStore.setState({
+      activeSessionId: "s1",
+      workingDir: "/work/before",
+      sessions: [projectSession("p1", "/work/alpha")],
+    });
+    await render();
+    await pointerDown(buttonByText("ideas.handOff"));
+    await act(async () => menuItemByText("alpha").click());
+    await flush();
+
+    const state = useAppStore.getState();
+    expect(state.activeSessionId).toBe("s1");
+    expect(state.workingDir).toBe("/work/before");
+    expect(state.pendingEditorAppend).toBeNull();
+    expect(state.activeView).toBe("ideas");
+    expect(state.globalNotice?.type).toBe("error");
+    expect(state.globalNotice?.message).toBe(
+      "sidebar.newSessionForProjectFailed",
+    );
+  });
+
+  it("workdir.set 抛异常：与返回失败同样处理", async () => {
+    invoke.mockRejectedValue(new Error("ipc down"));
+    useAppStore.setState({
+      activeSessionId: "s1",
+      sessions: [projectSession("p1", "/work/alpha")],
+    });
+    await render();
+    await pointerDown(buttonByText("ideas.handOff"));
+    await act(async () => menuItemByText("alpha").click());
+    await flush();
+
+    const state = useAppStore.getState();
+    expect(state.activeSessionId).toBe("s1");
+    expect(state.activeView).toBe("ideas");
+    expect(state.globalNotice?.message).toBe(
+      "sidebar.newSessionForProjectFailed",
+    );
+  });
+
+  it("没有项目：只留一条灰掉的说明项，没有组标签", async () => {
+    useAppStore.setState({
+      activeSessionId: "s1",
+      sessions: [
+        { ...projectSession("plain", "/work/x"), isProjectMode: false },
+      ],
+    });
+    await render();
+    await pointerDown(buttonByText("ideas.handOff"));
+
+    const hint = [...document.body.querySelectorAll('[role="menuitem"]')].find(
+      (item) => item.textContent?.trim() === "ideas.handOffNoProjects",
+    ) as HTMLElement | undefined;
+    expect(hint, "空态说明项必须存在").toBeTruthy();
+    // 只有 aria-disabled 是真断言：这一项压根没有 onSelect，"点它没反应"恒真、测不出东西。
+    expect(hint!.getAttribute("aria-disabled")).toBe("true");
+    expect(document.body.textContent).not.toContain(
+      "ideas.handOffNewInProject",
+    );
   });
 });

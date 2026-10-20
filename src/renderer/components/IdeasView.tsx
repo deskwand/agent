@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ChevronDown,
   Ellipsis,
+  Folder,
   Lightbulb,
   Plus,
   RefreshCw,
@@ -14,12 +15,14 @@ import {
 import { selectVisibleIdeas, useAppStore } from "../store";
 import { captureShortcutLabel } from "../utils/capture-shortcut-label";
 import { formatAppDateTime } from "../utils/i18n-format";
+import { listWorkspaceProjects } from "../utils/sidebar-session-groups";
 import { Button } from "./app-button";
 import { Toggle } from "./ui/toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
@@ -81,6 +84,8 @@ export function IdeasView(): JSX.Element {
   const startNewSession = useAppStore((s) => s.startNewSession);
   const setPendingEditorAppend = useAppStore((s) => s.setPendingEditorAppend);
   const openIdeaCapture = useAppStore((s) => s.openIdeaCapture);
+  const setWorkingDir = useAppStore((s) => s.setWorkingDir);
+  const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
 
   const visible = useMemo(
     () => selectVisibleIdeas({ showArchivedIdeas, ideasInbox, ideasArchived }),
@@ -92,6 +97,11 @@ export function IdeasView(): JSX.Element {
   // 依赖对象身份会让读取 effect 在「窗口重新获得焦点」「⌘R」「保存后自己调的那次 loadIdeas」
   // 上重跑 —— 而重跑要给编辑中的草稿让路（见下面的 effect）。
   const selectedName = selected?.name ?? null;
+
+  const projects = useMemo(() => listWorkspaceProjects(sessions), [sessions]);
+
+  /** 交给 AI 时填进输入框的文本：正在编辑的草稿 > 已加载正文 > 摘要。 */
+  const draftText = () => (session?.text ?? body) || selected?.excerpt || "";
 
   const [body, setBody] = useState("");
   const [session, setSession] = useState<EditSession | null>(null);
@@ -406,7 +416,52 @@ export function IdeasView(): JSX.Element {
     setProcessingOpen(false);
     // 只是把正文填进输入框，不自动发送：你多半要先补一句「把这个做成…」。
     if (mode === "new") startNewSession();
-    setPendingEditorAppend((session?.text ?? body) || selected.excerpt);
+    setPendingEditorAppend(draftText());
+    setActiveView("chat");
+  };
+
+  /**
+   * 在指定项目里开新会话。与 `handOff("new")` 的差别只有工作目录。
+   *
+   * 先 `workdir.set`：它是唯一的失败早退点（目录被删 / 路径在当前平台不支持时
+   * 会返回 `success: false`）。不发这个 IPC，就只能把一条死路径塞进 store，
+   * 等用户在聊天页发送时才暴出一个看不懂的错。
+   * 注意它**不**改主进程的全局默认工作目录（那个值初始化后不再变），所以别指望它
+   * 顺手同步主进程 —— 新会话的 cwd 是渲染层发送时带过去的。
+   * 失败处理与侧边栏 `handleNewSessionInProject` 同形状（success 判定 + catch）。
+   */
+  const handOffInProject = async (cwd: string) => {
+    setProcessingOpen(false);
+    // 与侧边栏 handleNewSessionInProject 的 showFailureNotice 同形状：
+    // 两条失败路径（返回失败 / IPC 抛异常）共用同一句提示。
+    const showHandoffFailed = () =>
+      setGlobalNotice({
+        id: `notice-idea-handoff-${Date.now()}`,
+        type: "error",
+        message: t("sidebar.newSessionForProjectFailed"),
+      });
+    let nextPath = cwd;
+    try {
+      const result = await window.electronAPI.invoke<{
+        success: boolean;
+        path: string;
+        error?: string;
+      }>({ type: "workdir.set", payload: { path: cwd } });
+      if (!result?.success) {
+        showHandoffFailed();
+        return;
+      }
+      nextPath = result.path; // 用主进程回传的 path（今天它原样回传入参）—— 与侧边栏同形
+    } catch {
+      showHandoffFailed();
+      return;
+    }
+    // 顺序不能反：startNewSession() 内部会 setWorkingDir(null)，
+    // 先设项目再清会话会把新会话静默落回默认工作目录。
+    // （那条"清 workingDir"本身是刻意行为，被 titlebar-left-cluster.test.ts:76 钉着，改不得。）
+    startNewSession();
+    setWorkingDir(nextPath);
+    setPendingEditorAppend(draftText());
     setActiveView("chat");
   };
 
@@ -728,6 +783,32 @@ export function IdeasView(): JSX.Element {
                           >
                             {t("ideas.handOffCurrent")}
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {projects.length === 0 ? (
+                            <DropdownMenuItem disabled className="text-xs">
+                              {t("ideas.handOffNoProjects")}
+                            </DropdownMenuItem>
+                          ) : (
+                            <>
+                              <DropdownMenuLabel className="px-2.5 py-1 text-xs text-muted-foreground">
+                                {t("ideas.handOffNewInProject")}
+                              </DropdownMenuLabel>
+                              {projects.map((project) => (
+                                <DropdownMenuItem
+                                  key={project.cwd}
+                                  className="gap-2 text-xs"
+                                  onSelect={() =>
+                                    void handOffInProject(project.cwd)
+                                  }
+                                >
+                                  <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                  <span className="truncate">
+                                    {project.name}
+                                  </span>
+                                </DropdownMenuItem>
+                              ))}
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
