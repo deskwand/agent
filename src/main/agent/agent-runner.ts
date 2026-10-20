@@ -81,6 +81,7 @@ import {
   logTiming,
 } from "../utils/logger";
 import { trackEvent } from "../telemetry-events";
+import { featureForTool } from "../telemetry-feature-from-tool";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -4143,6 +4144,13 @@ Tool routing:\n
               logCtx(`[AgentRunner] Tool execution start: ${event.toolName}`);
               if (event.toolName === AGENT_TOOL_NAME) {
                 subagentTap.observeAgentToolCall(session.id, event.toolCallId);
+              }
+              // Layer 2: the agent acting on the user's behalf. This fires when a
+              // call actually starts executing — not when the model merely emits
+              // one, so a call cancelled before execution is never counted.
+              const toolFeature = featureForTool(event.toolName);
+              if (toolFeature) {
+                void trackEvent("feature_use", { feature: toolFeature });
               }
               break;
             }

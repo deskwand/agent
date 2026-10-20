@@ -64,4 +64,29 @@ describe('telemetry event wiring', () => {
       );
     }
   });
+
+  it('reports the new user-action features', () => {
+    const source = read('src/main/index.ts');
+    expect(source).toContain(
+      'void trackEvent("feature_use", { feature: "ideas" });',
+    );
+    expect(source).toContain(
+      'void trackEvent("feature_use", { feature: "feeds" });',
+    );
+    expect(source).toContain(
+      'void trackEvent("feature_use", { feature: "office_preview" });',
+    );
+  });
+
+  it('reports agent tools from the execution event, not from generation', () => {
+    const source = read('src/main/agent/agent-runner.ts');
+    // A call the model merely emits (then aborts) must not count, so the hook
+    // lives in the `tool_execution_start` case rather than `toolcall_start`.
+    const execution = source.indexOf('case "tool_execution_start"');
+    const generation = source.indexOf('ame.type === "toolcall_start"');
+    const hook = source.indexOf('featureForTool(event.toolName)');
+    expect(execution).toBeGreaterThan(-1);
+    expect(generation).toBeGreaterThan(-1);
+    expect(hook).toBeGreaterThan(execution);
+  });
 });

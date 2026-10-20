@@ -3536,7 +3536,11 @@ ipcMain.handle("file.renderOfficePreview", async (_event, filePath: string) => {
     return { ok: false, reason: "render-failed" as const };
   }
   try {
-    return await renderOfficePreview(filePath);
+    const preview = await renderOfficePreview(filePath);
+    if (preview.ok) {
+      void trackEvent("feature_use", { feature: "office_preview" });
+    }
+    return preview;
   } catch (err: unknown) {
     logError("[App] renderOfficePreview failed:", err);
     return { ok: false, reason: "render-failed" as const };
@@ -4155,6 +4159,10 @@ ipcMain.handle("feed.clearAll", async () => ({
 }));
 ipcMain.handle("feed.refreshNow", async () => {
   const result = await feedService?.refresh("manual");
+  // Only a refresh that actually started counts; "running" / "tooSoon" / "skipped"
+  // are rejections of the click, not a use of the feature.
+  if (result?.started === true)
+    void trackEvent("feature_use", { feature: "feeds" });
   return result ?? { started: false };
 });
 ipcMain.handle("feed.setBlockedTopics", (_e, topics: string[]) => {
@@ -4598,9 +4606,11 @@ ipcMain.handle("ideas.read", (_e, name: string) =>
   requireIdeaService().read(name),
 );
 
-ipcMain.handle("ideas.create", (_e, input: IdeaCreateInput) =>
-  requireIdeaService().create(input),
-);
+ipcMain.handle("ideas.create", async (_e, input: IdeaCreateInput) => {
+  const created = await requireIdeaService().create(input);
+  void trackEvent("feature_use", { feature: "ideas" });
+  return created;
+});
 
 ipcMain.handle("ideas.update", (_e, name: string, patch: IdeaUpdatePatch) =>
   requireIdeaService().update(name, patch.content, patch.mtimeMs),

@@ -1,6 +1,6 @@
 import { app } from "electron";
 import { randomUUID } from "node:crypto";
-import fs from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { DESKWAND_API_URL } from "../shared/oauth-config";
@@ -10,27 +10,49 @@ import { configStore } from "./config/config-store";
 export const TELEMETRY_PING_INTERVAL_MS = 60 * 60 * 1000;
 
 /**
+ * Cached device-id initialization. Callers await the same promise, so a burst
+ * of concurrent events performs one disk read and one write, never more — and
+ * nothing on this path blocks synchronously.
+ */
+let deviceIdPromise: Promise<string> | null = null;
+
+/**
  * Reads the anonymous device id, generating and persisting one on first use.
  * Shared by the ping heartbeat and the event reporter so both report under the
  * same id.
  */
-export async function getOrCreateDeviceId(): Promise<string> {
-  const deviceIdPath = join(app.getPath("userData"), "device-id.json");
-  try {
-    const stored = JSON.parse(fs.readFileSync(deviceIdPath, "utf-8")) as {
-      id?: unknown;
-    };
-    // A well-formed file with a missing/non-string id must regenerate rather
-    // than send `undefined`, which the API would reject with a silent 400.
-    if (typeof stored?.id !== "string") {
-      throw new Error("invalid device id file");
+export function getOrCreateDeviceId(): Promise<string> {
+  if (deviceIdPromise) return deviceIdPromise;
+  deviceIdPromise = (async () => {
+    const deviceIdPath = join(app.getPath("userData"), "device-id.json");
+    try {
+      const stored: unknown = JSON.parse(await readFile(deviceIdPath, "utf-8"));
+      // A well-formed file with a missing/non-string id must regenerate rather
+      // than send `undefined`, which the API would reject with a silent 400.
+      if (
+        stored &&
+        typeof stored === "object" &&
+        "id" in stored &&
+        typeof stored.id === "string"
+      ) {
+        return stored.id;
+      }
+    } catch {
+      // Missing or corrupt file: fall through and allocate a fresh id.
     }
-    return stored.id;
-  } catch {
-    const deviceId = randomUUID();
-    fs.writeFileSync(deviceIdPath, JSON.stringify({ id: deviceId }));
-    return deviceId;
-  }
+    const id = randomUUID();
+    await writeFile(deviceIdPath, JSON.stringify({ id }));
+    return id;
+  })().catch((error: unknown) => {
+    deviceIdPromise = null;
+    throw error;
+  });
+  return deviceIdPromise;
+}
+
+/** Tests only; call after all pending initialization has settled. */
+export function resetDeviceIdForTest(): void {
+  deviceIdPromise = null;
 }
 
 /**

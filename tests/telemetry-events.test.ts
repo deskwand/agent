@@ -100,8 +100,11 @@ describe("trackEvent", () => {
     );
     await trackEvent("feature_use", { feature: "browser" });
 
+    // The failure starts a 60s cooldown; a real use after it may retry.
+    const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 60_000);
     vi.stubGlobal("fetch", mockFetch);
     await trackEvent("feature_use", { feature: "browser" });
+    spy.mockRestore();
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
@@ -135,5 +138,57 @@ describe("trackEvent", () => {
     mockGetDeviceId.mockRejectedValueOnce(new Error("no userData"));
 
     await expect(trackEvent("reply_ok")).resolves.toBeUndefined();
+  });
+
+  it("reports a feature once per gate crossed", async () => {
+    const sent: Array<{ count?: number }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: { body: string }) => {
+        sent.push(JSON.parse(init.body));
+        return Promise.resolve({ ok: true, status: 204 });
+      }),
+    );
+
+    for (let i = 0; i < 101; i += 1) {
+      await trackEvent("feature_use", { feature: "ideas" });
+    }
+
+    // Gates are 1 / 5 / 20 / 100 — four sends, no more, no fewer.
+    expect(sent.map((b) => b.count)).toEqual([1, 5, 20, 100]);
+  });
+
+  it("retries the same gate after a failed send", async () => {
+    const statuses = [500, 204];
+    const sent: Array<{ count?: number }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: { body: string }) => {
+        sent.push(JSON.parse(init.body));
+        const status = statuses.shift() ?? 204;
+        return Promise.resolve({ ok: status === 204, status });
+      }),
+    );
+
+    await trackEvent("feature_use", { feature: "ideas" });
+    // The 500 starts a 60s cooldown; step past it so the retry is allowed.
+    const spy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 60_000);
+    await trackEvent("feature_use", { feature: "ideas" });
+    spy.mockRestore();
+
+    // The first send 500s, so the same gate is offered again on the next use —
+    // and `count` is the running total at send time, so by then it reads 2.
+    expect(sent.map((b) => b.count)).toEqual([1, 2]);
+  });
+
+  it("never throws when the transport rejects a feature_use", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new Error("network down"))),
+    );
+
+    await expect(
+      trackEvent("feature_use", { feature: "ideas" }),
+    ).resolves.toBeUndefined();
   });
 });

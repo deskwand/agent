@@ -25,8 +25,13 @@ vi.mock("../main/config/config-store", () => ({
   configStore: { get: mockGet },
 }));
 
-const { sendTelemetryPing, startTelemetryHeartbeat, TELEMETRY_PING_INTERVAL_MS } =
-  await import("../main/telemetry");
+const {
+  sendTelemetryPing,
+  startTelemetryHeartbeat,
+  TELEMETRY_PING_INTERVAL_MS,
+  resetDeviceIdForTest,
+  getOrCreateDeviceId,
+} = await import("../main/telemetry");
 
 const mockFetch = vi.fn();
 let userDataDir = "";
@@ -38,6 +43,9 @@ function readDeviceId(): string {
 
 beforeEach(() => {
   userDataDir = fs.mkdtempSync(join(os.tmpdir(), "deskwand-telemetry-"));
+  // The device-id promise is cached for the process lifetime; without this a
+  // later case would reuse the id another case already initialized.
+  resetDeviceIdForTest();
   state.userDataDir = userDataDir;
   deviceIdPath = join(userDataDir, "device-id.json");
 
@@ -138,7 +146,9 @@ describe("sendTelemetryPing", () => {
       resolved = true;
     });
 
-    await Promise.resolve();
+    // The device id is initialized with asynchronous IO now, so one microtask
+    // is no longer enough to know the request has been issued.
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
     expect(resolved).toBe(false);
 
     settle?.();
@@ -167,6 +177,9 @@ describe("startTelemetryHeartbeat", () => {
   });
 
   it("pings immediately and then once per interval", async () => {
+    // Settle asynchronous device-id initialization before the fake timers take
+    // over, so the timer assertions are not racing the disk read.
+    await getOrCreateDeviceId();
     vi.useFakeTimers();
     try {
       startTelemetryHeartbeat();
