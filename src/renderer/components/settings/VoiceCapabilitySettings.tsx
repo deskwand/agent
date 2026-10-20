@@ -23,6 +23,7 @@ import {
 } from "../../voice-shortcut-labels";
 import type { VoiceEngineConfig } from "../../types";
 import { useAppStore } from "../../store";
+import { useEmotionInstall } from "../../hooks/useEmotionInstall";
 import { useVoiceEngine } from "../../hooks/useVoiceEngine";
 import {
   InstallProgress,
@@ -47,6 +48,9 @@ export function VoiceCapabilitySettings({
   const [removing, setRemoving] = useState(false);
   // 安装态与聊天页共用一份订阅（见 useVoiceEngine）。
   const { install } = useVoiceEngine();
+  // 情感识别是另一个安装单元：订阅独立，失败互不影响。
+  const emotion = useEmotionInstall();
+  const emotionEnabled = appConfig?.voiceEmotion?.enabled === true;
 
   const engine = appConfig?.voiceEngine;
   const enabled = engine?.enabled === true;
@@ -84,6 +88,17 @@ export function VoiceCapabilitySettings({
   const busy = isInstalling(install);
   const installed = install?.installed === true;
   const status = installStatusLabel(t, install);
+  const emotionStatus = installStatusLabel(t, emotion.state);
+
+  const saveEmotion = async (next: boolean) => {
+    if (!window.electronAPI) return;
+    const saved = await window.electronAPI.config.save({
+      voiceEmotion: { enabled: next },
+    });
+    if (saved?.config) setAppConfig(saved.config);
+    // 打开即开始安装（已装好时不再调用）。
+    if (next && !emotion.installed) void emotion.install();
+  };
 
   return (
     <SettingsCard>
@@ -116,7 +131,8 @@ export function VoiceCapabilitySettings({
           note={t("settings.capabilities.memoryNote")}
           control={
             installed ? (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 data-testid="voice-remove"
                 aria-label={t("settings.capabilities.voice.remove")}
@@ -128,7 +144,8 @@ export function VoiceCapabilitySettings({
               </Button>
             ) : (
               !busy && (
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   data-testid="voice-install"
                   aria-label={t("settings.capabilities.voice.download")}
@@ -149,6 +166,86 @@ export function VoiceCapabilitySettings({
         <InstallProgress
           percent={install?.percent ?? 0}
           testId="voice-install-progress"
+        />
+      )}
+
+      {enabled && (
+        <SettingsRow
+          testId="emotion-engine"
+          sub
+          title={t("settings.capabilities.voice.emotionTitle")}
+          note={t("settings.capabilities.voice.emotionDesc")}
+          badge={
+            <SettingsStatusBadge
+              testId="emotion-engine-badge"
+              tone={emotionStatus.tone}
+              label={emotionStatus.label}
+            />
+          }
+          control={
+            emotion.installed ? (
+              <Button
+                variant="ghost"
+                type="button"
+                data-testid="emotion-remove"
+                aria-label={t("settings.capabilities.voice.emotionTitle")}
+                disabled={emotion.busy}
+                onClick={() => {
+                  // 删了模型就把开关也回到关：不然配置里留着 enabled，下次开机白等一次安装。
+                  void emotion.remove().then(() => saveEmotion(false));
+                }}
+                className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 h-auto"
+              >
+                {t("settings.capabilities.install.delete")}
+              </Button>
+            ) : (
+              !emotion.busy && (
+                <Button
+                  variant="ghost"
+                  type="button"
+                  data-testid="emotion-install"
+                  aria-label={t("settings.capabilities.voice.emotionTitle")}
+                  onClick={() => void emotion.install()}
+                  className="rounded-control bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
+                >
+                  {emotion.error
+                    ? t("settings.capabilities.install.retry")
+                    : t("settings.capabilities.install.download")}
+                </Button>
+              )
+            )
+          }
+        />
+      )}
+
+      {enabled && emotion.busy && (
+        <InstallProgress
+          percent={emotion.state?.percent ?? 0}
+          testId="emotion-install-progress"
+        />
+      )}
+
+      {enabled && emotion.installed && (
+        <SettingsRow
+          testId="emotion-enabled"
+          sub
+          title={t("settings.capabilities.voice.emotionEnable")}
+          note={
+            emotion.state?.last
+              ? t("settings.capabilities.voice.emotionLastResult", {
+                  label: emotion.state.last.label,
+                  confidence: emotion.state.last.confidence.toFixed(2),
+                })
+              : undefined
+          }
+          control={
+            <SettingsSwitch
+              checked={emotionEnabled}
+              label={t("settings.capabilities.voice.emotionEnable")}
+              testId="emotion-enable"
+              onChange={(next) => void saveEmotion(next)}
+            />
+          }
         />
       )}
 

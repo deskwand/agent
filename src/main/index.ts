@@ -139,6 +139,8 @@ import { registerCapabilitiesIpc } from "./capabilities";
 import { initStatusStore } from "./connectors/status-store";
 import { registerVoiceIpc } from "./voice/ipc";
 import { allowPermissionRequest } from "./media-permission";
+import { registerEmotionIpc } from "./voice/emotion/ipc";
+import type { EmotionIpcHandle } from "./voice/emotion/ipc";
 import type { VoiceIpcHandle } from "./voice/ipc";
 import { registerTtsIpc } from "./tts/ipc";
 import { disposeEngineHost } from "./engine/engine-host";
@@ -3205,8 +3207,24 @@ registerMailIpc({
 registerCapabilitiesIpc({ ipcMain, openUrl: openExternalUrl });
 
 // 语音输入：七个 invoke 通道 + 独立的 voice.event 推送通道。
+let emotionIpc: EmotionIpcHandle | null = null;
+
 voiceIpc = registerVoiceIpc({
   userDataPath: app.getPath("userData"),
+  sendEvent: (event) => {
+    // 情感结果只记在主进程内存里：设置页的「最近一次结果」读它（重启即空）。
+    if (event.type === "done" && event.emotion)
+      emotionIpc?.noteEmotion(event.emotion);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("voice.event", event);
+    }
+  },
+});
+
+// 情感识别：三个 invoke 通道；进度与最近一次结果走同一条 voice.event。
+emotionIpc = registerEmotionIpc({
+  userDataPath: app.getPath("userData"),
+  onBeforeRemove: () => voiceIpc?.releaseEmotion(),
   sendEvent: (event) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("voice.event", event);
@@ -4708,6 +4726,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.turnId,
         elementRefsOf(event.payload.elSelections),
         event.payload.turnProfile,
+        event.payload.emotion,
       );
     }
 

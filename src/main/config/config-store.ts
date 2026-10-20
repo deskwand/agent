@@ -165,6 +165,8 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
+  /** 语音情感识别。只存开关：装没装看 userData/emotion/install.json。 */
+  voiceEmotion?: VoiceEmotionConfig;
   /** 本地 OCR 能力。只存开关：装没装看 userData/ocr/install.json。 */
   ocr?: OcrConfig;
   readAloud?: ReadAloudConfig;
@@ -201,6 +203,8 @@ export interface StoredConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
+  /** 语音情感识别。只存开关：装没装看 userData/emotion/install.json。 */
+  voiceEmotion?: VoiceEmotionConfig;
   /** 本地 OCR 能力。只存开关：装没装看 userData/ocr/install.json。 */
   ocr?: OcrConfig;
   readAloud?: ReadAloudConfig;
@@ -332,6 +336,7 @@ export function defaultStoredConfig(): StoredConfig {
       shortcut: DEFAULT_VOICE_SHORTCUT,
       autoPolish: true,
     },
+    voiceEmotion: { enabled: false },
     ocr: { enabled: false },
     feed: { enabled: false, blockedTopics: [] },
     readAloud: { enabled: false },
@@ -993,6 +998,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     isConfigured: stored.isConfigured,
     visionModel: stored.visionModel,
     voiceEngine: normalizeVoiceEngineConfig(stored.voiceEngine),
+    voiceEmotion: normalizeVoiceEmotionConfig(stored.voiceEmotion),
     ocr: normalizeOcrConfig(stored.ocr),
     readAloud: normalizeReadAloudConfig(stored.readAloud),
     voiceMode: normalizeVoiceModeConfig(stored.voiceMode),
@@ -1162,6 +1168,8 @@ export class ConfigStore {
       stored.visionModel = updates.visionModel;
     if (updates.voiceEngine !== undefined)
       stored.voiceEngine = updates.voiceEngine;
+    if (updates.voiceEmotion !== undefined)
+      stored.voiceEmotion = normalizeVoiceEmotionConfig(updates.voiceEmotion);
     // ⚠️ 每一个 AppConfig 字段都要在这里有自己的分支 —— 这个函数不铺开 unknown key，
     // 漏一个就是「界面上点得动、落不了盘」。OCR 就踩过这个坑。
     if (updates.ocr !== undefined) stored.ocr = normalizeOcrConfig(updates.ocr);
@@ -1510,4 +1518,19 @@ export function normalizeCapabilityIntro(raw: unknown): CapabilityIntroConfig {
   return typeof dismissedAt === "number" && Number.isFinite(dismissedAt)
     ? { dismissedAt }
     : {};
+}
+
+export interface VoiceEmotionConfig {
+  enabled: boolean;
+}
+
+/** 情感识别开关。缺字段 = 关（老用户清单里没有这个键，不需要迁移）。 */
+export function normalizeVoiceEmotionConfig(
+  value: unknown,
+): VoiceEmotionConfig {
+  const enabled =
+    typeof value === "object" &&
+    value !== null &&
+    (value as { enabled?: unknown }).enabled === true;
+  return { enabled };
 }

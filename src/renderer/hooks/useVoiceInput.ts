@@ -405,7 +405,8 @@ export function useVoiceInput(
   useEffect(() => {
     const unsubscribe = window.electronAPI?.voice.onEvent(
       (event: VoiceEvent) => {
-        if (event.type === "install") return;
+        if (event.type === "install" || event.type === "emotion-install")
+          return;
         // VAD 事件不带 sessionId（它属于语音模式，不属于任何一条录音）。
         if (event.type === "vad") return;
         if (event.sessionId !== sessionRef.current) return;

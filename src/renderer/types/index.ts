@@ -1,3 +1,4 @@
+import type { EmotionSignal } from "../../shared/voice-emotion";
 import type { ThemePreset, ThemeAccent } from "../../shared/theme";
 import type { CodemodeConfig } from "../../shared/codemode-config";
 import type { VoiceModeConfig, TurnProfileName } from "../../shared/voice-mode";
@@ -488,6 +489,8 @@ export type ClientEvent =
         elSelections?: ElementSelection[];
         /** 本轮档案（设计 §3.1）：语音轮走精简工具集、关思考、口播化输出。 */
         turnProfile?: TurnProfileName;
+        /** 本轮说话人情感（语音轮才有）。 */
+        emotion?: EmotionSignal;
       };
     }
   | {
@@ -930,6 +933,11 @@ export interface VoiceEngineConfig {
   autoPolish: boolean;
 }
 
+/** 语音情感识别。与 voiceEngine 分开：装语音输入不等于装了情感模型。 */
+export interface VoiceEmotionConfig {
+  enabled: boolean;
+}
+
 export interface ReadAloudConfig {
   enabled: boolean;
 }
@@ -1023,6 +1031,7 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
+  voiceEmotion?: VoiceEmotionConfig;
   ocr?: OcrConfig;
   readAloud?: ReadAloudConfig;
   voiceMode?: VoiceModeConfig;

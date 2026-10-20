@@ -21,6 +21,7 @@ import {
 import { useIPC } from "./hooks/useIPC";
 import { useVoiceModeShortcut } from "./hooks/useVoiceModeShortcut";
 import { VoiceModeHost } from "./components/voice-mode/VoiceModeHost";
+import type { EmotionSignal } from "../shared/voice-emotion";
 
 import { useWindowSize } from "./hooks/useWindowSize";
 import { Sidebar } from "./components/Sidebar";
@@ -300,7 +301,12 @@ function App() {
   );
 
   const handleVoiceQuestion = useCallback(
-    (targetSessionId: string, text: string, turnId: string): boolean => {
+    (
+      targetSessionId: string,
+      text: string,
+      turnId: string,
+      emotion?: EmotionSignal,
+    ): boolean => {
       const store = useAppStore.getState();
       const target = store.sessions.find(
         (s) => s.id === targetSessionId && s.kind === "voice",
@@ -317,15 +323,26 @@ function App() {
         return false;
       // turnId 由语音侧分配，宿主只负责原样带上：回答按它归属，
       // 不然新旧两轮的增量会串台。
-      void continueSession(
-        targetSessionId,
-        text,
-        target.providerProfileKey,
-        target.model,
-        undefined,
-        "voice",
-        turnId,
-      );
+      void (emotion
+        ? continueSession(
+            targetSessionId,
+            text,
+            target.providerProfileKey,
+            target.model,
+            undefined,
+            "voice",
+            turnId,
+            emotion,
+          )
+        : continueSession(
+            targetSessionId,
+            text,
+            target.providerProfileKey,
+            target.model,
+            undefined,
+            "voice",
+            turnId,
+          ));
       return true;
     },
     [continueSession],
@@ -896,8 +913,8 @@ function App() {
         <VoiceModeHost
           key={voiceModeSessionId}
           sessionId={voiceModeSessionId}
-          onSendQuestion={(text, turnId) =>
-            handleVoiceQuestion(voiceModeSessionId, text, turnId)
+          onSendQuestion={(text, turnId, emotion) =>
+            handleVoiceQuestion(voiceModeSessionId, text, turnId, emotion)
           }
         />
       ) : null}

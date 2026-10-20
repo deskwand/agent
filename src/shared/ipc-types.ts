@@ -1,3 +1,4 @@
+import type { EmotionSignal } from "./voice-emotion";
 import type { EngineInstallState } from "./engine-install";
 /**
  * IPC type definitions shared between the main process and the renderer/preload.
@@ -491,6 +492,17 @@ export interface VoiceInstallState {
   error?: string;
 }
 
+/** 情感识别的安装态与最近一次结果。装语音不等于装了情感，两份状态各自独立。 */
+export interface EmotionInstallState {
+  phase: VoiceInstallPhase;
+  /** 0-100。 */
+  percent: number;
+  installed: boolean;
+  error?: string;
+  /** 最近一次识别结果。只在主进程内存里，重启即空。 */
+  last?: { label: string; confidence: number; at: string };
+}
+
 export interface VoicePolishedResult {
   ok: boolean;
   text?: string;
@@ -505,9 +517,17 @@ export interface VoicePolishedResult {
  */
 export type VoiceEvent =
   | { type: "partial"; sessionId: string; text: string }
-  | { type: "done"; sessionId: string; text: string; discarded: boolean }
+  | {
+      type: "done";
+      sessionId: string;
+      text: string;
+      discarded: boolean;
+      /** 本轮说话人情感。没跑或没信号时缺席。 */
+      emotion?: EmotionSignal;
+    }
   | { type: "error"; sessionId: string; code: VoiceErrorCode; message: string }
   | { type: "install"; state: VoiceInstallState }
+  | { type: "emotion-install"; state: EmotionInstallState }
   /**
    * VAD 边沿。**不带 sessionId** —— 朗读期没有 ASR 会话，而那时正是最需要
    * 它的时刻（判断用户有没有开口打断）。渲染层的 sessionId 过滤器要为它让路。

@@ -17,7 +17,9 @@ import type {
   VoiceEvent,
   VoiceStartResult,
 } from "../../shared/ipc-types";
+import type { EmotionSignal } from "../../shared/voice-emotion";
 import { isBackchannel } from "../utils/voice/backchannel";
+import { emotionFromDone } from "../utils/voice/voice-emotion";
 import type { MicCapture } from "../utils/voice/mic-capture";
 import type { StreamingSpeech } from "./useStreamingSpeech";
 
@@ -66,7 +68,7 @@ export interface ConversationDeps {
    * 把识别出来的问题发出去。返回 false = 宿主没收下（例如语音模式已关），
    * 这时不能再开一条没人铺答案的朗读。
    */
-  sendQuestion(text: string): boolean;
+  sendQuestion(text: string, emotion?: EmotionSignal): boolean;
   /** 静音这么久就认为这一轮说完了，收尾。 */
   silenceMs: number;
   onState(state: ConversationState): void;
@@ -161,7 +163,11 @@ export function createVoiceConversation(
     clearPrefetch();
   };
 
-  const finishRound = (text: string, discarded: boolean) => {
+  const finishRound = (
+    text: string,
+    discarded: boolean,
+    emotion?: EmotionSignal,
+  ) => {
     const transcript = text.trim();
     const wasCandidate = candidate;
     candidate = false;
@@ -185,7 +191,11 @@ export function createVoiceConversation(
     }
     // 确认打断：旧回答的播放到此为止，它后面的增量也不再出声。
     deps.speech.stop();
-    if (!deps.sendQuestion(transcript)) {
+    // 没有情感时按原样调用：关着这个功能的那条路必须逐字节与加功能前一致。
+    const accepted = emotion
+      ? deps.sendQuestion(transcript, emotion)
+      : deps.sendQuestion(transcript);
+    if (!accepted) {
       answering = false;
       setBargeIn(false);
       setState(idleState());
@@ -363,7 +373,7 @@ export function createVoiceConversation(
   };
 
   const unsubscribe = deps.voice.onEvent((event) => {
-    if (event.type === "install") return;
+    if (event.type === "install" || event.type === "emotion-install") return;
     // VAD 事件不带 sessionId，且必须在朗读期（无会话）也能收 ——
     // 所以它在下面那道 sessionId 过滤**之前**。
     if (event.type === "vad") {
@@ -376,7 +386,7 @@ export function createVoiceConversation(
       return;
     }
     if (event.type === "done") {
-      finishRound(event.text, event.discarded);
+      finishRound(event.text, event.discarded, emotionFromDone(event));
       return;
     }
     failRound(event.code);

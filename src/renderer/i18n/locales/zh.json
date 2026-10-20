@@ -135,7 +135,11 @@
         "shortcutDisabled": "不使用快捷键",
         "shortcutHint": "按住说话，松开结束。",
         "autoPolish": "自动整理",
-        "autoPolishDesc": "把口语转写整理成书面文字。"
+        "autoPolishDesc": "把口语转写整理成书面文字。",
+        "emotionTitle": "情感识别",
+        "emotionDesc": "听出说话人的语气，让回复的语气跟着变。录音不出本机。下载约 95MB（含运行时）。",
+        "emotionEnable": "用情感调整回复语气",
+        "emotionLastResult": "最近一次：{{label}}（{{confidence}}）"
       },
       "voiceMode": {
         "title": "语音",

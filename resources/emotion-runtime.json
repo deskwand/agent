@@ -1,0 +1,14 @@
+{
+  "modelUrl": "https://file.deskwand.com/emotion-models/emotion2vec-plus-base-int8.tar.gz",
+  "modelSha256": "c56375d108cf69abebac0ef6d091ff3cf5b7dbba633dfdf7e19e8a9834ac1a2f",
+  "runtimeUrl": {
+    "darwin-arm64": "https://file.deskwand.com/emotion-runtime/emotion-runtime-darwin-arm64-1.30.0.tar.gz",
+    "win32-x64": "https://file.deskwand.com/emotion-runtime/emotion-runtime-win32-x64-1.30.0.tar.gz",
+    "linux-x64": "https://file.deskwand.com/emotion-runtime/emotion-runtime-linux-x64-1.30.0.tar.gz"
+  },
+  "runtimeSha256": {
+    "darwin-arm64": "cf6fba8a59b9a593c71bee92c2266663625990a4ea1358535fff1a763cbdd0e2",
+    "win32-x64": "ac2f5bfcd66f8707fb2321cb32d202cc76a42b643bcc7e68231eeb48129df6a0",
+    "linux-x64": "091c552cea39c54a780668d7b695775353a16a0f2a7b880f377a5f5ca1b2ac54"
+  }
+}

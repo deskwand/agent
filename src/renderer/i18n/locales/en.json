@@ -135,7 +135,11 @@
         "shortcutDisabled": "No shortcut",
         "shortcutHint": "Hold to talk, release to stop.",
         "autoPolish": "Auto clean-up",
-        "autoPolishDesc": "Turn the transcript into written text."
+        "autoPolishDesc": "Turn the transcript into written text.",
+        "emotionTitle": "Emotion recognition",
+        "emotionDesc": "Detect the speaker's tone so replies can match it. Audio never leaves this machine. about 95MB to download, runtime included.",
+        "emotionEnable": "Shape replies by the speaker's tone",
+        "emotionLastResult": "Last result: {{label}} ({{confidence}})"
       },
       "voiceMode": {
         "title": "Voice",

@@ -50,6 +50,7 @@ import type {
   PickerStartResult,
 } from "../shared/ipc-types";
 import type {
+  EmotionInstallState,
   VadProfile,
   VoiceEvent,
   VoiceInstallState,
@@ -1032,6 +1033,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
     },
   },
 
+  // ── 情感识别（语音轮的说话人情感）────────────────────────────
+  emotion: {
+    getState: (): Promise<EmotionInstallState> =>
+      ipcRenderer.invoke("emotion.getState"),
+    install: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("emotion.install"),
+    remove: (): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke("emotion.remove"),
+  },
+
   // ── Read aloud（朗读）──────────────────────────────────────────
   tts: {
     speak: (text: string, opts?: TtsSpeakOptions): Promise<TtsSpeakResult> =>
@@ -1759,6 +1770,11 @@ declare global {
         removeInstall: () => Promise<{ ok: boolean }>;
         getInstallState: () => Promise<VoiceInstallState>;
         onEvent: (callback: (event: VoiceEvent) => void) => () => void;
+      };
+      emotion: {
+        getState: () => Promise<EmotionInstallState>;
+        install: () => Promise<{ ok: boolean; error?: string }>;
+        remove: () => Promise<{ ok: boolean }>;
       };
       tts: {
         speak: (

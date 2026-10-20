@@ -1,8 +1,6 @@
 import { useEffect, useCallback } from "react";
-import {
-  normalizeThemeAccent,
-  normalizeThemePreset,
-} from "../../shared/theme";
+import { normalizeThemeAccent, normalizeThemePreset } from "../../shared/theme";
+import type { EmotionSignal } from "../../shared/voice-emotion";
 import { useAppStore } from "../store";
 import type {
   AppConfig,
@@ -1045,6 +1043,8 @@ export function useIPC() {
       turnProfile?: TurnProfileName,
       /** 调用方指定的轮次标识（语音模式按它归属回答）。缺省时自己生成。 */
       requestedTurnId?: string,
+      /** 本轮说话人情感（语音轮才有）。 */
+      emotion?: EmotionSignal,
     ) => {
       setLoading(true);
       console.log("[useIPC] Continuing session:", sessionId);
@@ -1138,6 +1138,7 @@ export function useIPC() {
             turnId,
             elSelections: elSelections?.length ? elSelections : undefined,
             turnProfile,
+            emotion,
           },
         });
         // Loading will be reset when we receive session.status event

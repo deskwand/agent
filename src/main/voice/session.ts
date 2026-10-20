@@ -10,6 +10,12 @@
  */
 import type { VoiceErrorCode } from "../../shared/ipc-types";
 import {
+  EMOTION_BUFFER_LIMIT_SAMPLES,
+  EMOTION_MIN_SAMPLES,
+  EMOTION_TIMEOUT_MS,
+  type EmotionSignal,
+} from "../../shared/voice-emotion";
+import {
   SAMPLE_RATE,
   type TranscriptionEngine,
   type TranscriptionStream,
@@ -21,18 +27,35 @@ export const WRONG_TOUCH_MS = 400;
 export interface VoiceSessionEvents {
   /** 累积到此刻的完整文本（段落 + 实时那一段）。 */
   onPartial: (text: string) => void;
-  onDone: (payload: { text: string; discarded: boolean }) => void;
+  onDone: (payload: {
+    text: string;
+    discarded: boolean;
+    emotion?: EmotionSignal;
+  }) => void;
   onError: (code: VoiceErrorCode, message: string) => void;
+}
+
+/** 情感识别的结构类型：会话只要求这一个方法，引擎在结构上满足它。 */
+export interface EmotionRecognizer {
+  recognize(
+    samples: Int16Array,
+    timeoutMs: number,
+  ): Promise<EmotionSignal | null>;
 }
 
 export interface VoiceSessionOptions {
   engine: TranscriptionEngine;
   events: VoiceSessionEvents;
+  /** 情感识别。缺席 = 这个功能关着，一切照旧。 */
+  emotion?: EmotionRecognizer;
 }
 
 export class VoiceSession {
   private readonly stream: TranscriptionStream;
   private readonly events: VoiceSessionEvents;
+  private readonly emotion?: EmotionRecognizer;
+  /** 本轮 PCM。上限 15 s，超出丢头部（spec §4）。 */
+  private buffer = new Int16Array(0);
   private readonly segments: string[] = [];
   private partial = "";
   private pushedSamples = 0;
@@ -41,8 +64,9 @@ export class VoiceSession {
   /** 上一次推给渲染层的文本。帧率是 10Hz，而文字可能几秒不动。 */
   private lastEmitted = "";
 
-  constructor({ engine, events }: VoiceSessionOptions) {
+  constructor({ engine, events, emotion }: VoiceSessionOptions) {
     this.events = events;
+    this.emotion = emotion;
     this.stream = engine.createStream();
   }
 
@@ -55,6 +79,16 @@ export class VoiceSession {
         floats[i] = samples[i] / 0x8000;
       const update = this.stream.push(floats);
       this.pushedSamples += samples.length;
+
+      if (this.emotion) {
+        const merged = new Int16Array(this.buffer.length + samples.length);
+        merged.set(this.buffer, 0);
+        merged.set(samples, this.buffer.length);
+        this.buffer =
+          merged.length > EMOTION_BUFFER_LIMIT_SAMPLES
+            ? merged.subarray(merged.length - EMOTION_BUFFER_LIMIT_SAMPLES)
+            : merged;
+      }
 
       if (update.segment) {
         this.segments.push(update.segment);
@@ -100,7 +134,21 @@ export class VoiceSession {
 
     const text = this.text();
     const discarded = !text && durationMs < WRONG_TOUCH_MS;
-    this.events.onDone({ text, discarded });
+    const emotion = await this.recognizeEmotion();
+    this.events.onDone({ text, discarded, ...(emotion ? { emotion } : {}) });
+  }
+
+  private async recognizeEmotion(): Promise<EmotionSignal | undefined> {
+    const samples = this.buffer;
+    this.buffer = new Int16Array(0);
+    if (!this.emotion || samples.length < EMOTION_MIN_SAMPLES) return undefined;
+    try {
+      return (
+        (await this.emotion.recognize(samples, EMOTION_TIMEOUT_MS)) ?? undefined
+      );
+    } catch {
+      return undefined;
+    }
   }
 
   /** 丢弃：不发 done，也不发 error。 */

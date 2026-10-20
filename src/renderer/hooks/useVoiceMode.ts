@@ -19,6 +19,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { VoiceErrorCode } from "../../shared/ipc-types";
+import type { EmotionSignal } from "../../shared/voice-emotion";
 import { DEFAULT_VOICE_MODE, resolveVoiceTone } from "../../shared/voice-mode";
 import { useAppStore } from "../store";
 import type { Message } from "../types";
@@ -59,7 +60,7 @@ export interface UseVoiceModeOptions {
    * `turnId` 由这里分配、宿主必须原样用：回答只按它归属。返回值表示宿主
    * **收没收下**这一轮（语音模式可能已经被关掉），不代表后台生成成功。
    */
-  sendQuestion(text: string, turnId: string): boolean;
+  sendQuestion(text: string, turnId: string, emotion?: EmotionSignal): boolean;
 }
 
 const EMPTY: VoiceModeView = {
@@ -186,7 +187,7 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
         },
       },
       speech,
-      sendQuestion: (text) => {
+      sendQuestion: (text, emotion) => {
         const store = useAppStore.getState();
         // 不再要求「正在看这个会话」：后台运行就是为此。仍然只认这条会话 ——
         // 会话被删、运行时被换掉或结束，这一轮就作废。
@@ -200,7 +201,10 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
         // 先绑定再提交：宿主可能同步把这一轮写进 store。
         const turnId = crypto.randomUUID();
         expectedTurnId = turnId;
-        const accepted = optionsRef.current.sendQuestion(text, turnId);
+        // 同上：没有情感时不改变这次调用的形状（老测试与老行为都依赖它）。
+        const accepted = emotion
+          ? optionsRef.current.sendQuestion(text, turnId, emotion)
+          : optionsRef.current.sendQuestion(text, turnId);
         if (!accepted) expectedTurnId = null;
         return accepted;
       },

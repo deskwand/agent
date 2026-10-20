@@ -17,6 +17,7 @@ import { useVoiceMode } from "../../hooks/useVoiceMode";
 import { VoiceModeOverlay } from "../VoiceModeOverlay";
 import { CAPTION_KEY } from "./orb-state";
 import { VOICE_MESSAGE_KEYS } from "../../hooks/useVoiceInput";
+import type { EmotionSignal } from "../../../shared/voice-emotion";
 import { voiceCaptionLine } from "../../utils/voice/voice-caption";
 import { getCapabilityGate } from "../../capabilities/capability-gate";
 import { resolveTtsSource } from "../../../shared/voice-mode";
@@ -51,7 +52,11 @@ function useTtsInstalls(): TtsInstallStates | null {
 export interface VoiceModeHostProps {
   sessionId: string;
   /** 把一轮问题发出去。返回值表示宿主收没收下这一轮。 */
-  onSendQuestion(text: string, turnId: string): boolean;
+  onSendQuestion(
+    text: string,
+    turnId: string,
+    emotion?: EmotionSignal,
+  ): boolean;
 }
 
 export function VoiceModeHost({

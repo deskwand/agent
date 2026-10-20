@@ -23,6 +23,7 @@ import {
   resolveUtilityModelConfig,
 } from "../memory/memory-llm-client";
 import { logWarn } from "../utils/logger";
+import { loadEmotionRecognizer, type EmotionEngine } from "./emotion/engine";
 import { LocalTranscriptionEngine, loadSherpaAddon } from "./local-engine";
 import { VoiceSession } from "./session";
 import {
@@ -51,6 +52,8 @@ export interface VoiceIpcOptions {
 export interface VoiceIpcHandle {
   /** 主窗口销毁时调用：中断全部会话，避免悬挂。 */
   dispose: () => void;
+  /** 释放情感会话。删除情感模型后由 emotion IPC 调（Windows 上不先释放，删文件会失败）。 */
+  releaseEmotion: () => void;
 }
 
 /**
@@ -97,6 +100,8 @@ export function registerVoiceIpc({
    * 重建它就会把每条录音的延迟打回两秒多。
    */
   let engine: LocalTranscriptionEngine | null = null;
+  /** 情感识别器：只构造一次，缺模型时它自己退化成永远 null（Task 10 再加开关门控）。 */
+  let emotionRecognizer: EmotionEngine | null = null;
 
   /**
    * VAD 引擎。生命周期是**语音模式**，不是 ASR 会话 —— 朗读期没有会话，
@@ -118,6 +123,25 @@ export function registerVoiceIpc({
     );
   };
 
+  /**
+   * 只丢引用与释放 ORT 会话。真的调用点有两个：删除模型（emotion IPC 通过 handle 调），
+   * 以及开关关掉之后的下一次 voice.start（那时才需要重建）。
+   */
+  const releaseEmotion = (): void => {
+    emotionRecognizer?.release();
+    emotionRecognizer = null;
+  };
+
+  /** 情感初始化失败只能退化成「没有情感」，不许把整条语音输入打回失败（spec §1 目标 4）。 */
+  const safeEmotionRecognizer = (): EmotionEngine | undefined => {
+    try {
+      return (emotionRecognizer ??= loadEmotionRecognizer(userDataPath));
+    } catch (error) {
+      logWarn("[Voice] emotion recognizer init failed:", error);
+      return undefined;
+    }
+  };
+
   const drop = (sessionId: string): VoiceSession | undefined => {
     const session = sessions.get(sessionId);
     sessions.delete(sessionId);
@@ -125,7 +149,9 @@ export function registerVoiceIpc({
   };
 
   ipcMain.handle("voice.start", async (): Promise<VoiceStartResult> => {
-    const engineConfig = configStore.getAll().voiceEngine;
+    const appConfig = configStore.getAll();
+    const engineConfig = appConfig.voiceEngine;
+    const emotionEnabled = appConfig.voiceEmotion?.enabled === true;
     if (!engineConfig?.enabled)
       return { ok: false, code: "VOICE_NOT_CONFIGURED" };
     if (!isInstalled()) return { ok: false, code: "VOICE_NOT_INSTALLED" };
@@ -147,12 +173,13 @@ export function registerVoiceIpc({
         sessionId,
         new VoiceSession({
           engine,
+          emotion: emotionEnabled ? safeEmotionRecognizer() : undefined,
           events: {
             onPartial: (text) =>
               sendEvent({ type: "partial", sessionId, text }),
-            onDone: ({ text, discarded }) => {
+            onDone: ({ text, discarded, emotion }) => {
               drop(sessionId);
-              sendEvent({ type: "done", sessionId, text, discarded });
+              sendEvent({ type: "done", sessionId, text, discarded, emotion });
             },
             onError: (code, message) => {
               drop(sessionId);
@@ -167,6 +194,10 @@ export function registerVoiceIpc({
       logWarn("[Voice] engine init failed:", error);
       return { ok: false, code: "VOICE_ENGINE_FAILED" };
     }
+
+    // 预热：会话加载实测 274 ms，放在用户说话之前做掉，别落到 stop() 里。
+    if (emotionEnabled) void safeEmotionRecognizer()?.warmUp();
+    else releaseEmotion();
 
     return { ok: true, sessionId };
   });
@@ -343,5 +374,6 @@ export function registerVoiceIpc({
       sessions.clear();
       vadEngine = null;
     },
+    releaseEmotion,
   };
 }
