@@ -1226,10 +1226,18 @@
 
   /* Sidebar scrollbar auto-hide — uses modern scrollbar-color (Chromium 121+ / Firefox) */
   .sidebar-scroll {
+    /* 沟槽常驻。Chromium 一旦在元素上设了 scrollbar-width / scrollbar-color，
+       就放弃 macOS 的 overlay 滚动条、改用**占布局宽度**的经典滚动条：
+       列表恰好溢出时内容宽度被吃掉，会话行跟着左右飘。
+       stable 把这段宽度恒定预留，溢出前后、hover 上色前后行宽完全一致。
+       别删 —— sidebar-scroll-gutter.test.ts 钉着这一行。 */
+    scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
   }
-  .group:hover .sidebar-scroll {
+  /* hover 只上色不改宽度；focus-within 让键盘浏览时滑块同样可见。 */
+  .group:hover .sidebar-scroll,
+  .group:focus-within .sidebar-scroll {
     scrollbar-color: var(--border) transparent;
   }
 }
