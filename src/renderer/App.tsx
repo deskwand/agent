@@ -60,6 +60,8 @@ import { ensureVoiceModeStart } from "./utils/voice/voice-mode-gate";
 import { IdeaCaptureOverlay } from "./components/IdeaCaptureOverlay";
 import { IdeasView } from "./components/IdeasView";
 import { useIdeaCaptureShortcut } from "./hooks/useIdeaCaptureShortcut";
+import { useSessionSearchShortcut } from "./hooks/useSessionSearchShortcut";
+import { SessionSearchPalette } from "./components/SessionSearchPalette";
 import { ImageLightbox } from "./components/ImageLightbox";
 import { useImageLightboxState } from "./store/selectors";
 import { PanelErrorBoundary } from "./components/PanelErrorBoundary";
@@ -169,11 +171,20 @@ function App() {
     useIPC();
   const voiceModeOpen = useAppStore((s) => s.voiceModeOpen);
   const openIdeaCapture = useAppStore((s) => s.openIdeaCapture);
+  const ideaCaptureOpen = useAppStore((s) => s.ideaCaptureOpen);
   const voiceModeSessionId = useAppStore((s) => s.voiceModeSessionId);
   const sessions = useAppStore((s) => s.sessions);
   const closeVoiceMode = useAppStore((s) => s.closeVoiceMode);
   // 语音模式开着时把 ⇧K 让出去：那个浮层在抢键盘焦点。
   useIdeaCaptureShortcut(openIdeaCapture, !voiceModeOpen);
+  // 搜索结果只在内存里，开关是 store 上的一个布尔；这里只负责把 ⌘K 接上去。
+  // 弹窗已经开着时再按一次是无操作（不是 toggle）——目标状态就是「开着」。
+  // 另外两个浮层开着时让位：语音是全屏的，记一笔是记笔记的焦点面，叠一个搜索弹窗
+  // 上去只会互相抢焦点。
+  useSessionSearchShortcut(
+    () => useAppStore.getState().openSessionSearch(),
+    !voiceModeOpen && !ideaCaptureOpen,
+  );
   const [voiceCreating, setVoiceCreating] = useState(false);
   const voiceCreateLock = useRef(false);
   const voiceNavigationEpoch = useRef(0);
@@ -909,6 +920,9 @@ function App() {
 
       {/* 记一笔：快捷键与标题栏按钮共用这一个浮层，与语音模式互斥。 */}
       <IdeaCaptureOverlay />
+
+      {/* 会话搜索（⌘K）：根层常驻，任何视图都能开；选中会话会自己切回聊天视图。 */}
+      <SessionSearchPalette />
 
       {/* 划词菜单：全局常驻，与内容组件零耦合（可划选面的 allowlist 即契约）。 */}
       <SelectionMenuHost />

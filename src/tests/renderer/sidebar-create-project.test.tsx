@@ -248,12 +248,13 @@ describe("Sidebar 的「新建项目」弹窗", () => {
     // 计划 2 的评审对同类问题的结论也是这句：「守卫在共享路径上，行为已覆盖，
     // 属测试覆盖缺口而非行为缺口」。
   });
-  it("项目操作胶囊键补了 px-0：20px 宽不再被撑到 32（否则左 32 + 右 20 的胶囊会重合）", async () => {
-    // 2026-10-10 实测：不传 size + 手写 `w-5 h-8` ⇒ `px-4` 留下 ⇒ 盒宽 32（作者写的是 20 ✗）。
+  it("新聊天行尾的 ▾ 胶囊键补了 px-0：不会被 Button 的 px-4 撑到 32", async () => {
+    // 2026-10-10 实测：不传 size + 手写宽度 ⇒ `px-4` 留下 ⇒ 盒宽被撑到 32（作者写的更窄 ✗）。
+    // 2026-10-15：▾ 从顶部那颗 32² 图标格挪到「新聊天」整行的行尾，宽度 w-6。
     await renderSidebar(); // 该文件既有的辅助：渲染带项目行的侧栏（项目区已展开）
     const tokens = projectActionsTrigger()!.className.split(/\s+/);
     expect(tokens).toContain("px-0");
-    expect(tokens).toContain("w-5");
+    expect(tokens).toContain("w-6");
     expect(tokens).not.toContain("px-4");
   });
 });

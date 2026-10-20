@@ -5,6 +5,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { OccludingDialog } from "./ui/occluding-dialog";
 import { DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { useIPC } from "../hooks/useIPC";
+import { useOpenSession } from "../hooks/useOpenSession";
 import {
   Trash2,
   Search as SearchIcon,
@@ -79,11 +80,10 @@ export function Sidebar({
   const sessionStates = useAppStore((s) => s.sessionStates);
   const pendingAskUsers = useAppStore((s) => s.pendingAskUsers);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
-  const setMessagesTail = useAppStore((s) => s.setMessagesTail);
-  const setTraceSteps = useAppStore((s) => s.setTraceSteps);
   const workingDir = useAppStore((s) => s.workingDir);
   const setWorkingDir = useAppStore((s) => s.setWorkingDir);
   const startNewSession = useAppStore((s) => s.startNewSession);
+  const openSessionSearch = useAppStore((s) => s.openSessionSearch);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
@@ -97,14 +97,12 @@ export function Sidebar({
     renameSession,
     archiveSession,
     setSessionCompleted,
-    getSessionMessagesPage,
-    getSessionTraceSteps,
     changeWorkingDir,
     createProject,
     isElectron,
   } = useIPC();
+  const openSessionById = useOpenSession();
 
-  const [searchQuery, setSearchQuery] = useState("");
   const [projectExpansionOverrides, setProjectExpansionOverrides] = useState(
     () => loadGroupExpansion(),
   );
@@ -151,21 +149,16 @@ export function Sidebar({
   // 「引用计数会溶解它」的地方。
   const [projectName, setProjectName] = useState("");
   const [isCreatingProject, setIsCreatingProject] = useState(false);
-  const sessionLoadSeqRef = useRef(0);
   const scrollListRef = useRef<HTMLDivElement>(null);
 
-  const normalizedQuery = useMemo(
-    () => searchQuery.trim().toLowerCase(),
-    [searchQuery],
-  );
   // Exclude archived sessions from normal display
   const activeSessions = useMemo(
     () => sessions.filter((s) => !s.archived),
     [sessions],
   );
   const sessionGroups = useMemo(
-    () => buildSidebarSessionGroups(sessions, normalizedQuery, sidebarPins),
-    [sessions, normalizedQuery, sidebarPins],
+    () => buildSidebarSessionGroups(sessions, "", sidebarPins),
+    [sessions, sidebarPins],
   );
   const sessionHasPendingAskUser = useCallback(
     (sessionId: string) =>
@@ -248,21 +241,20 @@ export function Sidebar({
   );
 
   useEffect(() => {
-    if (!activeSessionId || normalizedQuery) return;
+    if (!activeSessionId) return;
     const raf = requestAnimationFrame(() => {
       scrollListRef.current
         ?.querySelector(`[data-session-id="${activeSessionId}"]`)
         ?.scrollIntoView({ block: "nearest" });
     });
     return () => cancelAnimationFrame(raf);
-  }, [activeSessionId, normalizedQuery]);
+  }, [activeSessionId]);
 
   const resolveProjectExpanded = (
     groupKey: string,
     projectIndex: number,
     projectSessions: Session[],
   ): boolean => {
-    if (normalizedQuery) return true;
     const override = projectExpansionOverrides.get(groupKey);
     if (override !== undefined) return override;
     if (
@@ -274,13 +266,11 @@ export function Sidebar({
   };
 
   const resolveOrdinarySessionsExpanded = (): boolean => {
-    if (normalizedQuery) return true;
     // 「最近」默认展开：它是会话列表的主入口
     return projectExpansionOverrides.get(ORDINARY_SESSION_GROUP_KEY) ?? true;
   };
 
   const resolveProjectsExpanded = (): boolean => {
-    if (normalizedQuery) return true;
     const override = projectExpansionOverrides.get(PROJECTS_GROUP_KEY);
     if (override !== undefined) return override;
     // 默认收起；但当前会话落在某个项目里时必须展开，
@@ -298,7 +288,6 @@ export function Sidebar({
     groupKey: string,
     groupSessions: Session[],
   ): number => {
-    if (normalizedQuery) return groupSessions.length;
     const override = sessionVisibleCountOverrides.get(groupKey);
     let visibleCount = Math.min(
       override ?? DEFAULT_VISIBLE_SESSIONS,
@@ -382,76 +371,25 @@ export function Sidebar({
       setShowApps(false);
       if (activeSessionId === sessionId) return;
 
-      const existingMessages = sessionStates[sessionId]?.messages;
-      const existingSteps = sessionStates[sessionId]?.traceSteps;
-      const needsMessages =
-        isElectron && !sessionStates[sessionId]?.historyHydrated;
-      const needsTraceSteps =
-        isElectron && (!existingSteps || existingSteps.length === 0);
-
-      if (!needsMessages && !needsTraceSteps) {
-        setActiveSession(sessionId);
-        return;
-      }
-
-      const loadSeq = sessionLoadSeqRef.current + 1;
-      sessionLoadSeqRef.current = loadSeq;
-      console.log("[Sidebar] Session switch start", {
-        sessionId,
-        needsMessages,
-        needsTraceSteps,
-      });
-
-      try {
-        let loadedMessages = existingMessages ?? [];
-        let loadedSteps = existingSteps ?? [];
-
-        if (needsMessages) {
-          const page = (await getSessionMessagesPage(
-            sessionId,
-            null,
-            1000,
-          )) || {
-            messages: [],
-            hasMore: false,
-          };
-          if (sessionLoadSeqRef.current !== loadSeq) return;
-          setMessagesTail(sessionId, page.messages, page.hasMore);
-          loadedMessages = page.messages;
-        }
-
-        if (needsTraceSteps) {
-          loadedSteps = (await getSessionTraceSteps(sessionId)) || [];
-          if (sessionLoadSeqRef.current !== loadSeq) return;
-          setTraceSteps(sessionId, loadedSteps);
-        }
-
-        if (sessionLoadSeqRef.current !== loadSeq) return;
-        setActiveSession(sessionId);
-        console.log("[Sidebar] Session switch ready", {
-          sessionId,
-          messageCount: loadedMessages.length,
-          traceStepCount: loadedSteps.length,
-        });
-      } catch (error) {
-        if (sessionLoadSeqRef.current !== loadSeq) return;
-        console.error("[Sidebar] Failed to load session before switch:", {
-          sessionId,
-          error,
+      // 预载失败时不切换（见 useOpenSession）；这里得说一声，
+      // 否则「点了没反应」且日志里也没有痕迹。
+      const opened = await openSessionById(sessionId);
+      if (!opened) {
+        setGlobalNotice({
+          id: `notice-session-open-failed-${Date.now()}`,
+          type: "error",
+          message: t("sidebar.openSessionFailed"),
         });
       }
     },
     [
       activeSessionId,
-      getSessionMessagesPage,
-      getSessionTraceSteps,
-      isElectron,
-      sessionStates,
-      setActiveSession,
-      setMessagesTail,
+      openSessionById,
+      setGlobalNotice,
       setShowApps,
       setShowSettings,
-      setTraceSteps,
+      setShowSchedule,
+      t,
     ],
   );
 
@@ -659,10 +597,10 @@ export function Sidebar({
 
   const handleDeleteProject = useCallback(
     (group: SidebarProjectGroup) => {
-      // 计数口径必须与「实际会被停掉的会话」一致：搜索态下 group.sessions
-      // 已被过滤，用它统计会把没显示的进行中会话算漏，所以遍历未过滤的
-      // activeSessions。判定用 isSessionBusy（运行中 / 有后台子代理 /
-      // 在等 ask_user），这三类在删除时都会被 stopSession 打断。
+      // 计数口径必须与「实际会被停掉的会话」一致：遍历 activeSessions
+      // 而不是渲染出来的 group.sessions —— 后者只是分组快照，别把它当成事实来源。
+      // 判定用 isSessionBusy（运行中 / 有后台子代理 / 在等 ask_user），
+      // 这三类在删除时都会被 stopSession 打断。
       const activeCount = activeSessions.filter((s) => {
         const sessionCwd = s.cwd;
         if (!sessionCwd) return false;
@@ -745,21 +683,6 @@ export function Sidebar({
     ],
   );
 
-  const highlightTitle = (title: string, query: string) => {
-    if (!query) return title;
-    const idx = title.toLowerCase().indexOf(query.toLowerCase());
-    if (idx === -1) return title;
-    return (
-      <>
-        {title.slice(0, idx)}
-        <mark className="bg-accent text-foreground rounded-sm px-0.5">
-          {title.slice(idx, idx + query.length)}
-        </mark>
-        {title.slice(idx + query.length)}
-      </>
-    );
-  };
-
   const renderSessionItem = (
     session: Session,
     showRelativeTime: boolean,
@@ -833,7 +756,7 @@ export function Sidebar({
                       : "text-muted-foreground"
                 }`}
               >
-                {highlightTitle(session.title, normalizedQuery)}
+                {session.title}
               </div>
             )}
             {/* 置顶不再有看得见的标记（和项目行一致），但状态不能只剩「排在最前面」
@@ -904,7 +827,8 @@ export function Sidebar({
                       : "opacity-0 pointer-events-none"
                   }`}
                 >
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     size="iconXs"
                     aria-pressed={Boolean(session.completedAt)}
@@ -939,7 +863,8 @@ export function Sidebar({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost"
+                          <Button
+                            variant="ghost"
                             type="button"
                             size="iconXs"
                             className="rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary-text hover:bg-accent transition-colors"
@@ -1060,12 +985,14 @@ export function Sidebar({
     const unpinnedSessions = groupSessions.filter(
       (session) => !pinnedSessionIds.has(session.id),
     );
-    const visibleUnpinnedCount = normalizedQuery
-      ? unpinnedSessions.length
-      : Math.max(visibleCount - pinnedSessions.length, 0);
-    const visibleSessions = normalizedQuery
-      ? groupSessions
-      : [...pinnedSessions, ...unpinnedSessions.slice(0, visibleUnpinnedCount)];
+    const visibleUnpinnedCount = Math.max(
+      visibleCount - pinnedSessions.length,
+      0,
+    );
+    const visibleSessions = [
+      ...pinnedSessions,
+      ...unpinnedSessions.slice(0, visibleUnpinnedCount),
+    ];
     const hiddenCount = Math.max(
       0,
       unpinnedSessions.length - visibleUnpinnedCount,
@@ -1082,10 +1009,11 @@ export function Sidebar({
         {visibleSessions.map((session) =>
           renderSessionItem(session, true, isProjectList),
         )}
-        {!normalizedQuery && (hiddenCount > 0 || canShowLess) && (
+        {(hiddenCount > 0 || canShowLess) && (
           <div className="flex items-center">
             {hiddenCount > 0 && (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={() => {
                   requestSectionMotion(groupKey);
@@ -1105,7 +1033,8 @@ export function Sidebar({
             {/* 「收起」和上一条一样用 `pr-3` 右内边距 ⇒ 比会话行的时间（`pr-2.5`）多缩 2px ✗：
                 右拉回 2px 落到同一条基准线上 ✓（「展开更多」是左对齐，不在这条线上，不动 ✓）。 */}
             {canShowLess && (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={() => {
                   requestSectionMotion(groupKey);
@@ -1141,19 +1070,16 @@ export function Sidebar({
 
     // 组头沿用折叠机制的既有 key 空间（`projectExpansionOverrides` + 那份持久化）
     const completedKey = `${groupKey}::completed`;
-    // 优先级照 `resolveProjectExpanded` 抄：搜索强制展开（否则命中的会话在折叠堆里，
-    // 搜到了却看不见）→ 用户的显式开合 → 组里装着当前打开的会话就展开。
+    // 优先级照 `resolveProjectExpanded` 抄：用户的显式开合 → 组里装着当前打开的
+    // 会话就展开。
     //
     // 最后那一档是「打勾后行不能从眼前消失」的正解：把**容器**打开，而不是把行搬走。
     // 曾把这条兼进谓词（`session.id === activeSessionId ⇒ 不沉`），结果是
     // 从组里点开一条会话它就会被弹回主排 ✗ —— 成员资格不能取决于谁开着。
     // 用户显式的开合仍然优先：他真要收起一个装着活跃会话的组，就由他 ✓。
-    const completedExpanded = normalizedQuery
-      ? true
-      : (projectExpansionOverrides.get(completedKey) ??
-        completedSessions.some(
-          (session) => session.id === activeSessionId,
-        ));
+    const completedExpanded =
+      projectExpansionOverrides.get(completedKey) ??
+      completedSessions.some((session) => session.id === activeSessionId);
 
     return (
       <>
@@ -1163,7 +1089,8 @@ export function Sidebar({
             {/* 组头 = 「展开更多」那一行的同款：纯文字、左对齐、无图标、无配套「收起」
                 （再点一次就是收起）。左内边距必须自己给 —— `SESSION_OVERFLOW_BUTTON_CLASS`
                 自 45d09601 起只剩 `pr-3`，已经没有左内边距可继承 ✗ */}
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               type="button"
               aria-expanded={completedExpanded}
               onClick={() => {
@@ -1203,43 +1130,33 @@ export function Sidebar({
       >
         {!sidebarCollapsed && (
           <>
-            <div className="px-4 pt-3 pb-1">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1 min-w-0">
-                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t("sidebar.searchPlaceholder")}
-                    className="w-full rounded-xl border border-transparent bg-muted pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-border focus:bg-background transition-colors h-auto shadow-none"
-                  />
-                </div>
-                <div className="relative flex flex-shrink-0">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost"
-                        onClick={() => startNewSession()}
-                        className="h-8 w-8 rounded-l-xl text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center"
-                        aria-label={t("sidebar.newChat")}
-                      >
-                        <SquarePen className="w-4 h-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      {t("sidebar.newChat")}
-                    </TooltipContent>
-                  </Tooltip>
+            {/* 顶部一行：整行「新聊天」+ 行尾 hover 才浮出的 ▾（项目下拉）+ 常驻放大镜。
+                ▾ 绝对定位在整行右缘：平常用不到的三个入口不该占一行的地方，
+                但 hover / 行内聚焦时必须出现，否则它们就成了隐藏功能。 */}
+            <div className="px-3 pt-3 pb-1">
+              <div className="flex items-center gap-1">
+                <div className="group/newchat relative min-w-0 flex-1">
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => startNewSession()}
+                    className="h-8 w-full justify-start gap-2 rounded-lg px-3 text-sm font-normal text-foreground hover:bg-accent"
+                  >
+                    <SquarePen className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{t("sidebar.newChat")}</span>
+                  </Button>
                   <DropdownMenu
                     open={showProjectActions}
                     onOpenChange={setShowProjectActions}
                   >
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
-                        className="w-5 h-8 rounded-r-xl px-0 text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center"
+                        aria-label={t("sidebar.projectActions")}
+                        className="absolute right-0 top-0 h-8 w-6 rounded-md px-0 text-muted-foreground opacity-0 pointer-events-none transition-opacity group-hover/newchat:opacity-100 group-hover/newchat:pointer-events-auto group-focus-within/newchat:opacity-100 group-focus-within/newchat:pointer-events-auto hover:bg-primary/10 hover:text-primary-text"
                       >
-                        <ChevronDown className="w-3 h-3" />
+                        <ChevronDown className="h-3 w-3" />
                       </Button>
                     </DropdownMenuTrigger>
                     {/* ⚠️ 根必须同时包住触发器与内容 ✗（计划 8 ✓）。这里**没有** Tooltip ✓。
@@ -1249,7 +1166,7 @@ export function Sidebar({
                       className="w-44"
                       // ⚠️ **实测**（探针）：点菜单项打开对话框时 ✗，Radix 在关闭时会把焦点
                       // **归还给触发器** ✓ —— 于是它**抢走了对话框输入框的焦点** ✗✗
-                      //（`activeElement` 是那颗 `w-5 h-8 rounded-r-xl` 的 chevron ✓）。
+                      //（`activeElement` 是那颗触发器 ✓）。
                       // 阻止它 ✓，对话框自己的 `autoFocus` 才能生效 ✓。
                       onCloseAutoFocus={(event) => event.preventDefault()}
                     >
@@ -1289,6 +1206,15 @@ export function Sidebar({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => openSessionSearch()}
+                  aria-label={t("sidebar.searchChat")}
+                  className="h-8 w-8 shrink-0 rounded-lg px-0 text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <SearchIcon className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
@@ -1299,7 +1225,8 @@ export function Sidebar({
             >
               <div>
                 <section>
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     aria-expanded={ordinarySessionsExpanded}
                     aria-label={t(
@@ -1307,7 +1234,6 @@ export function Sidebar({
                         ? "sidebar.collapseSessions"
                         : "sidebar.expandSessions",
                     )}
-                    disabled={Boolean(normalizedQuery)}
                     onClick={() => {
                       requestSectionMotion(ORDINARY_SESSION_GROUP_KEY);
                       const nextExpanded = !ordinarySessionsExpanded;
@@ -1322,7 +1248,7 @@ export function Sidebar({
                         );
                       }
                     }}
-                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors h-auto"
                   >
                     <SidebarGroupIcon
                       kind="sessions"
@@ -1354,7 +1280,8 @@ export function Sidebar({
                         这里的尾槽跟它对齐（详见下面两颗按钮的 -mr-1），hover / 聚焦时浮出的
                         按钮才和会话行的时间 / 状态点落在同一条竖线上。 */}
                     <div className="group/projects flex items-center justify-between pr-0.5">
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
                         aria-expanded={projectsExpanded}
                         aria-label={t(
@@ -1362,7 +1289,6 @@ export function Sidebar({
                             ? "sidebar.collapseProjects"
                             : "sidebar.expandProjects",
                         )}
-                        disabled={Boolean(normalizedQuery)}
                         onClick={() => {
                           requestSectionMotion(PROJECTS_GROUP_KEY);
                           setProjectExpanded(
@@ -1370,7 +1296,7 @@ export function Sidebar({
                             !projectsExpanded,
                           );
                         }}
-                        className="min-w-0 flex-1 rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                        className="min-w-0 flex-1 rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors h-auto"
                       >
                         <SidebarGroupIcon
                           kind="project"
@@ -1380,7 +1306,9 @@ export function Sidebar({
                           }
                           badgeKind={projectsRootBadgeKind}
                         />
-                        <span className="truncate">{t("sidebar.projects")}</span>
+                        <span className="truncate">
+                          {t("sidebar.projects")}
+                        </span>
                       </Button>
                       {/* 两颗都藏着（`opacity-0` 会把焦点环一起吃成透明 ⇒ 补一条
                           `group-focus-within`，键盘 Tab 进来时才看得见）。
@@ -1391,7 +1319,8 @@ export function Sidebar({
                           靠 `mr-1` 把那 4px 补回来，图标中心仍在行右缘内缩 18px 那条线上。 */}
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost"
+                          <Button
+                            variant="ghost"
                             type="button"
                             size="iconXs"
                             onClick={(event) => {
@@ -1410,7 +1339,8 @@ export function Sidebar({
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost"
+                          <Button
+                            variant="ghost"
                             type="button"
                             size="iconXs"
                             onClick={(event) => {
@@ -1454,7 +1384,8 @@ export function Sidebar({
                                 className="group/project flex items-center justify-between pr-0.5"
                                 title={group.cwd}
                               >
-                                <Button variant="ghost"
+                                <Button
+                                  variant="ghost"
                                   type="button"
                                   aria-expanded={isProjectExpanded}
                                   aria-label={t(
@@ -1463,7 +1394,6 @@ export function Sidebar({
                                       : "sidebar.expandProject",
                                     { projectName: group.name },
                                   )}
-                                  disabled={Boolean(normalizedQuery)}
                                   onClick={() => {
                                     requestSectionMotion(group.key);
                                     const nextExpanded = !isProjectExpanded;
@@ -1475,7 +1405,7 @@ export function Sidebar({
                                       );
                                     }
                                   }}
-                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-sm font-normal leading-5 text-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-sm font-normal leading-5 text-foreground hover:bg-accent transition-colors h-auto"
                                 >
                                   <SidebarGroupIcon
                                     kind="project"
@@ -1489,7 +1419,8 @@ export function Sidebar({
                                 </Button>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button variant="ghost"
+                                    <Button
+                                      variant="ghost"
                                       type="button"
                                       onClick={(event) => {
                                         event.stopPropagation();
@@ -1511,7 +1442,8 @@ export function Sidebar({
                                 </Tooltip>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button variant="ghost"
+                                    <Button
+                                      variant="ghost"
                                       type="button"
                                       onClick={(event) => {
                                         event.stopPropagation();
@@ -1534,7 +1466,8 @@ export function Sidebar({
                                     不会挪位。置顶不再常显 —— 排在置顶区首位本身就是标记。 */}
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button variant="ghost"
+                                    <Button
+                                      variant="ghost"
                                       type="button"
                                       onClick={(event) =>
                                         handleToggleProjectPin(event, group.key)
@@ -1649,14 +1582,16 @@ export function Sidebar({
                   className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-border h-auto shadow-none"
                 />
                 <div className="flex items-center justify-end gap-2">
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     onClick={() => setCreateProjectModalOpen(false)}
                     disabled={isCreatingProject}
                     className="rounded-xl px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"
                   >
                     {t("sidebar.cancel")}
                   </Button>
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     onClick={() => void handleCreateProject()}
                     disabled={isCreatingProject}
                     className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"

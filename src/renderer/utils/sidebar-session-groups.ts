@@ -27,7 +27,7 @@ const EMPTY_SIDEBAR_PINS: SidebarPins = {
   projectKeys: [],
 };
 
-function sessionTime(session: Session): number {
+export function sessionTime(session: Session): number {
   return session.updatedAt || session.createdAt;
 }
 

@@ -469,33 +469,6 @@ describe("Sidebar session completion", () => {
     expect(container.querySelector('[data-session-id="s1"]')).toBeNull();
   });
 
-  it("搜索命中一条已完成的会话时组强制展开 —— 搜到了必须看得见", async () => {
-    useAppStore.setState({ activeSessionId: null });
-    await render([
-      session("hit", {
-        title: "宽度排查",
-        completedAt: 1_700_000_000_000,
-        updatedAt: 1,
-      }),
-      session("other", { title: "别的", updatedAt: 5 }),
-    ]);
-
-    expect(container.querySelector('[data-session-id="hit"]')).toBeNull();
-
-    const input = container.querySelector("input");
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(input, "宽度");
-      input?.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await flush();
-
-    expect(sessionRow("hit")).toBeTruthy();
-  });
-
   it("项目内列表的组头跟着内层缩进（pl-9），不是 pl-3", async () => {
     useAppStore.setState({ activeSessionId: null });
     const cwd = "/work/completed-group-indent";

@@ -15,6 +15,7 @@ const ipc = vi.hoisted(() => ({
   deleteProject: vi.fn(),
   archiveSession: vi.fn(),
   getSessionMessages: vi.fn(),
+  getSessionMessagesPage: vi.fn(),
   getSessionTraceSteps: vi.fn(),
   changeWorkingDir: vi.fn(),
   createProject: vi.fn(),
@@ -116,20 +117,6 @@ describe("Sidebar project groups", () => {
     } catch {
       // 存储不可用时保持内存态：与 Sidebar.saveGroupExpansion 一致
     }
-  }
-
-  async function search(value: string): Promise<void> {
-    const input = container.querySelector("input");
-    expect(input).toBeTruthy();
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(input, value);
-      input?.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await flush();
   }
 
   it("keeps session group headers on the horizontal inset", async () => {
@@ -373,9 +360,9 @@ describe("Sidebar project groups", () => {
     const expandedSessionsIcon = ordinary.querySelector(
       ".lucide-message-square-text",
     ) as SVGElement;
-    expect(collapsedSessionsIcon.classList.contains("text-muted-foreground")).toBe(
-      false,
-    );
+    expect(
+      collapsedSessionsIcon.classList.contains("text-muted-foreground"),
+    ).toBe(false);
     // 「最近」默认展开：展开态图标可见、收起态图标隐藏
     expect(expandedSessionsIcon.style.opacity).toBe("1");
     expect(collapsedSessionsIcon.style.opacity).toBe("0");
@@ -398,9 +385,9 @@ describe("Sidebar project groups", () => {
     const expandedProjectIcon = project.querySelector(
       ".lucide-folder-open",
     ) as SVGElement;
-    expect(collapsedProjectIcon.classList.contains("text-muted-foreground")).toBe(
-      false,
-    );
+    expect(
+      collapsedProjectIcon.classList.contains("text-muted-foreground"),
+    ).toBe(false);
     // 项目行的会话计数已删（2026-10-12）—— 这一行内不再有 muted 文本；
     // 本用例关心的图标状态断言在上下两段，原样保留。
     expect(collapsedProjectIcon.style.opacity).toBe("0");
@@ -471,10 +458,6 @@ describe("Sidebar project groups", () => {
       expect(
         animatedTargets.some((target) => target instanceof SVGElement),
       ).toBe(false);
-
-      animatedTargets.length = 0;
-      await search("ordinary");
-      expect(animatedTargets).toHaveLength(0);
     } finally {
       if (animateDescriptor) {
         Object.defineProperty(Element.prototype, "animate", animateDescriptor);
@@ -495,21 +478,6 @@ describe("Sidebar project groups", () => {
 
     expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
     expect(container.textContent).toContain("Active ordinary");
-  });
-
-  it("temporarily expands ordinary search results", async () => {
-    await render([session("ordinary", { title: "Find sidebar" })]);
-    // 先收起「最近」，才能看出搜索是否临时把它展开
-    await act(async () => ordinaryToggle().click());
-    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
-
-    await search("sidebar");
-    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
-    expect(ordinaryToggle().disabled).toBe(true);
-    expect(container.textContent).toContain("Find sidebar");
-
-    await search("");
-    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
   });
 
   it("renders dense project headers with hover-only actions", async () => {
@@ -840,45 +808,6 @@ describe("Sidebar project groups", () => {
     expect(container.querySelector('[title="/work/two/app"]')).toBeTruthy();
   });
 
-  it("keeps a project header while filtering sessions by title", async () => {
-    await render([
-      session("match", {
-        title: "Fix sidebar",
-        isProjectMode: true,
-        cwd: "/work/deskwand",
-      }),
-      session("miss", {
-        title: "Release notes",
-        isProjectMode: true,
-        cwd: "/work/deskwand",
-      }),
-    ]);
-
-    await search("sidebar");
-    expect(container.querySelector('[title="/work/deskwand"]')).toBeTruthy();
-    expect(container.textContent).toContain("Fix sidebar");
-    expect(container.textContent).not.toContain("Release notes");
-  });
-
-  it("shows the complete group when the project name matches", async () => {
-    await render([
-      session("one", {
-        title: "Fix sidebar",
-        isProjectMode: true,
-        cwd: "/work/deskwand",
-      }),
-      session("two", {
-        title: "Release notes",
-        isProjectMode: true,
-        cwd: "/work/deskwand",
-      }),
-    ]);
-
-    await search("deskwand");
-    expect(container.textContent).toContain("Fix sidebar");
-    expect(container.textContent).toContain("Release notes");
-  });
-
   it("starts a blank session only after a successful workspace change", async () => {
     ipc.invoke.mockResolvedValue({ success: true, path: "/work/deskwand" });
     useAppStore.setState({
@@ -956,17 +885,6 @@ describe("Sidebar project groups", () => {
     // 原选择器 `.group.relative.cursor-pointer` 会直接查不到（Sidebar.tsx:775 的 data-session-id 才是意图锚点）。
     const row = title?.closest("[data-session-id]");
     expect(row?.textContent).not.toContain("deskwand");
-
-    await search("deskwand");
-    // 分组头那颗折叠开关本来就写着项目名 —— 它不算「筛选 chip」✗。
-    // 2026-10-12 之前它因为尾巴上挂着会话计数（"deskwand1"）而碰巧没被这条断言抓到，
-    // 计数删掉后才真的暴露出来。按 `aria-expanded` 把它排除，断言仍然锁「没有 chip」。
-    const textButtons = Array.from(container.querySelectorAll("button")).filter(
-      (button) =>
-        button.textContent?.trim() === "deskwand" &&
-        !button.hasAttribute("aria-expanded"),
-    );
-    expect(textButtons).toHaveLength(0);
   });
 
   it("does not render a completed-task dismissal control", async () => {
@@ -1102,7 +1020,9 @@ describe("Sidebar project groups", () => {
     expect(showMore?.className).not.toContain("pl-9");
     expect(showMore?.className).toContain("text-muted-foreground");
     expect(showMore?.className).toContain("hover:text-muted-foreground");
-    expect(showMore?.className).toContain("focus-visible:text-muted-foreground");
+    expect(showMore?.className).toContain(
+      "focus-visible:text-muted-foreground",
+    );
     expect(showMore?.className).toContain("bg-transparent");
     expect(showMore?.className).toContain("hover:bg-transparent");
     expect(showMore?.className).toContain("focus-visible:bg-transparent");
@@ -1235,50 +1155,6 @@ describe("Sidebar project groups", () => {
     );
     expect(projectSection("/work/deskwand").textContent).toContain(
       i18n.t("sidebar.showMoreSessions", { count: 2 }),
-    );
-  });
-
-  it("temporarily expands search results and restores the visible count", async () => {
-    await render([
-      ...makeProjectSessions("deskwand", 12, 500),
-      ...makeProjectSessions("project-2", 1, 400),
-      ...makeProjectSessions("project-3", 1, 300),
-    ]);
-
-    // 2026-10-11：项目内列表的「展开更多」跟随内层缩进（36px = `pl-9`）
-    const projectMore = Array.from(
-      projectSection("/work/deskwand").querySelectorAll("button"),
-    ).find((button) =>
-      button.textContent?.includes(
-        i18n.t("sidebar.showMoreSessions", { count: 5 }),
-      ),
-    );
-    expect(projectMore).toBeTruthy();
-    expect(projectMore?.className).toContain("pl-9");
-    expect(projectMore?.className).not.toContain("pl-3");
-    expect(projectMore?.className).toContain("pr-3");
-
-    await act(async () =>
-      findButton(i18n.t("sidebar.showMoreSessions", { count: 5 }))?.click(),
-    );
-    expect(projectSection("/work/deskwand").textContent).toContain(
-      "deskwand chat 10",
-    );
-    expect(projectSection("/work/deskwand").textContent).not.toContain(
-      "deskwand chat 11",
-    );
-
-    await search("deskwand");
-    expect(projectSection("/work/deskwand").textContent).toContain(
-      "deskwand chat 12",
-    );
-
-    await search("");
-    expect(projectSection("/work/deskwand").textContent).toContain(
-      "deskwand chat 10",
-    );
-    expect(projectSection("/work/deskwand").textContent).not.toContain(
-      "deskwand chat 11",
     );
   });
 
@@ -1611,7 +1487,9 @@ describe("Sidebar project groups", () => {
       ),
     );
     expect(hint, "告警行必须存在").toBeTruthy();
-    expect(hint!.className, "告警必须是 error 语气").toContain("text-destructive");
+    expect(hint!.className, "告警必须是 error 语气").toContain(
+      "text-destructive",
+    );
   });
 
   it("keeps the confirmation open when the delete fails", async () => {
@@ -1637,54 +1515,6 @@ describe("Sidebar project groups", () => {
     expect(useAppStore.getState().globalNotice).toMatchObject({
       type: "error",
     });
-  });
-
-  it("counts the active sessions hidden by search, not the rendered group", async () => {
-    ipc.deleteProject.mockResolvedValue({
-      success: true,
-      path: "/work/deskwand",
-      deletedSessionIds: ["p1", "p2"],
-    });
-    await render([
-      session("p1", {
-        title: "Alpha",
-        isProjectMode: true,
-        cwd: "/work/deskwand",
-      }),
-      session("p2", {
-        title: "Beta",
-        isProjectMode: true,
-        cwd: "/work/deskwand",
-        status: "running",
-      }),
-    ]);
-
-    // 搜 "alpha" 后组里只剩 idle 的 Alpha，运行中的 Beta 被过滤掉了。
-    // 若计数取自渲染出来的 group.sessions，这里会算成 0 —— 这正是本用例守的规则。
-    await search("alpha");
-
-    const trash = projectHeader("/work/deskwand")?.querySelector(
-      `button[aria-label="${i18n.t("common.delete")}"]`,
-    ) as HTMLButtonElement;
-    expect(trash).toBeTruthy();
-    await act(async () => trash.click());
-
-    expect(document.body.textContent).toContain(
-      i18n.t("sidebar.deleteProjectRunningHint", { count: 1 }),
-    );
-
-    // 那条告警必须是 **error 语气** —— 承载语义（删除会打断正在跑的会话），不是装饰。
-    // 原实现是 `text-sm leading-6 text-destructive`，迁到 ConfirmDialog 后靠
-    // descriptionTone="error" 保住。计划 4 的 Review Focus #2 要的就是这一条。
-    const hint = Array.from(
-      document.body.querySelectorAll('[role="alertdialog"] p'),
-    ).find((p) =>
-      p.textContent?.includes(
-        i18n.t("sidebar.deleteProjectRunningHint", { count: 1 }),
-      ),
-    );
-    expect(hint, "告警行必须存在").toBeTruthy();
-    expect(hint!.className, "告警必须是 error 语气").toContain("text-destructive");
   });
 
   it("drops the deleted project's pin and expansion state", async () => {
@@ -2009,29 +1839,67 @@ describe("Sidebar project groups", () => {
     expect(sessionRow("recent").className).toContain("pl-3");
   });
 
-  it("keeps search and both new-session controls in the toolbar", async () => {
+  it("renders a new-chat row with a hover disclosure and a search button", async () => {
     await render([]);
-    const input = container.querySelector('input[type="text"]');
-    expect(input?.getAttribute("placeholder")).toBe(
-      i18n.t("sidebar.searchPlaceholder"),
-    );
-    const newChat = container.querySelector(
-      `button[aria-label="${i18n.t("sidebar.newChat")}"]`,
-    );
+
+    const newChat = findButton(i18n.t("sidebar.newChat"));
     expect(newChat).toBeTruthy();
-    const controls = newChat?.parentElement;
-    const dropdown = controls?.querySelector(
+    // 整行按钮（不是 32² 图标格）：文字在按钮里、宽度交给容器
+    expect(newChat?.className).toContain("w-full");
+    expect(newChat?.className).toContain("justify-start");
+
+    const disclosure = newChat?.parentElement?.querySelector(
       'button[data-state][aria-haspopup="menu"]',
     );
-    expect(dropdown).toBeTruthy();
-    // 工具栏左→右的 DOM 顺序（不量几何：jsdom 没有布局）：search → newChat → dropdown。
-    // `compareDocumentPosition` 返回位掩码，用 FOLLOWING 位确认先后。
-    expect(input?.compareDocumentPosition(newChat as Node) ?? 0).toBe(
+    expect(disclosure).toBeTruthy();
+    // 收起时不占视觉：hover / 行内聚焦才浮出
+    expect(disclosure?.className).toContain("opacity-0");
+    expect(disclosure?.className).toContain("group-hover/newchat:opacity-100");
+
+    const searchButton = container.querySelector(
+      `button[aria-label="${i18n.t("sidebar.searchChat")}"]`,
+    ) as HTMLButtonElement | null;
+    expect(searchButton).toBeTruthy();
+    await act(async () => searchButton?.click());
+    expect(useAppStore.getState().sessionSearchOpen).toBe(true);
+
+    // 内联搜索框已下线（改名输入框只在编辑态出现）
+    expect(container.querySelector('input[type="text"]')).toBeNull();
+    // DOM 顺序：新聊天行 → 放大镜
+    expect(newChat?.compareDocumentPosition(searchButton as Node) ?? 0).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(newChat?.compareDocumentPosition(dropdown as Node) ?? 0).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
+  });
+
+  it("tells the user when a session could not be opened", async () => {
+    ipc.getSessionMessagesPage.mockRejectedValue(new Error("ipc down"));
+    await render([session("stuck", { title: "Stuck" })]);
+
+    await act(async () => sessionRow("stuck").click());
+    await flush();
+
+    expect(useAppStore.getState().activeSessionId).toBeNull();
+    expect(useAppStore.getState().globalNotice?.message).toBe(
+      i18n.t("sidebar.openSessionFailed"),
     );
+  });
+
+  it("starts a blank chat from the new-chat row", async () => {
+    useAppStore.setState({
+      activeSessionId: "somewhere",
+      workingDir: "/work/eagent",
+    });
+    await render([session("somewhere", { title: "Somewhere" })]);
+
+    const newChat = findButton(i18n.t("sidebar.newChat"));
+    expect(newChat).toBeTruthy();
+
+    await act(async () => newChat?.click());
+    await flush();
+
+    expect(useAppStore.getState().activeSessionId).toBeNull();
+    expect(useAppStore.getState().workingDir).toBeNull();
+    expect(useAppStore.getState().activeView).toBe("chat");
   });
 
   it("retains truncation and rail space for long project titles", async () => {
@@ -2466,51 +2334,6 @@ describe("Sidebar group expansion persistence", () => {
     // proj-a has a valid boolean → respected
     expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
       "true",
-    );
-  });
-
-  it("does not dirty manual expansion overrides during search", async () => {
-    await render([
-      ...ordinarySessions(),
-      ...makeProjectSessions("proj-a", 1, 300),
-    ]);
-
-    // Collapse proj-a (index 0, normally expanded by default)
-    await act(async () => projectToggle("/work/proj-a").click());
-    expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
-      "false",
-    );
-
-    // Search — expands all matching groups
-    const input = container.querySelector("input");
-    expect(input).toBeTruthy();
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(input, "proj");
-      input?.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(projectToggle("/work/proj-a").disabled).toBe(true);
-
-    // Clear search — manual override should still hold
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(input, "");
-      input?.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
-      "false",
     );
   });
 

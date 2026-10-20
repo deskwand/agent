@@ -238,6 +238,8 @@ interface AppState {
    */
   pendingEditorAppend: string | null;
   ideaCaptureOpen: boolean;
+  /** 搜索弹窗（⌘K）。侧栏顶部那颗放大镜与快捷键共用这一个开关。 */
+  sessionSearchOpen: boolean;
   /** 打开浮层时要预填的文本（划词菜单带进来的）。空串 = 开一个空白浮层。 */
   ideaCaptureSeed: string;
   ideasInbox: IdeaSummary[];
@@ -399,6 +401,8 @@ interface AppState {
   setPendingEditorAppend: (text: string | null) => void;
   openIdeaCapture: (seed?: string) => void;
   closeIdeaCapture: () => void;
+  openSessionSearch: () => void;
+  closeSessionSearch: () => void;
   setShowArchivedIdeas: (show: boolean) => void;
   selectIdea: (name: string | null) => void;
   loadIdeas: () => Promise<void>;
@@ -716,6 +720,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingEditorText: null,
   pendingEditorAppend: null,
   ideaCaptureOpen: false,
+  sessionSearchOpen: false,
   ideaCaptureSeed: "",
   ideasInbox: [],
   ideasArchived: [],
@@ -832,6 +837,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   openIdeaCapture: (seed?: string) =>
     set({ ideaCaptureOpen: true, ideaCaptureSeed: seed ?? "" }),
   closeIdeaCapture: () => set({ ideaCaptureOpen: false }),
+  openSessionSearch: () => set({ sessionSearchOpen: true }),
+  closeSessionSearch: () => set({ sessionSearchOpen: false }),
   setShowArchivedIdeas: (showArchivedIdeas) => set({ showArchivedIdeas }),
   selectIdea: (ideasSelectedName) => set({ ideasSelectedName }),
 

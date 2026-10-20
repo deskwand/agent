@@ -972,6 +972,12 @@
     "helpText1": "导出的诊断包会包含应用日志、脱敏后的运行环境信息，以及最近会话/错误的元数据摘要，不会默认附带消息正文。",
     "helpText2": "把诊断包发给我们后，通常可以更快定位到是前端异常、工具调用失败，还是配置/环境问题。"
   },
+  "searchPalette": {
+    "chats": "聊天",
+    "quickActions": "快捷操作",
+    "empty": "没有匹配的聊天",
+    "openFolder": "打开文件夹"
+  },
   "sidebar": {
     "recents": "最近",
     "running": "运行中",
@@ -980,8 +986,8 @@
     "noTasks": "暂无任务",
     "noTasksHint": "开始一个新聊天，继续构建、调研或编辑文件。",
     "search": "搜索聊天...",
-    "searchPlaceholder": "搜索会话或项目...",
-    "newChat": "新建",
+    "searchChat": "搜索聊天",
+    "newChat": "新聊天",
     "deleteAll": "删除所有聊天",
     "newTaskHint": "开启一段全新的聊天",
     "localTasks": "这些任务在本地运行，不会在设备间同步。",
@@ -1004,7 +1010,9 @@
     "apps": "连接",
     "allSessions": "会话",
     "emptyTitle": "还没有会话",
-    "emptyHint": "点击「新建」开始",
+    "emptyHint": "点击「新聊天」开始",
+    "projectActions": "项目操作",
+    "openSessionFailed": "无法打开这个会话，请再试一次",
     "newSessionInProject": "在项目下新建会话",
     "newSessionForProject": "在该项目下新建会话",
     "newSessionForProjectFailed": "无法在该项目下新建会话",
