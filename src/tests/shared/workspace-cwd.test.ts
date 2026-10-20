@@ -50,3 +50,16 @@ describe("toSshWorkspace / formatWorkspaceCwd", () => {
     expect(formatWorkspaceCwd("/Users/a/proj")).toBe("/Users/a/proj");
   });
 });
+
+describe("远程路径归一化（纯字符串实现，不依赖 Node 的 path.posix）", () => {
+  it("折叠重复分隔符、`.` 段与 `..` 段", () => {
+    expect(toSshWorkspace("h1", "/srv//./app/../app")).toBe("ssh://h1/srv/app");
+  });
+
+  it("根路径与尾部斜杠都能往返", () => {
+    expect(parseWorkspaceCwd(toSshWorkspace("h1", "/")).path).toBe("/");
+    expect(parseWorkspaceCwd(toSshWorkspace("h1", "/srv/app/")).path).toBe(
+      "/srv/app",
+    );
+  });
+});

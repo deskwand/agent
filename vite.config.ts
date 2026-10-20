@@ -373,6 +373,13 @@ export default defineConfig({
                 // NodeCanvasFactory for page rendering (image-only PDF pages).
                 // Native addons must not be bundled.
                 "@napi-rs/canvas",
+                // ssh2 optionally loads two native addons via literal requires
+                // (`./crypto/build/Release/sshcrypto.node` and `cpu-features`),
+                // both inside try/catch. Rollup follows those requires and tries
+                // to parse the Mach-O/ELF binary as JS, which fails the main
+                // build. Keep ssh2 external so its own loader runs at runtime
+                // and falls back to the pure-JS ciphers when a binding is absent.
+                "ssh2",
               ],
               output: {
                 // Ensure consistent interop for CJS/ESM
