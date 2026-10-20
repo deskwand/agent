@@ -21,6 +21,9 @@
  */
 import type { ModelCost, ModelCostRates } from "@earendil-works/pi-ai";
 
+// ⚠️ 改这张表的"形状"（加/删档位、增删条目）必须同时把 usage-store.ts 的
+// ROLLUP_VERSION +1，否则日聚合表里的历史桶会按错误档位计价，而运行时检查抓不到
+// （tier = -1 永远解析得到）。纯改费率不用 bump：定价发生在读取时。
 export const MODEL_PRICE_OVERRIDES: Record<string, ModelCost> = {
   // xAI grok-code-fast-1 = 官方模型名 grok-build-0.1 的别名（同 grok-code-fast）。
   // 官方按单次 prompt 是否达到 200k 分档，达到后**整条请求**都按高价计 —— 与本表的
@@ -135,6 +138,7 @@ export interface PeakRates {
  * （deskwand 云与用户 relay 的 provider id 都是运行期生成的，枚举不出来）。
  * 值是人手写的字面量，不做运行期负价守卫 —— 由 usage-cost.test.ts 的不变量用例钉住。
  */
+// ⚠️ 同上：增删条目或改峰谷时段常量，必须把 usage-store.ts 的 ROLLUP_VERSION +1。
 export const MODEL_PEAK_PRICING: Record<string, PeakRates> = {
   // deepseek-flash = DeepSeek-V4.1-Flash（2026-09-10 官方改名）。
   "*|deepseek-flash": {

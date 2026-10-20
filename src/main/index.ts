@@ -194,8 +194,15 @@ import { eventRequiresSessionManager } from "./client-event-utils";
 import { backfillUsageFromSessions } from "./usage/usage-backfill";
 import { getExchangeRates, warmExchangeRateCache } from "./usage/exchange-rate";
 import { backfillSubagentUsageFromSessions } from "./usage/usage-subagent-backfill";
-import { removePooledSubagentRows } from "./usage/usage-store";
-import { queryUsage } from "./usage/usage-store";
+import {
+  ROLLUP_VERSION,
+  isRollupFresh,
+  queryUsage,
+  rebuildUsageRollup,
+  removePooledSubagentRows,
+  rollupIntegrityOk,
+} from "./usage/usage-store";
+import { loadPriceIndex } from "./usage/usage-cost";
 import { DEFAULT_USAGE_RANGE, type UsageRange } from "../shared/usage";
 import { getUnsupportedWorkspacePathReason } from "./workspace-path-constraints";
 import {
@@ -656,7 +663,8 @@ function createWindow() {
   // controlled by CSS and the window background color.
   const effectiveTheme = resolveEffectiveTheme(savedTheme);
   const themePreset = (configStore.get("themePreset") as string) || "zinc";
-  const presetBg = THEME_PRESET_BG[themePreset as ThemePreset] || THEME_PRESET_BG.zinc;
+  const presetBg =
+    THEME_PRESET_BG[themePreset as ThemePreset] || THEME_PRESET_BG.zinc;
   const THEME =
     effectiveTheme === "dark"
       ? {
@@ -1263,6 +1271,14 @@ app
     // evaluation finishes.
     void ensureUsageBackfilled();
 
+    // 聚合表：新鲜时只花一次 state 读 + 两次小表聚合，否则就地重建一次。
+    //
+    // 刻意**不 await 回填完成**（上面那句是 void）：两者并发是安全的 —— 回填逐块写入
+    // 时若 state 行已存在就走增量 upsert，重建则清空后按 id 分页重来、末尾用 `id >
+    // maxId` 的尾巴补齐（见 design §6.2）。串起来反而会把重建推迟到一个几秒级的全量
+    // 重扫之后。
+    void ensureUsageRollup();
+
     // Initialize internal browser panel (WebContentsView embedded in main window)
     if (mainWindow) {
       browserViewManager = new BrowserViewManager();
@@ -1336,7 +1352,8 @@ app
         !mainWindow.isDestroyed()
       ) {
         const tp = (configStore.get("themePreset") as string) || "zinc";
-        const presetBg = THEME_PRESET_BG[tp as ThemePreset] || THEME_PRESET_BG.zinc;
+        const presetBg =
+          THEME_PRESET_BG[tp as ThemePreset] || THEME_PRESET_BG.zinc;
         mainWindow.setBackgroundColor(
           nativeTheme.shouldUseDarkColors ? presetBg.dark : presetBg.light,
         );
@@ -1899,6 +1916,40 @@ function refreshSubagentUsage() {
     return sub;
   });
 }
+
+let usageRollupPromise: Promise<void> | null = null;
+
+/**
+ * 聚合表的新鲜度闸门：新鲜就什么都不做，否则就地重建。
+ *
+ * 挂在启动预热里（在两次回填之后 —— 先把语料灌进 usage_records 再归并），同时也被
+ * `usage.query` 在发现陈旧时触发；但**查询本身不 await 它**：那次查询走原始路径，
+ * 结果正确只是慢，重建在后台跑完，下一次打开就是毫秒级。
+ *
+ * promise 是守卫：并发触发共享同一轮；失败清空以便下次重试（而不是缓存错误）。
+ */
+function ensureUsageRollup(): Promise<void> {
+  if (!usageRollupPromise) {
+    usageRollupPromise = (async () => {
+      const db = getDatabase().raw;
+      const index = loadPriceIndex();
+      if (isRollupFresh(db, index) && rollupIntegrityOk(db)) return;
+      const merged = await rebuildUsageRollup(db, index);
+      log(`[Usage] rollup rebuilt rows=${merged} version=${ROLLUP_VERSION}`);
+    })()
+      .catch((error) => {
+        logWarn("[Usage] rollup rebuild failed:", error);
+      })
+      // 无论成败都在收尾时清空守卫：成功时留着它，会让"运行期才发现的陈旧"（价目表
+      // 形状变了、有人手工删了 state 行）永远触发不了第二次重建 —— 页面就静默地一直
+      // 走 450ms 的兜底路径。清空后每次陈旧查询都会重试一次（重建本身仍是幂等的）。
+      .finally(() => {
+        usageRollupPromise = null;
+      });
+  }
+  return usageRollupPromise;
+}
+
 const piTrustPending = new Map<string, (decision: boolean | null) => void>();
 
 ipcMain.handle("pi-ext.resolve-trust", async (_event, cwd: string) => {
@@ -4780,7 +4831,14 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         requested === "all"
           ? requested
           : DEFAULT_USAGE_RANGE;
-      const snapshot = queryUsage(getDatabase().raw, range, Date.now());
+      // 聚合表陈旧时：本次查询走原始路径（正确但 ~450ms），重建在后台跑，不阻塞这次 IPC
+      const snapshot = queryUsage(
+        getDatabase().raw,
+        range,
+        Date.now(),
+        loadPriceIndex(),
+        () => void ensureUsageRollup(),
+      );
       // 未定价的模型：页面只展示计数，明细只有日志能告诉我们该往覆盖表补哪一条
       // （src/main/usage/model-price-overrides.ts）。
       // 故意不做去重缓存：切一次区间就重打一遍同一批模型。噪声可接受，
@@ -4900,7 +4958,8 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         if (mainWindow && !mainWindow.isDestroyed()) {
           const effectiveTheme = resolveEffectiveTheme(nextTheme);
           const tp = (configStore.get("themePreset") as string) || "zinc";
-          const presetBg = THEME_PRESET_BG[tp as ThemePreset] || THEME_PRESET_BG.zinc;
+          const presetBg =
+            THEME_PRESET_BG[tp as ThemePreset] || THEME_PRESET_BG.zinc;
           mainWindow.setBackgroundColor(
             effectiveTheme === "dark" ? presetBg.dark : presetBg.light,
           );
@@ -4915,13 +4974,16 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       }
       // ⚠️ 名单必须来自 shared/theme：2026-10-10 之前这里是硬编码的**旧** 7 个 id
       //（paper/void/…），于是新底色（stone/mauve/…）一律校验不过、静默不落盘。
-      if (VALID_THEME_PRESETS.includes(event.payload.themePreset as ThemePreset)) {
+      if (
+        VALID_THEME_PRESETS.includes(event.payload.themePreset as ThemePreset)
+      ) {
         configStore.update({
           themePreset: event.payload.themePreset as ThemePreset,
         });
         if (mainWindow && !mainWindow.isDestroyed()) {
           const tp = event.payload.themePreset;
-          const presetBg = THEME_PRESET_BG[tp as ThemePreset] || THEME_PRESET_BG.zinc;
+          const presetBg =
+            THEME_PRESET_BG[tp as ThemePreset] || THEME_PRESET_BG.zinc;
           const effectiveTheme = resolveEffectiveTheme(
             getSavedThemePreference(),
           );
@@ -4938,7 +5000,9 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         });
       }
       // 强调色：与底色同构，但它不影响原生窗口底色，所以没有 setBackgroundColor 那一段。
-      if (VALID_THEME_ACCENTS.includes(event.payload.themeAccent as ThemeAccent)) {
+      if (
+        VALID_THEME_ACCENTS.includes(event.payload.themeAccent as ThemeAccent)
+      ) {
         configStore.update({
           themeAccent: event.payload.themeAccent as ThemeAccent,
         });

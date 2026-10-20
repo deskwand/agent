@@ -304,3 +304,97 @@ export function isPeakAt(ts: number): boolean {
     (window) => minute >= window.startMinute && minute < window.endMinute,
   );
 }
+
+/**
+ * 聚合桶：把"一条记录"压成"一个定价档位"。
+ *
+ * 桶内的记录共享同一套费率，所以**先累加 token 再套价与逐条套价精确相等**——这是
+ * 日粒度预聚合能成立的全部理由。之所以要存 peak / tier 两个维度：本机 84% 的行命中
+ * 峰谷计划、1,829 行跨档，丢了任意一个维度都会算错。
+ */
+export interface UsageBucket {
+  provider: string | null;
+  model: string | null;
+  peak: 0 | 1;
+  tier: number;
+}
+
+/**
+ * 该记录命中的档位阈值，-1 = 基础档。
+ *
+ * 用**恒等比较**认回 ratesFor 选中的那个 tier 对象：ratesFor 直接把 cost.tiers 里的
+ * 元素赋给返回值，引用相等是它给出的最直接契约。刻意不在这里重写一遍"取阈值最大的
+ * 那档"的规则——那条规则只能有一份实现，否则两处会漂移。
+ */
+function matchedTierOf(cost: ModelCost, promptTokens: number): number {
+  const rates = ratesFor(cost, promptTokens);
+  return (
+    (cost.tiers ?? []).find((tier) => tier === rates)?.inputTokensAbove ?? -1
+  );
+}
+
+/**
+ * 按阈值精确取档；undefined = 当前价目表里没有这一档 = 聚合表陈旧。
+ * 只在同文件内部用（costOfBucket 定价、isBucketResolvable 判陈旧），不导出。
+ */
+function tierRateOf(cost: ModelCost, tier: number): ModelCostRates | undefined {
+  if (tier === -1) return cost;
+  return (cost.tiers ?? []).find(
+    (candidate) => candidate.inputTokensAbove === tier,
+  );
+}
+
+/**
+ * 记录 → 桶。
+ *
+ * peak 对**所有**模型都判定，不只对有计划的那几个：某个模型将来被加进
+ * MODEL_PEAK_PRICING 时，历史桶里已经带了正确的峰谷标记，只需一次版本重建。
+ */
+export function bucketOf(index: PriceIndex, row: UsageCostRow): UsageBucket {
+  const bucket: UsageBucket = {
+    provider: row.provider,
+    model: row.model,
+    peak: isPeakAt(row.ts) ? 1 : 0,
+    tier: -1,
+  };
+  // 计划命中即取代价目表，与 costOfRecord 同语义（计划值不含 tiers）
+  if (index.plans.get(row.model ?? "")) return bucket;
+  const cost = resolveModelCost(index, row.provider, row.model);
+  if (cost) {
+    bucket.tier = matchedTierOf(
+      cost,
+      row.input + row.cacheRead + row.cacheWrite,
+    );
+  }
+  return bucket;
+}
+
+/** 读取侧定价：桶 + token 累加 → 金额。null = 该桶无价目（与 costOfRecord 同语义）。 */
+export function costOfBucket(
+  index: PriceIndex,
+  bucket: UsageBucket,
+  tokens: UsageTokens,
+): number | null {
+  const plan = index.plans.get(bucket.model ?? "");
+  if (plan) {
+    return costOfTokens(bucket.peak === 1 ? plan.peak : plan.offPeak, tokens);
+  }
+  const cost = resolveModelCost(index, bucket.provider, bucket.model);
+  if (!cost) return null;
+  const rates = tierRateOf(cost, bucket.tier);
+  // 纵深防御：档位解析不到说明价目表被改过而聚合表没重建。返回 null —— 宁可不计价，
+  // 也绝不按错误档位计价。
+  if (!rates) return null;
+  return costOfTokens(rates, tokens);
+}
+
+/** 桶的档位在**当前**价目表里能否解析。false = 聚合表陈旧。 */
+export function isBucketResolvable(
+  index: PriceIndex,
+  bucket: UsageBucket,
+): boolean {
+  if (bucket.tier === -1) return true;
+  const cost = resolveModelCost(index, bucket.provider, bucket.model);
+  if (!cost) return true; // 无价目是合法的"无价"状态，不是陈旧
+  return tierRateOf(cost, bucket.tier) !== undefined;
+}
