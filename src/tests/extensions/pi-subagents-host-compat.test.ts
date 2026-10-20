@@ -46,6 +46,56 @@ describe("pi-subagents 0.19.0 patch surfaces survive on the 0.99.1 host", () => 
   it("still records toolCallId on foreground records", () => {
     expect(index).toContain("if (fgRec) fgRec.toolCallId = toolCallId");
   });
+
+  // 「子代理结果被 TTL 清掉后还能取回」那组修复的补丁面。行为正确性由
+  // pi-subagents-result-history-runtime.test.ts 用真实工厂证明；这里只保证
+  // 补丁没有在重生成时丢掉任一处接线（丢了就是静默退回「Agent not found」）。
+  const patchText = readFileSync(
+    join(process.cwd(), "patches/@tintinweb+pi-subagents+0.19.0.patch"),
+    "utf8",
+  );
+
+  it("keeps the persisted-result fallback wired into get_subagent_result", () => {
+    expect(index).toContain(
+      'import { findHistoricalResult, formatHistoricalResult } from "./result-history.js"',
+    );
+    expect(index).toContain(
+      "findHistoricalResult(ctx.sessionManager.getEntries(), params.agent_id)",
+    );
+    expect(index).toContain(
+      "return textResult(formatHistoricalResult(historical, params.verbose))",
+    );
+  });
+
+  it("keeps every settle path writing the session snapshot", () => {
+    expect(index).toContain("function persistAgentResult(record) {");
+    expect(index).toContain("persistAgentResult(record);");
+    // 前台 resume 由 AgentManager 就地 settle，不触发完成回调，所以它必须自己
+    // 落盘；同时先写启动屏障，避免退回上一次运行的答案。
+    expect(index).toContain(
+      "startForegroundResume(manager, pi, existing, params, signal)",
+    );
+    expect(index).toContain('piRef.appendEntry("subagents:result-state"');
+    expect(index).toContain(
+      'pi.appendEntry("subagents:result-state", { id, status: "queued" })',
+    );
+  });
+
+  // 上面两组同时要落在**补丁文本**里：本地 node_modules 是打过补丁的，光查它
+  // 无法发现「重生成时丢了 index.js 的 hunk」——那种情况下干净安装会静默回到
+  // 没有回退的版本。
+  it("the patch text carries the entry-point wiring, not just the helper files", () => {
+    for (const wiring of [
+      'import { findHistoricalResult, formatHistoricalResult } from "./result-history.js"',
+      "findHistoricalResult(ctx.sessionManager.getEntries(), params.agent_id)",
+      "function persistAgentResult(record) {",
+      "startForegroundResume(manager, pi, existing, params, signal)",
+      'piRef.appendEntry("subagents:result-state"',
+      'pi.appendEntry("subagents:result-state", { id, status: "queued" })',
+    ]) {
+      expect(patchText, `补丁缺少接线：${wiring}`).toContain(wiring);
+    }
+  });
 });
 
 describe("pi-subagents host-side assumptions still hold (independent of our patch)", () => {
@@ -69,6 +119,20 @@ describe("pi-subagents host-side assumptions still hold (independent of our patc
     ]) {
       expect(read(file), `${file} 不再调用 manager.listAgents()`).toContain(
         "manager.listAgents()",
+      );
+    }
+  });
+
+  it("the history helper ships with the patch, not only in this checkout", () => {
+    // 补丁面：干净安装后 helper 必须真的被 patch-package 写进 dist，
+    // 否则入口 import 会在运行期抛 ERR_MODULE_NOT_FOUND。
+    const patch = readFileSync(
+      join(process.cwd(), "patches/@tintinweb+pi-subagents+0.19.0.patch"),
+      "utf8",
+    );
+    for (const file of ["result-history.js", "result-history.d.ts"]) {
+      expect(patch, `${file} 不在补丁里`).toContain(
+        `b/node_modules/@tintinweb/pi-subagents/dist/${file}`,
       );
     }
   });

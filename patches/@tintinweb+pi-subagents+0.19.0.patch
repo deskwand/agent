@@ -1,8 +1,68 @@
 diff --git a/node_modules/@tintinweb/pi-subagents/dist/index.js b/node_modules/@tintinweb/pi-subagents/dist/index.js
-index 79e7820..917d43b 100644
+index 79e7820..50181c5 100644
 --- a/node_modules/@tintinweb/pi-subagents/dist/index.js
 +++ b/node_modules/@tintinweb/pi-subagents/dist/index.js
-@@ -677,6 +677,7 @@ export default function (pi) {
+@@ -14,6 +14,7 @@ import { isAbsolute, join } from "node:path";
+ import { defineTool, getAgentDir, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
+ import { Container, Key, matchesKey, SettingsList, Spacer, Text } from "@earendil-works/pi-tui";
+ import { Type } from "@sinclair/typebox";
++import { findHistoricalResult, formatHistoricalResult } from "./result-history.js";
+ import { abortable } from "./abortable.js";
+ import { hasAgentBadge, renderAgentName } from "./agent-color.js";
+ import { buildNewAgentFile, disableInContent, enableInContent, isEmptyStub, locateAgentFile, personalAgentsDir, projectAgentsDir, serializeAgentFile } from "./agent-file-toggle.js";
+@@ -522,11 +523,7 @@ export default function (pi) {
+             pi.events.emit("subagents:completed", eventData);
+         }
+         // Persist final record for cross-extension history reconstruction
+-        pi.appendEntry("subagents:record", {
+-            id: record.id, type: record.type, description: record.description,
+-            status: record.status, result: record.result, error: record.error,
+-            startedAt: record.startedAt, completedAt: record.completedAt,
+-        });
++        persistAgentResult(record);
+         // Skip notification if result was already consumed via get_subagent_result
+         if (record.resultConsumed) {
+             agentActivity.delete(record.id);
+@@ -551,6 +548,15 @@ export default function (pi) {
+     }, undefined, (record) => {
+         if (!isTopLevelAgent(record))
+             return;
++        // A run that has STARTED outranks any earlier final snapshot for the same
++        // id: without this, a resume that is still in flight (or whose completion
++        // write is yet to land) would let `get_subagent_result` serve the PREVIOUS
++        // run's answer once the live record is evicted. Settles are written by
++        // persistAgentResult, so the newest matching entry always describes the
++        // latest run this session knows about.
++        pi.appendEntry("subagents:result-state", {
++            id: record.id, status: "running",
++        });
+         // Agent-tool spawns refresh these surfaces in their tool handler, but RPC
+         // and scheduler spawns enter through the manager directly.
+         if (currentCtx?.hasUI) {
+@@ -585,6 +591,22 @@ export default function (pi) {
+         if (reportUsage)
+             pendingUsage.add(usage);
+     });
++    /**
++     * Write a settled run into the session as `subagents:record` — the copy that
++     * outlives the record itself, and what `get_subagent_result` falls back to
++     * once `cleanup()` has evicted it. Called from every settle path of a
++     * top-level agent: the manager's completion callback, and the foreground
++     * resume branch of the Agent tool (which settles inline without firing that
++     * callback). Fields are the historical contract: readers key off `id` and
++     * `status`/`result`/`error`.
++     */
++    function persistAgentResult(record) {
++        pi.appendEntry("subagents:record", {
++            id: record.id, type: record.type, description: record.description,
++            status: record.status, result: record.result, error: record.error,
++            startedAt: record.startedAt, completedAt: record.completedAt,
++        });
++    }
+     // Expose manager via Symbol.for() global registry for cross-package access.
+     // Standard Node.js pattern for cross-package singletons (used by OpenTelemetry, etc.).
+     // Documented for callers in docs/rpc.md ("The manager registry").
+@@ -677,6 +699,7 @@ export default function (pi) {
          waitForAll: () => manager.waitForAll(),
          hasRunning: () => manager.hasRunning(),
          spawn: spawnTopLevel,
@@ -10,7 +70,7 @@ index 79e7820..917d43b 100644
          getRecord: (id) => {
              const record = manager.getRecord(id);
              return record !== undefined && isTopLevelAgent(record) ? record : undefined;
-@@ -686,6 +687,10 @@ export default function (pi) {
+@@ -686,6 +709,10 @@ export default function (pi) {
      if (ownsManagerRegistry) {
          globalThis[MANAGER_KEY] = registryEntry;
      }
@@ -21,7 +81,7 @@ index 79e7820..917d43b 100644
      // --- Cross-extension RPC via pi.events ---
      let currentCtx;
      // RPC handlers + the `subagents:ready` broadcast are wired on `session_start`
-@@ -1021,6 +1026,7 @@ export default function (pi) {
+@@ -1021,6 +1048,7 @@ export default function (pi) {
          if (ownsManagerRegistry && globalThis[MANAGER_KEY] === registryEntry) {
              delete globalThis[MANAGER_KEY];
          }
@@ -29,7 +89,59 @@ index 79e7820..917d43b 100644
          scheduler.stop();
          // Before abortAll, and not folded into it: a workflow owns a worker thread
          // as well as its children, and only its own signal terminates that.
-@@ -2044,6 +2050,8 @@ Terse command-style prompts produce shallow, generic work.
+@@ -1250,8 +1278,42 @@ export default function (pi) {
+             description: existing.description,
+             isBackground: true,
+         });
++        // A queued resume has no onStart until the queue drains it, so mark the
++        // new run here — otherwise the previous run's saved result stays the
++        // newest snapshot while this one waits for a concurrency slot.
++        if (record.status === "queued") {
++            pi.appendEntry("subagents:result-state", { id, status: "queued" });
++        }
+         return record;
+     }
++    /**
++     * Run the Agent tool's FOREGROUND resume, keeping the session's snapshot of
++     * that agent consistent with the new run.
++     *
++     * The manager settles a foreground resume inline (`resume()` sets status,
++     * result and completedAt directly) without firing the completion callback
++     * the background paths use — so without this, a resumed agent's new answer
++     * would never reach `subagents:record` and `get_subagent_result` would keep
++     * serving the PREVIOUS run's answer after the live record ages out.
++     *
++     * `manager.resume()` runs synchronously up to its first `await`, so the
++     * record is already "running" when it returns its promise: a start barrier
++     * written here is ordered before the settle snapshot, and a request the
++     * manager refused (still running/queued, or no session) leaves no barrier
++     * behind — it changed nothing, so it must not shadow anything either.
++     */
++    async function startForegroundResume(managerRef, piRef, existing, params, signal) {
++        const pending = managerRef.resume(params.resume, params.prompt, signal);
++        if (existing.status === "running") {
++            piRef.appendEntry("subagents:result-state", {
++                id: existing.id, status: "running",
++            });
++        }
++        const settled = await pending;
++        if (settled)
++            persistAgentResult(settled);
++        return settled;
++    }
+     // Grab UI context from first tool execution + clear lingering widget on new turn
+     pi.on("tool_execution_start", async (_event, ctx) => {
+         widget.setUICtx(ctx.ui);
+@@ -1854,7 +1916,7 @@ Terse command-style prompts produce shallow, generic work.
+                         `\nYou will be notified when this agent completes.\n` +
+                         `Use get_subagent_result to retrieve full results, or steer_subagent to send it messages.`, { ...detailBaseFor(record), toolUses: record.toolUses, tokens: "", durationMs: 0, status: "background", agentId: id });
+                 }
+-                const record = await manager.resume(params.resume, params.prompt, signal);
++                const record = await startForegroundResume(manager, pi, existing, params, signal);
+                 if (!record) {
+                     return textResult(`Failed to resume agent "${params.resume}".`);
+                 }
+@@ -2044,6 +2106,8 @@ Terse command-style prompts produce shallow, generic work.
                      // onSpawned: called synchronously after spawn, before onSessionCreated fires.
                      // Set up the output file so streamToOutputFile can pick it up.
                      const fgRec = manager.getRecord(fgAgentId);
@@ -38,3 +150,154 @@ index 79e7820..917d43b 100644
                      attachTranscript(fgRec, fgAgentId);
                  });
                  record = fgResult.record;
+@@ -2514,9 +2578,26 @@ Terse command-style prompts produce shallow, generic work.
+                 description: "If true, include the agent's full conversation (messages + tool calls). Default: false.",
+             })),
+         }),
+-        execute: async (_toolCallId, params, signal, _onUpdate, _ctx) => {
++        execute: async (_toolCallId, params, signal, _onUpdate, ctx) => {
+             const record = resolveAgentRef(params.agent_id);
+-            if (!record || !isTopLevelAgent(record)) {
++            if (!record) {
++                // The record may simply have outlived its 10-minute TTL while its
++                // result is still saved in this session — answer from that rather
++                // than claiming the agent never existed. `getEntries` (not
++                // `getBranch`) is deliberate: the entry belongs to the parent
++                // session, and branching it must not deny access to a result the
++                // same tool would have returned moments before the cleanup.
++                const historical = findHistoricalResult(ctx.sessionManager.getEntries(), params.agent_id);
++                if (historical) {
++                    return textResult(formatHistoricalResult(historical, params.verbose));
++                }
++                return textResult(`Agent not found: "${params.agent_id}". It may have been cleaned up.`);
++            }
++            // A live record that this surface does not own (a nested child or a
++            // workflow's agent) is refused outright, and deliberately WITHOUT the
++            // history fallback above: ownership is a permission question, and a
++            // saved snapshot must not become a way around it.
++            if (!isTopLevelAgent(record)) {
+                 return textResult(`Agent not found: "${params.agent_id}". It may have been cleaned up.`);
+             }
+             // Wait for completion if requested. Cancellation stops only this tool
+diff --git a/node_modules/@tintinweb/pi-subagents/dist/result-history.d.ts b/node_modules/@tintinweb/pi-subagents/dist/result-history.d.ts
+new file mode 100644
+index 0000000..aaaf1d3
+--- /dev/null
++++ b/node_modules/@tintinweb/pi-subagents/dist/result-history.d.ts
+@@ -0,0 +1,29 @@
++/**
++ * Type surface for result-history.js (the implementation is plain JS in this
++ * package's dist; this declaration is what the TS side sees).
++ */
++export type HistoricalResultStatus =
++    | "completed"
++    | "steered"
++    | "stopped"
++    | "aborted"
++    | "error";
++
++export interface HistoricalResult {
++    id: string;
++    status: HistoricalResultStatus;
++    /** The run's final assistant text, when it was saved. */
++    result?: string;
++    /** Failure text for `status: "error"`. */
++    error?: string;
++}
++
++export declare function findHistoricalResult(
++    entries: readonly unknown[],
++    id: string,
++): HistoricalResult | undefined;
++
++export declare function formatHistoricalResult(
++    record: HistoricalResult,
++    verbose?: boolean,
++): string;
+diff --git a/node_modules/@tintinweb/pi-subagents/dist/result-history.js b/node_modules/@tintinweb/pi-subagents/dist/result-history.js
+new file mode 100644
+index 0000000..a84ec8b
+--- /dev/null
++++ b/node_modules/@tintinweb/pi-subagents/dist/result-history.js
+@@ -0,0 +1,81 @@
++/**
++ * result-history.ts — Read a subagent's FINAL result back out of the session's
++ * own persisted entries, for the case where the live record is already gone.
++ *
++ * `AgentManager.cleanup()` evicts finished records ten minutes after they
++ * settle, and that eviction is what bounds memory — so it is deliberate, and
++ * must not be traded away for reachability. The same extension already writes
++ * every terminal record into the session as `subagents:record`, so the result
++ * outlives the record it came from; this module is the reader for it.
++ *
++ * Two rules carry the weight here:
++ *
++ * - The newest match wins, and an unusable newest match ends the search.
++ *   `subagents:result-state` marks a run that has started but not settled, so
++ *   a stale earlier answer sitting behind it belongs to a PREVIOUS run and
++ *   must not be served as this one's. Same for a damaged snapshot: falling
++ *   back to an older success would answer a question it cannot answer.
++ * - Only the fields that reach the caller are validated. The snapshot's other
++ *   fields (timestamps, usage, ids) are informational, and a shape change in
++ *   one of them is not a reason to discard a result that is otherwise intact.
++ *
++ * Deliberately narrow: exact `agent_id` only. Handles and output-file paths
++ * are not part of this contract.
++ */
++const TERMINAL = new Set(["completed", "steered", "stopped", "aborted", "error"]);
++const SNAPSHOT_TYPES = ["subagents:record", "subagents:result-state"];
++
++function object(value) {
++    return value !== null && typeof value === "object" && !Array.isArray(value);
++}
++
++/**
++ * Find the terminal snapshot for `id` in `entries` (session order).
++ * Returns undefined when the newest match is a start barrier, a non-terminal
++ * status, or malformed.
++ */
++export function findHistoricalResult(entries, id) {
++    for (let i = entries.length - 1; i >= 0; i--) {
++        const entry = entries[i];
++        if (!object(entry) ||
++            entry.type !== "custom" ||
++            !SNAPSHOT_TYPES.includes(entry.customType) ||
++            !object(entry.data) ||
++            entry.data.id !== id)
++            continue;
++        const data = entry.data;
++        // Start barrier, or an older/unknown host's non-terminal record: the
++        // newest thing we know about this agent is "not settled yet".
++        if (entry.customType === "subagents:result-state" || !TERMINAL.has(data.status))
++            return;
++        if (data.result !== undefined && typeof data.result !== "string")
++            return;
++        if (data.error !== undefined && typeof data.error !== "string")
++            return;
++        return { id, status: data.status, result: data.result, error: data.error };
++    }
++}
++
++/**
++ * Render a historical result. Every non-clean status is stated in words, so a
++ * partial output can't be mistaken for a completed answer, and the source line
++ * tells the caller why `verbose` cannot return a conversation.
++ */
++export function formatHistoricalResult(record, verbose = false) {
++    const notes = {
++        stopped: "STOPPED BY THE USER; task unfinished; output is partial",
++        aborted: "Aborted at the turn limit; output may be incomplete",
++        steered: "Wrapped up at the turn limit; output may be partial",
++        error: "Failed; any saved output is partial",
++    };
++    let text = `Agent ID: ${record.id}\nStatus: ${record.status}\n` +
++        "Source: persisted result from the current parent session\n";
++    if (notes[record.status])
++        text += `${notes[record.status]}\n`;
++    if (record.status === "error")
++        text += `Error: ${record.error ?? "unknown"}\n`;
++    text += `\n${record.result?.trim() || "No final output was saved."}`;
++    if (verbose)
++        text += "\n\nFull conversation is unavailable in this historical snapshot.";
++    return text;
++}
