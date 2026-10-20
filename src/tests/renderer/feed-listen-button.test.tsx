@@ -81,8 +81,7 @@ beforeEach(() => {
   root = createRoot(container);
 });
 afterEach(async () => {
-  // 不卸载的话，上一个用例挂上的 `useFeedListenInterrupts` 订阅还会活着，
-  // 后一个用例的 setState 会把它一并唤醒。
+  // 不卸载的话，上一个用例挂上的订阅还会活着，后一个用例的 setState 会把它一并唤醒。
   await act(async () => root.unmount());
   container.remove();
 });
@@ -158,34 +157,9 @@ describe("FeedListenButton", () => {
     );
   });
 
-  it("双向互斥：消息朗读开始 → 停收听；语音模式打开 → 停收听", () => {
-    const stop = vi.fn();
-    setFeedListenControllerForTests({
-      getState: () => ({
-        session: null,
-        status: "idle",
-        progress: null,
-        skipped: 0,
-      }),
-      start: vi.fn(),
-      toggle: vi.fn(),
-      next: vi.fn(),
-      prev: vi.fn(),
-      stop,
-    });
-    useAppStore.setState({ feedListen: sessionWith(0) });
-    render();
-
-    act(() =>
-      useAppStore.setState({
-        readAloud: { ...useAppStore.getState().readAloud, status: "playing" },
-      }),
-    );
-    expect(stop).toHaveBeenCalledTimes(1);
-
-    act(() => useAppStore.setState({ voiceModeOpen: true }));
-    expect(stop).toHaveBeenCalledTimes(2);
-  });
+  // 双向互斥（消息朗读 / 语音模式 → 停收听）的用例已搬到
+  // speaker-interrupts.test.tsx：那个规则的挂载点从本组件移到了 App.tsx，
+  // 留在这里就测不到它了。
 
   it("播放中：图标是三根音条，不再画 Pause 字形", () => {
     useAppStore.setState({ feedListen: sessionWith(0) });

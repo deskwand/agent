@@ -178,4 +178,38 @@ describe("捕获浮层", () => {
     expect(noticeKey()).toBe("capture.saved");
     expect(useAppStore.getState().globalNotice?.actionLabel).toBeUndefined();
   });
+
+  it("划词菜单带 seed 打开时预填文本，并把光标落到末尾", async () => {
+    // 真实路径是「浮层关着 → 菜单带 seed 把它打开」，所以先把开状态收回去。
+    act(() => useAppStore.setState({ ideaCaptureOpen: false }));
+    await view.render(<IdeaCaptureOverlay />);
+    act(() => useAppStore.getState().openIdeaCapture("选中的一段正文"));
+    await act(async () => {});
+
+    const box = document.body.querySelector("textarea")!;
+    expect(box.value).toBe("选中的一段正文");
+    expect(box.selectionStart).toBe("选中的一段正文".length);
+    expect(box.selectionEnd).toBe("选中的一段正文".length);
+  });
+
+  it("超长选中不截断：照原样填进去，交给既有超长提示与保存门禁", async () => {
+    act(() => useAppStore.setState({ ideaCaptureOpen: false }));
+    await view.render(<IdeaCaptureOverlay />);
+    const long = "字".repeat(4100); // 上限是 4000 码点
+    act(() => useAppStore.getState().openIdeaCapture(long));
+    await act(async () => {});
+
+    expect(document.body.querySelector("textarea")?.value).toHaveLength(4100);
+    expect(saveButton().disabled).toBe(true);
+  });
+
+  it("不带 seed 打开仍是空白的（快捷键路径）", async () => {
+    act(() => useAppStore.setState({ ideaCaptureOpen: false }));
+    await view.render(<IdeaCaptureOverlay />);
+    act(() => useAppStore.getState().openIdeaCapture());
+    await act(async () => {});
+
+    expect(useAppStore.getState().ideaCaptureSeed).toBe("");
+    expect(document.body.querySelector("textarea")?.value).toBe("");
+  });
 });

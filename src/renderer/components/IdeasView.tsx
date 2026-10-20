@@ -571,7 +571,7 @@ export function IdeasView(): JSX.Element {
                 aria-label={t("ideas.addWithShortcut", {
                   keys: captureShortcutLabel(window.electronAPI?.platform),
                 })}
-                onClick={openIdeaCapture}
+                onClick={() => openIdeaCapture()}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <Plus className="h-4 w-4" />

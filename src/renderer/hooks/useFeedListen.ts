@@ -14,6 +14,10 @@
  */
 import { useEffect } from "react";
 import { useAppStore } from "../store";
+// 三路音频互停：本文件从「只管收听」扩成三者仲裁后就要认识另两路。
+// 依赖方向是单向的（两路都只被这里调），不成环。
+import { stopReadAloud } from "./useReadAloud";
+import { stopSelectionSpeech } from "../utils/tts/selection-speech";
 import {
   groupSpeechSegments,
   textToSpeechSegments,
@@ -436,26 +440,42 @@ export function useFeedListen(): FeedListenState & { stop: () => void } {
 }
 
 /**
- * 收听与其它音频互斥的守卫：宿主挂一次就够。
+ * 说话者互停：整条朗读、订阅收听、划词朗读三者任一时刻只允许一个出声。
  *
- * 1. 消息朗读开始 → 停收听（订阅 store，一处覆盖所有朗读入口）；
- * 2. 语音模式打开 → 停收听（与 `useVoiceMode` 停朗读是同一件事的另一半）。
+ * 放这个文件里是历史原因（它最早只管订阅收听），但它管的是三路音频，
+ * 挂载点在 App.tsx —— 不要挂回某个功能组件里，那样组件挪个位置规则就静默失效。
+ *
+ * 1. 任一路起播（状态从 idle 变成非 idle）→ 停另外两路；
+ * 2. 语音模式打开 → 停收听与划词朗读（整条朗读由 useVoiceMode 自己停）。
+ *
+ * 判据只看 idle ↔ 非 idle 的翻转，所以停止自身（落回 idle）不会再触发一轮，无回环。
  */
-export function useFeedListenInterrupts(): void {
+export function useSpeakerInterrupts(): void {
   useEffect(() => {
-    const unsubReadAloud = useAppStore.subscribe((state, prev) => {
-      if (
-        prev.readAloud.status === "idle" &&
-        state.readAloud.status !== "idle"
-      ) {
+    const unsubSpeakers = useAppStore.subscribe((state, prev) => {
+      const started = (next: string, before: string) =>
+        before === "idle" && next !== "idle";
+      if (started(state.readAloud.status, prev.readAloud.status)) {
+        stopFeedListen();
+        stopSelectionSpeech();
+      }
+      if (started(state.feedListen.status, prev.feedListen.status)) {
+        stopReadAloud();
+        stopSelectionSpeech();
+      }
+      if (started(state.selectionSpeech.status, prev.selectionSpeech.status)) {
+        stopReadAloud();
         stopFeedListen();
       }
     });
     const unsubVoice = useAppStore.subscribe((state, prev) => {
-      if (!prev.voiceModeOpen && state.voiceModeOpen) stopFeedListen();
+      if (!prev.voiceModeOpen && state.voiceModeOpen) {
+        stopFeedListen();
+        stopSelectionSpeech();
+      }
     });
     return () => {
-      unsubReadAloud();
+      unsubSpeakers();
       unsubVoice();
     };
   }, []);

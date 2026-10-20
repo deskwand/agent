@@ -339,6 +339,10 @@ describe("灵感视图", () => {
     expect(add!.getAttribute("aria-label")).toBe("ideas.addWithShortcut");
     act(() => add!.click());
     expect(useAppStore.getState().ideaCaptureOpen).toBe(true);
+    // 必顶：`openIdeaCapture` 现在收一个可选的 seed，而 React 会把 click 事件
+    // 当成第一个实参传进来 —— 那样 seed 会变成 MouseEvent，浮层一渲染就撞死在
+    // text.trim() 上，整棵 UI 被 ErrorBoundary 顶掉。
+    expect(useAppStore.getState().ideaCaptureSeed).toBe("");
   });
 
   it("列表空的时候这颗按钮也还在（不至于只剩一句 ⌘⇧K 教学）", async () => {

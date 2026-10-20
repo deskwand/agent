@@ -39,6 +39,8 @@ import { pruneDrafts, removeDraft } from "../utils/chat-draft-store";
 // 必须是类型 import：hook 那边要真的 import 本模块的 useAppStore，
 // 两边都用真值 import 就是循环依赖。类型 import 编译后会被抹掉，不成环。
 import type { ReadAloudState } from "../hooks/useReadAloud";
+// 同上：划词朗读的会话要真的 import 本模块的 useAppStore。
+import type { SelectionSpeechState } from "../utils/tts/selection-speech";
 // 类型 import（不是值）：controller 会 import 本模块，两边都用真值 import 就是循环依赖。
 import type { CapabilityGateState } from "../capabilities/capability-gate";
 // 同上一条：类型 import 编译后会被抹掉，与 hook 那边的真值 import 不成环。
@@ -236,6 +238,8 @@ interface AppState {
    */
   pendingEditorAppend: string | null;
   ideaCaptureOpen: boolean;
+  /** 打开浮层时要预填的文本（划词菜单带进来的）。空串 = 开一个空白浮层。 */
+  ideaCaptureSeed: string;
   ideasInbox: IdeaSummary[];
   ideasArchived: IdeaSummary[];
   /** 解析不出来的 md 文件数（用户手改坏了），列表顶部会提示。 */
@@ -266,6 +270,13 @@ interface AppState {
   /** 「按下播放但没有可播条目」的一次性提示。 */
   feedListenNotice: "empty" | null;
   setFeedListen: (patch: Partial<FeedListenState>) => void;
+  /**
+   * 划词朗读的会话状态。放 store 不是为了跨组件共享，而是因为三说话者互停
+   * 靠 store 订阅实现（见 hooks/useFeedListen 的 useSpeakerInterrupts）——
+   * 状态不进 store，那套互停就看不见它。
+   */
+  selectionSpeech: SelectionSpeechState;
+  setSelectionSpeech: (patch: Partial<SelectionSpeechState>) => void;
   startFeedListen: (opts?: { fromItemId?: string }) => Promise<void>;
   /** 用量页显示货币（ISO 4217）；金额本位永远是 USD。 */
   currency: CurrencyCode;
@@ -386,7 +397,7 @@ interface AppState {
   addSession: (session: Session) => void;
   setPendingEditorText: (text: string | null) => void;
   setPendingEditorAppend: (text: string | null) => void;
-  openIdeaCapture: () => void;
+  openIdeaCapture: (seed?: string) => void;
   closeIdeaCapture: () => void;
   setShowArchivedIdeas: (show: boolean) => void;
   selectIdea: (name: string | null) => void;
@@ -705,6 +716,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingEditorText: null,
   pendingEditorAppend: null,
   ideaCaptureOpen: false,
+  ideaCaptureSeed: "",
   ideasInbox: [],
   ideasArchived: [],
   ideasSkipped: 0,
@@ -733,6 +745,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     skipped: 0,
   },
   feedListenNotice: null,
+  selectionSpeech: { status: "idle" },
   currency: readStoredCurrency(),
   currencyRate: null,
   settingsTab: null,
@@ -815,7 +828,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPendingEditorText: (text) => set({ pendingEditorText: text }),
 
   setPendingEditorAppend: (text) => set({ pendingEditorAppend: text }),
-  openIdeaCapture: () => set({ ideaCaptureOpen: true }),
+  // 每次都写 seed：这样「快捷键开一个空白浮层」不会捡到上一次划词留下的文本。
+  openIdeaCapture: (seed?: string) =>
+    set({ ideaCaptureOpen: true, ideaCaptureSeed: seed ?? "" }),
   closeIdeaCapture: () => set({ ideaCaptureOpen: false }),
   setShowArchivedIdeas: (showArchivedIdeas) => set({ showArchivedIdeas }),
   selectIdea: (ideasSelectedName) => set({ ideasSelectedName }),
@@ -1538,6 +1553,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setFeedListen: (patch) =>
     set((s) => ({ feedListen: { ...s.feedListen, ...patch } })),
+  // 与 setReadAloud / setFeedListen 同形：每次都是新对象，zustand 的引用比较才能触发重渲染。
+  setSelectionSpeech: (patch) =>
+    set((s) => ({ selectionSpeech: { ...s.selectionSpeech, ...patch } })),
 
   startFeedListen: async (opts) => {
     const items = get().feedItems;

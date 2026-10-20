@@ -2744,5 +2744,13 @@
     "confirm": {
       "voice": "Reading replies aloud needs the voice model (~130MB). Download it now?"
     }
+  },
+  "selectionMenu": {
+    "readAloud": "Read",
+    "stopReading": "Stop reading",
+    "saveIdea": "Save idea",
+    "quote": "Quote",
+    "copy": "Copy",
+    "quoted": "Quoted into the input — switch to chat to send it"
   }
 }

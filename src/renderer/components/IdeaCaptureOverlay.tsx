@@ -105,10 +105,19 @@ export function IdeaCaptureOverlay(): JSX.Element {
 
   useEffect(() => {
     if (!open) return;
-    setText("");
+    // seed 在这里现取，**不进依赖**：浮层已经打开时再按一次「记一笔」快捷键会把
+    // seed 写成空串，进了依赖就会重跑这条 effect 并把用户正在写的正文清空。
+    setText(useAppStore.getState().ideaCaptureSeed);
     setBusy(false);
-    // 焦点要落在框里：浮层的全部价值就是"打开就能写"。
-    const id = window.setTimeout(() => boxRef.current?.focus(), 0);
+    // 焦点要落在框里：浮层的全部价值就是"打开就能写"。划词带进来的文本把光标放
+    // 末尾，接着写就顺。
+    const id = window.setTimeout(() => {
+      const box = boxRef.current;
+      if (!box) return;
+      box.focus();
+      const end = box.value.length;
+      box.setSelectionRange(end, end);
+    }, 0);
     return () => window.clearTimeout(id);
   }, [open]);
 

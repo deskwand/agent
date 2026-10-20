@@ -17,11 +17,7 @@ import {
   SkipForward,
   X,
 } from "lucide-react";
-import {
-  feedListenController,
-  useFeedListen,
-  useFeedListenInterrupts,
-} from "../hooks/useFeedListen";
+import { feedListenController, useFeedListen } from "../hooks/useFeedListen";
 import { TitlebarButton } from "./TitlebarButton";
 import { Button } from "./app-button";
 
@@ -30,7 +26,6 @@ const CONTROL_CLASS =
 
 export function FeedListenButton(): JSX.Element | null {
   const { t } = useTranslation();
-  useFeedListenInterrupts();
   const listen = useFeedListen();
   const session = listen.session;
   if (!session) return null;

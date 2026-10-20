@@ -2741,5 +2741,13 @@
     "confirm": {
       "voice": "朗读需要先装语音模型，约 130MB。现在下载吗？"
     }
+  },
+  "selectionMenu": {
+    "readAloud": "朗读",
+    "stopReading": "停止朗读",
+    "saveIdea": "记一笔",
+    "quote": "引用",
+    "copy": "复制",
+    "quoted": "已引用到输入框，切到聊天页即可发送"
   }
 }

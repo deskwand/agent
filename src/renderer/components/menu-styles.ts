@@ -73,3 +73,14 @@ export const MENU_BADGE_CLASS =
  */
 export const MENU_ITEM_AFTER_SLOT_CLASS =
   "flex h-7 w-full min-w-0 flex-1 items-center gap-2 rounded-lg pl-1 pr-2.5 text-left text-sm transition-colors";
+
+/**
+ * 横排菜单（划词菜单）的一行。
+ *
+ * 与 `MENU_ITEM_CLASS` 的结构相同，但**不含 `w-full` 与 `text-left`**：横排要按内容
+ * 自适应宽度。这里必须另起一个常量而不是在外面覆盖 `w-full` —— 同一属性冲突时
+ * Tailwind 的胜出顺序由生成 CSS 决定、不由 className 书写顺序决定（同上文
+ * `MENU_ITEM_AFTER_SLOT_CLASS` 的教训）。
+ */
+export const MENU_ITEM_BAR_CLASS =
+  "flex h-7 items-center gap-2 whitespace-nowrap rounded-lg px-2.5 text-sm transition-colors";

@@ -19,6 +19,7 @@ const MENU_FILES = [
   "src/renderer/components/usage/CurrencySelect.tsx",
   "src/renderer/components/MergedInputChip.tsx",
   "src/renderer/components/SlashMenu.tsx",
+  "src/renderer/components/SelectionMenuHost.tsx",
   "src/renderer/components/AccountMenu.tsx",
   "src/renderer/components/Sidebar.tsx",
   "src/renderer/components/VaultView.tsx",

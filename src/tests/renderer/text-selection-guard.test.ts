@@ -24,6 +24,10 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import {
+  SELECTION_ALLOW,
+  SELECTION_SUPPRESS,
+} from "../../renderer/utils/selection-menu";
 import { css, RENDERER } from "./theme-css-helpers";
 
 /** 剥掉注释：注释里的选择器名不能当成选择器（见文件头）。 */
@@ -184,5 +188,18 @@ describe("可选性分层守卫", () => {
     for (const rel of SELECTABLE_SURFACES) {
       expect(selectableIn(rel), `${rel} 缺少 .selectable`).toBeGreaterThan(0);
     }
+  });
+
+  it("JS 的划词名单与 CSS allowlist 双向逐项相等", () => {
+    // 两份名单分开维护，漏同步的失败模式是静默的：新面没有划词菜单，测试却全绿。
+    const split = (value: string) =>
+      value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .sort();
+    expect(split(`${SELECTION_ALLOW}, ${SELECTION_SUPPRESS}`)).toEqual(
+      split(allowlistRule().selector),
+    );
   });
 });

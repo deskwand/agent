@@ -19,6 +19,7 @@ import {
   usePendingDialogs,
 } from "./store/selectors";
 import { useIPC } from "./hooks/useIPC";
+import { useSpeakerInterrupts } from "./hooks/useFeedListen";
 import { useVoiceModeShortcut } from "./hooks/useVoiceModeShortcut";
 import { VoiceModeHost } from "./components/voice-mode/VoiceModeHost";
 import type { EmotionSignal } from "../shared/voice-emotion";
@@ -51,6 +52,7 @@ import { TopUpModal } from "./components/TopUpModal";
 import { Titlebar } from "./components/Titlebar";
 import { SandboxSetupDialog } from "./components/SandboxSetupDialog";
 import { SandboxSyncToast } from "./components/SandboxSyncToast";
+import { SelectionMenuHost } from "./components/SelectionMenuHost";
 import { GlobalNoticeToast } from "./components/GlobalNoticeToast";
 import { CapabilityDownloadConfirm } from "./components/CapabilityDownloadConfirm";
 import { getCapabilityGate } from "./capabilities/capability-gate";
@@ -129,6 +131,9 @@ function App() {
     useSandboxSetupState();
   const sandboxSyncStatus = useSandboxSyncStatus();
   const { pendingPermission, pendingSudoPassword } = usePendingDialogs();
+  // 三路音频互停（整条朗读 / 订阅收听 / 划词朗读）。挂这里而不是功能组件里：
+  // 它管的是全局规则，挂在某个按钮上会随那个组件的位置变化而静默失效。
+  useSpeakerInterrupts();
 
   // Actions are still pulled directly from the store
   const setShowConfigModal = useAppStore((s) => s.setShowConfigModal);
@@ -904,6 +909,9 @@ function App() {
 
       {/* 记一笔：快捷键与标题栏按钮共用这一个浮层，与语音模式互斥。 */}
       <IdeaCaptureOverlay />
+
+      {/* 划词菜单：全局常驻，与内容组件零耦合（可划选面的 allowlist 即契约）。 */}
+      <SelectionMenuHost />
 
       {voiceModeOpen &&
       voiceModeSessionId &&
