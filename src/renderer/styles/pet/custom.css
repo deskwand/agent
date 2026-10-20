@@ -1,0 +1,75 @@
+/* 图片占 88%，给 2px 光晕留出余量：72px 窗口的边界会裁掉更大的外发光。 */
+.pet-custom {
+  width: 88%;
+  height: 88%;
+  display: grid;
+  place-items: center;
+}
+.pet-custom__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+}
+.pet-custom[data-state="idle"] .pet-custom__img {
+  animation: pet-custom-float 4s ease-in-out infinite;
+}
+.pet-custom[data-state="running"] .pet-custom__img {
+  filter: drop-shadow(0 0 2px #6f9bff) brightness(1.08);
+  animation: pet-custom-breathe 1.3s ease-in-out infinite;
+}
+.pet-custom[data-state="success"] .pet-custom__img {
+  filter: drop-shadow(0 0 2px #ffd58a) brightness(1.15);
+  animation: pet-custom-pop 0.6s ease-out 1;
+}
+.pet-custom[data-state="failure"] .pet-custom__img {
+  filter: drop-shadow(0 0 2px #ff8b8b);
+  animation: pet-custom-shake 0.5s ease-in-out infinite;
+}
+@keyframes pet-custom-float {
+  0%,
+  100% {
+    transform: translateY(1px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes pet-custom-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+@keyframes pet-custom-pop {
+  0% {
+    transform: scale(0.94);
+  }
+  55% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes pet-custom-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* 与上面的 state 规则同特异性，靠媒体查询在后的顺序覆盖它们。 */
+  .pet-custom[data-state] .pet-custom__img {
+    animation: none;
+  }
+}

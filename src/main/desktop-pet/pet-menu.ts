@@ -1,9 +1,8 @@
 /**
- * 桌宠"外形"原生菜单。
+ * 桌宠“外形”原生菜单。
  *
  * 为什么是原生菜单：桌宠窗口只有 72×72，自绘菜单会被窗口边界裁掉。
- * 为什么全在主进程：清单（共享模块）、当前值（配置）、文案（主进程 i18n）
- * 三样都在主进程手里，渲染层没有能力也无需送进任何角色数据。
+ * 为什么全在主进程：清单、当前值、文案都在主进程手里，渲染层无需送进任何角色数据。
  */
 import {
   Menu,
@@ -26,30 +25,63 @@ const LABEL_KEYS: Record<PetCharacter, string> = {
   egg: "pet.charEgg",
 };
 
-export function buildPetCharacterMenuTemplate(
-  current: PetCharacter,
-  onSelect: (character: PetCharacter) => void,
-): MenuItemConstructorOptions[] {
-  return PET_CHARACTERS.map((id) => ({
-    type: "radio" as const,
-    label: t(LABEL_KEYS[id]),
-    checked: id === current,
-    click: () => onSelect(id),
-  }));
+export interface PetMenuCustomImage {
+  enabled: boolean;
+  exists: boolean;
+}
+
+export interface PetCharacterMenuOptions {
+  character: PetCharacter;
+  customImage: PetMenuCustomImage | null;
+  onSelectCharacter: (character: PetCharacter) => void;
+  onSelectCustomImage: () => void;
+  onChooseCustomImage: () => void;
+  onRemoveCustomImage: () => void;
+}
+
+export function buildPetCharacterMenuTemplate({
+  character,
+  customImage,
+  onSelectCharacter,
+  onSelectCustomImage,
+  onChooseCustomImage,
+  onRemoveCustomImage,
+}: PetCharacterMenuOptions): MenuItemConstructorOptions[] {
+  // 文件丢了就按“自定义图没生效”处理：内置角色显示实际回落项，避免一个勾选都没有。
+  const builtInChecked = !(customImage?.enabled && customImage.exists);
+  const items: MenuItemConstructorOptions[] = [
+    { label: t("pet.chooseImage"), click: onChooseCustomImage },
+  ];
+
+  if (customImage) {
+    if (customImage.exists) {
+      items.push({
+        type: "radio",
+        label: t("pet.customImage"),
+        checked: customImage.enabled,
+        click: onSelectCustomImage,
+      });
+    }
+    items.push({ label: t("pet.removeImage"), click: onRemoveCustomImage });
+  }
+
+  items.push({ type: "separator" });
+  for (const id of PET_CHARACTERS) {
+    items.push({
+      type: "radio",
+      label: t(LABEL_KEYS[id]),
+      checked: builtInChecked && id === character,
+      click: () => onSelectCharacter(id),
+    });
+  }
+  return items;
 }
 
 export function openPetCharacterMenu({
   window,
-  current,
-  onSelect,
-}: {
-  window: BrowserWindow;
-  current: PetCharacter;
-  onSelect: (character: PetCharacter) => void;
-}): void {
-  const menu = Menu.buildFromTemplate(
-    buildPetCharacterMenuTemplate(current, onSelect),
-  );
+  ...options
+}: { window: BrowserWindow } & PetCharacterMenuOptions): void {
+  const menu = Menu.buildFromTemplate(buildPetCharacterMenuTemplate(options));
   // 保留活引用：原生菜单没有活引用时可能在显示期间被 GC 收掉。
   openMenus.add(menu);
   menu.once("menu-will-close", () => openMenus.delete(menu));

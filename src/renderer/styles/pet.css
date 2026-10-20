@@ -5,6 +5,7 @@
 @import "./pet/jellyfish.css";
 @import "./pet/octopus.css";
 @import "./pet/egg.css";
+@import "./pet/custom.css";
 
 html,
 body,

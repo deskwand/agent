@@ -61,3 +61,28 @@ describe("uiFontSize", () => {
     );
   });
 });
+
+describe("petCustomImage", () => {
+  it("defaults to no custom image", () => {
+    expect(defaultStoredConfig().petCustomImage).toBeNull();
+  });
+
+  it("drops a stored custom image with an unsafe file name", () => {
+    const stored = {
+      ...defaultStoredConfig(),
+      petCustomImage: { fileName: "../escape.png", enabled: true },
+    } as unknown as StoredConfig;
+    expect(buildProjectedConfig(stored).petCustomImage).toBeNull();
+  });
+
+  it("keeps a safe stored custom image", () => {
+    const stored = {
+      ...defaultStoredConfig(),
+      petCustomImage: { fileName: "custom-1.png", enabled: false },
+    } as StoredConfig;
+    expect(buildProjectedConfig(stored).petCustomImage).toEqual({
+      fileName: "custom-1.png",
+      enabled: false,
+    });
+  });
+});

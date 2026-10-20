@@ -22,6 +22,10 @@ import {
 } from "../../shared/pet-characters";
 import type { PetCharacter } from "../../shared/pet-characters";
 import {
+  normalizePetCustomImage,
+  type PetCustomImageConfig,
+} from "../../shared/pet-appearance";
+import {
   normalizeWebAccessConfig,
   type WebAccessConfig,
 } from "../../shared/web-access";
@@ -155,6 +159,8 @@ export interface AppConfig {
   uiFontSize?: number;
   petEnabled?: boolean;
   petCharacter?: PetCharacter;
+  /** 主进程使用；主窗口的 config snapshot 会带上它，但渲染层不消费。 */
+  petCustomImage?: PetCustomImageConfig | null;
   sandboxEnabled: boolean;
   /** SSH 服务器列表。密码不在这里，只在 testConnection 的一次调用里。 */
   sshHosts?: SshHostConfig[];
@@ -195,6 +201,7 @@ export interface StoredConfig {
   uiFontSize?: number;
   petEnabled?: boolean;
   petCharacter?: PetCharacter;
+  petCustomImage?: PetCustomImageConfig | null;
   sandboxEnabled: boolean;
   /** SSH 服务器列表。密码不在这里，只在 testConnection 的一次调用里。 */
   sshHosts?: SshHostConfig[];
@@ -321,6 +328,7 @@ export function defaultStoredConfig(): StoredConfig {
     uiFontSize: UI_FONT_SIZE_DEFAULT,
     petEnabled: false,
     petCharacter: DEFAULT_PET_CHARACTER,
+    petCustomImage: null,
     sandboxEnabled: false,
     sshHosts: [],
     memoryEnabled: false,
@@ -993,6 +1001,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     petCharacter: isPetCharacter(stored.petCharacter)
       ? stored.petCharacter
       : DEFAULT_PET_CHARACTER,
+    petCustomImage: normalizePetCustomImage(stored.petCustomImage),
     sandboxEnabled: stored.sandboxEnabled,
     sshHosts: stored.sshHosts ?? [],
     memoryEnabled: stored.memoryEnabled,
@@ -1172,6 +1181,8 @@ export class ConfigStore {
       stored.petEnabled = updates.petEnabled;
     if (isPetCharacter(updates.petCharacter))
       stored.petCharacter = updates.petCharacter;
+    if (updates.petCustomImage !== undefined)
+      stored.petCustomImage = normalizePetCustomImage(updates.petCustomImage);
     if (updates.visionModel !== undefined)
       stored.visionModel = updates.visionModel;
     if (updates.voiceEngine !== undefined)

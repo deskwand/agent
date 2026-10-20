@@ -2,7 +2,15 @@ import { BrowserWindow, ipcMain, screen } from "electron";
 import Store from "electron-store";
 import { join } from "node:path";
 import { logError } from "../utils/logger";
-import type { PetCharacter } from "../../shared/pet-characters";
+import {
+  DEFAULT_PET_CHARACTER,
+  type PetCharacter,
+} from "../../shared/pet-characters";
+import {
+  resolvePetAppearance,
+  type PetAppearance,
+  type PetCustomImageConfig,
+} from "../../shared/pet-appearance";
 import type { PetStateTracker } from "./pet-state";
 import { openPetCharacterMenu } from "./pet-menu";
 import {
@@ -50,25 +58,41 @@ function isValidStoredPosition(
  */
 const MAX_DRAG_STEP = 1000;
 
+export interface PetAppearanceState {
+  character: PetCharacter;
+  customImage: PetCustomImageConfig | null;
+}
+
+export interface PetWindowControllerOptions {
+  /** 主窗口关闭后会被重建，因此每次点击都取当前窗口，不能保存旧引用。 */
+  getMainWindow: () => BrowserWindow | null;
+  tracker: PetStateTracker;
+  getAppearanceState: () => PetAppearanceState;
+  readCustomImage: (fileName: string) => Promise<string | null>;
+  hasCustomImage: (fileName: string) => boolean;
+  onSelectCharacter: (character: PetCharacter) => void;
+  onSelectCustomImage: () => void;
+  onChooseCustomImage: () => Promise<void>;
+  onRemoveCustomImage: () => Promise<void>;
+}
+
 export interface PetWindowController {
   setEnabled(enabled: boolean): void;
-  setCharacter(character: PetCharacter): void;
+  refreshAppearance(): Promise<void>;
   dispose(): void;
 }
 
 export function createPetWindowController({
   getMainWindow,
   tracker,
-  getCharacter,
+  getAppearanceState,
+  readCustomImage,
+  hasCustomImage,
   onSelectCharacter,
-}: {
-  /** 主窗口关闭后会被重建，因此每次点击都取当前窗口，不能保存旧引用。 */
-  getMainWindow: () => BrowserWindow | null;
-  tracker: PetStateTracker;
-  getCharacter: () => PetCharacter;
-  /** 菜单选中角色后的回写（写配置 + 下发窗口）：唯一的生产调用方是 index.ts，必填以免漏接线后静默失效。 */
-  onSelectCharacter: (character: PetCharacter) => void;
-}): PetWindowController {
+  onSelectCustomImage,
+  onChooseCustomImage,
+  onRemoveCustomImage,
+}: PetWindowControllerOptions): PetWindowController {
   const positions = new Store<{ position?: PetPosition }>({
     name: "desktop-pet-position",
   });
@@ -120,6 +144,55 @@ export function createPetWindowController({
   const onDisplayChange = () => keepVisible(true);
   screen.on("display-removed", onDisplayChange);
   screen.on("display-metrics-changed", onDisplayChange);
+
+  let appearanceSeq = 0;
+
+  const refreshAppearance = async (): Promise<void> => {
+    const target = petWindow;
+    if (!target || target.isDestroyed()) return;
+    const seq = ++appearanceSeq;
+    let appearance: PetAppearance;
+    try {
+      const state = getAppearanceState();
+      appearance = await resolvePetAppearance({
+        character: state.character,
+        customImage: state.customImage,
+        readImage: readCustomImage,
+      });
+      if (state.customImage?.enabled && appearance.image === null) {
+        logError(
+          "[DesktopPet] custom image unavailable:",
+          state.customImage.fileName,
+        );
+      }
+    } catch (error) {
+      logError("[DesktopPet] appearance refresh failed:", error);
+      appearance = { character: DEFAULT_PET_CHARACTER, image: null };
+    }
+    // 旧窗口的异步读图不能写给新窗口；序号则保证只发最后一次请求。
+    if (seq !== appearanceSeq || petWindow !== target || target.isDestroyed())
+      return;
+    try {
+      target.webContents.send("pet.appearance", appearance);
+    } catch (error) {
+      // webContents 可能先于窗口失效（renderer 崩溃）：这里也不能 reject。
+      logError("[DesktopPet] appearance send failed:", error);
+    }
+  };
+
+  /**
+   * 选图/移除共用一把锁：系统对话框未关时再次右键点“选图”，
+   * 不应该叠出第二个对话框，也不该让两个写配置的动作交错。
+   */
+  let menuAction: Promise<void> | null = null;
+  const runExclusive = (action: () => Promise<void>) => {
+    if (menuAction) return;
+    menuAction = action()
+      .catch((error) => logError("[DesktopPet] menu action failed:", error))
+      .finally(() => {
+        menuAction = null;
+      });
+  };
 
   const onActivate = (event: Electron.IpcMainEvent) => {
     if (event.sender !== petWindow?.webContents) return;
@@ -187,21 +260,25 @@ export function createPetWindowController({
   };
   const onOpenMenu = (event: Electron.IpcMainEvent) => {
     if (event.sender !== petWindow?.webContents || !petWindow) return;
+    const state = getAppearanceState();
     openPetCharacterMenu({
       window: petWindow,
-      // 当前值以配置为准，不信渲染层。
-      current: getCharacter(),
-      onSelect: onSelectCharacter,
+      character: state.character,
+      customImage: state.customImage
+        ? {
+            enabled: state.customImage.enabled,
+            exists: hasCustomImage(state.customImage.fileName),
+          }
+        : null,
+      onSelectCharacter,
+      onSelectCustomImage,
+      onChooseCustomImage: () => runExclusive(onChooseCustomImage),
+      onRemoveCustomImage: () => runExclusive(onRemoveCustomImage),
     });
   };
   ipcMain.on("pet.activate", onActivate);
   ipcMain.on("pet.drag", onDrag);
   ipcMain.on("pet.menu", onOpenMenu);
-
-  const setCharacter = (character: PetCharacter) => {
-    if (!petWindow || petWindow.isDestroyed()) return;
-    petWindow.webContents.send("pet.character", character);
-  };
 
   const setEnabled = (enabled: boolean) => {
     if (!enabled) {
@@ -246,8 +323,11 @@ export function createPetWindowController({
     window.webContents.on("will-navigate", (event) => event.preventDefault());
     window.webContents.on("did-finish-load", () => {
       window.webContents.send("pet.state", tracker.snapshot());
-      window.webContents.send("pet.character", getCharacter());
-      window.showInactive();
+      // 外观解析是异步的：解析完成（无论成败）再显示窗口，
+      // 避免先闪一下内置角色，也避免读图失败时窗口永远不出现。
+      void refreshAppearance().finally(() => {
+        if (!window.isDestroyed()) window.showInactive();
+      });
     });
     // 加载失败也要留线索：窗口默认不显示，否则只会是一个静默的空窗。
     window.webContents.on("did-fail-load", (_event, code, description) => {
@@ -267,7 +347,7 @@ export function createPetWindowController({
   };
   return {
     setEnabled,
-    setCharacter,
+    refreshAppearance,
     dispose() {
       setEnabled(false);
       screen.removeListener("display-removed", onDisplayChange);

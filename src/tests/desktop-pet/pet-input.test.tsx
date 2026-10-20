@@ -2,15 +2,22 @@
 import { act } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 
+type Appearance = { character: string; image: string | null };
+let appearanceListener: ((appearance: Appearance) => void) | null = null;
+
 const petAPI = {
   onState: vi.fn(() => () => {}),
-  onCharacter: vi.fn(() => () => {}),
+  onAppearance: vi.fn((listener: (appearance: Appearance) => void) => {
+    appearanceListener = listener;
+    return () => {};
+  }),
   openCharacterMenu: vi.fn(),
   activate: vi.fn(),
   drag: vi.fn(),
 };
 
 beforeEach(() => {
+  appearanceListener = null;
   (window as unknown as { petAPI: typeof petAPI }).petAPI = petAPI;
   document.body.innerHTML = '<div id="pet-root"></div>';
   // jsdom 不实现 pointer capture，而 pet.tsx 在 pointerdown 里会调它。
@@ -57,4 +64,17 @@ it("left click still brings the main window back", async () => {
     target.dispatchEvent(up);
   });
   expect(petAPI.activate).toHaveBeenCalledTimes(1);
+});
+
+it("renders a custom image pushed by the main process", async () => {
+  await act(async () => {
+    await import("../../renderer/pet");
+  });
+  await act(async () => {
+    appearanceListener?.({
+      character: "lens",
+      image: "data:image/png;base64,AAAA",
+    });
+  });
+  expect(document.querySelector(".pet-custom__img")).not.toBeNull();
 });

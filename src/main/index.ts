@@ -51,6 +51,9 @@ import {
   createPetWindowController,
   type PetWindowController,
 } from "./desktop-pet/pet-window";
+import { createPetImageStore } from "./desktop-pet/pet-image";
+import { createPetImageActions } from "./desktop-pet/pet-image-actions";
+import { PET_IMAGE_ERROR_KEYS } from "./desktop-pet/pet-image";
 import { SkillsManager, validateSkillName } from "./skills/skills-manager";
 import { MemoryService } from "./memory/memory-service";
 import { IdeaService } from "./ideas/idea-service";
@@ -87,7 +90,10 @@ import {
   toPromptCommandEntries,
 } from "./prompts/prompt-command-store";
 import { validatePromptCommandName } from "../shared/prompt-command-name";
-import { DEFAULT_PET_CHARACTER } from "../shared/pet-characters";
+import {
+  DEFAULT_PET_CHARACTER,
+  type PetCharacter,
+} from "../shared/pet-characters";
 import { PiTrustResolver } from "./extensions/pi-trust-resolver";
 import { ensureSubagentUsageReporting } from "./usage/subagent-usage-setting";
 import {
@@ -1275,6 +1281,36 @@ app
 
     // 桌宠：默认关闭，用户从头像菜单开关。窗口独立于主窗口，位置由控制器保存。
     if (sessionManager) {
+      const petImageStore = createPetImageStore({
+        dir: join(app.getPath("userData"), "desktop-pet"),
+      });
+
+      const petImageActions = createPetImageActions({
+        store: petImageStore,
+        getCustomImage: () => configStore.get("petCustomImage") ?? null,
+        setCustomImage: (value) =>
+          configStore.update({ petCustomImage: value }),
+        refreshAppearance: () => {
+          void petWindowController?.refreshAppearance();
+        },
+        showError: async (code) => {
+          await dialog.showMessageBox({
+            type: "warning",
+            message: t(PET_IMAGE_ERROR_KEYS[code]),
+          });
+        },
+        logError,
+      });
+
+      const selectCharacter = (character: PetCharacter) => {
+        const current = configStore.get("petCustomImage") ?? null;
+        configStore.update({
+          petCharacter: character,
+          petCustomImage: current ? { ...current, enabled: false } : null,
+        });
+        void petWindowController?.refreshAppearance();
+      };
+
       petWindowController = createPetWindowController({
         // 主窗口可能已被关掉：这时点击桌宠要重新把它开出来，而不是静默无反应。
         getMainWindow: () => {
@@ -1284,12 +1320,33 @@ app
           return mainWindow;
         },
         tracker: sessionManager.getPetStateTracker(),
-        getCharacter: () =>
-          configStore.get("petCharacter") ?? DEFAULT_PET_CHARACTER,
-        onSelectCharacter: (character) => {
-          configStore.update({ petCharacter: character });
-          petWindowController?.setCharacter(character);
+        getAppearanceState: () => ({
+          character: configStore.get("petCharacter") ?? DEFAULT_PET_CHARACTER,
+          customImage: configStore.get("petCustomImage") ?? null,
+        }),
+        readCustomImage: (fileName) => petImageStore.read(fileName),
+        hasCustomImage: (fileName) => petImageStore.has(fileName),
+        onSelectCharacter: selectCharacter,
+        onSelectCustomImage: () => {
+          const current = configStore.get("petCustomImage");
+          if (!current) return;
+          configStore.update({ petCustomImage: { ...current, enabled: true } });
+          void petWindowController?.refreshAppearance();
         },
+        onChooseCustomImage: async () => {
+          const picked = await dialog.showOpenDialog({
+            properties: ["openFile"],
+            filters: [
+              {
+                name: t("pet.imageFilter"),
+                extensions: ["png", "jpg", "jpeg", "webp", "gif"],
+              },
+            ],
+          });
+          if (picked.canceled || !picked.filePaths[0]) return;
+          await petImageActions.choose(picked.filePaths[0]);
+        },
+        onRemoveCustomImage: () => petImageActions.remove(),
       });
       petWindowController.setEnabled(configStore.get("petEnabled") ?? false);
     }

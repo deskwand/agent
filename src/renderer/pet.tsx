@@ -1,19 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { PetState } from "../main/desktop-pet/pet-state";
-import {
-  DEFAULT_PET_CHARACTER,
-  isPetCharacter,
-  type PetCharacter,
-} from "../shared/pet-characters";
-import { PET_CHARACTER_COMPONENTS } from "./pet-characters";
+import { isPetAppearance, type PetAppearance } from "../shared/pet-appearance";
+import { DEFAULT_PET_CHARACTER } from "../shared/pet-characters";
+import { PetSurface } from "./pet-surface";
 import "./styles/pet.css";
 
 declare global {
   interface Window {
     petAPI: {
       onState: (listener: (state: PetState) => void) => () => void;
-      onCharacter: (listener: (character: string) => void) => () => void;
+      onAppearance: (
+        listener: (appearance: PetAppearance) => void,
+      ) => () => void;
       openCharacterMenu: () => void;
       activate: () => void;
       drag: (delta: { dx: number; dy: number; done: boolean }) => void;
@@ -23,9 +22,10 @@ declare global {
 
 function Pet() {
   const [state, setState] = useState<PetState>("idle");
-  const [character, setCharacter] = useState<PetCharacter>(
-    DEFAULT_PET_CHARACTER,
-  );
+  const [appearance, setAppearance] = useState<PetAppearance>({
+    character: DEFAULT_PET_CHARACTER,
+    image: null,
+  });
   const pointer = useRef<{
     x: number;
     y: number;
@@ -39,14 +39,12 @@ function Pet() {
   useEffect(() => window.petAPI?.onState(setState), []);
   useEffect(
     () =>
-      window.petAPI?.onCharacter((next) => {
-        // 主进程理论上只发合法 id，但渲染层不能假设：非法值保持当前角色。
-        if (isPetCharacter(next)) setCharacter(next);
+      window.petAPI?.onAppearance((next) => {
+        // 主进程理论上只发合法消息，但渲染层不能假设：非法值保持当前外观。
+        if (isPetAppearance(next)) setAppearance(next);
       }),
     [],
   );
-
-  const Character = PET_CHARACTER_COMPONENTS[character];
 
   return (
     <div
@@ -102,7 +100,11 @@ function Pet() {
         pointer.current = null;
       }}
     >
-      <Character state={state} />
+      <PetSurface
+        state={state}
+        character={appearance.character}
+        image={appearance.image}
+      />
     </div>
   );
 }

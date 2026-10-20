@@ -124,6 +124,12 @@ export const Menu = {
   setApplicationMenu: noop,
 };
 
+export const nativeImage = {
+  createFromBuffer: () => {
+    throw new Error("nativeImage.createFromBuffer is not available in tests");
+  },
+};
+
 export const BrowserWindow = MockBrowserWindow;
 export const Tray = MockTray;
 
@@ -155,6 +161,7 @@ const electron = {
   Tray,
   contextBridge,
   protocol,
+  nativeImage,
 };
 
 export default electron;

@@ -121,6 +121,13 @@ const MSG: Record<Locale, MessageTable> = {
     "pet.charJellyfish": "小水母",
     "pet.charOctopus": "小章鱼",
     "pet.charEgg": "蛋仔",
+    "pet.chooseImage": "自定义图片…",
+    "pet.customImage": "自定义图片",
+    "pet.removeImage": "移除自定义图片",
+    "pet.imageFilter": "图片",
+    "pet.imageInvalid": "这张图片无法使用，请换一张 PNG、JPG、WebP 或 GIF。",
+    "pet.imageTooLarge": "图片太大（超过 10MB 或 8192px），请换一张小一点的。",
+    "pet.imageWriteFailed": "无法保存图片，请检查磁盘空间后重试。",
   },
   en: {
     // ── goal ──
@@ -244,6 +251,16 @@ const MSG: Record<Locale, MessageTable> = {
     "pet.charJellyfish": "Jellyfish",
     "pet.charOctopus": "Octopus",
     "pet.charEgg": "Egg",
+    "pet.chooseImage": "Custom Image…",
+    "pet.customImage": "Custom Image",
+    "pet.removeImage": "Remove Custom Image",
+    "pet.imageFilter": "Images",
+    "pet.imageInvalid":
+      "That image can't be used. Choose a PNG, JPG, WebP or GIF.",
+    "pet.imageTooLarge":
+      "That image is too large (over 10MB or 8192px). Choose a smaller one.",
+    "pet.imageWriteFailed":
+      "Couldn't save the image. Check disk space and try again.",
   },
 };
 

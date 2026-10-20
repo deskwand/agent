@@ -1,20 +1,36 @@
 import { EventEmitter } from "node:events";
 import { beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { PetStateTracker } from "../../main/desktop-pet/pet-state";
-import type { createPetWindowController as CreateController } from "../../main/desktop-pet/pet-window";
+import { DEFAULT_PET_CHARACTER } from "../../shared/pet-characters";
+import type {
+  createPetWindowController as CreateController,
+  PetWindowControllerOptions,
+} from "../../main/desktop-pet/pet-window";
 
-const { windows, ipc, displays, storage, screenEvents, removedScreenEvents } =
-  vi.hoisted(() => ({
-    windows: [] as Array<MockWindow>,
-    ipc: new Map<string, (...args: unknown[]) => void>(),
-    displays: [
-      { id: 1, workArea: { x: 0, y: 0, width: 1920, height: 1080 } },
-      { id: 2, workArea: { x: 1920, y: 0, width: 1920, height: 1080 } },
-    ],
-    storage: new Map<string, unknown>(),
-    screenEvents: new Map<string, () => void>(),
-    removedScreenEvents: [] as string[],
-  }));
+const {
+  windows,
+  ipc,
+  displays,
+  storage,
+  screenEvents,
+  removedScreenEvents,
+  menus,
+} = vi.hoisted(() => ({
+  windows: [] as Array<MockWindow>,
+  ipc: new Map<string, (...args: unknown[]) => void>(),
+  displays: [
+    { id: 1, workArea: { x: 0, y: 0, width: 1920, height: 1080 } },
+    { id: 2, workArea: { x: 1920, y: 0, width: 1920, height: 1080 } },
+  ],
+  storage: new Map<string, unknown>(),
+  screenEvents: new Map<string, () => void>(),
+  removedScreenEvents: [] as string[],
+  menus: [] as Array<{
+    template: Electron.MenuItemConstructorOptions[];
+    popup: ReturnType<typeof vi.fn>;
+    once: ReturnType<typeof vi.fn>;
+  }>,
+}));
 
 function assertIntegerCoordinate(value: number, index: number): void {
   // 实测（electron 35，macOS）：小数、-0、NaN 都会抛同样的 conversion failure。
@@ -89,6 +105,17 @@ vi.mock("electron", () => ({
       ipc.set(channel, fn),
     removeListener: (channel: string) => ipc.delete(channel),
   },
+  Menu: {
+    buildFromTemplate: (template: Electron.MenuItemConstructorOptions[]) => {
+      const menu = {
+        template,
+        popup: vi.fn(),
+        once: vi.fn(),
+      };
+      menus.push(menu);
+      return menu;
+    },
+  },
 }));
 vi.mock("electron-store", () => ({
   default: class {
@@ -102,10 +129,12 @@ vi.mock("electron-store", () => ({
 }));
 
 let createPetWindowController: typeof CreateController;
+let t: (key: string, params?: Record<string, string | number>) => string;
 let currentMain: MockWindow;
 beforeAll(async () => {
   ({ createPetWindowController } =
     await import("../../main/desktop-pet/pet-window"));
+  ({ t } = await import("../../main/i18n"));
 });
 const TWO_DISPLAYS = [
   { id: 1, workArea: { x: 0, y: 0, width: 1920, height: 1080 } },
@@ -118,76 +147,132 @@ beforeEach(() => {
   ipc.clear();
   screenEvents.clear();
   removedScreenEvents.length = 0;
+  menus.length = 0;
   // 每个用例都从完整的双屏布局开始：用例会拔屏或缩小工作区域。
   displays.splice(0, displays.length, ...structuredClone(TWO_DISPLAYS));
 });
 
-function enable(main: MockWindow = new MockWindow({})) {
+function enable(
+  overrides: Partial<PetWindowControllerOptions> = {},
+  main: MockWindow = new MockWindow({}),
+) {
   const controller = createPetWindowController({
     getMainWindow: () => main as never,
-    getCharacter: () => "lens",
-    onSelectCharacter: () => {},
     tracker: new PetStateTracker(),
+    getAppearanceState: () => ({ character: "lens", customImage: null }),
+    readCustomImage: async () => null,
+    hasCustomImage: () => false,
+    onSelectCharacter: () => {},
+    onSelectCustomImage: () => {},
+    onChooseCustomImage: async () => {},
+    onRemoveCustomImage: async () => {},
+    ...overrides,
   });
   controller.setEnabled(true);
   return { controller, main, pet: windows[1] };
 }
 
-it("pushes a newly selected character to the live window", () => {
-  const main = new MockWindow({});
-  const controller = createPetWindowController({
-    getMainWindow: () => main as never,
-    tracker: new PetStateTracker(),
-    getCharacter: () => "lens",
-    onSelectCharacter: () => {},
+it("pushes the stored custom image when the window loads", async () => {
+  const { controller, pet } = enable({
+    getAppearanceState: () => ({
+      character: "lens",
+      customImage: { fileName: "custom-1.png", enabled: true },
+    }),
+    readCustomImage: async () => "data:image/png;base64,AAA",
+    hasCustomImage: () => true,
   });
-  controller.setEnabled(true);
-  const pet = windows[1];
-  pet.webContents.send.mockClear();
-  controller.setCharacter("ghost");
-  // 选中即生效：改角色必须把新值推给活着的窗口，而不是等下次重建。
-  expect(pet.webContents.send).toHaveBeenCalledWith("pet.character", "ghost");
-  controller.setCharacter("lens");
-  expect(pet.webContents.send).toHaveBeenLastCalledWith(
-    "pet.character",
-    "lens",
+  pet.webContents.emit("did-finish-load");
+  await vi.waitFor(() =>
+    expect(pet.webContents.send).toHaveBeenCalledWith("pet.appearance", {
+      character: "lens",
+      image: "data:image/png;base64,AAA",
+    }),
   );
   controller.dispose();
 });
 
-it("pushes the current character on load", () => {
-  const main = new MockWindow({});
-  const controller = createPetWindowController({
-    getMainWindow: () => main as never,
-    tracker: new PetStateTracker(),
-    // 用非默认值，断言才有意义（默认值会让"没发也过"）。
-    getCharacter: () => "ghost",
-    onSelectCharacter: () => {},
+it("falls back to the built-in character when the custom file is missing", async () => {
+  const { controller, pet } = enable({
+    getAppearanceState: () => ({
+      character: "ghost",
+      customImage: { fileName: "custom-1.png", enabled: true },
+    }),
+    readCustomImage: async () => null,
+    hasCustomImage: () => true,
   });
-  controller.setEnabled(true);
-  const pet = windows[1];
   pet.webContents.emit("did-finish-load");
-  expect(pet.webContents.send).toHaveBeenCalledWith("pet.character", "ghost");
+  await vi.waitFor(() => {
+    expect(pet.webContents.send).toHaveBeenCalledWith("pet.appearance", {
+      character: "ghost",
+      image: null,
+    });
+    // 读图失败也必须把窗口显示出来，不能留一个永远隐藏的窗口。
+    expect(pet.showInactive).toHaveBeenCalled();
+  });
   controller.dispose();
 });
 
-it("creates an independent window and restores state on load", () => {
-  const main = new MockWindow({});
+it("sends only the latest appearance when reads overlap", async () => {
+  const resolves: Array<(value: string | null) => void> = [];
+  const readCustomImage = vi.fn(
+    () =>
+      new Promise<string | null>((resolve) => {
+        resolves.push(resolve);
+      }),
+  );
+  let fileName = "custom-1.png";
+  const { controller, pet } = enable({
+    getAppearanceState: () => ({
+      character: "lens",
+      customImage: { fileName, enabled: true },
+    }),
+    readCustomImage,
+    hasCustomImage: () => true,
+  });
+  pet.webContents.send.mockClear();
+
+  const first = controller.refreshAppearance();
+  fileName = "custom-2.png";
+  const second = controller.refreshAppearance();
+
+  resolves[1]?.("data:image/png;base64,NEW");
+  await second;
+  expect(pet.webContents.send).toHaveBeenCalledWith("pet.appearance", {
+    character: "lens",
+    image: "data:image/png;base64,NEW",
+  });
+
+  resolves[0]?.("data:image/png;base64,OLD");
+  await first;
+  expect(pet.webContents.send).not.toHaveBeenCalledWith("pet.appearance", {
+    character: "lens",
+    image: "data:image/png;base64,OLD",
+  });
+  controller.dispose();
+});
+
+it("does not move the window when the appearance refreshes", async () => {
+  const { controller, pet } = enable();
+  pet.setPosition.mockClear();
+  await controller.refreshAppearance();
+  expect(pet.setPosition).not.toHaveBeenCalled();
+  controller.dispose();
+});
+
+it("creates an independent window and restores state on load", async () => {
   const tracker = new PetStateTracker();
   tracker.start("a");
-  const controller = createPetWindowController({
-    getMainWindow: () => main as never,
-    getCharacter: () => "lens",
-    onSelectCharacter: () => {},
-    tracker,
-  });
-  controller.setEnabled(true);
-  const pet = windows[1];
+  const { controller, pet } = enable({ tracker });
   expect(pet).toBeDefined();
   pet.webContents.emit("did-finish-load");
   expect(pet.webContents.send).toHaveBeenCalledWith("pet.state", "running");
-  // 角色与状态一起下发；顺序不重要，重要的是两个都发了。
-  expect(pet.webContents.send).toHaveBeenCalledWith("pet.character", "lens");
+  // 外观与状态一起下发；顺序不重要，重要的是两个都发了。
+  await vi.waitFor(() =>
+    expect(pet.webContents.send).toHaveBeenCalledWith("pet.appearance", {
+      character: "lens",
+      image: null,
+    }),
+  );
   controller.setEnabled(false);
   expect(pet.destroy).toHaveBeenCalled();
   controller.dispose();
@@ -195,14 +280,7 @@ it("creates an independent window and restores state on load", () => {
 
 it("moves across displays, persists position, and rejects other senders", () => {
   const main = new MockWindow({});
-  const controller = createPetWindowController({
-    getMainWindow: () => main as never,
-    getCharacter: () => "lens",
-    onSelectCharacter: () => {},
-    tracker: new PetStateTracker(),
-  });
-  controller.setEnabled(true);
-  const pet = windows[1];
+  const { controller, pet } = enable({}, main);
   pet.bounds = { x: 1800, y: 300, width: 72, height: 72 };
   ipc.get("pet.drag")?.(
     { sender: main.webContents },
@@ -239,9 +317,14 @@ it("focuses the current main window after the original one was closed", () => {
   const controller = createPetWindowController({
     // 主窗口关闭后会被重建，控制器必须每次向 getter 取当前窗口。
     getMainWindow: () => currentMain as never,
-    getCharacter: () => "lens",
-    onSelectCharacter: () => {},
     tracker: new PetStateTracker(),
+    getAppearanceState: () => ({ character: "lens", customImage: null }),
+    readCustomImage: async () => null,
+    hasCustomImage: () => false,
+    onSelectCharacter: () => {},
+    onSelectCustomImage: () => {},
+    onChooseCustomImage: async () => {},
+    onRemoveCustomImage: async () => {},
   });
   controller.setEnabled(true);
   const pet = windows[1];
@@ -386,13 +469,7 @@ it("re-anchors when the window moved outside the drag (e.g. the OS clamped it)",
 it("restores a saved position after the controller is recreated", () => {
   storage.set("position", { displayId: 2, x: 2500, y: 400 });
   const main = new MockWindow({});
-  const controller = createPetWindowController({
-    getMainWindow: () => main as never,
-    getCharacter: () => "lens",
-    onSelectCharacter: () => {},
-    tracker: new PetStateTracker(),
-  });
-  controller.setEnabled(true);
+  const { controller } = enable({}, main);
   expect(windows[1].getBounds()).toMatchObject({ x: 2500, y: 400 });
   controller.dispose();
 });
@@ -402,5 +479,77 @@ it("stays out of fullscreen so a fullscreen main window cannot stretch it", () =
   // macOS 会把「主窗口全屏时新显示的窗口」一起全屏（electron#32374/#39614）：
   // fullscreenable 默认 true 的话，72px 的桌宠会被拉成整屏的椭圆。
   expect(pet.options.fullscreenable).toBe(false);
+  controller.dispose();
+});
+
+it("derives the menu state from the record and the file on disk", () => {
+  const { controller, pet } = enable({
+    getAppearanceState: () => ({
+      character: "ghost",
+      customImage: { fileName: "custom-1.png", enabled: true },
+    }),
+    hasCustomImage: () => false,
+  });
+  ipc.get("pet.menu")?.({ sender: pet.webContents });
+  const template = menus.at(-1)?.template ?? [];
+  expect(template.some((item) => item.label === t("pet.customImage"))).toBe(
+    false,
+  );
+  expect(template.some((item) => item.label === t("pet.removeImage"))).toBe(
+    true,
+  );
+  const ghost = template.find((item) => item.label === t("pet.charGhost"));
+  expect(ghost?.checked).toBe(true);
+  controller.dispose();
+});
+
+it("ignores a second choose request while the dialog is still open", async () => {
+  let finish: (() => void) | undefined;
+  const onChooseCustomImage = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { controller, pet } = enable({ onChooseCustomImage });
+  ipc.get("pet.menu")?.({ sender: pet.webContents });
+  const choose = menus
+    .at(-1)
+    ?.template.find((item) => item.label === t("pet.chooseImage"));
+  const click = () =>
+    choose?.click?.(undefined as never, undefined as never, undefined as never);
+
+  click();
+  click();
+  expect(onChooseCustomImage).toHaveBeenCalledTimes(1);
+
+  finish?.();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  click();
+  expect(onChooseCustomImage).toHaveBeenCalledTimes(2);
+  controller.dispose();
+});
+
+it("still sends a fallback appearance when config resolution throws", async () => {
+  const { controller, pet } = enable({
+    getAppearanceState: () => {
+      throw new Error("config");
+    },
+  });
+  pet.webContents.send.mockClear();
+  await expect(controller.refreshAppearance()).resolves.toBeUndefined();
+  expect(pet.webContents.send).toHaveBeenCalledWith("pet.appearance", {
+    character: DEFAULT_PET_CHARACTER,
+    image: null,
+  });
+  controller.dispose();
+});
+
+it("swallows a webContents send failure instead of rejecting", async () => {
+  const { controller, pet } = enable();
+  pet.webContents.send.mockImplementation(() => {
+    throw new Error("gone");
+  });
+  await expect(controller.refreshAppearance()).resolves.toBeUndefined();
   controller.dispose();
 });
