@@ -12,13 +12,20 @@
  */
 
 import type { BrowserWindow } from "electron";
-import { dialog } from "electron";
+import { app, dialog } from "electron";
+import { join } from "path";
 import { log, logWarn, logError } from "../utils/logger";
 import { WSLBridge, pathConverter } from "./wsl-bridge";
 import { LimaBridge, limaPathConverter } from "./lima-bridge";
 import { NativeExecutor } from "./native-executor";
 import { getSandboxBootstrap } from "./sandbox-bootstrap";
 import { configStore } from "../config/config-store";
+import { parseWorkspaceCwd } from "../../shared/workspace-cwd";
+import { SshExecutor } from "./ssh-executor";
+import { SshConfigService, SshConnectionPool } from "./ssh-config-service";
+import { getKnownHosts } from "./ssh-known-hosts";
+import { SshError, type KnownHostsStore } from "./types";
+import type { SshConnection } from "./ssh-connection";
 import type {
   SandboxConfig,
   SandboxExecutor,
@@ -61,6 +68,13 @@ export class SandboxAdapter implements SandboxExecutor {
   private _config: SandboxAdapterConfig | null = null;
   private initPromise: Promise<void> | null = null;
   private reinitializing: boolean = false;
+  private readonly sshPool = new SshConnectionPool();
+  private readonly sshConfig = new SshConfigService();
+  private readonly sshExecutors = new Map<string, Promise<SshExecutor>>();
+  private readonly sshKeyDir = join(app.getPath("userData"), "ssh");
+  private readonly knownHosts: KnownHostsStore = getKnownHosts(
+    join(app.getPath("userData"), "ssh", "known-hosts.json"),
+  );
 
   /**
    * Get current sandbox mode
@@ -642,6 +656,8 @@ export class SandboxAdapter implements SandboxExecutor {
       await this.executor.shutdown();
       this.executor = null;
     }
+    this.sshExecutors.clear();
+    await this.sshPool.closeAll();
 
     this.state.initialized = false;
     this.state.mode = "none";
@@ -749,6 +765,59 @@ export class SandboxAdapter implements SandboxExecutor {
     throw new Error(
       "DeskWand Agent execution is only supported in WSL/Lima mode",
     );
+  }
+
+  // ==================== SSH routing ====================
+
+  get activeSshHostIds(): string[] {
+    return this.sshPool.activeHostIds();
+  }
+
+  async getSshConnection(hostId: string): Promise<SshConnection> {
+    const host = this.sshConfig.getHost(hostId);
+    if (!host) throw new SshError("SSH_UNKNOWN", `Unknown server: ${hostId}`);
+    return this.sshPool.get(host, {
+      knownHosts: this.knownHosts,
+      keyDir: this.sshKeyDir,
+    });
+  }
+
+  /**
+   * Resolve the executor for a workspace: `ssh://` goes to the SSH pool,
+   * everything else keeps using the platform executor initialized at startup.
+   */
+  async resolveExecutor(cwd: string): Promise<SandboxExecutor> {
+    const parsed = parseWorkspaceCwd(cwd);
+    if (parsed.kind === "local") {
+      if (!this.executor) {
+        throw new SshError("SSH_UNKNOWN", "sandbox not initialized");
+      }
+      return this.executor;
+    }
+    const cacheKey = `${parsed.hostId}:${parsed.path}`;
+    const cached = this.sshExecutors.get(cacheKey);
+    if (cached) return cached;
+    const created = (async () => {
+      const host = this.sshConfig.getHost(parsed.hostId);
+      if (!host) {
+        throw new SshError("SSH_UNKNOWN", `Unknown server: ${parsed.hostId}`);
+      }
+      const connection = await this.sshPool.get(host, {
+        knownHosts: this.knownHosts,
+        keyDir: this.sshKeyDir,
+      });
+      const executor = new SshExecutor(connection, parsed.path);
+      // initialize 只在首次建执行器时做一次，避免每次工具调用都 stat 远端目录
+      await executor.initialize({ workspacePath: parsed.path });
+      return executor;
+    })();
+    this.sshExecutors.set(cacheKey, created);
+    try {
+      return await created;
+    } catch (error) {
+      this.sshExecutors.delete(cacheKey);
+      throw error;
+    }
   }
 }
 

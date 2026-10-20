@@ -26,6 +26,7 @@ import {
   type WebAccessConfig,
 } from "../../shared/web-access";
 import { type SubagentConfig } from "../../shared/subagent-config";
+import type { SshHostConfig } from "../sandbox/types";
 import {
   DEFAULT_VOICE_MODE,
   normalizeVoiceModeConfig,
@@ -155,6 +156,8 @@ export interface AppConfig {
   petEnabled?: boolean;
   petCharacter?: PetCharacter;
   sandboxEnabled: boolean;
+  /** SSH 服务器列表。密码不在这里，只在 testConnection 的一次调用里。 */
+  sshHosts?: SshHostConfig[];
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
   utilityRuntime: UtilityModelRuntimeConfig;
@@ -193,6 +196,8 @@ export interface StoredConfig {
   petEnabled?: boolean;
   petCharacter?: PetCharacter;
   sandboxEnabled: boolean;
+  /** SSH 服务器列表。密码不在这里，只在 testConnection 的一次调用里。 */
+  sshHosts?: SshHostConfig[];
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
   utilityRuntime: UtilityModelRuntimeConfig;
@@ -317,6 +322,7 @@ export function defaultStoredConfig(): StoredConfig {
     petEnabled: false,
     petCharacter: DEFAULT_PET_CHARACTER,
     sandboxEnabled: false,
+    sshHosts: [],
     memoryEnabled: false,
     memoryRuntime: defaultMemoryRuntime(),
     utilityRuntime: {
@@ -988,6 +994,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
       ? stored.petCharacter
       : DEFAULT_PET_CHARACTER,
     sandboxEnabled: stored.sandboxEnabled,
+    sshHosts: stored.sshHosts ?? [],
     memoryEnabled: stored.memoryEnabled,
     memoryRuntime: stored.memoryRuntime,
     utilityRuntime: stored.utilityRuntime,
@@ -1140,6 +1147,7 @@ export class ConfigStore {
       stored.themeAccent = updates.themeAccent;
     if (updates.sandboxEnabled !== undefined)
       stored.sandboxEnabled = updates.sandboxEnabled;
+    if (updates.sshHosts !== undefined) stored.sshHosts = updates.sshHosts;
     if (updates.memoryEnabled !== undefined)
       stored.memoryEnabled = updates.memoryEnabled;
     if (updates.memoryRuntime !== undefined)

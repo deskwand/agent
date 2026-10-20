@@ -17,6 +17,10 @@ import type {
   ExecutionContext,
   MountedPath,
 } from "../../renderer/types";
+import type { SandboxExecutor } from "../sandbox/types";
+import { parseWorkspaceCwd } from "../../shared/workspace-cwd";
+import { remoteJoinInsideRoot } from "./remote-path";
+import { globRemote, grepRemote } from "../sandbox/ssh-remote-query";
 import { isUncPath } from "../../shared/local-file-path";
 import { isPathWithinRoot } from "./path-containment";
 import { t } from "../i18n";
@@ -43,6 +47,10 @@ export class SandboxToolExecutor {
     }
 
     const primaryMount = mounts[0];
+    const remoteMount = parseWorkspaceCwd(primaryMount.real);
+    if (remoteMount.kind === "ssh") {
+      return remoteJoinInsideRoot(remoteMount.path, inputPath.trim() || ".");
+    }
     const normalizedPrimary = path.normalize(primaryMount.real);
     const trimmed = inputPath.trim();
 
@@ -103,13 +111,44 @@ export class SandboxToolExecutor {
     return realPath;
   }
 
+  /** Remote query root + executor, or null for local workspaces. */
+  private async remoteQuery(
+    sessionId: string,
+    target?: string,
+  ): Promise<{ root: string; executor: SandboxExecutor } | null> {
+    const mounts = this.pathResolver.getMounts(sessionId);
+    const parsed = parseWorkspaceCwd(mounts[0]?.real ?? "");
+    if (parsed.kind !== "ssh") return null;
+    return {
+      root: target ?? parsed.path,
+      executor: await this.sandboxAdapter.resolveExecutor(mounts[0].real),
+    };
+  }
+
+  /** Executor + path pair for a resolved workspace path. */
+  private async executorForPath(
+    sessionId: string,
+    target: string,
+  ): Promise<{ executor: SandboxExecutor; path: string }> {
+    const mount = this.pathResolver.getMounts(sessionId)[0];
+    const parsed = parseWorkspaceCwd(mount?.real ?? "");
+    const executor = await this.sandboxAdapter.resolveExecutor(
+      parsed.kind === "ssh" ? mount.real : target,
+    );
+    return { executor, path: target };
+  }
+
   /**
    * Read file contents using sandbox
    */
   async readFile(sessionId: string, filePath: string): Promise<string> {
     try {
       const pathToRead = this.resolveWorkspacePath(sessionId, filePath);
-      return await this.sandboxAdapter.readFile(pathToRead);
+      const { executor, path: target } = await this.executorForPath(
+        sessionId,
+        pathToRead,
+      );
+      return await executor.readFile(target);
     } catch (error) {
       throw new Error(
         `Failed to read file: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -129,13 +168,19 @@ export class SandboxToolExecutor {
       const pathToWrite = this.resolveWorkspacePath(sessionId, filePath);
 
       // Ensure directory exists
-      const dir = path.dirname(pathToWrite);
-      const dirExists = await this.sandboxAdapter.fileExists(dir);
+      const { executor, path: target } = await this.executorForPath(
+        sessionId,
+        pathToWrite,
+      );
+      const mount = this.pathResolver.getMounts(sessionId)[0];
+      const isRemote = parseWorkspaceCwd(mount?.real ?? "").kind === "ssh";
+      const dir = isRemote ? path.posix.dirname(target) : path.dirname(target);
+      const dirExists = await executor.fileExists(dir);
       if (!dirExists) {
-        await this.sandboxAdapter.createDirectory(dir);
+        await executor.createDirectory(dir);
       }
 
-      await this.sandboxAdapter.writeFile(pathToWrite, content);
+      await executor.writeFile(target, content);
     } catch (error) {
       throw new Error(
         `Failed to write file: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -149,7 +194,11 @@ export class SandboxToolExecutor {
   async listDirectory(sessionId: string, dirPath: string): Promise<string> {
     try {
       const pathToList = this.resolveWorkspacePath(sessionId, dirPath);
-      const entries = await this.sandboxAdapter.listDirectory(pathToList);
+      const { executor, path: target } = await this.executorForPath(
+        sessionId,
+        pathToList,
+      );
+      const entries = await executor.listDirectory(target);
 
       const result: string[] = [];
       for (const entry of entries) {
@@ -179,12 +228,13 @@ export class SandboxToolExecutor {
   ): Promise<string> {
     // Validate cwd is inside workspace
     const resolvedCwd = this.resolveWorkspacePath(sessionId, cwd);
-
-    // Execute in sandbox
-    const result = await this.sandboxAdapter.executeCommand(
-      command,
+    const { executor, path: target } = await this.executorForPath(
+      sessionId,
       resolvedCwd,
     );
+
+    // Execute in sandbox
+    const result = await executor.executeCommand(command, target);
 
     if (result.success) {
       return result.stdout || "Command completed successfully";
@@ -207,12 +257,16 @@ export class SandboxToolExecutor {
     try {
       const resolvedPath = this.resolveWorkspacePath(sessionId, filePath);
 
-      const exists = await this.sandboxAdapter.fileExists(resolvedPath);
+      const { executor, path: target } = await this.executorForPath(
+        sessionId,
+        resolvedPath,
+      );
+      const exists = await executor.fileExists(target);
       if (!exists) {
         throw new Error(`File not found: ${filePath}`);
       }
 
-      const content = await this.sandboxAdapter.readFile(resolvedPath);
+      const content = await executor.readFile(target);
 
       if (!content.includes(oldString)) {
         throw new Error(
@@ -221,7 +275,7 @@ export class SandboxToolExecutor {
       }
 
       const newContent = content.split(oldString).join(newString);
-      await this.sandboxAdapter.writeFile(resolvedPath, newContent);
+      await executor.writeFile(target, newContent);
     } catch (error) {
       throw new Error(
         `Edit failed: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -243,6 +297,16 @@ export class SandboxToolExecutor {
         sessionId,
         searchPath || ".",
       );
+      const remote = await this.remoteQuery(sessionId, pathToSearch);
+      if (remote) {
+        if (contentSearch) {
+          return await grepRemote(remote.executor, remote.root, pattern);
+        }
+        const files = await globRemote(remote.executor, remote.root, pattern);
+        return files.length > 0
+          ? files.slice(0, 100).join("\n")
+          : "No files found";
+      }
 
       if (contentSearch) {
         // Content search - read files and search
@@ -293,6 +357,13 @@ export class SandboxToolExecutor {
         sessionId,
         searchPath || ".",
       );
+      const remote = await this.remoteQuery(sessionId, pathToSearch);
+      if (remote) {
+        const files = await globRemote(remote.executor, remote.root, pattern);
+        return files.length > 0
+          ? files.slice(0, 100).join("\n")
+          : "No files found";
+      }
 
       const files = await glob(pattern, {
         cwd: pathToSearch,
@@ -323,6 +394,11 @@ export class SandboxToolExecutor {
         sessionId,
         searchPath || ".",
       );
+      const remote = await this.remoteQuery(sessionId, pathToSearch);
+      if (remote) {
+        if (pattern.length > 1000) return "Pattern too long";
+        return await grepRemote(remote.executor, remote.root, pattern);
+      }
 
       const results: string[] = [];
       if (pattern.length > 1000) return "Pattern too long";

@@ -25,6 +25,10 @@ describe("defaultStoredConfig", () => {
   it("defaults the pet character to the lens", () => {
     expect(defaultStoredConfig().petCharacter).toBe("lens");
   });
+
+  it("defaults ssh hosts to an empty list", () => {
+    expect(defaultStoredConfig().sshHosts).toEqual([]);
+  });
 });
 
 describe("petCharacter", () => {

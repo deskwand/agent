@@ -1269,3 +1269,27 @@ export interface ToolTraceUi {
 export interface OcrConfig {
   enabled: boolean;
 }
+
+// ── SSH servers ───────────────────────────────────────────────
+
+export interface SshHostConfig {
+  id: string;
+  label: string;
+  host: string;
+  port: number;
+  username: string;
+  authMode: "password" | "key";
+  privateKeyPath?: string;
+  defaultPath?: string;
+}
+
+export interface SshDirEntry {
+  name: string;
+  isDir: boolean;
+  size: number;
+}
+
+export interface SshConnectionStatus {
+  passwordless: boolean;
+  fingerprint: string;
+}

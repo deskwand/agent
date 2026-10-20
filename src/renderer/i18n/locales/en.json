@@ -784,6 +784,49 @@
     "close": "Close"
   },
   "sandbox": {
+    "ssh": {
+      "sectionTitle": "My servers",
+      "addServer": "SSH server",
+      "addServerHint": "Open a project directly on the server",
+      "more": "More actions",
+      "testConnection": "Test connection",
+      "testing": "Connecting…",
+      "passwordless": "Passwordless",
+      "needsPassword": "Password required",
+      "testFailed": "Connection failed",
+      "dialogTitle": "Add SSH server",
+      "dialogHint": "A dedicated key is installed on the server after connecting; no password is needed afterwards.",
+      "passwordHint": "The password is used for this connection only; a key is installed and the password is never stored.",
+      "auth": { "password": "Password", "key": "Private key" },
+      "fields": {
+        "label": "Display name",
+        "host": "Host",
+        "username": "Username",
+        "password": "Password",
+        "privateKey": "Private key path",
+        "defaultPath": "Default directory (optional)"
+      },
+      "stage": {
+        "key": "Key login",
+        "password": "Password login",
+        "bootstrap": "Install key and verify"
+      },
+      "error": {
+        "host": "Host is required and cannot contain spaces",
+        "port": "Port must be 1-65535",
+        "username": "Username is required"
+      },
+      "fingerprintTitle": "First connection: verify the server fingerprint",
+      "trustAndConnect": "Trust and connect",
+      "pickTitle": "Choose a directory on {{label}}",
+      "openCurrent": "Open \"{{name}}\"",
+      "localFolder": "Local folder…",
+      "noServers": "No servers yet",
+      "remoteLimits": "Remote project: Office preview, open with system app, reveal in Finder and image/PDF preview are unavailable.",
+      "statusLocal": "Local runtime",
+      "deleteBlocked": "This server is still used by an open project. Close the project first.",
+      "statusInUse": "Servers in use"
+    },
     "title": "Sandbox Environment",
     "wslDesc": "Run commands in WSL2 Linux environment for better isolation and security on Windows.",
     "limaDesc": "Run commands in Lima VM for better isolation and security on macOS.",
@@ -979,6 +1022,7 @@
     "openFolder": "Open folder"
   },
   "sidebar": {
+    "openProjectFailed": "Failed to open the project. Please try again.",
     "recents": "Recents",
     "running": "Running",
     "asking": "Asking you",

@@ -647,6 +647,65 @@ contextBridge.exposeInMainWorld("electronAPI", {
       error?: string;
       result?: unknown;
     }> => ipcRenderer.invoke("sandbox.retryLimaSetup"),
+    ssh: {
+      listHosts: (): Promise<
+        Array<{
+          id: string;
+          label: string;
+          host: string;
+          port: number;
+          username: string;
+          authMode: "password" | "key";
+          privateKeyPath?: string;
+          defaultPath?: string;
+        }>
+      > => ipcRenderer.invoke("sandbox.ssh.listHosts"),
+      saveHost: (input: {
+        id?: string;
+        label: string;
+        host: string;
+        port: number;
+        username: string;
+        authMode: "password" | "key";
+        privateKeyPath?: string;
+        defaultPath?: string;
+      }): Promise<{
+        id: string;
+        label: string;
+        host: string;
+        port: number;
+        username: string;
+        authMode: "password" | "key";
+        privateKeyPath?: string;
+        defaultPath?: string;
+      }> => ipcRenderer.invoke("sandbox.ssh.saveHost", input),
+      deleteHost: (id: string): Promise<{ ok: boolean }> =>
+        ipcRenderer.invoke("sandbox.ssh.deleteHost", id),
+      trustHostKey: (args: {
+        hostId: string;
+        fingerprint: string;
+      }): Promise<{ ok: boolean }> =>
+        ipcRenderer.invoke("sandbox.ssh.trustHostKey", args),
+      status: (): Promise<{ activeHostIds: string[]; mode: string }> =>
+        ipcRenderer.invoke("sandbox.ssh.status"),
+      testConnection: (args: {
+        hostId: string;
+        password?: string;
+      }): Promise<{
+        ok: boolean;
+        stages: string[];
+        status?: { passwordless: boolean; fingerprint: string };
+        error?: { code: string; message: string };
+      }> => ipcRenderer.invoke("sandbox.ssh.testConnection", args),
+      browse: (args: {
+        hostId: string;
+        path?: string;
+      }): Promise<{
+        path: string;
+        parent: string | null;
+        entries: Array<{ name: string; isDir: boolean; size: number }>;
+      }> => ipcRenderer.invoke("sandbox.ssh.browse", args),
+    },
   },
 
   // Logs methods
@@ -1360,6 +1419,59 @@ declare global {
           error?: string;
           result?: unknown;
         }>;
+        ssh: {
+          listHosts: () => Promise<
+            Array<{
+              id: string;
+              label: string;
+              host: string;
+              port: number;
+              username: string;
+              authMode: "password" | "key";
+              privateKeyPath?: string;
+              defaultPath?: string;
+            }>
+          >;
+          saveHost: (input: {
+            id?: string;
+            label: string;
+            host: string;
+            port: number;
+            username: string;
+            authMode: "password" | "key";
+            privateKeyPath?: string;
+            defaultPath?: string;
+          }) => Promise<{
+            id: string;
+            label: string;
+            host: string;
+            port: number;
+            username: string;
+            authMode: "password" | "key";
+            privateKeyPath?: string;
+            defaultPath?: string;
+          }>;
+          deleteHost: (id: string) => Promise<{ ok: boolean }>;
+          trustHostKey: (args: {
+            hostId: string;
+            fingerprint: string;
+          }) => Promise<{ ok: boolean }>;
+          status: () => Promise<{ activeHostIds: string[]; mode: string }>;
+          testConnection: (args: {
+            hostId: string;
+            password?: string;
+          }) => Promise<{
+            ok: boolean;
+            stages: string[];
+            status?: { passwordless: boolean; fingerprint: string };
+            error?: { code: string; message: string; fingerprint?: string };
+          }>;
+          browse: (args: { hostId: string; path?: string }) => Promise<{
+            path: string;
+            parent: string | null;
+            entries: Array<{ name: string; isDir: boolean; size: number }>;
+          }>;
+        };
       };
       logs: {
         getPath: () => Promise<string | null>;

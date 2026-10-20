@@ -2034,7 +2034,19 @@ describe("Sidebar project groups", () => {
     );
     await flush();
 
-    // 与 chevron 菜单里的「打开已有项目」同一条路径（handleSelectProjectDir）
+    // 新交互：先弹菜单（本地 / 服务器），此时还不该改工作区
+    expect(ipc.changeWorkingDir).not.toHaveBeenCalled();
+    const localItem = Array.from(
+      document.body.querySelectorAll('[role="menu"] button'),
+    ).find((button) =>
+      button.textContent?.includes(i18n.t("sandbox.ssh.localFolder")),
+    );
+    expect(localItem, "菜单里必须有「本地目录…」").toBeTruthy();
+
+    await act(async () => (localItem as HTMLElement).click());
+    await flush();
+
+    // 本地项仍走 handleSelectProjectDir
     expect(ipc.changeWorkingDir).toHaveBeenCalledTimes(1);
     expect(projectsToggle().getAttribute("aria-expanded")).toBe("true");
   });

@@ -2,6 +2,7 @@ import * as path from "path";
 import * as fs from "fs";
 import type { MountedPath } from "../../renderer/types";
 import { logWarn, logError } from "../utils/logger";
+import { parseWorkspaceCwd, toSshWorkspace } from "../../shared/workspace-cwd";
 import { isPathWithinRoot } from "../tools/path-containment";
 
 /**
@@ -58,7 +59,7 @@ export class PathResolver {
         const relativePath = normalizedVirtual.slice(normalizedMount.length);
 
         // Construct real path
-        const realPath = path.join(mount.real, relativePath);
+        const realPath = joinMountPath(mount.real, relativePath);
 
         // Validate the resolved path is within the mount
         if (this.validatePath(sessionId, realPath, mount.real)) {
@@ -106,6 +107,16 @@ export class PathResolver {
     mountRoot: string,
   ): boolean {
     try {
+      const remoteResolved = parseWorkspaceCwd(resolvedPath);
+      const remoteMount = parseWorkspaceCwd(mountRoot);
+      if (remoteResolved.kind === "ssh" && remoteMount.kind === "ssh") {
+        return (
+          remoteResolved.hostId === remoteMount.hostId &&
+          (remoteResolved.path === remoteMount.path ||
+            remoteResolved.path.startsWith(`${remoteMount.path}/`))
+        );
+      }
+
       // 1. Normalize the path (resolves . and ..)
       const normalized = path.normalize(resolvedPath);
       const normalizedMount = path.normalize(mountRoot);
@@ -227,4 +238,17 @@ export class PathResolver {
   getMounts(sessionId: string): MountedPath[] {
     return this.sessionMounts.get(sessionId) || [];
   }
+}
+
+/**
+ * Join a relative path onto a mount root. `path.join` collapses `ssh://h1/x`
+ * into `ssh:/h1/x`, so remote mounts are joined with posix semantics instead.
+ */
+export function joinMountPath(mountReal: string, relativePath: string): string {
+  const parsed = parseWorkspaceCwd(mountReal);
+  if (parsed.kind === "local") return path.join(mountReal, relativePath);
+  return toSshWorkspace(
+    parsed.hostId,
+    path.posix.join(parsed.path, relativePath),
+  );
 }

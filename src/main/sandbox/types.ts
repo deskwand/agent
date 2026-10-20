@@ -86,3 +86,50 @@ export interface PathConverter {
   toWSL(windowsPath: string): string;
   toWindows(wslPath: string): string;
 }
+
+// ── SSH backend ───────────────────────────────────────────────
+
+export type SshErrorCode =
+  | "SSH_HOST_UNREACHABLE"
+  | "SSH_AUTH_FAILED"
+  | "SSH_HOST_KEY_UNKNOWN"
+  | "SSH_HOST_KEY_MISMATCH"
+  | "SSH_WORKSPACE_MISSING"
+  | "SSH_TIMEOUT"
+  | "SSH_DISCONNECTED"
+  | "SSH_BOOTSTRAP_FAILED"
+  | "SSH_UNKNOWN";
+
+export class SshError extends Error {
+  constructor(
+    readonly code: SshErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "SshError";
+  }
+}
+
+export type HostKeyDecision = "trusted" | "unknown" | "mismatch";
+
+export interface KnownHostsStore {
+  check(host: string, port: number, fingerprint: string): HostKeyDecision;
+  trust(host: string, port: number, fingerprint: string): void;
+}
+
+export interface SshHostConfig {
+  id: string;
+  label: string;
+  host: string;
+  port: number;
+  username: string;
+  authMode: "password" | "key";
+  privateKeyPath?: string;
+  defaultPath?: string;
+}
+
+export interface SshDirEntry {
+  name: string;
+  isDir: boolean;
+  size: number;
+}

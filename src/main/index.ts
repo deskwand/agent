@@ -45,6 +45,7 @@ import { config } from "dotenv";
 import { initDatabase, closeDatabase, getDatabase } from "./db/database";
 import { registerVaultIpc } from "./vault/ipc";
 import { scanWorkspaceFiles } from "./workspace-file-scan";
+import { scanRemoteWorkspace } from "./sandbox/ssh-remote-query";
 import { SessionManager } from "./session/session-manager";
 import {
   createPetWindowController,
@@ -154,6 +155,12 @@ import { SandboxSync } from "./sandbox/sandbox-sync";
 import { WSLBridge } from "./sandbox/wsl-bridge";
 import { LimaBridge } from "./sandbox/lima-bridge";
 import { getSandboxBootstrap } from "./sandbox/sandbox-bootstrap";
+import { SshConfigService } from "./sandbox/ssh-config-service";
+import { getKnownHosts } from "./sandbox/ssh-known-hosts";
+import { testSshConnection } from "./sandbox/ssh-test-connection";
+import { browseRemote } from "./sandbox/ssh-browser";
+import { SshError, type SshHostConfig } from "./sandbox/types";
+import { parseWorkspaceCwd } from "../shared/workspace-cwd";
 import type {
   ClientEvent,
   ServerEvent,
@@ -986,6 +993,31 @@ async function setWorkingDir(
   newDir: string,
   sessionId?: string,
 ): Promise<{ success: boolean; path: string; error?: string }> {
+  const parsedRemote = parseWorkspaceCwd(newDir);
+  if (parsedRemote.kind === "ssh") {
+    const host = configStore
+      .get("sshHosts")
+      ?.find((item) => item.id === parsedRemote.hostId);
+    if (!host) {
+      return { success: false, path: newDir, error: "Unknown server" };
+    }
+    try {
+      await getSandboxAdapter().resolveExecutor(newDir);
+    } catch (error) {
+      return {
+        success: false,
+        path: newDir,
+        error:
+          error instanceof Error ? error.message : "Failed to open the project",
+      };
+    }
+    if (sessionId && sessionManager) {
+      sessionManager.updateSessionCwd(sessionId, newDir);
+    }
+    sendToRenderer({ type: "workdir.changed", payload: { path: newDir } });
+    return { success: true, path: newDir };
+  }
+
   const unsupportedReason = getWorkspacePathUnsupportedReason(newDir);
   if (unsupportedReason) {
     return { success: false, path: newDir, error: unsupportedReason };
@@ -2765,6 +2797,19 @@ ipcMain.handle("dialog.selectFiles", async () => {
 // File browser: list directory contents
 ipcMain.handle("fs.listDirectory", async (_event, dirPath: string) => {
   try {
+    const remote = parseWorkspaceCwd(dirPath);
+    if (remote.kind === "ssh") {
+      const executor = await getSandboxAdapter().resolveExecutor(dirPath);
+      const entries = await executor.listDirectory(remote.path);
+      return entries
+        .filter((entry) => !entry.name.startsWith("."))
+        .map((entry) => ({
+          name: entry.name,
+          isDir: entry.isDirectory,
+          size: entry.size ?? 0,
+          ext: entry.isDirectory ? "" : extname(entry.name).toLowerCase(),
+        }));
+    }
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
     return entries
       .filter((entry) => !entry.name.startsWith("."))
@@ -2789,6 +2834,16 @@ ipcMain.handle("fs.listDirectory", async (_event, dirPath: string) => {
 ipcMain.handle("fs.scanFiles", async (_event, rootDir: string) => {
   if (typeof rootDir !== "string" || rootDir.length === 0) {
     return { files: [], truncated: false };
+  }
+  const remote = parseWorkspaceCwd(rootDir);
+  if (remote.kind === "ssh") {
+    try {
+      const executor = await getSandboxAdapter().resolveExecutor(rootDir);
+      return await scanRemoteWorkspace(executor, remote.path);
+    } catch (error) {
+      logError("[fs.scanFiles] remote scan failed:", error);
+      return { files: [], truncated: false };
+    }
   }
   return scanWorkspaceFiles(rootDir);
 });
@@ -2816,8 +2871,32 @@ const MIME_MAP: Record<string, string> = {
   ".avif": "image/avif",
 };
 
+const REMOTE_BINARY_EXTS = new Set<string>([
+  ...IMAGE_EXTS,
+  ".pdf",
+  ".docx",
+  ".xlsx",
+  ".pptx",
+]);
+
 ipcMain.handle("fs.readFile", async (_event, filePath: string) => {
   try {
+    const remote = parseWorkspaceCwd(filePath);
+    if (remote.kind === "ssh") {
+      const ext = extname(remote.path).toLowerCase();
+      if (REMOTE_BINARY_EXTS.has(ext)) {
+        return {
+          type: "error",
+          message: "Remote projects do not support binary preview",
+        };
+      }
+      const executor = await getSandboxAdapter().resolveExecutor(filePath);
+      return {
+        type: "text",
+        content: await executor.readFile(remote.path),
+        ext,
+      };
+    }
     const resolved = resolve(filePath);
     if (!fs.existsSync(resolved)) {
       return { type: "error", message: "File not found" };
@@ -4422,6 +4501,98 @@ ipcMain.handle("sandbox.retrySetup", async () => {
   }
 });
 
+// ── SSH servers ────────────────────────────────────────────────
+
+const sshConfigService = new SshConfigService();
+const sshKeyDir = join(app.getPath("userData"), "ssh");
+const sshKnownHosts = getKnownHosts(join(sshKeyDir, "known-hosts.json"));
+
+ipcMain.handle("sandbox.ssh.listHosts", () => sshConfigService.listHosts());
+
+ipcMain.handle("sandbox.ssh.saveHost", (_event, input: SshHostConfig) =>
+  sshConfigService.saveHost(input),
+);
+
+ipcMain.handle("sandbox.ssh.deleteHost", (_event, id: string) => {
+  const referenced = sessionManager
+    ? sessionManager
+        .listSessions()
+        .sessions.map((s) => s.cwd)
+        .filter(
+          (cwd): cwd is string => typeof cwd === "string" && cwd.length > 0,
+        )
+    : [];
+  sshConfigService.deleteHost(id, referenced);
+  return { ok: true };
+});
+
+ipcMain.handle(
+  "sandbox.ssh.trustHostKey",
+  (_event, args: { hostId: string; fingerprint: string }) => {
+    const host = sshConfigService.getHost(args.hostId);
+    if (!host) throw new Error("Unknown server");
+    // 已记录不同指纹时不允许直接覆盖 —— 只能删掉服务器后重新信任
+    if (
+      sshKnownHosts.check(host.host, host.port, args.fingerprint) === "mismatch"
+    ) {
+      throw new SshError(
+        "SSH_HOST_KEY_MISMATCH",
+        "The server key changed. Delete this server and add it again to re-trust.",
+      );
+    }
+    sshKnownHosts.trust(host.host, host.port, args.fingerprint);
+    return { ok: true };
+  },
+);
+
+ipcMain.handle("sandbox.ssh.status", () => ({
+  activeHostIds: getSandboxAdapter().activeSshHostIds,
+  mode: getSandboxAdapter().mode,
+}));
+
+ipcMain.handle(
+  "sandbox.ssh.testConnection",
+  async (_event, args: { hostId: string; password?: string }) => {
+    const host = sshConfigService.getHost(args.hostId);
+    if (!host) throw new Error("Unknown server");
+    const stages: string[] = [];
+    try {
+      const result = await testSshConnection({
+        host,
+        password: args.password,
+        knownHosts: sshKnownHosts,
+        keyDir: sshKeyDir,
+        onStage: (stage) => stages.push(stage),
+      });
+      return { ok: true, stages, status: result };
+    } catch (error) {
+      return {
+        ok: false,
+        stages,
+        error:
+          error instanceof SshError
+            ? {
+                code: error.code,
+                message: error.message,
+                fingerprint: (error as SshError & { fingerprint?: string })
+                  .fingerprint,
+              }
+            : { code: "SSH_UNKNOWN", message: String(error) },
+      };
+    }
+  },
+);
+
+ipcMain.handle(
+  "sandbox.ssh.browse",
+  async (_event, args: { hostId: string; path?: string }) => {
+    const host = sshConfigService.getHost(args.hostId);
+    if (!host) throw new Error("Unknown server");
+    const connection = await getSandboxAdapter().getSshConnection(host.id);
+    return browseRemote(connection, args.path ?? host.defaultPath);
+  },
+);
+
 /**
  * 展示投影（可能没有）：没有选中元素时必须给 `undefined` 而不是 `[]`。
  * `toElementSelectionRefs` 永远返回数组，而 `[]` 会被原样写进宿主消息与 SDK `details`，
@@ -4923,6 +5094,13 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       return setWorkingDir(event.payload.path, event.payload.sessionId);
 
     case "workdir.select": {
+      if (parseWorkspaceCwd(getWorkingDir() ?? "").kind === "ssh") {
+        return {
+          success: false,
+          path: "",
+          error: "Remote workspace picker is handled in the renderer",
+        };
+      }
       const dialogDefaultPath =
         event.payload.currentPath && isAbsolute(event.payload.currentPath)
           ? event.payload.currentPath

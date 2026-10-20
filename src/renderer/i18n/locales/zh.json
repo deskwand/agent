@@ -784,6 +784,49 @@
     "close": "关闭"
   },
   "sandbox": {
+    "ssh": {
+      "sectionTitle": "我的服务器",
+      "addServer": "SSH 服务器",
+      "addServerHint": "在服务器上直接打开项目",
+      "more": "更多操作",
+      "testConnection": "测试连接",
+      "testing": "连接中…",
+      "passwordless": "已配置免密",
+      "needsPassword": "需要密码",
+      "testFailed": "连接失败",
+      "dialogTitle": "添加 SSH 服务器",
+      "dialogHint": "连接后会在服务器上配置应用专用密钥，之后不再需要密码。",
+      "passwordHint": "密码只用于本次连接并自动配置免密，不会保存。",
+      "auth": { "password": "密码", "key": "私钥" },
+      "fields": {
+        "label": "显示名",
+        "host": "主机",
+        "username": "用户名",
+        "password": "密码",
+        "privateKey": "私钥路径",
+        "defaultPath": "默认目录（可选）"
+      },
+      "stage": {
+        "key": "密钥登录",
+        "password": "密码登录",
+        "bootstrap": "写入公钥并验证"
+      },
+      "error": {
+        "host": "主机不能为空或含空格",
+        "port": "端口需在 1-65535",
+        "username": "用户名必填"
+      },
+      "fingerprintTitle": "首次连接，请核对服务器指纹",
+      "trustAndConnect": "信任并连接",
+      "pickTitle": "选择 {{label}} 上的目录",
+      "openCurrent": "打开「{{name}}」",
+      "localFolder": "本地目录…",
+      "noServers": "还没有服务器",
+      "remoteLimits": "远程项目：Office 预览、用系统应用打开、在访达中显示、图片/PDF 预览不可用。",
+      "statusLocal": "本机执行环境",
+      "deleteBlocked": "这台服务器还有项目在用，先关闭对应项目再删除。",
+      "statusInUse": "在用服务器"
+    },
     "title": "沙盒环境",
     "wslDesc": "在 WSL2 Linux 环境中运行命令，在 Windows 上提供更好的隔离和安全性。",
     "limaDesc": "在 Lima 虚拟机中运行命令，在 macOS 上提供更好的隔离和安全性。",
@@ -979,6 +1022,7 @@
     "openFolder": "打开文件夹"
   },
   "sidebar": {
+    "openProjectFailed": "打开项目失败，请稍后重试",
     "recents": "最近",
     "running": "运行中",
     "asking": "提问中",

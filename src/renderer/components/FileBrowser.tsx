@@ -7,6 +7,7 @@ import { FileTypeIcon } from "./file-type-icon";
 import { openFilePathInBrowser } from "../utils/open-in-browser";
 import { extOf, resolveOpenAction } from "../utils/open-file-by-ext";
 import { openOfficePreview } from "../utils/office-preview-runner";
+import { filePreviewCapability } from "../utils/remote-capabilities";
 import { OpenWithSystemAppButton } from "./OpenWithSystemAppButton";
 import { splitRelPath } from "./attach/picker-items";
 import {
@@ -106,6 +107,7 @@ export function FileBrowser({ width }: { width: number }) {
       : undefined,
   );
   const effectiveDir = activeSession?.cwd || workingDir;
+  const capability = filePreviewCapability(effectiveDir ?? "");
   const openPreview = useAppStore((s) => s.openPreview);
 
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -127,6 +129,15 @@ export function FileBrowser({ width }: { width: number }) {
   const handleFileOpen = useCallback(
     (fullPath: string, fileName: string) => {
       const action = resolveOpenAction(extOf(fileName));
+      if (!capability.office && (action === "office" || action === "browser")) {
+        // 远程项目里本地渲染与 file:// 都不可用：明确告知，不静默退回预览
+        setGlobalNotice({
+          id: `remote-open-disabled-${Date.now()}`,
+          type: "warning",
+          message: t("sandbox.ssh.remoteLimits"),
+        });
+        return;
+      }
       if (action === "browser") {
         openFilePathInBrowser(fullPath);
         return;
@@ -153,7 +164,7 @@ export function FileBrowser({ width }: { width: number }) {
       }
       window.electronAPI?.openPath?.(fullPath);
     },
-    [openPreview, setGlobalNotice, t],
+    [capability.office, openPreview, setGlobalNotice, t],
   );
 
   const handleToggle = useCallback(
@@ -230,6 +241,11 @@ export function FileBrowser({ width }: { width: number }) {
       className="shrink-0 bg-muted flex flex-col min-h-0 overflow-hidden"
       style={{ width }}
     >
+      {!capability.office && (
+        <div className="mx-2 mt-2 rounded border border-warning/40 bg-warning/10 px-2 py-1 text-xs text-warning">
+          {t("sandbox.ssh.remoteLimits")}
+        </div>
+      )}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40 shrink-0">
         <div className="flex-1 min-w-0 flex items-center gap-1.5 h-7 px-2 rounded bg-accent text-muted-foreground">
           <Search className="w-3.5 h-3.5 shrink-0" />
@@ -241,7 +257,8 @@ export function FileBrowser({ width }: { width: number }) {
             className="flex-1 min-w-0 bg-transparent outline-none text-xs text-foreground placeholder:text-muted-foreground"
           />
           {filtering && (
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               type="button"
               aria-label={t("fileBrowser.clearFilter")}
               onClick={() => handleQueryChange("")}
@@ -338,7 +355,9 @@ export function FileBrowser({ width }: { width: number }) {
                       <FileTypeIcon kind={getFileKind(name)} size={16} />
                       <span className="truncate text-foreground">{name}</span>
                       {dir && (
-                        <span className="truncate text-muted-foreground">{dir}</span>
+                        <span className="truncate text-muted-foreground">
+                          {dir}
+                        </span>
                       )}
                       <span className="ml-auto text-xs text-muted-foreground shrink-0">
                         {formatSize(match.size)}
@@ -351,7 +370,9 @@ export function FileBrowser({ width }: { width: number }) {
                           />
                         ) : (
                           <span className="opacity-0 group-hover:opacity-100">
-                            <OpenWithSystemAppButton filePath={fullPath} />
+                            {capability.systemApp && (
+                              <OpenWithSystemAppButton filePath={fullPath} />
+                            )}
                           </span>
                         )}
                       </span>

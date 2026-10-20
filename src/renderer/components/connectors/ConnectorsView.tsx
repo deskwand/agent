@@ -13,6 +13,9 @@ import {
 } from "../ui/dropdown-menu";
 import { AddServerDialog } from "./AddServerDialog";
 import { MailAccountDialog } from "./MailAccountDialog";
+import { SshServerCard } from "./SshServerCard";
+import { SshServerDialog } from "./SshServerDialog";
+import type { SshHostConfig } from "../../types";
 import { ConnectorCard } from "./ConnectorCard";
 import { KeyDialog } from "./KeyDialog";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -56,6 +59,45 @@ export function ConnectorsView() {
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
   const [addOpen, setAddOpen] = useState(false);
+  const [sshHosts, setSshHosts] = useState<SshHostConfig[]>([]);
+  const [passwordlessIds, setPasswordlessIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [sshDialogHost, setSshDialogHost] = useState<
+    SshHostConfig | null | undefined
+  >(undefined);
+
+  const refreshSshHosts = useCallback(async () => {
+    const api = window.electronAPI?.sandbox?.ssh;
+    if (!api) return;
+    setSshHosts(await api.listHosts());
+  }, []);
+
+  useEffect(() => {
+    void refreshSshHosts();
+  }, [refreshSshHosts]);
+
+  const removeSshHost = useCallback(
+    async (id: string) => {
+      try {
+        await window.electronAPI?.sandbox?.ssh?.deleteHost(id);
+        setPasswordlessIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        await refreshSshHosts();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(
+          /still used/i.test(message)
+            ? t("sandbox.ssh.deleteBlocked")
+            : message,
+        );
+      }
+    },
+    [refreshSshHosts, t],
+  );
   /** 「添加」下面的两项菜单（MCP / 邮箱）。false = 菜单收起。 */
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
@@ -521,6 +563,21 @@ export function ConnectorsView() {
                             {t("connectors.addMenu.mailboxHint")}
                           </span>
                         </DropdownMenuItem>
+                        <DropdownMenuItem
+                          data-testid="add-ssh"
+                          onClick={() => {
+                            setAddMenuOpen(false);
+                            setSshDialogHost(null);
+                          }}
+                          className="flex-col items-start gap-0 rounded-none border-t border-border/60 px-3 py-2.5"
+                        >
+                          <span className="block text-sm font-semibold text-foreground">
+                            {t("sandbox.ssh.addServer")}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {t("sandbox.ssh.addServerHint")}
+                          </span>
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -547,6 +604,29 @@ export function ConnectorsView() {
                         {t("connectors.filter.showAll")}
                       </Button>
                     </div>
+                  )}
+
+                  {sshHosts.length > 0 && (
+                    <section className="mb-5">
+                      <h3 className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-muted-foreground">
+                        {t("sandbox.ssh.sectionTitle")}
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          {sshHosts.length}
+                        </span>
+                      </h3>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {sshHosts.map((host) => (
+                          <SshServerCard
+                            key={host.id}
+                            host={host}
+                            passwordless={passwordlessIds.has(host.id)}
+                            onTest={() => setSshDialogHost(host)}
+                            onEdit={() => setSshDialogHost(host)}
+                            onDelete={() => void removeSshHost(host.id)}
+                          />
+                        ))}
+                      </div>
+                    </section>
                   )}
 
                   {visibleGroups.map((g) => (
@@ -591,6 +671,22 @@ export function ConnectorsView() {
           </div>
         </div>
 
+        {sshDialogHost !== undefined && (
+          <SshServerDialog
+            host={sshDialogHost}
+            onClose={() => setSshDialogHost(undefined)}
+            onSaved={(saved) => {
+              setSshHosts((prev) => {
+                const exists = prev.some((item) => item.id === saved.id);
+                return exists
+                  ? prev.map((item) => (item.id === saved.id ? saved : item))
+                  : [...prev, saved];
+              });
+              setPasswordlessIds((prev) => new Set(prev).add(saved.id));
+              setSshDialogHost(undefined);
+            }}
+          />
+        )}
         <AddServerDialog
           isOpen={addOpen}
           onClose={() => setAddOpen(false)}

@@ -5,6 +5,10 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { OccludingDialog } from "./ui/occluding-dialog";
 import { DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { useIPC } from "../hooks/useIPC";
+import { OpenProjectMenu } from "./workspace/OpenProjectMenu";
+import { RemoteFolderPicker } from "./workspace/RemoteFolderPicker";
+import { toSshWorkspace } from "../../shared/workspace-cwd";
+import type { SshHostConfig } from "../types";
 import { useOpenSession } from "../hooks/useOpenSession";
 import {
   Trash2,
@@ -82,6 +86,7 @@ export function Sidebar({
   const setActiveSession = useAppStore((s) => s.setActiveSession);
   const workingDir = useAppStore((s) => s.workingDir);
   const setWorkingDir = useAppStore((s) => s.setWorkingDir);
+  const setActiveView = useAppStore((s) => s.setActiveView);
   const startNewSession = useAppStore((s) => s.startNewSession);
   const openSessionSearch = useAppStore((s) => s.openSessionSearch);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
@@ -148,6 +153,11 @@ export function Sidebar({
   // 那种把两个弹窗的可见性 OR 起来喂给一个 hook 的写法，正是设计文档说
   // 「引用计数会溶解它」的地方。
   const [projectName, setProjectName] = useState("");
+  const [projectMenuAnchor, setProjectMenuAnchor] = useState<DOMRect | null>(
+    null,
+  );
+  const [sshHosts, setSshHosts] = useState<SshHostConfig[]>([]);
+  const [pickerHost, setPickerHost] = useState<SshHostConfig | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const scrollListRef = useRef<HTMLDivElement>(null);
 
@@ -494,10 +504,47 @@ export function Sidebar({
     [changeWorkingDir, handleNewSession, setWorkingDir, workingDir],
   );
 
-  const handleOpenProject = useCallback(async () => {
+  const handleOpenProjectMenu = useCallback((element: HTMLElement) => {
     setShowProjectActions(false);
+    setProjectMenuAnchor(element.getBoundingClientRect());
+  }, []);
+
+  const handleOpenLocalProject = useCallback(async () => {
+    setProjectMenuAnchor(null);
     await handleSelectProjectDir();
   }, [handleSelectProjectDir]);
+
+  const openRemoteProject = useCallback(
+    async (host: SshHostConfig, remotePath: string) => {
+      setPickerHost(null);
+      const target = toSshWorkspace(host.id, remotePath);
+      const result = await invoke<{
+        success: boolean;
+        path: string;
+        error?: string;
+      }>({ type: "workdir.set", payload: { path: target } });
+      if (!result?.success) {
+        setGlobalNotice({
+          id: `notice-open-remote-${Date.now()}`,
+          type: "error",
+          message: result?.error || t("sidebar.openProjectFailed"),
+        });
+        return;
+      }
+      setWorkingDir(result.path);
+      handleNewSession();
+    },
+    [handleNewSession, invoke, setGlobalNotice, setWorkingDir, t],
+  );
+
+  useEffect(() => {
+    const api = window.electronAPI?.sandbox?.ssh;
+    if (!projectMenuAnchor || !isElectron || !api) return;
+    void api
+      .listHosts()
+      .then(setSshHosts)
+      .catch(() => setSshHosts([]));
+  }, [isElectron, projectMenuAnchor]);
 
   const handleNewProject = useCallback(() => {
     setShowProjectActions(false);
@@ -1199,7 +1246,9 @@ export function Sidebar({
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="h-7 gap-2"
-                        onClick={() => void handleOpenProject()}
+                        onClick={(event) =>
+                          handleOpenProjectMenu(event.currentTarget)
+                        }
                       >
                         {t("sidebar.openProject")}
                       </DropdownMenuItem>
@@ -1345,7 +1394,7 @@ export function Sidebar({
                             size="iconXs"
                             onClick={(event) => {
                               event.stopPropagation();
-                              void handleOpenProject();
+                              handleOpenProjectMenu(event.currentTarget);
                             }}
                             className="mr-1 flex-shrink-0 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/projects:opacity-100 group-hover/projects:pointer-events-auto group-focus-within/projects:opacity-100"
                             aria-label={t("sidebar.openProject")}
@@ -1547,6 +1596,31 @@ export function Sidebar({
               onConfirm={() => deleteConfirm?.onConfirm()}
               onCancel={() => setDeleteConfirm(null)}
             />
+
+            {projectMenuAnchor && (
+              <OpenProjectMenu
+                anchor={projectMenuAnchor}
+                hosts={sshHosts}
+                onClose={() => setProjectMenuAnchor(null)}
+                onLocal={() => void handleOpenLocalProject()}
+                onPickHost={(host) => {
+                  setProjectMenuAnchor(null);
+                  setPickerHost(host);
+                }}
+                onAddServer={() => {
+                  setProjectMenuAnchor(null);
+                  setActiveView("apps");
+                }}
+              />
+            )}
+            {pickerHost && (
+              <RemoteFolderPicker
+                hostId={pickerHost.id}
+                hostLabel={pickerHost.label}
+                onClose={() => setPickerHost(null)}
+                onPick={(path) => void openRemoteProject(pickerHost, path)}
+              />
+            )}
 
             <OccludingDialog
               open={createProjectModalOpen}

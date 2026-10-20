@@ -35,6 +35,9 @@ const MENU_FILES = [
   // 主题跟不了 app）。登记进来才会一并受"不许内联阴影 / 必须有入场动画"那几条检查。
   "src/renderer/components/settings/shared.tsx",
   "src/renderer/components/connectors/ConnectorsView.tsx",
+  "src/renderer/components/connectors/SshServerCard.tsx",
+  // 既有遗漏：ProjectMenuChip 一直在用 DropdownMenuContent，但没登记。
+  "src/renderer/components/welcome/ProjectMenuChip.tsx",
 ];
 
 const readSource = (relPath: string) =>

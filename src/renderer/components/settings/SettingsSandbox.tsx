@@ -47,6 +47,18 @@ export function SettingsSandbox() {
   const { t } = useTranslation();
   const [sandboxEnabled, setSandboxEnabled] = useState(true);
   const [status, setStatus] = useState<SandboxStatus | null>(null);
+  const [sshStatus, setSshStatus] = useState<{
+    activeHostIds: string[];
+    mode: string;
+  }>({ activeHostIds: [], mode: "" });
+  useEffect(() => {
+    const api = window.electronAPI?.sandbox?.ssh;
+    if (!api) return;
+    void api
+      .status()
+      .then(setSshStatus)
+      .catch(() => undefined);
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
   const [isInstalling, setIsInstalling] = useState<string | null>(null);
@@ -298,7 +310,9 @@ export function SettingsSandbox() {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-6 h-6 animate-spin text-primary-text" />
-        <span className="ml-2 text-muted-foreground">{t("common.loading")}</span>
+        <span className="ml-2 text-muted-foreground">
+          {t("common.loading")}
+        </span>
       </div>
     );
   }
@@ -365,7 +379,8 @@ export function SettingsSandbox() {
             <h3 className="text-sm font-medium text-foreground">
               {t("sandbox.environmentStatus")}
             </h3>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               onClick={handleCheckStatus}
               disabled={isChecking || isInstalling !== null}
               className="px-3 py-1.5 rounded-lg bg-accent text-muted-foreground text-xs hover:bg-accent transition-colors disabled:opacity-50 flex items-center gap-1.5 h-auto"
@@ -399,6 +414,29 @@ export function SettingsSandbox() {
                   : status?.mode === "lima"
                     ? "Lima VM"
                     : t("sandbox.native")}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg bg-muted">
+              <div className="text-xs text-muted-foreground mb-1">
+                {t("sandbox.ssh.statusLocal")}
+              </div>
+              <div className="text-sm font-medium text-foreground">
+                {status?.mode === "wsl"
+                  ? "WSL2"
+                  : status?.mode === "lima"
+                    ? "Lima VM"
+                    : t("sandbox.native")}
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-muted">
+              <div className="text-xs text-muted-foreground mb-1">
+                {t("sandbox.ssh.statusInUse")}
+              </div>
+              <div className="text-sm font-medium text-foreground">
+                {sshStatus.activeHostIds.length}
               </div>
             </div>
           </div>
@@ -560,7 +598,8 @@ export function SettingsSandbox() {
 
       {/* Retry Setup Button */}
       {sandboxEnabled && sandboxAvailable && !sandboxReady && (
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           onClick={handleRetrySetup}
           disabled={isInstalling !== null}
           className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
@@ -620,7 +659,9 @@ function StatusItem({
           )}
         </div>
         <span className="text-sm text-foreground">{label}</span>
-        {detail && <span className="text-xs text-muted-foreground">({detail})</span>}
+        {detail && (
+          <span className="text-xs text-muted-foreground">({detail})</span>
+        )}
         {optional && !available && (
           <span className="text-xs text-muted-foreground">
             ({t("common.optional")})
@@ -628,7 +669,8 @@ function StatusItem({
         )}
       </div>
       {action && (
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           onClick={action.onClick}
           disabled={action.loading}
           className={`px-2.5 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1 ${
