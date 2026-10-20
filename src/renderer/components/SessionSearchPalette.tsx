@@ -210,9 +210,10 @@ export function SessionSearchPalette() {
                   ? `session-search-option-${safeIndex}`
                   : undefined
               }
-              // `focus:ring-0`：globals.css 给所有 input 加了 `focus:ring-1 focus:ring-primary`。
-              // 输入框贴着弹窗的上/左/右三边，环只剩下方 1px 露在弹窗里 —— 就是那条橙线。
-              // 焦点由「弹窗已打开 + 光标在框里」传达，不需要一圈强调色。
+              // `focus:ring-0`：globals.css 的 input 焦点规则会画 1px 主题色环
+              //（浅色主题下就是个黑框）。弹窗里不需要那圈环 —— 焦点由
+              //「弹窗已打开 + 光标在框里」传达。能覆盖得动，靠那条规则用 `:where()`
+              // 把 `:not()` 链的特异性清零；否则它的 0,6,1 会赢过 0,2,0 的 utility。
               className="w-full min-w-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-0"
             />
           </div>

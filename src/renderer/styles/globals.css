@@ -788,9 +788,15 @@
      现在语义色走 token() 函数色 + color-mix，可以正常写透明度修饰符。
      改这里的宽度前注意 focus-ring-css.test.ts 锁了 4 条 @apply 规则。 */
   select,
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
-      [type="file"]
-    ):not([type="color"]),
+  /* `:where()` 把 `:not()` 链的特异性**清零**（0,1,1），否则五个 `:not([type=…])`
+     把这条规则抬到 0,6,1，任何 `focus:ring-0` / `focus:ring-accent` 工具类都覆盖不了它
+     —— 表现就是「输入框永远挂着 1px 主题色焦点环」，2026-10-19 的搜索弹窗就是被它
+     画了一个黑框。`:where()` 不改变命中范围，只改权重。 */
+  input:where(
+      :not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
+          [type="file"]
+        ):not([type="color"])
+    ),
   textarea {
     @apply focus:outline-none focus:ring-1 focus:ring-primary;
   }

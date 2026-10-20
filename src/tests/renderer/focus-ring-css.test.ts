@@ -24,6 +24,16 @@ describe("焦点环机制", () => {
     expect(declarations).not.toMatch(/focus:ring-2|focus-visible:ring-2/);
   });
 
+  it("input 的 :not() 链包在 :where() 里，utility 才覆盖得动焦点环", () => {
+    // 五个 :not([type=…]) 会把规则抬到 0,6,1；`.focus\:ring-0:focus` 只有 0,2,0，
+    // 排在后面也赢不了 —— 输入框因此永远挂着 1px 主题色环（2026-10-19 搜索弹窗的「黑框」）。
+    // :where() 清零特异性、不改变命中范围；这条就是防止有人把它「还原」回去。
+    expect(cssFlat).toContain(
+      'input:where( :not([type="checkbox"]):not([type="radio"])',
+    );
+    expect(cssFlat).not.toMatch(/input:not\(\[type="checkbox"\]\)/);
+  });
+
   it("支撑焦点环的 4 条基础规则宽度都是 1px、颜色都是主题强调色", () => {
     // 逐条断言而不是全文件计数：全文件计数以后加一处合法用法就会误报。
     const rules = (cssFlat.match(/@apply[^;]*;/g) ?? []).filter((rule) =>
