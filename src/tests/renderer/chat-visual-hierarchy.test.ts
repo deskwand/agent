@@ -188,11 +188,12 @@ describe("侧栏：分组弱化，项目与会话靠缩进区分", () => {
     contentStart,
     sidebar.indexOf("${", contentStart),
   );
-  // marker 必须唯一：项目计数徽标的「12px + muted」样式现在也被「项目」外层
-  // 折叠行的计数共用，所以锚定它独有的 hover 显示部分。
-  const badge = classNameAt(
+  // 2026-10-12：「项目」行与项目行的计数都删掉了，原先锚定的那两个 12px + muted
+  // 元素已不在场。这里改锚空列表提示语 —— 它同样是「12px + muted」的辅助元素，
+  // "内层项目名不许和辅助元素撞档"这条性质不变。marker 在源码里唯一。
+  const emptyHint = classNameAt(
     sidebar,
-    "ml-auto text-xs font-normal text-muted-foreground opacity-0 transition-opacity",
+    "text-xs text-muted-foreground mt-1",
     '"',
   );
   const showMore = classNameAt(
@@ -218,12 +219,14 @@ describe("侧栏：分组弱化，项目与会话靠缩进区分", () => {
     const groupColor = textColorToken(group);
     // 2026-10-11：外层分组标题迁到 muted，内层项目名保持 text-foreground。
     expect(groupColor, `group=${group}`).toBe("foreground");
-    expect(groupColor, `badge=${badge}`).not.toBe(textColorToken(badge));
+    expect(groupColor, `emptyHint=${emptyHint}`).not.toBe(
+      textColorToken(emptyHint),
+    );
     expect(groupColor, `showMore=${showMore}`).not.toBe(
       textColorToken(showMore),
     );
     // 两个辅助元素彼此同档 —— 这是既有事实，记录成断言以免被误当成回归。
-    expect(textColorToken(badge)).toBe(textColorToken(showMore));
+    expect(textColorToken(emptyHint)).toBe(textColorToken(showMore));
   });
 
   it("保留 leading-5（该元素是 button，点击区高度不能被压小）", () => {

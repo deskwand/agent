@@ -19,6 +19,8 @@ import {
   PinOff,
   Mic,
   CircleHelp,
+  FolderPlus,
+  FolderOpen,
 } from "lucide-react";
 import { panelWidthTransitionClass } from "../utils/panel-width";
 import {
@@ -1348,40 +1350,84 @@ export function Sidebar({
 
                 {sessionGroups.projectGroups.length > 0 && (
                   <section className="pt-1.5">
-                    <Button variant="ghost"
-                      type="button"
-                      aria-expanded={projectsExpanded}
-                      aria-label={t(
-                        projectsExpanded
-                          ? "sidebar.collapseProjects"
-                          : "sidebar.expandProjects",
-                      )}
-                      disabled={Boolean(normalizedQuery)}
-                      onClick={() => {
-                        requestSectionMotion(PROJECTS_GROUP_KEY);
-                        setProjectExpanded(
-                          PROJECTS_GROUP_KEY,
-                          !projectsExpanded,
-                        );
-                      }}
-                      className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
-                    >
-                      <SidebarGroupIcon
-                        kind="project"
-                        expanded={projectsExpanded}
-                        motionVersion={
-                          sectionMotionVersions.get(PROJECTS_GROUP_KEY) ?? 0
-                        }
-                        badgeKind={projectsRootBadgeKind}
-                      />
-                      <span>{t("sidebar.projects")}</span>
-                      {/* -mr-0.5：这行按钮右内边距是 `px-3`（比会话行的 `pr-2.5` 多 2px）✗
-                          ⇒ 计数要落回会话行那条基准线，就得往右拉回这 2px ✓。
-                          左边不动：分组图标 / 标签的内缩保持原样 ✓。 */}
-                      <span className="ml-auto -mr-0.5 text-xs font-normal text-muted-foreground">
-                        {sessionGroups.projectGroups.length}
-                      </span>
-                    </Button>
+                    {/* pr-0.5 与内层项目行同一个基准：会话行尾部那个 16px 图标格的中心距行右缘 18px，
+                        这里的尾槽跟它对齐（详见下面两颗按钮的 -mr-1），hover / 聚焦时浮出的
+                        按钮才和会话行的时间 / 状态点落在同一条竖线上。 */}
+                    <div className="group/projects flex items-center justify-between pr-0.5">
+                      <Button variant="ghost"
+                        type="button"
+                        aria-expanded={projectsExpanded}
+                        aria-label={t(
+                          projectsExpanded
+                            ? "sidebar.collapseProjects"
+                            : "sidebar.expandProjects",
+                        )}
+                        disabled={Boolean(normalizedQuery)}
+                        onClick={() => {
+                          requestSectionMotion(PROJECTS_GROUP_KEY);
+                          setProjectExpanded(
+                            PROJECTS_GROUP_KEY,
+                            !projectsExpanded,
+                          );
+                        }}
+                        className="min-w-0 flex-1 rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                      >
+                        <SidebarGroupIcon
+                          kind="project"
+                          expanded={projectsExpanded}
+                          motionVersion={
+                            sectionMotionVersions.get(PROJECTS_GROUP_KEY) ?? 0
+                          }
+                          badgeKind={projectsRootBadgeKind}
+                        />
+                        <span className="truncate">{t("sidebar.projects")}</span>
+                      </Button>
+                      {/* 两颗都藏着（`opacity-0` 会把焦点环一起吃成透明 ⇒ 补一条
+                          `group-focus-within`，键盘 Tab 进来时才看得见）。
+                          内层项目行的三个动作按钮就是这个模式，这里照抄。
+                          尺寸用 24² 尾槽（`iconXs`）而不是内层那 32²：这一行的折叠开关自己
+                          只有 28px（`py-1` + `leading-5`），塞 32px 按钮会把分组头顶到 32px，
+                          比并肩的「最近」那行高 4px。24² 盒里的图标中心比 32² 少 4px，
+                          靠 `mr-1` 把那 4px 补回来，图标中心仍在行右缘内缩 18px 那条线上。 */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost"
+                            type="button"
+                            size="iconXs"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleNewProject();
+                            }}
+                            className="mr-1 flex-shrink-0 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/projects:opacity-100 group-hover/projects:pointer-events-auto group-focus-within/projects:opacity-100"
+                            aria-label={t("sidebar.newProject")}
+                          >
+                            <FolderPlus className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          {t("sidebar.newProject")}
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost"
+                            type="button"
+                            size="iconXs"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleOpenProject();
+                            }}
+                            className="mr-1 flex-shrink-0 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/projects:opacity-100 group-hover/projects:pointer-events-auto group-focus-within/projects:opacity-100"
+                            aria-label={t("sidebar.openProject")}
+                          >
+                            <FolderOpen className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          {t("sidebar.openProject")}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                     <SidebarAnimatedSection
                       expanded={projectsExpanded}
                       motionVersion={
@@ -1440,9 +1486,6 @@ export function Sidebar({
                                     badgeKind={badgeKindFor(group.key)}
                                   />
                                   <span className="truncate">{group.name}</span>
-                                  <span className="ml-auto text-xs font-normal text-muted-foreground opacity-0 transition-opacity group-hover/project:opacity-100">
-                                    {group.sessions.length}
-                                  </span>
                                 </Button>
                                 <Tooltip>
                                   <TooltipTrigger asChild>

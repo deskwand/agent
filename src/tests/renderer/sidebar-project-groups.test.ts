@@ -7,6 +7,7 @@ import i18n from "../../renderer/i18n/config";
 import { Sidebar } from "../../renderer/components/Sidebar";
 import { useAppStore } from "../../renderer/store";
 import type { AskUserRequest, Session } from "../../renderer/types";
+import { cleanupDialogs } from "../dialog-test-helpers";
 
 const ipc = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -65,6 +66,7 @@ describe("Sidebar project groups", () => {
 
   afterEach(async () => {
     await act(async () => root.unmount());
+    cleanupDialogs();
   });
 
   async function render(
@@ -399,11 +401,8 @@ describe("Sidebar project groups", () => {
     expect(collapsedProjectIcon.classList.contains("text-muted-foreground")).toBe(
       false,
     );
-    const projectCount = Array.from(project.querySelectorAll("span")).find(
-      (span) => span.textContent?.trim() === "1",
-    );
-    expect(projectCount).toBeTruthy();
-    expect(projectCount?.classList.contains("text-muted-foreground")).toBe(true);
+    // 项目行的会话计数已删（2026-10-12）—— 这一行内不再有 muted 文本；
+    // 本用例关心的图标状态断言在上下两段，原样保留。
     expect(collapsedProjectIcon.style.opacity).toBe("0");
     expect(expandedProjectIcon.style.opacity).toBe("1");
     expect(project.querySelector(".lucide-chevron-down")).toBeNull();
@@ -513,7 +512,7 @@ describe("Sidebar project groups", () => {
     expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("renders dense project headers with hover-only metadata", async () => {
+  it("renders dense project headers with hover-only actions", async () => {
     await render([
       session("project", {
         isProjectMode: true,
@@ -533,11 +532,8 @@ describe("Sidebar project groups", () => {
       "group-hover/project:pointer-events-auto",
     );
 
-    const count = Array.from(header?.querySelectorAll("span") ?? []).find(
-      (element) => element.textContent === "1",
-    );
-    expect(count?.className).toContain("opacity-0");
-    expect(count?.className).toContain("group-hover/project:opacity-100");
+    // 会话计数的断言已随计数一起删除 —— "项目行不再有数字"由
+    // 「「项目」行与项目行都不再渲染计数」那条用例锁定。
   });
 
   it("pins an ordinary session without selecting it and persists the order", async () => {
@@ -962,8 +958,13 @@ describe("Sidebar project groups", () => {
     expect(row?.textContent).not.toContain("deskwand");
 
     await search("deskwand");
+    // 分组头那颗折叠开关本来就写着项目名 —— 它不算「筛选 chip」✗。
+    // 2026-10-12 之前它因为尾巴上挂着会话计数（"deskwand1"）而碰巧没被这条断言抓到，
+    // 计数删掉后才真的暴露出来。按 `aria-expanded` 把它排除，断言仍然锁「没有 chip」。
     const textButtons = Array.from(container.querySelectorAll("button")).filter(
-      (button) => button.textContent?.trim() === "deskwand",
+      (button) =>
+        button.textContent?.trim() === "deskwand" &&
+        !button.hasAttribute("aria-expanded"),
     );
     expect(textButtons).toHaveLength(0);
   });
@@ -1457,6 +1458,20 @@ describe("Sidebar project groups", () => {
     return button as HTMLButtonElement;
   }
 
+  function projectsRow(): HTMLElement {
+    const row = projectsToggle().parentElement;
+    expect(row, "「项目」行必须有外层容器").toBeTruthy();
+    return row as HTMLElement;
+  }
+
+  function projectsRowAction(label: string): HTMLButtonElement {
+    const button = Array.from(projectsRow().querySelectorAll("button")).find(
+      (candidate) => candidate.getAttribute("aria-label") === label,
+    );
+    expect(button, `「项目」行必须有「${label}」按钮`).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
   it("shows a warning badge on a group whose session waits for an answer", async () => {
     await render(
       [
@@ -1850,15 +1865,10 @@ describe("Sidebar project groups", () => {
     await act(async () =>
       findButton(i18n.t("sidebar.showMoreSessions", { count: 2 }))?.click(),
     );
-    // 「收起」与「项目」计数：按钮内边距是 `px-3`（比会话行多 2px）⇒ 右拉回 2px ✓
+    // 「收起」：按钮内边距是 `px-3`（比会话行多 2px）⇒ 右拉回 2px ✓
     expect(findButton(i18n.t("sidebar.showLessSessions"))?.className).toContain(
       "-mr-0.5",
     );
-    const projectsCount = Array.from(
-      projectsToggle().querySelectorAll("span"),
-    ).find((span) => /^\d+$/.test(span.textContent ?? ""));
-    expect(projectsCount, "「项目」行的计数").toBeTruthy();
-    expect(projectsCount?.className).toContain("-mr-0.5");
   });
 
   it("会话行的归档/更多键是 24² 槽：缺省档垫子不在场（盒宽不再被撑到 32）", async () => {
@@ -2065,6 +2075,130 @@ describe("Sidebar project groups", () => {
       expect(heading.classList.contains("text-muted-foreground")).toBe(true);
       expect(heading.className).not.toContain("text-[13px]");
     }
+  });
+
+  it("「项目」行与项目行都不再渲染计数", async () => {
+    await render(makeProjectSessions("countless", 3, 30));
+
+    // 外层「项目」行的文本就是标签本身（旧实现尾巴上挂着一个 3）
+    expect(projectsToggle().textContent).toBe(i18n.t("sidebar.projects"));
+
+    // 内层项目行的 header 里没有任何纯数字 span（旧实现的会话数在这里）
+    const header = projectHeader("/work/countless");
+    expect(header, "项目行的 header 必须找得到").toBeTruthy();
+    const numeric = Array.from(header?.querySelectorAll("span") ?? []).filter(
+      (span) => /^\d+$/.test(span.textContent ?? ""),
+    );
+    expect(numeric).toEqual([]);
+  });
+
+  it("「项目」行 hover 浮出新建 / 打开项目按钮，点它不许折叠这一行", async () => {
+    await render([
+      session("root-row-project", {
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+      }),
+    ]);
+
+    const row = projectsRow();
+    const rowTokens = row.className.split(/\s+/);
+    expect(rowTokens).toContain("group/projects");
+    expect(rowTokens).toContain("pr-0.5");
+
+    const toggle = projectsToggle();
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    // 标签可收缩可截断：多两颗固定 32px 按钮后，英文长文案不许把动作挤出去
+    expect(toggle.className.split(/\s+/)).toContain("flex-1");
+    expect(toggle.className.split(/\s+/)).toContain("min-w-0");
+
+    const create = projectsRowAction(i18n.t("sidebar.newProject"));
+    const open = projectsRowAction(i18n.t("sidebar.openProject"));
+    for (const button of [create, open]) {
+      const tokens = button.className.split(/\s+/);
+      // 24² 尾槽（`size="iconXs"`）—— 为什么不给 32² 见下一条用例
+      expect(tokens).toContain("h-6");
+      expect(tokens).toContain("w-6");
+      expect(tokens).toContain("flex-shrink-0");
+      // 静止时藏着，浮出两条路径：鼠标 hover + 键盘把焦点落进行内
+      expect(tokens).toContain("opacity-0");
+      expect(tokens).toContain("pointer-events-none");
+      expect(tokens).not.toContain("opacity-100");
+      expect(tokens).toContain("group-hover/projects:opacity-100");
+      expect(tokens).toContain("group-hover/projects:pointer-events-auto");
+      expect(tokens).toContain("group-focus-within/projects:opacity-100");
+    }
+
+    // 这一行恰好三颗按钮，且顺序是：折叠开关 → 新建项目 → 打开已有项目
+    //（最右那颗落在与会话行尾部同一条竖线上）
+    expect(
+      Array.from(projectsRow().querySelectorAll("button")).map((button) =>
+        button.getAttribute("aria-label"),
+      ),
+    ).toEqual([
+      i18n.t("sidebar.collapseProjects"),
+      i18n.t("sidebar.newProject"),
+      i18n.t("sidebar.openProject"),
+    ]);
+
+    // 点击不许顺带折叠 / 展开
+    await act(async () => create.click());
+    await flush();
+    await new Promise((resolve) => setTimeout(resolve, 0)); // Radix Presence 延后一帧挂载
+    expect(projectsToggle().getAttribute("aria-expanded")).toBe("true");
+    expect(
+      document.body.querySelector(
+        `input[placeholder="${i18n.t("sidebar.projectNamePlaceholder")}"]`,
+      ),
+      "「新建项目」必须弹出新建项目对话框",
+    ).toBeTruthy();
+  });
+
+  it("「项目」行的「打开已有项目」走既有的目录选择入口", async () => {
+    await render([
+      session("root-open-project", {
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+      }),
+    ]);
+
+    await act(async () =>
+      projectsRowAction(i18n.t("sidebar.openProject")).click(),
+    );
+    await flush();
+
+    // 与 chevron 菜单里的「打开已有项目」同一条路径（handleSelectProjectDir）
+    expect(ipc.changeWorkingDir).toHaveBeenCalledTimes(1);
+    expect(projectsToggle().getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("「项目」行的两颗按钮是 24² 尾槽：不把分组头撑高，也不离那条基准线", async () => {
+    await render([
+      session("root-slot-project", {
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+      }),
+    ]);
+
+    // 折叠开关自己就是 28px（`py-1` + `leading-5`）。两颗 32px 按钮会把 flex 行顶到
+    // 32px，与「最近」那行（28px）差 4px —— 所以这里锁 24² 槽（会话行尾键同档）。
+    expect(projectsToggle().className.split(/\s+/)).toContain("py-1");
+
+    const create = projectsRowAction(i18n.t("sidebar.newProject"));
+    const open = projectsRowAction(i18n.t("sidebar.openProject"));
+    for (const button of [create, open]) {
+      const tokens = button.className.split(/\s+/);
+      expect(tokens).toContain("h-6");
+      expect(tokens).toContain("w-6");
+      // 缺省档的垫子不许进场：24² 盒子的宽度下限就是内边距之和（32² 会被挤成 40）
+      expect(tokens).not.toContain("px-4");
+      expect(tokens).not.toContain("py-2");
+      expect(tokens).not.toContain("h-8");
+      expect(tokens).not.toContain("w-8");
+    }
+    // 尾槽向左补 4px：24² 盒里 14px 图标的中心才回到会话行那条基准线上
+    // （行右缘到图标中心的距离：32² = 2(pr-0.5) + 16；24² = 2 + 4(mr-1) + 12）
+    expect(open.className.split(/\s+/)).toContain("mr-1");
+    expect(open.className.split(/\s+/)).not.toContain("-mr-1");
   });
 });
 
