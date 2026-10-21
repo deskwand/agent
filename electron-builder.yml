@@ -48,6 +48,12 @@ files:
   # 仍由 after-pack.js 保留，不要删那一段。
   - "!**/node_modules/@esbuild/android-*/**/*"
   - "!**/node_modules/@esbuild/openharmony-*/**/*"
+  # ssh2 的 cpu-features 是可选的原生 AES-GCM 加速。它没有预编译二进制、需要 node-gyp
+  # 从源码编译，而 node-gyp 不支持交叉编译 —— 在 macOS 上打 linux-x64 时必然失败
+  # （"node-gyp does not support cross-compiling native modules from source"），
+  # 把整个 linux 阶段卡住。ssh2 在绑定缺失时会回退到纯 JS 实现，所以排除它不影响
+  # SSH 远程项目的功能，只是少一层硬件加速。见 tests/packaging-optional-native-exclusions.test.ts。
+  - "!**/node_modules/cpu-features/**"
 
 # MCP servers and platform-specific resources are declared in each platform's
 # extraResources section below (win/mac/linux).
