@@ -798,7 +798,10 @@
       "dialogTitle": "Add SSH server",
       "dialogHint": "A dedicated key is installed on the server after connecting; no password is needed afterwards.",
       "passwordHint": "The password is used for this connection only; a key is installed and the password is never stored.",
-      "auth": { "password": "Password", "key": "Private key" },
+      "auth": {
+        "password": "Password",
+        "key": "Private key"
+      },
       "fields": {
         "label": "Display name",
         "host": "Host",
@@ -2806,5 +2809,76 @@
     "quote": "Quote",
     "copy": "Copy",
     "quoted": "Quoted into the input — switch to chat to send it"
+  },
+  "feedback": {
+    "compose": {
+      "title": "New feedback",
+      "subtitle": "Issues, ideas, or anything else. It will appear in the public list.",
+      "titleLabel": "Title",
+      "titlePlaceholder": "Describe the issue or idea in one line",
+      "bodyLabel": "Details",
+      "bodyPlaceholder": "Steps to reproduce, expected behavior, your environment…",
+      "publicNotice": "Feedback is visible to everyone. Do not paste keys, tokens, passwords, or private information.",
+      "cancel": "Cancel",
+      "submit": "Submit feedback"
+    },
+    "notice": {
+      "created": "Feedback submitted",
+      "deleted": "Deleted"
+    },
+    "replySection": "Replies",
+    "replyPlaceholder": "Write a reply…",
+    "reply": "Reply",
+    "replyPublic": "Public reply — everyone can see it",
+    "loginToReply": "Sign in to join the discussion",
+    "loginHint": "Browsing is public; replies and new feedback need a Deskwand account.",
+    "login": "Sign in",
+    "more": "More actions",
+    "title": "Feedback",
+    "subtitle": "Issues and suggestions are public",
+    "new": "New feedback",
+    "refresh": "Refresh",
+    "loadMore": "Load more",
+    "filter": {
+      "all": "All"
+    },
+    "type": {
+      "bug": "Issue",
+      "feature": "Idea",
+      "other": "Other"
+    },
+    "status": {
+      "open": "Open",
+      "resolved": "Resolved"
+    },
+    "author": {
+      "handle": "User #{{handle}}",
+      "you": "You",
+      "maintainer": "Maintainer"
+    },
+    "replies": "{{count}} replies",
+    "empty": "No feedback in this filter",
+    "detail": {
+      "select": "Select a feedback item",
+      "loading": "Loading…",
+      "retry": "Retry"
+    },
+    "error": {
+      "generic": "Something went wrong. Try again.",
+      "sessionExpired": "Your session expired. Please sign in again.",
+      "forbidden": "You do not have permission to do that.",
+      "rateLimited": "Too many actions. Try again later.",
+      "deleted": "This feedback was deleted."
+    },
+    "delete": {
+      "title": "Delete this feedback?",
+      "replyTitle": "Delete this reply?",
+      "body": "This cannot be undone.",
+      "action": "Delete feedback",
+      "replyAction": "Delete reply",
+      "confirm": "Delete"
+    },
+    "resolve": "Mark resolved",
+    "reopen": "Reopen"
   }
 }

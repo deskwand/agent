@@ -38,6 +38,12 @@ export const RAIL_ITEMS: readonly RailItem[] = [
     labelKey: "accountMenu.usage",
     placement: "more",
   },
+  {
+    key: "feedback",
+    view: "feedback",
+    labelKey: "help.feedback",
+    placement: "more",
+  },
 ];
 
 /** 当前视图对应的图标栏项 key；settings 不在栏上，返回 null。 */

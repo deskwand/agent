@@ -5,6 +5,7 @@ import {
   Clock3,
   LayoutGrid,
   MessageSquare,
+  MessageSquareText,
   Newspaper,
   NotebookPen,
 } from "lucide-react";
@@ -26,4 +27,5 @@ export const RAIL_ICONS: Record<
   apps: LayoutGrid,
   vault: Archive,
   usage: BarChart3,
+  feedback: MessageSquareText,
 };

@@ -135,10 +135,11 @@ const PAGE_SHELLS: Record<string, string> = {
   连接: "components/connectors/ConnectorsView.tsx",
   密库: "components/VaultView.tsx",
   用量统计: "components/UsageView.tsx",
+  反馈: "components/feedback/FeedbackList.tsx",
 };
 
 describe("各页外壳都从共享常量取内边距", () => {
-  it("九个外壳文件都把常量嵌进 className（不是只提一下名字）", () => {
+  it("十个外壳文件都把常量嵌进 className（不是只提一下名字）", () => {
     for (const [name, file] of Object.entries(PAGE_SHELLS)) {
       // 要的是 `${PAGE_INSET_X}` 这种模板串用法：注释里提一句名字不算
       expect(read(file), `${name}（${file}）没有把常量嵌进类串`).toContain(

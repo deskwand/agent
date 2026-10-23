@@ -6,6 +6,7 @@ import { SettingsCard, SettingsRow, SettingsSection } from "./shared";
 import { AppProgress } from "../app-progress";
 import appIconUrl from "../../../../resources/icon.png";
 import { Button } from "../app-button";
+import { useAppStore, type ActiveView } from "../../store";
 
 interface SettingsAboutProps {
   appVersion: string;
@@ -230,7 +231,13 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
             variant="ghost"
             key={link.labelKey}
             type="button"
-            onClick={() => void window.electronAPI?.openExternal(link.url)}
+            onClick={() => {
+              if (link.view) {
+                useAppStore.getState().setActiveView(link.view);
+              } else if (link.url) {
+                void window.electronAPI?.openExternal(link.url);
+              }
+            }}
             className="border-b border-border/60 pb-px text-xs text-muted-foreground transition-colors hover:text-foreground h-auto px-0"
           >
             {t(link.labelKey)}
@@ -270,7 +277,11 @@ const ABOUT_FEATURES = [
   },
 ];
 
-const ABOUT_LINKS = [
+const ABOUT_LINKS: Array<{
+  labelKey: string;
+  url?: string;
+  view?: ActiveView;
+}> = [
   { labelKey: "about.links.website", url: "https://deskwand.com" },
   { labelKey: "about.links.source", url: "https://github.com/deskwand/agent" },
   {
@@ -288,6 +299,6 @@ const ABOUT_LINKS = [
   { labelKey: "help.docs", url: "https://www.deskwand.com/manual" },
   {
     labelKey: "help.feedback",
-    url: "https://github.com/deskwand/agent/issues",
+    view: "feedback",
   },
 ];

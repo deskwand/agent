@@ -3,6 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsAbout } from "../../renderer/components/settings/SettingsAbout";
+import { useAppStore } from "../../renderer/store";
 import type { ServerEvent } from "../../renderer/types";
 
 let container: HTMLDivElement;
@@ -26,6 +27,7 @@ function buttonByText(text: string): HTMLButtonElement | undefined {
 
 beforeEach(async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  useAppStore.setState(useAppStore.getInitialState(), true);
   send = vi.fn();
   openExternal = vi.fn().mockResolvedValue(true);
   window.electronAPI = {
@@ -214,7 +216,7 @@ describe("设置 →「关于」页", () => {
     expect(container.textContent ?? "").not.toMatch(/about\.[a-zA-Z]/);
   });
 
-  it("六个链接逐个用正确的 URL 调 openExternal", async () => {
+  it("五个外链逐个用正确的 URL 调 openExternal", async () => {
     await render(<SettingsAbout appVersion="1.0.47" />);
 
     for (const [label, url] of [
@@ -223,9 +225,8 @@ describe("设置 →「关于」页", () => {
       ["更新日志", "https://github.com/deskwand/agent/releases"],
       ["MIT 开源协议", "https://github.com/deskwand/agent/blob/main/LICENSE"],
       // 2026-10-06：图标栏的「?」在有更新时会让位给升级按钮，菜单进不去。
-      // 这两条是那段时间里手册与反馈的唯一入口（见 rail-update-icon-design §5）。
+      // 这条是那段时间里手册的唯一入口（见 rail-update-icon-design §5）。
       ["使用手册", "https://www.deskwand.com/manual"],
-      ["反馈问题", "https://github.com/deskwand/agent/issues"],
     ] as const) {
       openExternal.mockClear();
       await act(async () => {
@@ -233,5 +234,17 @@ describe("设置 →「关于」页", () => {
       });
       expect(openExternal, label).toHaveBeenCalledWith(url);
     }
+  });
+
+  it("反馈问题切到应用内反馈视图，不打开外部 URL", async () => {
+    await render(<SettingsAbout appVersion="1.0.47" />);
+
+    await act(async () => {
+      buttonByText("反馈问题")?.click();
+    });
+    expect(useAppStore.getState().activeView).toBe("feedback");
+    expect(openExternal).not.toHaveBeenCalledWith(
+      "https://github.com/deskwand/agent/issues",
+    );
   });
 });

@@ -23,7 +23,6 @@ import { Button } from "./app-button";
 
 /** 外部链接是常量不是文案：不进 i18n，也没有跨组件共享需求。 */
 const MANUAL_URL = "https://www.deskwand.com/manual";
-const FEEDBACK_URL = "https://github.com/deskwand/agent/issues";
 
 /**
  * 图标栏底部的帮助菜单：? 按钮 + 弹层 + 更新弹窗。
@@ -120,15 +119,14 @@ export function HelpMenu() {
             </DropdownMenuItem>
             <DropdownMenuItem
               className="h-7 gap-2"
-              onClick={() => openExternal(FEEDBACK_URL)}
+              onClick={() => {
+                useAppStore.getState().setActiveView("feedback");
+              }}
             >
               <span className="shrink-0 text-muted-foreground">
                 <Bug className="w-4 h-4" />
               </span>
               <span className="truncate">{t("help.feedback")}</span>
-              <span className="ml-auto shrink-0 text-muted-foreground">
-                <ArrowUpRight className="w-4 h-4" />
-              </span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="h-7 gap-2"

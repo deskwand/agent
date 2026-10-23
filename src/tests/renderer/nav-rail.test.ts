@@ -18,6 +18,7 @@ const ALL_VIEWS: ActiveView[] = [
   "vault",
   "settings",
   "usage",
+  "feedback",
 ];
 
 describe("RAIL_ITEMS", () => {
@@ -31,6 +32,7 @@ describe("RAIL_ITEMS", () => {
       "apps",
       "vault",
       "usage",
+      "feedback",
     ]);
   });
 
@@ -50,6 +52,7 @@ describe("resolveRailActiveKey", () => {
     expect(resolveRailActiveKey("apps")).toBe("apps");
     expect(resolveRailActiveKey("vault")).toBe("vault");
     expect(resolveRailActiveKey("usage")).toBe("usage");
+    expect(resolveRailActiveKey("feedback")).toBe("feedback");
   });
 
   it("returns null for settings because it lives in the bottom cluster", () => {
@@ -92,6 +95,7 @@ describe("RAIL_ITEMS 的 placement 分组", () => {
       "apps",
       "vault",
       "usage",
+      "feedback",
     ]);
   });
 

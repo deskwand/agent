@@ -42,6 +42,7 @@ import { WelcomeView } from "./components/WelcomeView";
 import { VaultView } from "./components/VaultView";
 import { UsageView } from "./components/UsageView";
 import { FeedView } from "./components/FeedView";
+import { FeedbackView } from "./components/feedback/FeedbackView";
 import { ScheduleView } from "./components/ScheduleView";
 import { AppsView } from "./components/AppsView";
 import { PermissionDialog } from "./components/PermissionDialog";
@@ -701,6 +702,8 @@ function App() {
               <VaultView />
             ) : activeView === "usage" ? (
               <UsageView />
+            ) : activeView === "feedback" ? (
+              <FeedbackView />
             ) : activeSessionId ? (
               <PanelErrorBoundary
                 name="ChatView"

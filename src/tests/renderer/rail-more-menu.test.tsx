@@ -171,7 +171,7 @@ describe("触发器（那颗 … 图标）", () => {
 });
 
 describe("卡片内容", () => {
-  it("四行长尾项都在，各带图标与文字（没有「更多」标题行）", async () => {
+  it("长尾项都在，各带图标与文字（没有「更多」标题行）", async () => {
     await mount();
     for (const item of RAIL_MORE_ITEMS) {
       expect(rowFor(item.labelKey).querySelector("svg"), item.key).toBeTruthy();
@@ -183,7 +183,7 @@ describe("卡片内容", () => {
 
   it("面板不是菜单：没有 menu 角色，且按钮数恰好是 行 + 图钉", async () => {
     // 「点触发器什么也不做」拦不住「把 Radix 菜单加回来」（那会同时满足不导航 + 类串不变）；
-    // 这条钉住形状：面板里只有 4 行 × 2 颗按钮，没有任何 menu/menuitem 角色。
+    // 这条钉住形状：面板里只有长尾项 × 2 颗按钮，没有任何 menu/menuitem 角色。
     await mount();
     expect(
       container.querySelectorAll('[role="menu"], [role="menuitem"]'),

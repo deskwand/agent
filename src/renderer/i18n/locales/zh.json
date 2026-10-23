@@ -798,7 +798,10 @@
       "dialogTitle": "添加 SSH 服务器",
       "dialogHint": "连接后会在服务器上配置应用专用密钥，之后不再需要密码。",
       "passwordHint": "密码只用于本次连接并自动配置免密，不会保存。",
-      "auth": { "password": "密码", "key": "私钥" },
+      "auth": {
+        "password": "密码",
+        "key": "私钥"
+      },
       "fields": {
         "label": "显示名",
         "host": "主机",
@@ -2803,5 +2806,76 @@
     "quote": "引用",
     "copy": "复制",
     "quoted": "已引用到输入框，切到聊天页即可发送"
+  },
+  "feedback": {
+    "compose": {
+      "title": "新建反馈",
+      "subtitle": "问题、建议或其他想法都可以。提交后会出现在公开列表里。",
+      "titleLabel": "标题",
+      "titlePlaceholder": "一句话说清问题或建议",
+      "bodyLabel": "正文",
+      "bodyPlaceholder": "复现步骤、期望的行为、你的环境…",
+      "publicNotice": "反馈内容对所有用户可见。请勿粘贴密钥、令牌、密码或私人信息。",
+      "cancel": "取消",
+      "submit": "提交反馈"
+    },
+    "notice": {
+      "created": "反馈已提交",
+      "deleted": "已删除"
+    },
+    "replySection": "回复",
+    "replyPlaceholder": "写下你的回复…",
+    "reply": "回复",
+    "replyPublic": "公开回复，所有人都能看到",
+    "loginToReply": "登录后参与讨论",
+    "loginHint": "浏览不需要登录，回复和新建反馈需要 Deskwand 账号。",
+    "login": "登录",
+    "more": "更多操作",
+    "title": "反馈",
+    "subtitle": "问题与建议公开可见",
+    "new": "新建反馈",
+    "refresh": "刷新",
+    "loadMore": "加载更多",
+    "filter": {
+      "all": "全部"
+    },
+    "type": {
+      "bug": "问题",
+      "feature": "建议",
+      "other": "其他"
+    },
+    "status": {
+      "open": "未解决",
+      "resolved": "已解决"
+    },
+    "author": {
+      "handle": "用户 #{{handle}}",
+      "you": "我",
+      "maintainer": "维护者"
+    },
+    "replies": "{{count}} 条回复",
+    "empty": "这个筛选下还没有反馈",
+    "detail": {
+      "select": "选择一条反馈查看详情",
+      "loading": "加载中…",
+      "retry": "重试"
+    },
+    "error": {
+      "generic": "操作失败，请稍后重试",
+      "sessionExpired": "登录已过期，请重新登录",
+      "forbidden": "没有权限",
+      "rateLimited": "操作太频繁，请稍后再试",
+      "deleted": "这条反馈已被删除"
+    },
+    "delete": {
+      "title": "删除这条反馈？",
+      "replyTitle": "删除这条回复？",
+      "body": "删除后无法恢复。",
+      "action": "删除反馈",
+      "replyAction": "删除回复",
+      "confirm": "删除"
+    },
+    "resolve": "标记已解决",
+    "reopen": "重新打开"
   }
 }

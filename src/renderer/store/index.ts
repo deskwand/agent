@@ -221,7 +221,8 @@ export type ActiveView =
   | "automation"
   | "vault"
   | "settings"
-  | "usage";
+  | "usage"
+  | "feedback";
 
 interface AppState {
   // Sessions

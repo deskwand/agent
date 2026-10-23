@@ -176,10 +176,11 @@ describe("帮助弹层的四类行", () => {
     expect(document.body.textContent).not.toContain("help.feedback");
   });
 
-  it("点反馈问题：打开 issues 地址", async () => {
+  it("点反馈问题：切到应用内反馈视图", async () => {
     await openMenu();
     await act(async () => row("help.feedback").click());
-    expect(openExternal).toHaveBeenCalledWith(FEEDBACK_URL);
+    expect(useAppStore.getState().activeView).toBe("feedback");
+    expect(openExternal).not.toHaveBeenCalledWith(FEEDBACK_URL);
   });
 
   it("点关于 DeskWand：进设置页的 about tab", async () => {
