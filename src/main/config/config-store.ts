@@ -570,6 +570,7 @@ function getDefaultProviderModel(
 function normalizeProviderModel(
   raw: Partial<ApiProviderModel> | undefined,
   fallbackId: string,
+  registryProviderId?: string,
 ): ApiProviderModel | null {
   const id = toNonEmptyString(raw?.id) || fallbackId;
   if (!id) {
@@ -592,7 +593,7 @@ function normalizeProviderModel(
   // Auto-resolve contextWindow for all models (preset + custom without manual override)
   if (!model.contextWindow || model.contextWindow <= 0) {
     try {
-      const cw = resolveModelContextWindow(id);
+      const cw = resolveModelContextWindow(id, registryProviderId);
       if (cw > 0) model.contextWindow = cw;
     } catch {
       /* pi registry may be unavailable; model keeps no contextWindow */
@@ -622,6 +623,9 @@ export function normalizeProviderConfig(
     model: "",
   };
   const fallbackModel = getDefaultProviderModel(profileKey);
+  // provider-aware 元数据解析：opencode-go 的 minimax-m3 与 opencode 那份同名
+  // 不同值（1M vs 512K），必须带上当前 profile 的 provider 才能取对。
+  const registryProviderId = registryProviderIdForProfileKey(profileKey);
   const isCustomProfile =
     meta.provider === "custom" || meta.provider === "oauth";
   const rawModels = Array.isArray(raw?.models) ? raw.models : [];
@@ -633,7 +637,7 @@ export function normalizeProviderConfig(
 
   if (preserveRawModels) {
     for (const item of rawModels) {
-      const normalized = normalizeProviderModel(item, "");
+      const normalized = normalizeProviderModel(item, "", registryProviderId);
       if (normalized) {
         deduped.set(normalized.id, normalized);
       }
@@ -1574,4 +1578,17 @@ export function normalizeVoiceEmotionConfig(
     value !== null &&
     (value as { enabled?: unknown }).enabled === true;
   return { enabled };
+}
+
+/**
+ * 把 profile key 映射成 pi 注册表里的 provider id（provider-aware 元数据
+ * 解析用）。自定义/订阅 profile 不在注册表里，返回 undefined。
+ */
+export function registryProviderIdForProfileKey(
+  profileKey: ProviderProfileKey,
+): string | undefined {
+  const meta = profileKeyToProvider(profileKey);
+  if (meta.provider === "custom") return undefined;
+  if (meta.provider === "oauth") return extractOAuthProviderId(profileKey);
+  return meta.provider;
 }

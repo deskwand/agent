@@ -6,6 +6,7 @@ import {
   getProviders,
 } from "@earendil-works/pi-ai/compat";
 import type { Api, Model } from "@earendil-works/pi-ai";
+import { getModelsDevContextWindow } from "../config/models-dev-catalog";
 import { isOfficialOpenAIBaseUrl } from "../config/auth-utils";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 
@@ -482,12 +483,54 @@ export function resolvePiRegistryModel(
 
 /**
  * Resolve the context window for a model name string.
- * Checks KNOWN_MODEL_SPECS first, then falls back to pi registry.
+ *
+ * 顺序：
+ * 1. 注册表里该 provider 下的同 id 条目
+ * 2. KNOWN_MODEL_SPECS 家族匹配（仅本地模型：无 provider 或 ollama）
+ * 3. models.dev 目录快照里的同 provider / 同 id —— 端点独有模型只有这里有数
+ * 4. 跨 provider 的注册表回退（历史行为）
+ *
+ * 家族表只服务本地模型：云端 provider 的 id 里 qwen3.7-max 这类前缀会误匹配
+ * 到 qwen3（40960），既偏小又把目录值挡住。opencode-go 的 minimax-m3 曾因
+ * 跨 provider 顺序拿到 opencode 的 512000 而不是 1,000,000，所以调用方能定位
+ * profile 时必须把 provider 传进来。
  */
-export function resolveModelContextWindow(modelName: string): number {
-  const key = modelName.toLowerCase();
-  for (const [specKey, spec] of Object.entries(KNOWN_MODEL_SPECS)) {
-    if (key.startsWith(specKey)) return spec.contextWindow;
+export function resolveModelContextWindow(
+  modelName: string,
+  providerId?: string,
+): number {
+  const modelId = modelName.includes("/")
+    ? modelName.split("/").slice(1).join("/")
+    : modelName;
+  if (providerId) {
+    try {
+      const registryProviders = getProviders();
+      if (registryProviders.includes(providerId as PiRegistryProvider)) {
+        const exact = getModels(providerId as PiRegistryProvider).find(
+          (model) => model.id === modelId,
+        );
+        if (exact?.contextWindow && exact.contextWindow > 0) {
+          return exact.contextWindow;
+        }
+      }
+    } catch {
+      /* registry unavailable; fall through to the catalog snapshot */
+    }
+  }
+  // KNOWN_MODEL_SPECS 只是本地模型的家族表（见其表头注释）。云端 provider 下
+  // 裸前缀会误伤：qwen3.7-max / qwen3.6-plus 会命中 qwen3（40960），比 128K
+  // 兜底还小，而且把 models.dev 的 1M 彻底挡在门外。
+  if (!providerId || providerId === "ollama") {
+    const key = modelName.toLowerCase();
+    for (const [specKey, spec] of Object.entries(KNOWN_MODEL_SPECS)) {
+      if (key.startsWith(specKey)) return spec.contextWindow;
+    }
+  }
+  if (providerId) {
+    const catalogContextWindow = getModelsDevContextWindow(providerId, modelId);
+    if (catalogContextWindow && catalogContextWindow > 0) {
+      return catalogContextWindow;
+    }
   }
   const model = resolvePiRegistryModel(modelName);
   return model?.contextWindow ?? 0;

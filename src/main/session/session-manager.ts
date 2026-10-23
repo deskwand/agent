@@ -51,7 +51,10 @@ import { AgentRunner } from "../agent/agent-runner";
 import { webAccessCache } from "../agent/tools/web-access/cache";
 import { removeWebAccessTempDir } from "../agent/tools/web-access/session-temp";
 import { resolveModelContextWindow } from "../agent/pi-model-resolution";
-import { configStore } from "../config/config-store";
+import {
+  configStore,
+  registryProviderIdForProfileKey,
+} from "../config/config-store";
 import {
   DEFAULT_WORKDIR_DIRNAME,
   getDefaultWorkingDirPath,
@@ -861,15 +864,17 @@ export class SessionManager {
     const contextWindows: Record<string, number> = {};
     for (const s of sessions) {
       const modelName = s.model?.trim();
-      if (modelName) {
-        try {
-          const cw = resolveModelContextWindow(modelName);
-          if (cw > 0) {
-            contextWindows[s.id] = cw;
-          }
-        } catch {
-          /* skip unresolved */
+      if (!modelName) continue;
+      try {
+        const providerId = s.providerProfileKey
+          ? registryProviderIdForProfileKey(s.providerProfileKey)
+          : undefined;
+        const cw = resolveModelContextWindow(modelName, providerId);
+        if (cw > 0) {
+          contextWindows[s.id] = cw;
         }
+      } catch {
+        /* skip unresolved */
       }
     }
     const goalExt = this.extensionManager?.getExtension<{

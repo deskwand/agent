@@ -279,6 +279,7 @@ import {
   resolveUtilityModelConfig,
 } from "./memory/memory-llm-client";
 import { getFeedConfig } from "./config/config-store";
+import { ensureModelsDevCatalog } from "./config/models-dev-catalog";
 import {
   installArtifactProtocol,
   registerArtifactProtocolScheme,
@@ -1172,6 +1173,10 @@ app
     }
 
     await configStore.syncOAuthProviderModelsFromRegistry();
+
+    // 预热目录：只用于补注册表滞后的模型上下文（opencode 端点独有模型）。
+    // 不阻塞启动，失败由 ensureModelsDevCatalog 内部的退避兜住。
+    void ensureModelsDevCatalog();
 
     // Apply dev logs setting from config
     const enableDevLogs = configStore.get("enableDevLogs");

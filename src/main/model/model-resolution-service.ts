@@ -2,6 +2,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { normalizeOpenAICompatibleBaseUrl } from "../config/auth-utils";
 import { getCodingSubscription } from "../../shared/coding-subscriptions";
 import { t } from "../i18n";
+import { registryProviderIdForProfileKey } from "../config/config-store";
 import type {
   AppConfig,
   ApiProviderConfig,
@@ -11,6 +12,10 @@ import type {
   ProviderType,
 } from "../config/config-store";
 import { fetchOllamaModelInfo } from "../config/ollama-api";
+import {
+  ensureModelsDevCatalog,
+  getModelsDevContextWindow,
+} from "../config/models-dev-catalog";
 import { resolveProviderApiKey } from "../agent/shared-model-runtime";
 import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import { DESKWAND_PROVIDER_PREFIX } from "../../shared/deskwand-provider";
@@ -197,6 +202,19 @@ export class ModelResolutionService {
     if (!piModel) {
       piModelSource = "synthetic";
       notes.push("registry_model_not_found");
+      // 目录按「注册表 provider id」索引；custom / oauth profile 在这里没有
+      // 对应条目，直接跳过，不要让会话白等超时。
+      const catalogProviderId = registryProviderIdForProfileKey(
+        providerSelection.providerProfileKey,
+      );
+      const catalogContextWindow =
+        modelSelection.matchedModel.contextWindow || !catalogProviderId
+          ? undefined
+          : await resolveCatalogContextWindow(
+              catalogProviderId,
+              modelSelection.modelId,
+            );
+      if (catalogContextWindow) notes.push("model_metadata_from_models_dev");
       const synthetic = resolveSyntheticPiModelFallback({
         rawModel: modelSelection.modelId,
         resolvedModelString: modelString,
@@ -211,7 +229,7 @@ export class ModelResolutionService {
         baseUrl,
         undefined,
         undefined,
-        modelSelection.matchedModel.contextWindow,
+        modelSelection.matchedModel.contextWindow ?? catalogContextWindow,
         modelSelection.matchedModel.maxTokens,
       );
       piModel = applyPiModelRuntimeOverrides(piModel, {
@@ -341,3 +359,19 @@ export class ModelResolutionService {
 }
 
 export const modelResolutionService = new ModelResolutionService();
+
+/**
+ * 端点独有模型（注册表没有条目）的上下文只能靠 models.dev。快照通常已在
+ * 启动预热时填好，这里只是同步读；只有冷启动竞态才会等网络，且最多 2s。
+ */
+async function resolveCatalogContextWindow(
+  registryProviderId: string,
+  modelId: string,
+): Promise<number | undefined> {
+  const cached = getModelsDevContextWindow(registryProviderId, modelId);
+  if (cached) return cached;
+  const ok = await ensureModelsDevCatalog({ timeoutMs: 2000 });
+  return ok
+    ? getModelsDevContextWindow(registryProviderId, modelId)
+    : undefined;
+}

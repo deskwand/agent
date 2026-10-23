@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const resolveProviderApiKeyMock = vi.hoisted(() => vi.fn());
+const modelsDevEnsureMock = vi.hoisted(() => vi.fn());
+const modelsDevContextMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../main/config/models-dev-catalog", () => ({
+  ensureModelsDevCatalog: modelsDevEnsureMock,
+  getModelsDevContextWindow: modelsDevContextMock,
+}));
 
 vi.mock("../../main/agent/shared-model-runtime", () => ({
   resolveProviderApiKey: resolveProviderApiKeyMock,
@@ -379,5 +386,114 @@ describe("ModelResolutionService", () => {
     });
 
     expect(result.piModel.input).toEqual(["text", "image"]);
+  });
+});
+
+describe("ModelResolutionService — models.dev fallback for endpoint-only models", () => {
+  const service = new ModelResolutionService();
+
+  function appConfigWithOpencodeGo(): AppConfig {
+    const base = buildAppConfig();
+    return {
+      ...base,
+      activeProviderKey: "opencode-go",
+      providers: {
+        ...base.providers,
+        "opencode-go": {
+          provider: "opencode-go",
+          customProtocol: "openai",
+          apiKey: "sk-test",
+          baseUrl: "https://opencode.ai/inference/go/v1",
+          defaultModel: "minimax-m3.1-flash-free",
+          models: [
+            {
+              id: "minimax-m3.1-flash-free",
+              label: "minimax-m3.1-flash-free",
+              source: "preset",
+            },
+          ],
+          updatedAt: "2026-10-22T00:00:00.000Z",
+        },
+      },
+    };
+  }
+
+  function appConfigWithCustomProfile(): AppConfig {
+    const base = buildAppConfig();
+    return {
+      ...base,
+      activeProviderKey: "custom:relay",
+      providers: {
+        ...base.providers,
+        "custom:relay": {
+          provider: "custom",
+          customProtocol: "openai",
+          apiKey: "sk-test",
+          baseUrl: "https://relay.example.com/v1",
+          defaultModel: "my-model",
+          models: [{ id: "my-model", label: "my-model", source: "custom" }],
+          updatedAt: "2026-10-22T00:00:00.000Z",
+        },
+      },
+    };
+  }
+
+  beforeEach(() => {
+    modelsDevEnsureMock.mockReset();
+    modelsDevContextMock.mockReset();
+    modelsDevEnsureMock.mockResolvedValue(true);
+    modelsDevContextMock.mockReturnValue(undefined);
+  });
+
+  it("uses the catalog instead of the 128K default", async () => {
+    modelsDevContextMock.mockReturnValue(1000000);
+
+    const resolved = await service.resolve({
+      sessionProviderProfileKey: "opencode-go",
+      sessionModel: "minimax-m3.1-flash-free",
+      appConfig: appConfigWithOpencodeGo(),
+    });
+
+    expect(resolved.trace.piModelSource).toBe("synthetic");
+    // 快照已命中，不应该再等网络
+    expect(modelsDevEnsureMock).not.toHaveBeenCalled();
+    expect(resolved.contextWindow).toBe(1000000);
+    expect(resolved.piModel.contextWindow).toBe(1000000);
+  });
+
+  it("waits at most 2s and keeps 128K when the catalog is down", async () => {
+    modelsDevEnsureMock.mockResolvedValue(false);
+
+    const resolved = await service.resolve({
+      sessionProviderProfileKey: "opencode-go",
+      sessionModel: "minimax-m3.1-flash-free",
+      appConfig: appConfigWithOpencodeGo(),
+    });
+
+    expect(modelsDevEnsureMock).toHaveBeenCalledWith({ timeoutMs: 2000 });
+    expect(resolved.contextWindow).toBe(128000);
+  });
+
+  it("never consults the catalog for profiles without a registry provider", async () => {
+    await service.resolve({
+      sessionProviderProfileKey: "custom:relay",
+      sessionModel: "my-model",
+      appConfig: appConfigWithCustomProfile(),
+    });
+
+    expect(modelsDevContextMock).not.toHaveBeenCalled();
+    expect(modelsDevEnsureMock).not.toHaveBeenCalled();
+  });
+
+  it("does not consult the catalog when the registry already knows the model", async () => {
+    const resolved = await service.resolve({
+      sessionProviderProfileKey: "opencode-go",
+      sessionModel: "minimax-m3",
+      appConfig: appConfigWithOpencodeGo(),
+    });
+
+    expect(modelsDevEnsureMock).not.toHaveBeenCalled();
+    expect(modelsDevContextMock).not.toHaveBeenCalled();
+    expect(resolved.contextWindow).toBe(1000000);
   });
 });
