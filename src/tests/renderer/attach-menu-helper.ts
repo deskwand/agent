@@ -51,3 +51,20 @@ export async function toggleAttachMenu(container: HTMLElement): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 }
+
+/**
+ * 指针离开某个元素（React 的 `onPointerLeave` 由它合成）。
+ *
+ * jsdom 没有 PointerEvent，用 MouseEvent 顶替；`pointerType` 必须补上（Radix 的
+ * `whenMouse` 只认 `'mouse'`），`relatedTarget` 则是 React 判定「真的离开了」的依据 ——
+ * React 不监听原生 `pointerleave`，它拿 `pointerout` 的 relatedTarget 合成 enter/leave。
+ */
+export function pointerOut(relatedTarget: Element | null): MouseEvent {
+  const event = new MouseEvent("pointerout", {
+    bubbles: true,
+    cancelable: true,
+    relatedTarget,
+  });
+  Object.defineProperty(event, "pointerType", { value: "mouse" });
+  return event;
+}

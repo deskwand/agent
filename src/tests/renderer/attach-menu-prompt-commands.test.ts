@@ -6,7 +6,7 @@
 // attach-menu-command-wiring.test.ts。
 
 import React, { act } from "react";
-import { toggleAttachMenu } from "./attach-menu-helper";
+import { pointerOut, toggleAttachMenu } from "./attach-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttachMenu } from "../../renderer/components/attach/AttachMenu";
@@ -269,6 +269,32 @@ describe("命令组的新建 / 编辑 / 删除", () => {
     );
     expect(listCommands).toHaveBeenCalledTimes(2);
     expect(document.querySelector("[role='dialog']")).toBeNull();
+  });
+
+  it("指针停在悬停才出现的编辑按钮上，行仍是焦点目标", async () => {
+    await openMenu({ onCommandEntry: vi.fn() });
+    const row = menuItem("翻译成英文")!;
+    const edit = document.body.querySelector<HTMLElement>(
+      "[data-command-edit='translate']",
+    )!;
+
+    await act(async () => {
+      row.focus();
+    });
+    expect(document.activeElement).toBe(row);
+
+    // 指针往行尾的编辑按钮上移：item 的 pointerleave 先到（Radix 借它把焦点交回菜单
+    // 内容），按钮随后在指针底下出现 —— 中间没有 pointermove 可接，所以这里也只派
+    // pointerout。
+    await act(async () => {
+      row.dispatchEvent(pointerOut(edit));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(
+      document.activeElement,
+      "编辑/删除是行的一部分，指针压上去不能让行失焦",
+    ).toBe(row);
   });
 
   it("点编辑：读回内容填进表单，保存调 prompts.save(isCreate=false) 并刷新", async () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React, { act } from "react";
-import { toggleAttachMenu } from "./attach-menu-helper";
+import { pointerOut, toggleAttachMenu } from "./attach-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttachMenu } from "../../renderer/components/attach/AttachMenu";
@@ -214,6 +214,31 @@ describe("+ 菜单的技能组", () => {
         .querySelector("[data-skill-pin='review'] svg")
         ?.getAttribute("fill"),
     ).toBe("currentColor");
+  });
+
+  it("指针移到行首星标上，焦点仍在这一行（整行是一个焦点目标）", async () => {
+    await openMenu({ onInsertSkill: vi.fn() }, ["pdf"]);
+    const row = skillRows()[0];
+    const pin = pinButton("pdf");
+
+    // Radix 在指针进到菜单项上时把焦点放到 item 上 —— 行高亮就是它。
+    await act(async () => {
+      row.focus();
+    });
+    expect(document.activeElement).toBe(row);
+
+    // 只派发 pointerout：真实浏览器里指针离开 item 就是它，Radix 借此把焦点交回菜单
+    // 内容。**刻意不补 pointermove** —— 修复不能依赖「指针又动了」：命令行悬停时，
+    // 编辑/删除会在指针底下冒出来，那一刻指针是静止的。
+    await act(async () => {
+      row.dispatchEvent(pointerOut(pin));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(
+      document.activeElement,
+      "星标在行内、行看起来是一整块：指针压上去不能让行失焦",
+    ).toBe(row);
   });
 
   it("星标超过 5 个时只显示前 5 行，标题右侧出现 5/N 计数", async () => {

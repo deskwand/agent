@@ -622,6 +622,12 @@ export function AttachMenu({
                     <DropdownMenuItem
                       data-skill-row={name}
                       onClick={() => runSkillEntry(name)}
+                      // 行高亮是 item 的 `focus` 撑的，而 Radix 在 item 的 pointerleave 里
+                      // 会把焦点交回菜单内容（`onItemLeave`）—— 可这一行的星标不是 item，
+                      // 指针一压上去整行就失焦、↓ 也从第一项重新数。拦下这次默认处理
+                      // （composeEventHandlers 见到 preventDefault 即跳过）：指针在菜单里
+                      // 怎么走，焦点都留在最后碰到的那一行 —— 原生菜单也是这个手感。
+                      onPointerLeave={(event) => event.preventDefault()}
                       // 结构与 MENU_ITEM_AFTER_SLOT_CLASS 相同，但不含左内边距：
                       // 左边距交给外层容器，让星标正好落在别处放行图标的位置。
                       className="h-7 min-w-0 flex-1 gap-2 pl-1 pr-2.5"
@@ -694,6 +700,9 @@ export function AttachMenu({
                 >
                   <DropdownMenuItem
                     onClick={() => runPromptEntry(row.name)}
+                    // 同上：行尾的编辑/删除会在指针底下冒出来，那一刻没有 pointermove
+                    // 可接，只能靠这条拦住 item 把焦点交回菜单内容。
+                    onPointerLeave={(event) => event.preventDefault()}
                     className="h-7 min-w-0 flex-1 gap-2"
                   >
                     <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
