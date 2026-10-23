@@ -140,7 +140,7 @@ const ZHIPU_REGIONS = [
   },
 ] as const;
 
-/** OpenCode 订阅计划：Zen（按量付费）与 Go（$10/月订阅），同一账号同一 API Key */
+/** OpenCode 计划：Zen（按量付费）与 Go / Go Plus（订阅，含用量限额，Go Plus 额度更高），同一账号同一 API Key */
 const OPENCODE_PLANS = [
   {
     id: "zen",

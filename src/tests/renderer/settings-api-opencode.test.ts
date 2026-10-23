@@ -123,24 +123,38 @@ describe("SettingsAPI OpenCode provider", () => {
     });
     await flush();
 
-    // Zen/Go 切换按钮出现（测试环境为英文 locale：Zen · Pay as you go / Go · $10/mo subscription）
+    // 计划切换按钮出现（测试环境为英文 locale：Zen · Pay as you go / Go / Go Plus · Subscription）
     const planButtons = Array.from(editorDialog().querySelectorAll("button"));
     expect(
       planButtons.some((b) => b.textContent?.includes("Pay as you go")),
     ).toBe(true);
-    expect(planButtons.some((b) => b.textContent?.includes("$10/mo"))).toBe(
-      true,
-    );
+    expect(
+      planButtons.some((b) => b.textContent?.includes("Go / Go Plus")),
+    ).toBe(true);
+
+    // 三档共用同一账号/Key；价格会变，所以这一块不写金额
+    const planSection = planButtons
+      .find((b) => b.textContent?.includes("Go / Go Plus"))
+      ?.closest("div.space-y-3");
+    const planText = planSection?.textContent ?? "";
+    expect(planText).toContain("Billing");
+    expect(planText).toContain("Go / Go Plus");
+    expect(planText).toContain("higher limits");
+    expect(planText).not.toMatch(/\$\s?\d/);
 
     // 切换到 Go：OpenCode Go 按钮变为选中态
     await act(async () => {
-      const goBtn = planButtons.find((b) => b.textContent?.includes("$10/mo"));
+      const goBtn = planButtons.find((b) =>
+        b.textContent?.includes("Go / Go Plus"),
+      );
       goBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await flush();
 
     const afterSwitch = Array.from(editorDialog().querySelectorAll("button"));
-    const goActive = afterSwitch.find((b) => b.textContent?.includes("$10/mo"));
+    const goActive = afterSwitch.find((b) =>
+      b.textContent?.includes("Go / Go Plus"),
+    );
     expect(goActive?.className).toContain("border-primary");
 
     // 填写 API Key 并切换回 Zen，Key 保留
@@ -220,7 +234,7 @@ describe("SettingsAPI OpenCode provider", () => {
     // 切换到 Go
     await act(async () => {
       const goBtn = Array.from(editorDialog().querySelectorAll("button")).find(
-        (b) => b.textContent?.includes("$10/mo"),
+        (b) => b.textContent?.includes("Go / Go Plus"),
       );
       goBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });

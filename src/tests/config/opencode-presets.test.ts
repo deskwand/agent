@@ -73,6 +73,15 @@ describe("OpenCode config integration", () => {
     expect(fallback.models.length).toBeGreaterThan(0);
   });
 
+  it("keeps the implicit Go default model stable when curating the fallback list", () => {
+    // getDefaultProviderModel 取静态预设里**字母序第一个**，既不是数组第一项，
+    // 也不是 defaultProfiles 的 kimi-k3。往兜底清单里加一个排序在
+    // deepseek-v4-pro 之前的 id（例如 claude-haiku-5-5）会静默改掉未存 models
+    // 的 Go 配置的默认模型。
+    const fallback = normalizeProviderConfig("opencode-go", undefined);
+    expect(fallback.defaultModel).toBe("deepseek-v4-pro");
+  });
+
   it("enriches opencode payloads with full registry models", async () => {
     const enriched = await enrichProviderModelsFromRegistry({
       profileKey: "opencode",
