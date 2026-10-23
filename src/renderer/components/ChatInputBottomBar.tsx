@@ -21,6 +21,11 @@ export interface ContextStatusDetails {
   usedLabel: string;
   totalLabel: string;
   cacheHitRate: string;
+  /**
+   * 生成速度标签（"38 tok/s" / "约 42 tok/s"）。
+   * 缺省 = 本宿主没有该数据（欢迎页）或不显示。
+   */
+  tokenSpeedLabel?: string;
 }
 
 export interface ChatInputBottomBarProps {

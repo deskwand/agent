@@ -78,6 +78,8 @@ export interface SessionState {
   pendingTurns: TurnState[];
   activeTurn: TurnState | null;
   executionClock: SessionExecutionClock;
+  /** 最近一条 assistant 消息的生成速度；不落库，重启后为 null。 */
+  tokenSpeed?: { tokensPerSecond: number; estimated: boolean } | null;
   traceSteps: TraceStep[];
   contextWindow: number;
   compaction: CompactionState;
@@ -149,6 +151,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   pendingTurns: [],
   activeTurn: null,
   executionClock: { startAt: null, endAt: null },
+  tokenSpeed: null,
   traceSteps: [],
   contextWindow: 0,
   compaction: { status: "idle" },
@@ -421,6 +424,10 @@ interface AppState {
   finishExecutionClock: (sessionId: string, endAt?: number) => void;
   clearExecutionClock: (sessionId: string) => void;
   ensureExecutionClock: (sessionId: string, now: number) => void;
+  setTokenSpeed: (
+    sessionId: string,
+    speed: { tokensPerSecond: number; estimated: boolean },
+  ) => void;
   setGoalStatus: (
     sessionId: string,
     goalStatus: SessionState["goalStatus"],
@@ -1068,15 +1075,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   startExecutionClock: (sessionId, startAt) =>
     set((state) => {
-      const { executionClock } = getSession(state.sessionStates, sessionId);
+      const { executionClock, tokenSpeed } = getSession(
+        state.sessionStates,
+        sessionId,
+      );
       // 正在跑：排队发送不能把当前这一轮的起点往后推。
       // live 的定义是 endAt === null —— 与 isTurnClockLive 保持一致。
       if (executionClock.startAt !== null && executionClock.endAt === null) {
         return {};
       }
+      // 上一轮的估算值（中止的回合没有 message_end）不得跨进新回合；
+      // 精确值保留，作为「上一轮速度」继续显示。
+      const clearedSpeed = tokenSpeed?.estimated ? { tokenSpeed: null } : {};
       return {
         sessionStates: patchSession(state.sessionStates, sessionId, {
           executionClock: { startAt, endAt: null },
+          ...clearedSpeed,
         }),
       };
     }),
@@ -1123,6 +1137,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
       };
     }),
+
+  setTokenSpeed: (sessionId, speed) =>
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        tokenSpeed: speed,
+      }),
+    })),
 
   setGoalStatus: (sessionId, goalStatus) =>
     set((state) => ({

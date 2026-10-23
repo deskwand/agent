@@ -2314,7 +2314,7 @@
   "statusPopover": {
     "ringTooltip": "Context & usage",
     "context": "Context",
-    "cacheHitRate": "Cache hit rate {{rate}}",
+    "cacheHitRate": "Cache {{rate}}",
     "windowSession": "5h window",
     "windowWeekly": "7d window",
     "resetAt": "Resets {{time}}"

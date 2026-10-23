@@ -643,6 +643,14 @@ export type ServerEvent =
       };
     }
   | {
+      type: "stream.speed";
+      payload: {
+        sessionId: string;
+        tokensPerSecond: number;
+        estimated: boolean;
+      };
+    }
+  | {
       type: "stream.toolResultPartial";
       payload: {
         sessionId: string;

@@ -2311,7 +2311,7 @@
   "statusPopover": {
     "ringTooltip": "上下文与额度",
     "context": "上下文",
-    "cacheHitRate": "缓存命中率 {{rate}}",
+    "cacheHitRate": "缓存 {{rate}}",
     "windowSession": "5h 窗口",
     "windowWeekly": "7d 窗口",
     "resetAt": "重置 {{time}}"

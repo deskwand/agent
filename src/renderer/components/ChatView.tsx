@@ -31,6 +31,7 @@ import {
 } from "../utils/voice/voice-owner";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import { resolveDisplayedContextUsage } from "../utils/context-usage";
+import { formatTokenSpeed } from "../utils/token-speed";
 import { MessageCard } from "./MessageCard";
 import { projectNestedToolMessages } from "../utils/nested-tool-display";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
@@ -563,6 +564,9 @@ export function ChatView() {
   const goalStatus = useAppStore((s) =>
     activeSessionId ? s.sessionStates[activeSessionId]?.goalStatus : undefined,
   );
+  const tokenSpeed = useAppStore((s) =>
+    activeSessionId ? s.sessionStates[activeSessionId]?.tokenSpeed : undefined,
+  );
   // Hide complete/blocked transition state 5 seconds after it appears
   const [goalTransitionVisible, setGoalTransitionVisible] = useState(true);
   useEffect(() => {
@@ -656,6 +660,12 @@ export function ChatView() {
     displayedContextTokens === null
       ? "--"
       : formatTokenCount(displayedContextTokens);
+  const formattedTokenSpeed = formatTokenSpeed(tokenSpeed?.tokensPerSecond);
+  const tokenSpeedLabel = formattedTokenSpeed
+    ? tokenSpeed?.estimated
+      ? t("chat.approximateValue", { value: formattedTokenSpeed })
+      : formattedTokenSpeed
+    : undefined;
   const contextStatusDetails = {
     usedLabel:
       displayedContextUsage.isEstimated && displayedContextTokens !== null
@@ -663,6 +673,7 @@ export function ChatView() {
         : formattedUsed,
     totalLabel: formatTokenCount(contextWindow || 0),
     cacheHitRate,
+    tokenSpeedLabel,
   };
   const thinkingLevel = (activeSession?.thinkingLevel ||
     "medium") as ThinkingLevel;

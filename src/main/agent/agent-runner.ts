@@ -29,6 +29,7 @@ import {
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 import { createNestedToolCallTracker } from "./nested-tool-call-tracker";
+import { TokenSpeedReporter } from "./token-speed";
 import {
   createTurnProfileExtension,
   filterAppendPromptForSessionKind,
@@ -3770,6 +3771,14 @@ Tool routing:\n
 
       // Accumulate streamed text deltas in case message_end.content is empty (pi SDK streaming behaviour)
       let streamedText = "";
+      // 生成速度：按消息计时，流式期间节流发估算，message_end 发精确值。
+      const speed = new TokenSpeedReporter({
+        emit: (sample) =>
+          this.sendToRenderer({
+            type: "stream.speed",
+            payload: { sessionId: session.id, ...sample },
+          }),
+      });
       let compactionStepId: string | undefined;
       let hasEmittedError = false;
       let terminalErrorText: string | undefined;
@@ -3860,6 +3869,7 @@ Tool routing:\n
               log(`[AgentRunner] Event: ${event.type} → ${updateType}`);
             }
           } else if (event.type === "message_start") {
+            if (event.message?.role === "assistant") speed.startMessage();
             log(
               "[AgentRunner] Event: message_start",
               safeStringify(summarizeMessageForLog(event.message), 2),
@@ -3901,6 +3911,7 @@ Tool routing:\n
               const ame = event.assistantMessageEvent;
               if (ame.type === "text_delta") {
                 markFirstStreamEvent(ame.type);
+                speed.observeDelta(ame.delta);
                 const parsed = thinkParser.push(ame.delta);
                 if (parsed.thinking) {
                   this.sendToRenderer({
@@ -3918,6 +3929,7 @@ Tool routing:\n
                 }
               } else if (ame.type === "thinking_delta") {
                 markFirstStreamEvent(ame.type);
+                speed.observeDelta(ame.delta);
                 // Forward thinking delta to renderer for real-time display
                 this.sendToRenderer({
                   type: "stream.thinking",
@@ -3945,6 +3957,9 @@ Tool routing:\n
                       : undefined,
                   timestamp: Date.now(),
                 });
+              } else if (ame.type === "toolcall_delta") {
+                // 工具参数的 JSON 也计入 output tokens，估算与精确值同口径
+                speed.observeDelta(ame.delta);
               } else if (ame.type === "done") {
                 // Some providers emit 'done' via message_update — we handle it
                 // in message_end below as a unified path for all providers.
@@ -4127,6 +4142,7 @@ Tool routing:\n
                     logWarn("[AgentRunner] usage record failed:", error);
                   }
                 }
+                speed.finish(tokenUsage?.output ?? 0);
                 if (contentBlocks.length > 0) {
                   const assistantMsg: Message = {
                     id: uuidv4(),

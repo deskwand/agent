@@ -492,6 +492,13 @@ function registerSharedIpcListener(): () => void {
           );
           break;
 
+        case "stream.speed":
+          store.setTokenSpeed(event.payload.sessionId, {
+            tokensPerSecond: event.payload.tokensPerSecond,
+            estimated: event.payload.estimated,
+          });
+          break;
+
         // Empty content is the clear signal sent from tool_execution_end.
         // Normal partial updates always have non-empty content from onUpdate.
         case "stream.toolResultPartial": {
