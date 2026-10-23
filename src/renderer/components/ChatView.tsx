@@ -88,6 +88,10 @@ import {
   type ChatInputSubmitData,
 } from "./ChatInput";
 import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
+import {
+  sendQueuedInput,
+  suppressNextInputQueueDrain,
+} from "../utils/input-queue-drain";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { toMicButtonProps } from "./VoiceMicButton";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
@@ -432,8 +436,6 @@ export function ChatView() {
   // and pin unconditionally — they never infer intent.
   const isAtBottomRef = useRef(true);
   const previousScrollTopRef = useRef(0);
-  const autoDrainRef = useRef(false);
-  const stopRequestedRef = useRef(false);
   const prevMessageCountRef = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const scrollToBottomByButtonRef = useRef<() => void>(() => {});
@@ -1856,7 +1858,9 @@ export function ChatView() {
   const handleStop = () => {
     if (canStop) {
       if (activeSessionId) {
-        stopRequestedRef.current = true; // 用户主动停止：抑制队列自动执行一次
+        // 用户主动停止：抑制队列自动执行一次。标记存在出队器那边（与视图无关）——
+        // 出队器已不在 ChatView 内，不能再用局部 ref。
+        suppressNextInputQueueDrain(activeSessionId);
         stopSession(activeSessionId);
         updateSession(activeSessionId, { status: "idle" });
         clearActiveTurn(activeSessionId);
@@ -1866,38 +1870,14 @@ export function ChatView() {
     chatInputRef.current?.submit();
   };
 
-  /** 统一出队发送入口：自动执行与手动引导（idle）共用，防双回合。 */
+  /** 统一出队发送入口：手动引导（idle）与后台出队器共用，防双回合。 */
   const sendQueuedItem = useCallback(
     (item: QueuedInput) => {
-      if (!activeSessionId || isCompacting) return; // 压缩中禁止发送（与 handleSubmit 守卫一致）
-      autoDrainRef.current = true;
-      removeInput(activeSessionId, item.id);
-      const contentBlocks: ContentBlock[] = [
-        ...(item.images ?? []),
-        ...(item.files ?? []),
-      ];
-      if (item.text) {
-        contentBlocks.push({ type: "text", text: item.text });
-      }
-      // 发送失败（会话删除/非法 model 等）：复位 in-flight guard，避免队列永久卡死
-      continueSession(
-        activeSessionId,
-        contentBlocks,
-        activeSession?.providerProfileKey,
-        activeSession?.model,
-        item.elSelections,
-      ).catch(() => {
-        autoDrainRef.current = false;
-      });
+      // 压缩中禁止发送（与 handleSubmit 守卫一致）
+      if (!activeSessionId || !activeSession || isCompacting) return;
+      sendQueuedInput(activeSessionId, item, continueSession, activeSession);
     },
-    [
-      activeSessionId,
-      isCompacting,
-      continueSession,
-      removeInput,
-      activeSession?.providerProfileKey,
-      activeSession?.model,
-    ],
+    [activeSessionId, activeSession, isCompacting, continueSession],
   );
 
   const handleQueueSteer = useCallback(
@@ -1962,34 +1942,8 @@ export function ChatView() {
     ],
   );
 
-  // 会话空闲 + 队列非空 → 自动执行第一条（FIFO）；用户 stop 抑制一次
-  const previousDrainSessionIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    // 跨会话切换：复位上一会话的 in-flight / stop 抑制标记，避免静默失效
-    if (previousDrainSessionIdRef.current !== activeSessionId) {
-      previousDrainSessionIdRef.current = activeSessionId ?? null;
-      autoDrainRef.current = false;
-      stopRequestedRef.current = false;
-    }
-    if (!activeSessionId || activeSession?.status !== "idle") {
-      autoDrainRef.current = false;
-      return;
-    }
-    if (stopRequestedRef.current) {
-      stopRequestedRef.current = false;
-      return;
-    }
-    if (autoDrainRef.current) return;
-    const queue =
-      useAppStore.getState().sessionStates[activeSessionId]?.inputQueue ?? [];
-    if (queue.length === 0) return;
-    sendQueuedItem(queue[0]);
-  }, [
-    activeSessionId,
-    activeSession?.status,
-    inputQueue.length,
-    sendQueuedItem,
-  ]);
+  // 会话空闲 + 队列非空 → 自动执行第一条（FIFO）；用户 stop 抑制。
+  // 这段调度在 components/InputQueueDrainer.tsx —— 出队属于会话，不属于当前视图。
 
   const scrollToBottomByButton = () => {
     isAtBottomRef.current = true;

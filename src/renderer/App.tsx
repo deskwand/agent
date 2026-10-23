@@ -50,6 +50,7 @@ import { ExtensionDialogs } from "./components/ExtensionDialogs";
 import { PiTuiModal } from "./components/PiTuiModal";
 import { TopUpModal } from "./components/TopUpModal";
 import { Titlebar } from "./components/Titlebar";
+import { InputQueueDrainer } from "./components/InputQueueDrainer";
 import { SandboxSetupDialog } from "./components/SandboxSetupDialog";
 import { SandboxSyncToast } from "./components/SandboxSyncToast";
 import { SelectionMenuHost } from "./components/SelectionMenuHost";
@@ -623,6 +624,8 @@ function App() {
 
   return (
     <div className="h-full w-full min-h-0 flex flex-col overflow-hidden bg-background">
+      {/* 排队区自动出队：挂在视图之外，切会话/切页面都不影响队列推进 */}
+      <InputQueueDrainer />
       {/* Titlebar - draggable region */}
       <Titlebar />
 
