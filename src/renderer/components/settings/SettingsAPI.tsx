@@ -62,6 +62,7 @@ import {
 } from "../../../shared/web-access";
 import { ProviderBrandIcon, resolveProviderBrand } from "./provider-icons";
 import { resolveProviderDisplayName } from "../../utils/model-label";
+import { isFreeModel } from "../../utils/free-model";
 import {
   SettingsCard,
   SettingsContentSection,
@@ -488,7 +489,6 @@ export function SettingsAPI({
     useAppStore.getState().appConfig,
   );
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
   // ── 连接 / 模型探测状态 ──
   const [connectState, setConnectState] = useState<
@@ -507,7 +507,19 @@ export function SettingsAPI({
     setConnectMessage("");
   };
 
+  /**
+   * 连接/刷新请求的序号。每次打开弹窗、切换计划或关闭弹窗都自增，
+   * 在途请求回来时序号已变就丢弃结果 —— 否则静默刷新会把旧计划的
+   * 模型列表写进刚切到的计划（或被关掉的弹窗）。
+   */
+  const connectRequestRef = useRef(0);
+  const startConnectRequest = () => {
+    connectRequestRef.current += 1;
+    return connectRequestRef.current;
+  };
+
   const closeEditor = () => {
+    startConnectRequest();
     setEditorOpen(false);
     resetConnectState();
   };
@@ -659,6 +671,7 @@ export function SettingsAPI({
   const isCustomDraft = draft?.provider === "custom";
 
   const openCreate = (provider: ProviderType = "openrouter") => {
+    startConnectRequest();
     setOriginalProfileKey(null);
     setDraft(createEmptyDraft(provider, presets));
     setError("");
@@ -670,6 +683,7 @@ export function SettingsAPI({
   const openEdit = (profileKey: ProviderProfileKey) => {
     const provider = appConfig?.providers?.[profileKey];
     if (!provider) return;
+    startConnectRequest();
     setOriginalProfileKey(profileKey);
     const nextDraft = createDraftFromProvider(profileKey, provider, presets);
     setDraft(nextDraft);
@@ -679,9 +693,6 @@ export function SettingsAPI({
     setEditorOpen(true);
 
     // 先把本地已有列表显示出来（断网也能看到当前启用集）
-    const isOpencode =
-      nextDraft.provider === "opencode" || nextDraft.provider === "opencode-go";
-    if (isOpencode) return;
     setModelRows(
       provider.models.map((model) => ({
         id: model.id,
@@ -690,7 +701,7 @@ export function SettingsAPI({
         contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
         input: model.input,
-        enabled: true,
+        enabled: !(provider.disabledModels ?? []).includes(model.id),
         isDefault: model.id === provider.defaultModel,
       })),
     );
@@ -726,7 +737,6 @@ export function SettingsAPI({
       setError(t("api.enterApiKey"));
       return;
     }
-    setIsSaving(true);
     setError("");
     setSuccessMessage("");
     try {
@@ -762,16 +772,12 @@ export function SettingsAPI({
       setError(
         saveError instanceof Error ? saveError.message : String(saveError),
       );
-    } finally {
-      setIsSaving(false);
     }
   };
 
   // ── 连接：落盘 → 诊断拉模型 → 合并 → 写回 ──
-  const isOpencodeDraft =
-    draft?.provider === "opencode" || draft?.provider === "opencode-go";
 
-  /** 目录（预设供应商才有；自定义与 oauth/opencode 传空数组） */
+  /** 目录（预设供应商才有；自定义与 oauth 传空数组） */
   const catalogForDraft = (value: ProviderDraft) => {
     if (value.provider === "custom" || value.provider === "oauth") return [];
     return sortedPresetModels(
@@ -865,6 +871,8 @@ export function SettingsAPI({
    */
   const runConnect = async (draftValue: ProviderDraft, silent = false) => {
     if (!window.electronAPI) return;
+    const requestId = startConnectRequest();
+    const isStale = () => connectRequestRef.current !== requestId;
     const sanitized = sanitizeDraft(draftValue, presets);
     const isCustom = sanitized.provider === "custom";
     // 从配置里判定是否已落过盘（不能读 originalProfileKey：openEdit 会
@@ -872,6 +880,7 @@ export function SettingsAPI({
     const alreadySaved = Boolean(appConfig?.providers?.[sanitized.profileKey]);
 
     const fail = (message?: string) => {
+      if (isStale()) return;
       if (silent) {
         setConnectMessage(message ?? t("api.modelsRefreshFailed"));
         setConnectState("idle");
@@ -899,14 +908,13 @@ export function SettingsAPI({
     // 预设供应商先落盘（目录兜底，断网也可用）；自定义供应商等拉取成功再落盘。
     // 编辑已有供应商时不预写 —— 它已经落过盘，预写会把现有模型列表洗回目录。
     if (!isCustom && !alreadySaved) {
-      setIsSaving(true);
       const savedFirst = await persistModels(
         sanitized,
         [],
         sanitized.defaultModel,
         sanitized.disabledModels ?? [],
       );
-      setIsSaving(false);
+      if (isStale()) return;
       if (!savedFirst) {
         setConnectState("idle");
         return;
@@ -933,6 +941,7 @@ export function SettingsAPI({
       return;
     }
 
+    if (isStale()) return;
     setDiagResult(result);
 
     if (result.skippedReason) {
@@ -1255,6 +1264,7 @@ export function SettingsAPI({
   };
 
   const selectProvider = (provider: ProviderType) => {
+    startConnectRequest();
     setDraft((current) => {
       const next = createEmptyDraft(
         provider,
@@ -1385,6 +1395,13 @@ export function SettingsAPI({
   };
 
   const updateDraft = (patch: Partial<ProviderDraft>) => {
+    // 改连接参数后「已连接」不再成立：否则底部只剩「重新连接 / 完成」，
+    // 「完成」会把刚改的 Key、名称或端点静默丢掉。
+    if ("apiKey" in patch || "name" in patch || "baseUrl" in patch) {
+      setConnectState((current) =>
+        current === "connected" ? "idle" : current,
+      );
+    }
     setDraft((current) => {
       if (!current) return current;
       const next = { ...current, ...patch };
@@ -2980,6 +2997,11 @@ export function SettingsAPI({
                                 {t("api.modelsNew")}
                               </span>
                             )}
+                            {isFreeModel({ id: row.id, label: row.label }) && (
+                              <span className="shrink-0 rounded-md border border-success/40 bg-success/10 px-1.5 py-0.5 text-[10px] text-success">
+                                {t("common.free")}
+                              </span>
+                            )}
                             <Button
                               variant="ghost"
                               type="button"
@@ -3025,29 +3047,7 @@ export function SettingsAPI({
                 )}
 
                 <div className="flex items-center justify-end gap-2">
-                  {isOpencodeDraft ? (
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      onClick={() => {
-                        void handleSave();
-                      }}
-                      disabled={isSaving}
-                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          {t("common.saving")}
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4" />
-                          {t("api.saveSettings")}
-                        </>
-                      )}
-                    </Button>
-                  ) : connectState === "connected" ? (
+                  {connectState === "connected" ? (
                     <>
                       <Button
                         variant="ghost"

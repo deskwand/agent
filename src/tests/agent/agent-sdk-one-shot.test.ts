@@ -17,7 +17,10 @@ vi.mock("../../main/agent/shared-model-runtime", () => ({
 import type { AppConfig } from "../../main/config/config-store";
 import { normalizeCodemodeConfig } from "../../shared/codemode-config";
 import { normalizeWebAccessConfig } from "../../shared/web-access";
-import { runPiAiOneShot } from "../../main/agent/agent-sdk-one-shot";
+import {
+  runPiAiOneShot,
+  generateTitleWithAgentSdk,
+} from "../../main/agent/agent-sdk-one-shot";
 
 function makeConfig(): AppConfig {
   return {
@@ -89,6 +92,59 @@ describe("runPiAiOneShot", () => {
       temperature: 0.2,
       maxTokens: 1234,
     });
+  });
+
+  it("injects a session id so OpenCode can route one-shot requests", async () => {
+    await runPiAiOneShot("hello", "system", makeConfig());
+
+    const options = completeSimpleMock.mock.calls[0][2] as {
+      sessionId?: unknown;
+    };
+    expect(typeof options.sessionId).toBe("string");
+    expect((options.sessionId as string).length).toBeGreaterThan(0);
+  });
+
+  it("passes an explicit session id through", async () => {
+    await runPiAiOneShot("hello", "system", makeConfig(), {
+      sessionId: "session-abc",
+    });
+
+    expect(completeSimpleMock.mock.calls[0][2]).toMatchObject({
+      sessionId: "session-abc",
+    });
+  });
+
+  it("generates a distinct session id per one-shot call", async () => {
+    await runPiAiOneShot("first", "system", makeConfig());
+    await runPiAiOneShot("second", "system", makeConfig());
+
+    const first = completeSimpleMock.mock.calls[0][2] as { sessionId: string };
+    const second = completeSimpleMock.mock.calls[1][2] as {
+      sessionId: string;
+    };
+    expect(first.sessionId).not.toBe(second.sessionId);
+  });
+
+  it("reuses the conversation session id for title generation", async () => {
+    await generateTitleWithAgentSdk(
+      "title prompt",
+      makeConfig(),
+      "session-xyz",
+    );
+
+    expect(completeSimpleMock.mock.calls[0][2]).toMatchObject({
+      sessionId: "session-xyz",
+    });
+  });
+
+  it("still injects a session id when title generation has no conversation", async () => {
+    await generateTitleWithAgentSdk("title prompt", makeConfig());
+
+    const options = completeSimpleMock.mock.calls[0][2] as {
+      sessionId?: unknown;
+    };
+    expect(typeof options.sessionId).toBe("string");
+    expect((options.sessionId as string).length).toBeGreaterThan(0);
   });
 
   it("resolves OAuth through the shared ModelRuntime adapter", async () => {

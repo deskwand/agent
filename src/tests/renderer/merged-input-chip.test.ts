@@ -290,6 +290,29 @@ describe("MergedInputChip (single-panel)", () => {
     expect(panel().style.maxHeight).toBe("244px");
   });
 
+  it("badges free models in the menu", async () => {
+    render({
+      modelOptions: [
+        {
+          profileKey: "profile-a" as never,
+          groupLabel: "Provider A",
+          items: [
+            {
+              id: "longcat-2.5-preview-free",
+              name: "LongCat 2.5 Preview Free",
+            },
+            { id: "kimi-k3", name: "Kimi K3" },
+          ],
+        },
+      ],
+    });
+    await openPanel();
+
+    const items = panel().querySelectorAll('[role="option"]');
+    expect(items[0]?.textContent).toContain("common.free");
+    expect(items[1]?.textContent).not.toContain("common.free");
+  });
+
   it("shows every group plus thinking row when logged out", async () => {
     render();
     await openPanel();

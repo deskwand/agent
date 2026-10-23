@@ -1,4 +1,5 @@
 // TODO: migrate from compat to createModels() when compat is removed
+import { randomUUID } from "node:crypto";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
 import { type UserMessage as PiUserMessage } from "@earendil-works/pi-ai";
 import type { ApiTestInput, ApiTestResult } from "../../renderer/types";
@@ -216,6 +217,13 @@ export async function runPiAiOneShot(
     temperature?: number;
     maxTokens?: number;
     signal?: AbortSignal;
+    /**
+     * 会话 id。opencode / opencode-go 要求每次请求带 `x-opencode-session`
+     * （pi-ai 会把该字段转成请求头），缺了直接 400 MissingSessionID。
+     * 会话相关的调用（如标题生成）传入真实 session id；一次性调用不传，
+     * 这里按请求生成，避免把互不相关的请求登记成同一个会话。
+     */
+    sessionId?: string;
   },
 ): Promise<{
   text: string;
@@ -326,7 +334,11 @@ export async function runPiAiOneShot(
       systemPrompt,
       messages: [userMsg],
     },
-    { ...options, apiKey: apiKey || undefined },
+    {
+      ...options,
+      apiKey: apiKey || undefined,
+      sessionId: options?.sessionId?.trim() || randomUUID(),
+    },
   );
 
   // pi-ai resolves (not rejects) on provider errors — the error details
@@ -486,10 +498,13 @@ export async function generateTitleWithAgentSdk(
   sessionId?: string,
 ): Promise<string | null> {
   try {
+    // 把真实会话 id 透传给请求：opencode 的 `x-opencode-session` 用它做路由
+    // 与 prompt cache，标题请求与会话本身同 id 最省一次路由成本。
     const result = await runPiAiOneShot(
       titlePrompt,
       "Generate a concise title. Reply with only the title text and no extra markup.",
       config,
+      sessionId ? { sessionId } : undefined,
     );
     recordAuxUsage(
       result.usage,

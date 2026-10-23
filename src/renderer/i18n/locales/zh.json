@@ -23,7 +23,8 @@
     "back": "返回",
     "appLogoAlt": "DeskWand 标志",
     "pastedImageAlt": "粘贴图片 {{index}}",
-    "confirm": "确认"
+    "confirm": "确认",
+    "free": "免费"
   },
   "welcome": {
     "title": "今天我能为您做些什么？",

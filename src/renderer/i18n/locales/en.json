@@ -23,7 +23,8 @@
     "back": "Back",
     "appLogoAlt": "DeskWand logo",
     "pastedImageAlt": "Pasted {{index}}",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "free": "Free"
   },
   "welcome": {
     "title": "How can I help you today?",

@@ -169,16 +169,37 @@ describe("SettingsAPI OpenCode provider", () => {
     expect(keyAfterSwitch?.value).toBe("sk-opencode-test");
   });
 
-  it("saves the Go plan with its own baseUrl and default model", async () => {
-    const saveProvider = vi.fn(async () => ({
+  it("connects the Go plan and keeps endpoint-only models", async () => {
+    type SavedPayload = {
+      profileKey: string;
+      config: {
+        provider: string;
+        baseUrl: string;
+        defaultModel: string;
+        models: Array<{ id: string }>;
+      };
+    };
+    const saveProvider = vi.fn(async (_payload: SavedPayload) => ({
       success: true,
       config: buildConfig(),
+    }));
+    const diagnose = vi.fn(async () => ({
+      steps: [{ name: "auth", status: "ok", latencyMs: 1 }],
+      overallOk: true,
+      totalLatencyMs: 1,
+      models: [
+        { id: "kimi-k3", name: "Kimi K3" },
+        { id: "beam-free", name: "Beam Free" },
+      ],
+      modelsSource: "live",
+      modelsFiltered: 0,
     }));
     window.electronAPI = {
       ...window.electronAPI,
       config: {
         ...window.electronAPI.config,
         saveProvider,
+        diagnose,
       },
     } as unknown as typeof window.electronAPI;
 
@@ -192,6 +213,10 @@ describe("SettingsAPI OpenCode provider", () => {
     });
     await flush();
 
+    // OpenCode 与其它预设供应商一样走「连接」，不再有单独的「保存设置」
+    expect(editorDialog().textContent).toContain("Connect");
+    expect(editorDialog().textContent).not.toContain("Save Settings");
+
     // 切换到 Go
     await act(async () => {
       const goBtn = Array.from(editorDialog().querySelectorAll("button")).find(
@@ -201,7 +226,6 @@ describe("SettingsAPI OpenCode provider", () => {
     });
     await flush();
 
-    // 填写 Key 并保存
     const keyInput = editorDialog().querySelector('input[type="password"]');
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
@@ -213,20 +237,109 @@ describe("SettingsAPI OpenCode provider", () => {
     });
     await flush();
     await act(async () => {
-      clickButton(editorDialog(), "Save Settings");
+      clickButton(editorDialog(), "Connect");
     });
     await flush();
 
-    expect(saveProvider).toHaveBeenCalledWith(
+    expect(diagnose).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "opencode-go",
+        captureModels: true,
+      }),
+    );
+
+    // 两次落盘：连接前用目录兜底，第二次带着合并后的完整列表
+    expect(saveProvider).toHaveBeenCalledTimes(2);
+    const lastPayload = saveProvider.mock.calls[1][0];
+    expect(lastPayload).toEqual(
       expect.objectContaining({
         profileKey: "opencode-go",
         config: expect.objectContaining({
           provider: "opencode-go",
           customProtocol: "openai",
           baseUrl: "https://opencode.ai/zen/go/v1",
-          defaultModel: "kimi-k3",
         }),
       }),
+    );
+    const ids = lastPayload.config.models.map((model) => model.id);
+    expect(ids).toContain("kimi-k3");
+    // 端点独有模型会被带去落盘（主进程 enrich 的保留逻辑由
+    // opencode-presets.test.ts 单独覆盖）
+    expect(ids).toContain("beam-free");
+    // Go 计划的目录默认模型
+    expect(lastPayload.config.defaultModel).toBe("kimi-k3");
+    expect(editorDialog().textContent).toContain("Connected");
+  });
+
+  it("refreshes an existing OpenCode profile when its editor opens", async () => {
+    const savedConfig = buildConfig({
+      activeProviderKey: "opencode-go",
+      isConfigured: true,
+      providers: {
+        "opencode-go": {
+          provider: "opencode-go",
+          customProtocol: "openai",
+          apiKey: "oc_sk_test",
+          baseUrl: "https://opencode.ai/zen/go/v1",
+          defaultModel: "kimi-k3",
+          models: [{ id: "kimi-k3", label: "Kimi K3", source: "preset" }],
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      },
+    });
+    const saveProvider = vi.fn(async (_payload: unknown) => ({
+      success: true,
+      config: savedConfig,
+    }));
+    const diagnose = vi.fn(async () => ({
+      steps: [{ name: "auth", status: "ok", latencyMs: 1 }],
+      overallOk: true,
+      totalLatencyMs: 1,
+      models: [
+        { id: "kimi-k3", name: "Kimi K3" },
+        { id: "beam-free", name: "Beam Free" },
+      ],
+      modelsSource: "live",
+      modelsFiltered: 0,
+    }));
+    useAppStore.setState({ appConfig: savedConfig, isConfigured: true });
+    window.electronAPI = {
+      ...window.electronAPI,
+      config: {
+        ...window.electronAPI.config,
+        get: vi.fn(async () => savedConfig),
+        saveProvider,
+        diagnose,
+      },
+    } as unknown as typeof window.electronAPI;
+
+    await act(async () => {
+      root.render(React.createElement(SettingsAPI, {}));
+    });
+    await flush();
+
+    const editButton = container.querySelector<HTMLButtonElement>(
+      '[data-testid="opencode-go-edit"]',
+    );
+    expect(editButton).not.toBeNull();
+    await act(async () => {
+      editButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    // 静默刷新是 openEdit 里 fire-and-forget 的，多推几轮微任务
+    await flush();
+    await flush();
+
+    expect(diagnose).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "opencode-go",
+        captureModels: true,
+      }),
+    );
+    const lastPayload = saveProvider.mock.calls.at(-1)?.[0] as
+      | { config: { models: Array<{ id: string }> } }
+      | undefined;
+    expect(lastPayload?.config.models.map((model) => model.id)).toContain(
+      "beam-free",
     );
   });
 });

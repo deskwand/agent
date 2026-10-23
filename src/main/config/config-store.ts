@@ -771,7 +771,7 @@ export async function enrichProviderModelsFromRegistry(
     return payload;
   }
 
-  const models: ApiProviderModel[] = piModels.map((m) => ({
+  let models: ApiProviderModel[] = piModels.map((m) => ({
     id: m.id,
     label: m.name,
     source: "preset" as const,
@@ -779,6 +779,28 @@ export async function enrichProviderModelsFromRegistry(
     maxTokens: m.maxTokens,
     input: m.input,
   }));
+  // opencode 的注册表比端点滞后：端点独有的模型（如 beam-free /
+  // minimax-m3.1-flash-free）会被注册表整体替换顺手丢掉。保留它们并追加在
+  // 注册表之后（注册表在前，同 id 以注册表元数据为准）。oauth 没有端点列表，
+  // 维持整体替换。
+  if (!isOAuth) {
+    const seen = new Set(models.map((model) => model.id));
+    const extras: ApiProviderModel[] = [];
+    for (const model of payload.config.models ?? []) {
+      const id = typeof model?.id === "string" ? model.id.trim() : "";
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      extras.push({ ...model, id, label: model.label?.trim() || id });
+    }
+    extras.sort((left, right) => left.id.localeCompare(right.id));
+    models.push(...extras);
+    // 用户取消勾选的模型不写回——否则注册表重建会把它们「复活」，
+    // 而聊天选择器只看 models、不看 disabledModels。全部被关掉时保留
+    // 注册表全集，避免产出没有可用模型的配置。
+    const disabled = new Set(payload.config.disabledModels ?? []);
+    const kept = models.filter((model) => !disabled.has(model.id));
+    if (kept.length > 0) models = kept;
+  }
   // Keep an explicit non-empty defaultModel when it exists in the
   // enriched set (e.g. the plan-aware defaults set by the UI);
   // otherwise fall back to the registry-order first model.

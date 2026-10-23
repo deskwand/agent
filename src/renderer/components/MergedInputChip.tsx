@@ -4,6 +4,7 @@ import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import type { ProviderProfileKey, ThinkingLevel } from "../types";
 import type { ModelOptionGroup } from "./ChatInputBottomBar";
 import { resolveModelLabel } from "../utils/model-label";
+import { isFreeModel } from "../utils/free-model";
 import { useAppStore } from "../store";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
@@ -172,6 +173,11 @@ export function MergedInputChip({
           title={item.name}
         >
           <span className="truncate">{item.name}</span>
+          {isFreeModel({ id: item.id, name: item.name }) && (
+            <span className="ml-auto shrink-0 rounded-md border border-success/40 bg-success/10 px-1.5 py-0.5 text-[10px] text-success">
+              {t("common.free")}
+            </span>
+          )}
           {selected && <Check className="h-4 w-4 shrink-0" />}
         </Button>
       );

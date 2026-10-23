@@ -123,4 +123,58 @@ describe("OpenCode config integration", () => {
       enriched.config.models.some((m) => m.id === enriched.config.defaultModel),
     ).toBe(true);
   });
+
+  it("keeps endpoint-only models that the registry does not know", async () => {
+    const enriched = await enrichProviderModelsFromRegistry({
+      profileKey: "opencode-go",
+      config: {
+        provider: "opencode-go",
+        customProtocol: "openai",
+        apiKey: "sk-test",
+        baseUrl: "https://opencode.ai/zen/go/v1",
+        defaultModel: "kimi-k3",
+        models: [
+          { id: "kimi-k3", label: "Kimi K3 (endpoint)", source: "preset" },
+          { id: "beam-free", label: "Beam Free", source: "preset" },
+        ],
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      },
+    });
+
+    const ids = enriched.config.models.map((model) => model.id);
+    expect(ids.filter((id) => id === "beam-free")).toHaveLength(1);
+    // 端点独有模型追加在注册表之后
+    expect(ids[ids.length - 1]).toBe("beam-free");
+    // 同 id 以注册表元数据为准（label 不是端点侧传进来的那个）
+    expect(
+      enriched.config.models.find((model) => model.id === "kimi-k3")?.label,
+    ).not.toBe("Kimi K3 (endpoint)");
+  });
+
+  it("drops blank extras and keeps disabled models", async () => {
+    const enriched = await enrichProviderModelsFromRegistry({
+      profileKey: "opencode-go",
+      config: {
+        provider: "opencode-go",
+        customProtocol: "openai",
+        apiKey: "sk-test",
+        baseUrl: "https://opencode.ai/zen/go/v1",
+        defaultModel: "kimi-k3",
+        models: [
+          { id: "   ", label: "Blank", source: "preset" },
+          { id: "beam-free", label: "Beam Free", source: "preset" },
+        ],
+        disabledModels: ["glm-5.2"],
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      },
+    });
+
+    const ids = enriched.config.models.map((model) => model.id);
+    expect(ids).not.toContain("");
+    expect(ids).not.toContain("   ");
+    // 取消勾选的注册表模型不会被重建回来
+    expect(ids).not.toContain("glm-5.2");
+    expect(ids).toContain("kimi-k3");
+    expect(enriched.config.disabledModels).toEqual(["glm-5.2"]);
+  });
 });
