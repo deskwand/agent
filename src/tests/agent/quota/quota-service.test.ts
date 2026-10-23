@@ -2,10 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const resolveProviderApiKeyMock = vi.hoisted(() => vi.fn());
 const ipcHandleMock = vi.hoisted(() => vi.fn());
+const configGetAllMock = vi.hoisted(() => vi.fn());
 
 vi.mock("electron", () => ({ ipcMain: { handle: ipcHandleMock } }));
 vi.mock("../../../main/agent/shared-model-runtime", () => ({
   resolveProviderApiKey: resolveProviderApiKeyMock,
+}));
+// quota/index 现在会 import config-store 去取 API-key profile 的凭据；
+// electron-store 在模块加载期就要读 userData，本文件只 mock 了 ipcMain，必须一并挡住。
+vi.mock("../../../main/config/config-store", () => ({
+  configStore: { getAll: configGetAllMock },
 }));
 // logger 会写文件、刷控制台，与断言无关；丢掉它让测试输出干净。
 // （logger 内部对 app 未定义有保护，不 mock 也不会抛，但输出会很脏）
@@ -52,6 +58,9 @@ beforeEach(() => {
   clearQuotaCache();
   resolveProviderApiKeyMock.mockReset();
   resolveProviderApiKeyMock.mockResolvedValue(token());
+  // 默认没有任何 API-key profile：opencode-go 通道取不到凭据，不参与断言。
+  configGetAllMock.mockReset();
+  configGetAllMock.mockReturnValue({ providers: {} });
   ipcHandleMock.mockReset();
 });
 
@@ -331,5 +340,58 @@ describe("clearQuotaCache（C）", () => {
 
     release(1);
     await Promise.all([b1, b2, c]);
+  });
+});
+
+describe("opencode-go 通道（API-key profile）", () => {
+  /** 按 URL 分流：Codex 与 OpenCode Go 的响应形状不同，共用一份 body 会互相污染。 */
+  function stubRoutedFetch() {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "https://opencode.ai/inference/go/v1/usage") {
+        return Response.json({
+          usage: {
+            rolling: { status: "ok", percent: 19 },
+            weekly: { status: "ok", percent: 7 },
+            monthly: { status: "ok", percent: 3 },
+          },
+        });
+      }
+      return Response.json(usageBody());
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("profile 里有 key 时该通道出现在面板，顺序在 Codex 之后", async () => {
+    configGetAllMock.mockReturnValue({
+      providers: { "opencode-go": { apiKey: "oc_sk_test" } },
+    });
+    const fetchMock = stubRoutedFetch();
+
+    const snapshots = await listQuotaSnapshots();
+
+    expect(snapshots.map((snapshot) => snapshot.providerId)).toEqual([
+      "openai-codex",
+      "opencode-go",
+    ]);
+    expect(snapshots[1].windows.map((window) => window.kind)).toEqual([
+      "session",
+      "weekly",
+      "monthly",
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("profile 的 key 只有空白时不打网络、不出条目", async () => {
+    configGetAllMock.mockReturnValue({
+      providers: { "opencode-go": { apiKey: "   " } },
+    });
+    const fetchMock = stubRoutedFetch();
+
+    await expect(listQuotaSnapshots()).resolves.toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://chatgpt.com/backend-api/wham/usage",
+    );
   });
 });

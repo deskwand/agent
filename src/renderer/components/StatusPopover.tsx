@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { QuotaSnapshot } from "../../shared/quota";
+import type { QuotaSnapshot, QuotaWindowKind } from "../../shared/quota";
 import type { ContextStatusDetails } from "./ChatInputBottomBar";
 import { formatResetTime } from "../utils/i18n-format";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -15,6 +15,14 @@ export interface StatusPopoverProps {
 
 const RING_RADIUS = 9;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+/** 窗口 → 文案 key。用 Record 而不是三元式：新增窗口时缺项会在编译期报错，
+ *  也不会再出现「月度被当成 7d」这类默认分支错误。 */
+const QUOTA_WINDOW_LABEL_KEYS: Record<QuotaWindowKind, string> = {
+  session: "statusPopover.windowSession",
+  weekly: "statusPopover.windowWeekly",
+  monthly: "statusPopover.windowMonthly",
+};
 
 /**
  * 上下文占用圆环 + 点击弹出的状态面板。
@@ -164,18 +172,15 @@ export function StatusPopover({
                   <div key={window.kind}>
                     <div className="flex items-center gap-2">
                       <span className="w-[60px] shrink-0 text-muted-foreground">
-                        {window.kind === "session"
-                          ? t("statusPopover.windowSession")
-                          : t("statusPopover.windowWeekly")}
+                        {t(QUOTA_WINDOW_LABEL_KEYS[window.kind])}
                       </span>
                       <AppProgress
                         value={window.usedPercent}
                         max={100}
-                        aria-label={
-                          window.kind === "session"
-                            ? t("statusPopover.windowSession")
-                            : t("statusPopover.windowWeekly")
-                        }
+                        aria-label={t(QUOTA_WINDOW_LABEL_KEYS[window.kind])}
+                        // 超额（>100%）时进度条会被夹到 100，aria-valuenow 也随之失真；
+                        // 用 valuetext 把真实百分比读给读屏。
+                        aria-valuetext={`${Math.round(window.usedPercent)}%`}
                         className="h-2 flex-1 rounded-sm bg-accent [&>div]:rounded-sm"
                       />
                       <span className="w-[38px] shrink-0 text-right font-medium tabular-nums text-foreground">

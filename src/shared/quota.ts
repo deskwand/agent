@@ -1,15 +1,15 @@
-export type QuotaWindowKind = "session" | "weekly";
+export type QuotaWindowKind = "session" | "weekly" | "monthly";
 
 export interface QuotaWindow {
   kind: QuotaWindowKind;
-  /** 已用百分比，0-100 */
+  /** 已用百分比（正常 0-100；套餐允许超额时可能大于 100） */
   usedPercent: number;
   /** 重置时间（epoch ms）；拿不到则不设，该副行不渲染 */
   resetsAt?: number;
 }
 
 export interface QuotaSnapshot {
-  /** OAuth provider id，如 "openai-codex" */
+  /** 通道 id：OAuth provider id（"openai-codex"）或 API-key profile key（"opencode-go"） */
   providerId: string;
   /** 展示名，如 "OpenAI Codex"。产品名，不走 i18n（设计文档 §5.3） */
   providerName: string;

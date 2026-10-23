@@ -2314,6 +2314,7 @@
     "cacheHitRate": "缓存 {{rate}}",
     "windowSession": "5h 窗口",
     "windowWeekly": "7d 窗口",
+    "windowMonthly": "月度窗口",
     "resetAt": "重置 {{time}}"
   },
   "activity": {

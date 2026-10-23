@@ -1,8 +1,10 @@
 import { ipcMain } from "electron";
 import type { QuotaSnapshot } from "../../shared/quota";
 import { resolveProviderApiKey } from "../agent/shared-model-runtime";
+import { configStore } from "../config/config-store";
 import { log } from "../utils/logger";
 import { fetchCodexQuota } from "./codex";
+import { fetchOpenCodeGoQuota, OPENCODE_GO_PROVIDER_ID } from "./opencode-go";
 
 /** 打开面板时的重复点击保护窗口。Claude 适配器进来时必须收紧（设计文档 §5.3）。 */
 export const QUOTA_CACHE_TTL_MS = 60_000;
@@ -17,15 +19,31 @@ export const QUOTA_CACHE_TTL_MS = 60_000;
 export const STALE_FALLBACK_MAX_MS = 15 * 60_000;
 
 /**
- * providerId → 取额度的方法。**键即白名单**：不在表里就不查凭据、不打网络。
+ * 一条额度通道：先取凭据，再拿它去查额度。两个步骤分开，是因为凭据来源不同 ——
+ * OAuth 登录写在 auth.json，API-key profile 存在 config.json，不能共用一条取法。
+ */
+interface QuotaAdapter {
+  /** 返回 undefined 表示这个通道没配凭据，调用方直接跳过、不打网络。 */
+  resolveToken: () => Promise<string | undefined>;
+  fetch: (token: string) => Promise<QuotaSnapshot | null>;
+}
+
+/**
+ * providerId → 额度通道。**键即白名单**：不在表里就不查凭据、不打网络。
+ * 键是 OAuth provider id 或 API-key profile key，两种都同时充当缓存键。
  * 这张表回答的是「能查什么额度」，与登录白名单（oauth-service 的
  * SUPPORTED_OAUTH_PROVIDERS，回答「能登录什么」）是两个语义，不要合并。
+ * 对象键序即面板展示顺序。
  */
-const ADAPTERS: Record<
-  string,
-  (token: string) => Promise<QuotaSnapshot | null>
-> = {
-  "openai-codex": fetchCodexQuota,
+const ADAPTERS: Record<string, QuotaAdapter> = {
+  "openai-codex": {
+    resolveToken: () => resolveProviderApiKey("openai-codex"),
+    fetch: fetchCodexQuota,
+  },
+  [OPENCODE_GO_PROVIDER_ID]: {
+    resolveToken: () => resolveProfileApiKey(OPENCODE_GO_PROVIDER_ID),
+    fetch: fetchOpenCodeGoQuota,
+  },
 };
 
 interface CacheEntry {
@@ -69,9 +87,9 @@ export async function fetchQuotaSnapshot(
   const startedGeneration = cacheGeneration;
 
   const request = (async () => {
-    const token = await resolveProviderApiKey(providerId);
+    const token = await adapter.resolveToken();
     if (!token) return null;
-    return adapter(token);
+    return adapter.fetch(token);
   })().catch((error: unknown) => {
     log("[Quota] 抓取失败:", providerId, error);
     return null;
@@ -101,7 +119,7 @@ export async function fetchQuotaSnapshot(
 /**
  * 取所有「有适配器」通道的额度快照，用于面板并列展示。
  *
- * 不枚举凭据、不筛凭据类型：`fetchQuotaSnapshot` 内部已用 resolveProviderApiKey
+ * 不枚举凭据、不筛凭据类型：`fetchQuotaSnapshot` 内部已由各通道的 `resolveToken`
  * 处理「没有凭据 → null」，两者在用户可见行为上零差别，
  * 却省掉 getSharedModelRuntime 与一层筛选（以及它在整模块 mock 下静默失效的风险）。
  */
@@ -140,4 +158,17 @@ export async function listQuotaSnapshots(): Promise<QuotaSnapshot[]> {
 
 export function initQuotaIpc(): void {
   ipcMain.handle("quota.list", () => listQuotaSnapshots());
+}
+
+/**
+ * API-key profile 的凭据：存在 config.json 的 providers[profileKey].apiKey。
+ *
+ * 不走 `resolveProviderApiKey`：那条路读的是 auth.json，而 agent-runner 对非 oauth
+ * provider 只把 key 设到会话级 runtime，从不落盘 —— 对 opencode-go 永远拿不到。
+ */
+async function resolveProfileApiKey(
+  profileKey: string,
+): Promise<string | undefined> {
+  const apiKey = configStore.getAll().providers[profileKey]?.apiKey?.trim();
+  return apiKey && apiKey.length > 0 ? apiKey : undefined;
 }

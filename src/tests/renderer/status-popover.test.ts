@@ -169,6 +169,7 @@ describe("StatusPopover", () => {
     windows: [
       { kind: "session" as const, usedPercent: 0, resetsAt: 1789759179000 },
       { kind: "weekly" as const, usedPercent: 51, resetsAt: 1789903190000 },
+      { kind: "monthly" as const, usedPercent: 82, resetsAt: 1790000000000 },
     ],
   };
 
@@ -184,7 +185,7 @@ describe("StatusPopover", () => {
     return list;
   }
 
-  it("有快照时渲染 provider 标签行、两条窗口与重置行", async () => {
+  it("有快照时渲染 provider 标签行、各窗口与重置行", async () => {
     stubQuotaList([quota]);
     render();
     act(() => trigger().click());
@@ -196,8 +197,20 @@ describe("StatusPopover", () => {
     expect(text).toContain("team");
     expect(text).toContain("statusPopover.windowSession");
     expect(text).toContain("statusPopover.windowWeekly");
+    expect(text).toContain("statusPopover.windowMonthly");
     expect(text).toContain("statusPopover.resetAt");
     expect(text).toContain("51%");
+  });
+
+  it("只有月度窗口时用月度文案，而不是退化成 7d", async () => {
+    stubQuotaList([{ ...quota, windows: [quota.windows[2]] }]);
+    render();
+    act(() => trigger().click());
+    await act(async () => {});
+
+    const text = dialog()!.textContent!;
+    expect(text).toContain("statusPopover.windowMonthly");
+    expect(text).not.toContain("statusPopover.windowWeekly");
   });
 
   it("只有一条窗口时只渲染一条", async () => {
