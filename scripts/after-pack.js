@@ -288,6 +288,8 @@ module.exports = async function afterPack(context) {
   //    实测：win-x64 产物里 `@esbuild/` 是空目录 —— 那本来就是正确结果，只是日志在撒谎。
   // ② `@earendil-works/chord/node_modules/@esbuild` 这份嵌套副本从来没被扫到过，
   //    于是每个 Windows / Linux 产物都在白带一个 darwin 二进制。
+  // pi SDK 1.3.0 起上游彻底不再依赖 chord / esbuild（实测产物里两个目录都不存在），
+  // 所以下面两段现在是不可达的守卫。保留它们：老版本回退时仍然正确。
   // NOTE: do not try this with a per-platform `files` pattern in electron-builder.yml — a
   // platform-level `files` array replaces the top-level `files` list, so the main matcher
   // collapses to `**/*` and local repo junk (.codegraph/codegraph.db, 436MB) gets packed.

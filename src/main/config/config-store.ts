@@ -282,12 +282,12 @@ const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
   },
   opencode: {
     apiKey: "",
-    baseUrl: "https://opencode.ai/zen/v1",
+    baseUrl: "https://opencode.ai/inference/v1",
     model: "gpt-5.6-luna",
   },
   "opencode-go": {
     apiKey: "",
-    baseUrl: "https://opencode.ai/zen/go/v1",
+    baseUrl: "https://opencode.ai/inference/go/v1",
     model: "kimi-k3",
   },
   "custom:anthropic": {

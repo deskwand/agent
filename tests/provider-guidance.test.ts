@@ -9,10 +9,13 @@ import {
 } from '../src/shared/api-provider-guidance';
 
 describe('provider guidance helpers', () => {
-  it('detects Kimi Coding and recommends Anthropic-compatible setup', () => {
+  it('detects Kimi Coding and recommends OpenAI-compatible setup', () => {
     const setup = detectCommonProviderSetup('https://api.kimi.com/coding');
     expect(setup?.id).toBe('kimi-coding');
-    expect(setup?.recommendedProtocol).toBe('anthropic');
+    // 1.3.0 switched kimi-coding to openai-completions, and its base URL must
+    // now include /v1 — the guidance has to follow or new setups cannot connect.
+    expect(setup?.recommendedProtocol).toBe('openai');
+    expect(setup?.recommendedBaseUrl).toBe('https://api.kimi.com/coding/v1');
   });
 
   it('detects DeepSeek and recommends OpenAI-compatible setup', () => {

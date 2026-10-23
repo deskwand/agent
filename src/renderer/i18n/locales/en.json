@@ -618,7 +618,7 @@
         },
         "kimi": {
           "name": "Kimi Coding",
-          "note": "Use the coding endpoint with Anthropic-compatible mode. Double-check the exact coding model ID from Moonshot docs."
+          "note": "Use OpenAI-compatible mode with a base URL that includes /v1. Double-check the exact coding model ID from Moonshot docs."
         },
         "glm": {
           "name": "GLM / BigModel (Anthropic route)",

@@ -80,8 +80,8 @@ export const COMMON_PROVIDER_SETUPS: CommonProviderSetup[] = [
     nameKey: "api.guidance.setups.kimi.name",
     noteKey: "api.guidance.setups.kimi.note",
     applyProvider: "custom",
-    recommendedProtocol: "anthropic",
-    recommendedBaseUrl: "https://api.kimi.com/coding",
+    recommendedProtocol: "openai",
+    recommendedBaseUrl: "https://api.kimi.com/coding/v1",
     exampleModel: "kimi-k2-thinking",
     matcher: {
       hosts: ["api.kimi.com"],
@@ -149,13 +149,13 @@ export const COMMON_PROVIDER_SETUPS: CommonProviderSetup[] = [
     noteKey: "api.guidance.setups.opencode.note",
     applyProvider: "custom",
     recommendedProtocol: "openai",
-    recommendedBaseUrl: "https://opencode.ai/zen/v1",
+    recommendedBaseUrl: "https://opencode.ai/inference/v1",
     exampleModel: "gpt-5.6-luna",
     protocolLabel: "OpenCode",
     preferProviderTab: "opencode",
     matcher: {
       hosts: ["opencode.ai"],
-      pathPrefixes: ["/zen"],
+      pathPrefixes: ["/zen", "/inference"],
     },
   },
   {

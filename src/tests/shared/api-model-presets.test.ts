@@ -9,11 +9,11 @@ describe("OpenCode presets", () => {
   it("defines both Zen and Go presets with correct base URLs", () => {
     expect(API_PROVIDER_PRESETS.opencode.name).toBe("OpenCode");
     expect(API_PROVIDER_PRESETS.opencode.baseUrl).toBe(
-      "https://opencode.ai/zen/v1",
+      "https://opencode.ai/inference/v1",
     );
     expect(API_PROVIDER_PRESETS["opencode-go"].name).toBe("OpenCode Go");
     expect(API_PROVIDER_PRESETS["opencode-go"].baseUrl).toBe(
-      "https://opencode.ai/zen/go/v1",
+      "https://opencode.ai/inference/go/v1",
     );
   });
 

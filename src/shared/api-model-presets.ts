@@ -160,7 +160,7 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
   },
   opencode: {
     name: "OpenCode",
-    baseUrl: "https://opencode.ai/zen/v1",
+    baseUrl: "https://opencode.ai/inference/v1",
     models: [
       { id: "gpt-5.6-luna", name: "gpt-5.6-luna" },
       { id: "gpt-5.5", name: "gpt-5.5" },
@@ -177,16 +177,16 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
   },
   "opencode-go": {
     name: "OpenCode Go",
-    baseUrl: "https://opencode.ai/zen/go/v1",
+    baseUrl: "https://opencode.ai/inference/go/v1",
     models: [
       { id: "kimi-k3", name: "kimi-k3" },
       { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
-      { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
+      { id: "deepseek-v4.1-flash", name: "deepseek-v4.1-flash" },
       { id: "glm-5.2", name: "glm-5.2" },
       { id: "gpt-5.6-luna", name: "gpt-5.6-luna" },
       { id: "qwen3.7-plus", name: "qwen3.7-plus" },
       { id: "minimax-m3", name: "minimax-m3" },
-      { id: "grok-4.5", name: "grok-4.5" },
+      { id: "grok-4.7", name: "grok-4.7" },
     ],
     keyPlaceholder: "sk-...",
     keyHint: "从 opencode.ai/auth 获取",

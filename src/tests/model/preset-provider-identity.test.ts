@@ -6,7 +6,7 @@
  * 第三方主机。本测试把这个面钉住。
  *
  * 关键：断言的是「相对 0.87.1 基线**新增**了多少漂移/缺失」，不是「全对」的绝对不变式。
- * 下面 KNOWN_PREEXISTING 里的三条已实测确认在 0.87.1 的目录里**完全相同**，
+ * 下面 KNOWN_PREEXISTING 里的两条已实测确认在 0.87.1 的目录里**完全相同**，
  * 属既存缺陷、不在本次升级范围 —— 锚定基线才能既拦住本次引入的新问题，
  * 又不把无关的既存缺陷混进升级提交。
  */
@@ -30,11 +30,12 @@ function piProviderOf(key: string): string {
 const NO_PI_CATALOG = new Set(["custom"]);
 
 /**
- * 既存异常白名单。三条都已核对：0.87.1 与 0.99.1 的目录里完全相同。
+ * 既存异常白名单。两条都已核对：0.87.1 与 0.99.1 的目录里完全相同。
  * 不要为了让测试变绿而删预设 —— 见文件头注释。
+ * 1.3.0 把 opencode-go 的 grok-4.5 换成了 grok-4.7，预设跟着换了 id，
+ * 因此这条漂移不再存在，从白名单里退场。
  */
 const KNOWN_PREEXISTING = [
-  "opencode-go/grok-4.5",
   "anthropic/claude-3-7-sonnet-latest",
   "zhipu/glm-4.6v-flash",
 ];

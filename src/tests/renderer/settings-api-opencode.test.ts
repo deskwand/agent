@@ -257,7 +257,7 @@ describe("SettingsAPI OpenCode provider", () => {
         config: expect.objectContaining({
           provider: "opencode-go",
           customProtocol: "openai",
-          baseUrl: "https://opencode.ai/zen/go/v1",
+          baseUrl: "https://opencode.ai/inference/go/v1",
         }),
       }),
     );

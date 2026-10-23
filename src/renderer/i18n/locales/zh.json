@@ -618,7 +618,7 @@
         },
         "kimi": {
           "name": "Kimi Coding",
-          "note": "推荐对 coding endpoint 使用 Anthropic 兼容协议，并按 Moonshot 文档确认精确的 coding 模型 ID。"
+          "note": "推荐使用 OpenAI 兼容协议，base URL 需带 /v1，并按 Moonshot 文档确认精确的 coding 模型 ID。"
         },
         "glm": {
           "name": "GLM / BigModel（Anthropic 路由）",
