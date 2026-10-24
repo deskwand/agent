@@ -1,5 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { CODING_SUBSCRIPTIONS } from "../../../shared/coding-subscriptions";
+import {
+  getLocalGatewayPreset,
+  type LocalGatewayId,
+  type LocalGatewayProbeState,
+} from "../../../shared/local-gateways";
 import type { ProviderPresets, ProviderType } from "../../types";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { SubscriptionPlanIcon } from "./coding-subscription-cards";
@@ -11,7 +16,11 @@ import {
   PROVIDER_CATALOG,
   type ProviderCatalogEntry,
 } from "./provider-catalog";
-import { SettingsSection, SettingsStatusBadge } from "./shared";
+import {
+  SettingsSection,
+  SettingsStatusBadge,
+  type StatusBadgeTone,
+} from "./shared";
 import { Button } from "../app-button";
 
 export interface ProviderCatalogGridProps {
@@ -25,6 +34,10 @@ export interface ProviderCatalogGridProps {
   onCreatePlan: () => void;
   onOAuthLogin: (providerId: string) => void;
   onOAuthDisconnect: (providerId: string) => void;
+  /** 已配置且可用的本机网关 */
+  configuredLocalGateways?: ReadonlySet<LocalGatewayId>;
+  localGatewayStatus?: Partial<Record<LocalGatewayId, LocalGatewayProbeState>>;
+  onOpenLocalGateway?: (id: LocalGatewayId) => void;
 }
 
 /** 条目 → 网格显示名。provider 类取预设名，custom 走「其他供应商」。 */
@@ -34,6 +47,9 @@ export function entryLabel(
   t: (key: string) => string,
 ): string {
   if (entry.labelKey) return t(entry.labelKey);
+  if (entry.kind === "local") {
+    return getLocalGatewayPreset(entry.id)?.name ?? entry.id;
+  }
   if (entry.kind === "oauth") {
     return OAUTH_PROVIDERS.find((p) => p.id === entry.id)?.name ?? entry.id;
   }
@@ -51,6 +67,7 @@ export function entryLabel(
 }
 
 function entryBrand(entry: ProviderCatalogEntry): ProviderBrand | ProviderType {
+  if (entry.kind === "local") return "magpie";
   if (entry.kind === "oauth") {
     return OAUTH_PROVIDERS.find((p) => p.id === entry.id)?.brand ?? "custom";
   }
@@ -68,6 +85,9 @@ export function ProviderCatalogGrid({
   onCreatePlan,
   onOAuthLogin,
   onOAuthDisconnect,
+  configuredLocalGateways = new Set<LocalGatewayId>(),
+  localGatewayStatus = {},
+  onOpenLocalGateway,
 }: ProviderCatalogGridProps) {
   const { t } = useTranslation();
 
@@ -96,6 +116,39 @@ export function ProviderCatalogGrid({
                 const oauthInfo = isOauth
                   ? OAUTH_PROVIDERS.find((p) => p.id === entry.id)
                   : undefined;
+                const isLocal = entry.kind === "local";
+                const localId = isLocal
+                  ? (entry.id as LocalGatewayId)
+                  : undefined;
+                const localStatus = localId
+                  ? localGatewayStatus[localId]
+                  : undefined;
+                const localStatusLabel = isLocal
+                  ? localStatus?.state === "probing"
+                    ? t("api.localGatewayProbing")
+                    : localStatus?.state === "available"
+                      ? typeof localStatus.modelCount === "number"
+                        ? t("api.localGatewayRunningWithCount", {
+                            count: localStatus.modelCount,
+                          })
+                        : t("api.localGatewayRunning")
+                      : localStatus?.state === "unavailable"
+                        ? t("api.localGatewayUnavailable")
+                        : undefined
+                  : undefined;
+                const configured = localId
+                  ? configuredLocalGateways.has(localId)
+                  : !isOauth &&
+                    entry.id !== "custom" &&
+                    configuredProfileKeys.has(entry.id);
+                const localBadge = localId
+                  ? [
+                      localStatusLabel,
+                      configured ? t("api.catalogConfiguredBadge") : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
+                  : undefined;
                 // 卡片没了以后，描述与注意事项改挂到瓦片的 tooltip 上，不让文案丢。
                 const tooltip = oauthInfo
                   ? [
@@ -104,28 +157,38 @@ export function ProviderCatalogGrid({
                     ]
                       .filter(Boolean)
                       .join(" — ")
-                  : undefined;
+                  : isLocal
+                    ? localBadge
+                    : undefined;
                 const loggedIn = isOauth
                   ? Boolean(oauthStatuses[entry.id]?.loggedIn)
                   : false;
                 const busy = isOauth ? Boolean(oauthLoading[entry.id]) : false;
-                const configured =
-                  !isOauth &&
-                  entry.id !== "custom" &&
-                  configuredProfileKeys.has(entry.id);
                 // 已登录的瓦片仍可点击 → 走断开确认。它是登出的唯一出口：
                 // 已配置行可能已被删除，而 token 还在。
                 const disabled = isOauth && busy;
-                const badge = busy
-                  ? t("api.oauthLoggingIn")
-                  : loggedIn
-                    ? t("api.catalogConnectedBadge")
-                    : configured
-                      ? t("api.catalogConfiguredBadge")
-                      : undefined;
+                const badge = isLocal
+                  ? localBadge
+                  : busy
+                    ? t("api.oauthLoggingIn")
+                    : loggedIn
+                      ? t("api.catalogConnectedBadge")
+                      : configured
+                        ? t("api.catalogConfiguredBadge")
+                        : undefined;
+                const badgeTone: StatusBadgeTone = isLocal
+                  ? localStatus?.state === "probing"
+                    ? "busy"
+                    : localStatus?.state === "available"
+                      ? "ok"
+                      : "muted"
+                  : busy
+                    ? "busy"
+                    : "ok";
 
                 const tile = (
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     key={`${entry.kind}:${entry.id}`}
                     type="button"
                     data-catalog-entry={`${entry.kind}:${entry.id}`}
@@ -141,6 +204,10 @@ export function ProviderCatalogGrid({
                         else onOAuthLogin(entry.id);
                         return;
                       }
+                      if (entry.kind === "local") {
+                        if (localId) onOpenLocalGateway?.(localId);
+                        return;
+                      }
                       if (entry.kind === "plan") {
                         onCreatePlan();
                         return;
@@ -148,9 +215,7 @@ export function ProviderCatalogGrid({
                       onCreateProvider(entry.id as ProviderType);
                     }}
                     className={`flex h-10 w-full min-w-0 items-center gap-2.5 rounded-control px-2.5 text-left text-sm text-foreground ${
-                      disabled
-                        ? "cursor-default opacity-60"
-                        : "hover:bg-accent"
+                      disabled ? "cursor-default opacity-60" : "hover:bg-accent"
                     }`}
                   >
                     {entry.kind === "plan" ? (
@@ -169,8 +234,13 @@ export function ProviderCatalogGrid({
                       <span className="ml-auto flex-none">
                         <SettingsStatusBadge
                           dotOnly
-                          tone={busy ? "busy" : "ok"}
+                          tone={badgeTone}
                           label={badge}
+                          testId={
+                            localId
+                              ? `local-gateway-status-${localId}`
+                              : undefined
+                          }
                         />
                       </span>
                     )}

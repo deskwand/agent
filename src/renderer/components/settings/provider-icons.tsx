@@ -1,4 +1,4 @@
-import { Server, SquareTerminal } from "lucide-react";
+import { Bird, Server, SquareTerminal } from "lucide-react";
 import type { CustomProtocolType, ProviderType } from "../../types";
 
 /**
@@ -33,7 +33,8 @@ export type ProviderBrand =
   | "gemini"
   | "github"
   | "zhipu"
-  | "opencode";
+  | "opencode"
+  | "magpie";
 
 interface BrandSpec {
   /** SVG path 数据（simple-icons, CC0-1.0），viewBox 24x24 */
@@ -85,6 +86,9 @@ export function ProviderBrandIcon({
 }: ProviderBrandIconProps) {
   if (brand === "opencode") {
     return <SquareTerminal className={className} aria-hidden="true" />;
+  }
+  if (brand === "magpie") {
+    return <Bird className={className} aria-hidden="true" />;
   }
   const spec = BRAND_SPECS[brand as ProviderBrand];
   if (!spec) {

@@ -349,3 +349,54 @@ describe("disabledModels normalization", () => {
     expect(result.disabledModels).toEqual(["claude-opus-4-6"]);
   });
 });
+
+describe("normalizeProviderConfig — localGateway marker", () => {
+  const magpieProfile = {
+    provider: "custom" as const,
+    customProtocol: "openai" as const,
+    name: "Magpie",
+    apiKey: "magpie",
+    baseUrl: "http://127.0.0.1:3425/v1",
+    defaultModel: "opencode-go/kimi-k3",
+    models: [
+      {
+        id: "opencode-go/kimi-k3",
+        label: "Kimi K3",
+        source: "custom" as const,
+      },
+    ],
+    localGateway: "magpie" as const,
+    updatedAt: "2026-10-24T00:00:00.000Z",
+  };
+
+  it("keeps a known marker on a custom profile", () => {
+    const result = normalizeProviderConfig("custom:magpie", magpieProfile);
+    expect(result.localGateway).toBe("magpie");
+  });
+
+  it("drops an unknown marker id", () => {
+    const result = normalizeProviderConfig("custom:magpie", {
+      ...magpieProfile,
+      localGateway: "nope" as never,
+    });
+    expect(result.localGateway).toBeUndefined();
+  });
+
+  it("drops the marker on a preset provider", () => {
+    const result = normalizeProviderConfig("deepseek", {
+      localGateway: "magpie",
+    });
+    expect(result.localGateway).toBeUndefined();
+  });
+
+  it("round-trips the marker through saveProvider and getAll", () => {
+    const store = new ConfigStore();
+    store.saveProvider({
+      profileKey: "custom:magpie",
+      config: magpieProfile,
+    });
+    expect(store.getAll().providers["custom:magpie"]?.localGateway).toBe(
+      "magpie",
+    );
+  });
+});

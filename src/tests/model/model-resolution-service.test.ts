@@ -496,4 +496,34 @@ describe("ModelResolutionService — models.dev fallback for endpoint-only model
     expect(modelsDevContextMock).not.toHaveBeenCalled();
     expect(resolved.contextWindow).toBe(1000000);
   });
+
+  it("keeps magpie's full model id for a passthrough local gateway", async () => {
+    const appConfig = buildAppConfig();
+    appConfig.providers["custom:magpie"] = {
+      provider: "custom",
+      customProtocol: "openai",
+      name: "Magpie",
+      apiKey: "magpie",
+      baseUrl: "http://127.0.0.1:3425/v1",
+      defaultModel: "opencode-go/kimi-k3",
+      models: [
+        {
+          id: "opencode-go/kimi-k3",
+          label: "Kimi K3",
+          source: "custom" as const,
+        },
+      ],
+      localGateway: "magpie",
+      updatedAt: "2026-10-24T00:00:00.000Z",
+    };
+
+    const result = await service.resolve({
+      sessionProviderProfileKey: "custom:magpie",
+      sessionModel: "opencode-go/kimi-k3",
+      appConfig,
+    });
+
+    expect(result.piModel.id).toBe("opencode-go/kimi-k3");
+    expect(result.piModel.provider).toBe("deskwand:custom:magpie");
+  });
 });

@@ -14,6 +14,10 @@ import type {
   VisionModelConfig,
 } from "../../shared/api-model-presets";
 import { getCodingSubscription } from "../../shared/coding-subscriptions";
+import {
+  isLocalGatewayId,
+  type LocalGatewayId,
+} from "../../shared/local-gateways";
 import { VALID_THEME_PRESETS } from "../../shared/theme";
 import type { ThemePreset } from "../../shared/theme";
 import {
@@ -103,6 +107,8 @@ export interface ApiProviderConfig {
    * 只作为"记忆"：合并时用它把模型默认置为未勾选，不参与展示与执行。
    */
   disabledModels?: string[];
+  /** 本机网关预设；目前只有 magpie。仅对 provider === "custom" 生效。 */
+  localGateway?: LocalGatewayId;
   updatedAt: string;
 }
 
@@ -696,6 +702,10 @@ export function normalizeProviderConfig(
     defaultModel,
     models,
     disabledModels: normalizeDisabledModels(raw?.disabledModels),
+    localGateway:
+      meta.provider === "custom" && isLocalGatewayId(raw?.localGateway)
+        ? raw.localGateway
+        : undefined,
     updatedAt: toNonEmptyString(raw?.updatedAt) || nowISO(),
   };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertCircle,
@@ -37,6 +37,12 @@ import {
 } from "../../hooks/useApiConfigState";
 import { oauthProfileKey } from "../../../shared/oauth-utils";
 import { isCodingSubscriptionProfileKey } from "../../../shared/coding-subscriptions";
+import {
+  getLocalGatewayPreset,
+  type LocalGatewayId,
+  type LocalGatewayPreset,
+  type LocalGatewayProbeState,
+} from "../../../shared/local-gateways";
 import {
   connectCodingSubscription,
   connectOAuthProvider,
@@ -108,6 +114,8 @@ interface ProviderDraft {
   models: ApiProviderModel[];
   /** 用户取消勾选过的模型 id，写回 config.disabledModels */
   disabledModels?: string[];
+  /** 本机网关预设；目前只有 magpie */
+  localGateway?: LocalGatewayId;
 }
 
 const PROVIDER_ORDER: ProviderChoice[] = [
@@ -280,6 +288,20 @@ function createEmptyDraft(
   };
 }
 
+function createLocalGatewayDraft(preset: LocalGatewayPreset): ProviderDraft {
+  return {
+    profileKey: `custom:${crypto.randomUUID()}`,
+    provider: "custom",
+    customProtocol: preset.protocol,
+    name: preset.name,
+    apiKey: preset.defaultApiKey,
+    baseUrl: preset.baseUrl,
+    defaultModel: "",
+    localGateway: preset.id,
+    models: [],
+  };
+}
+
 function createDraftFromProvider(
   profileKey: ProviderProfileKey,
   config: ApiProviderConfig,
@@ -300,6 +322,7 @@ function createDraftFromProvider(
     defaultModel: config.defaultModel,
     models: config.models.map((item) => ({ ...item })),
     disabledModels: config.disabledModels ? [...config.disabledModels] : [],
+    localGateway: config.localGateway,
   };
 }
 
@@ -585,6 +608,40 @@ export function SettingsAPI({
     useState<string | null>(null);
   // ── 订阅套餐弹窗（Coding Plan）：包住既有的 CodingSubscriptionCards ──
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [localGatewayStatus, setLocalGatewayStatus] = useState<
+    Partial<Record<LocalGatewayId, LocalGatewayProbeState>>
+  >({});
+  const localGatewayOpeningRef = useRef(false);
+
+  const runLocalGatewayProbe = useCallback(
+    async (
+      id: LocalGatewayId,
+      input: { baseUrl?: string; apiKey?: string },
+    ) => {
+      if (!window.electronAPI?.config.probeLocalGateway) return undefined;
+      setLocalGatewayStatus((prev) => ({
+        ...prev,
+        [id]: { state: "probing" },
+      }));
+      try {
+        const result = await window.electronAPI.config.probeLocalGateway(input);
+        setLocalGatewayStatus((prev) => ({
+          ...prev,
+          [id]: result.available
+            ? { state: "available", modelCount: result.modelCount }
+            : { state: "unavailable" },
+        }));
+        return result;
+      } catch {
+        setLocalGatewayStatus((prev) => ({
+          ...prev,
+          [id]: { state: "unavailable" },
+        }));
+        return undefined;
+      }
+    },
+    [],
+  );
 
   const isVisionConfigured = !!appConfig?.visionModel?.model?.trim();
 
@@ -604,6 +661,16 @@ export function SettingsAPI({
       setPresets(nextPresets);
       setAppConfig(nextConfig);
       setIsConfigured(Boolean(nextConfig.isConfigured));
+      const existingLocalGatewayKey = Object.keys(nextConfig.providers ?? {})
+        .filter((key) => nextConfig.providers?.[key]?.localGateway === "magpie")
+        .sort()[0];
+      const existingLocalGateway = existingLocalGatewayKey
+        ? nextConfig.providers[existingLocalGatewayKey]
+        : undefined;
+      void runLocalGatewayProbe("magpie", {
+        baseUrl: existingLocalGateway?.baseUrl,
+        apiKey: existingLocalGateway?.apiKey,
+      });
       // Initialize vision model state from config
       if (nextConfig.visionModel) {
         setVisionDraft(nextConfig.visionModel);
@@ -634,7 +701,7 @@ export function SettingsAPI({
     return () => {
       cancelled = true;
     };
-  }, [setAppConfig, setIsConfigured]);
+  }, [setAppConfig, setIsConfigured, runLocalGatewayProbe]);
 
   const configuredProviders = useMemo(() => {
     const providers = appConfig?.providers || {};
@@ -667,8 +734,22 @@ export function SettingsAPI({
     return keys;
   }, [configuredProviders, appConfig]);
 
+  const configuredLocalGateways = useMemo(() => {
+    const ids = new Set<LocalGatewayId>();
+    for (const [key, config] of Object.entries(appConfig?.providers ?? {})) {
+      if (!config?.localGateway) continue;
+      if (hasUsableCredentials(key as ProviderProfileKey, config)) {
+        ids.add(config.localGateway);
+      }
+    }
+    return ids;
+  }, [appConfig]);
+
   const isCreating = originalProfileKey === null;
   const isCustomDraft = draft?.provider === "custom";
+  const localGatewayPreset = draft?.localGateway
+    ? getLocalGatewayPreset(draft.localGateway)
+    : undefined;
 
   const openCreate = (provider: ProviderType = "openrouter") => {
     startConnectRequest();
@@ -753,6 +834,9 @@ export function SettingsAPI({
           ...((sanitized.disabledModels ?? []).length > 0
             ? { disabledModels: sanitized.disabledModels }
             : {}),
+          ...(sanitized.localGateway
+            ? { localGateway: sanitized.localGateway }
+            : {}),
           updatedAt: new Date().toISOString(),
         },
       };
@@ -805,6 +889,9 @@ export function SettingsAPI({
       defaultModel,
       models,
       ...(disabledModels.length > 0 ? { disabledModels } : {}),
+      ...(sanitized.localGateway
+        ? { localGateway: sanitized.localGateway }
+        : {}),
       updatedAt: new Date().toISOString(),
     },
   });
@@ -949,7 +1036,11 @@ export function SettingsAPI({
       return;
     }
     if (!result.overallOk) {
-      fail();
+      fail(
+        Boolean(draftValue.localGateway) && result.failedAt === "auth"
+          ? t("api.localGatewayAuthFailed")
+          : undefined,
+      );
       return;
     }
 
@@ -966,7 +1057,11 @@ export function SettingsAPI({
 
     // 自定义供应商拿不到可用列表：不落盘，退回手填编辑器 + 「保存」
     if (isCustom && (!live || merge.enabled.length === 0)) {
-      fail(t("api.modelsManualHint"));
+      fail(
+        draftValue.localGateway && live
+          ? t("api.localGatewayNoModels")
+          : t("api.modelsManualHint"),
+      );
       return;
     }
 
@@ -998,6 +1093,50 @@ export function SettingsAPI({
 
   const handleConnect = () => {
     if (draft) void runConnect(draft);
+  };
+
+  const openLocalGateway = async (id: LocalGatewayId) => {
+    // 双击瓦片会在弹窗挂载前触发两次 click；第二次直接丢弃，避免并发探测与
+    // 「正在检测中」的误导提示。
+    if (localGatewayOpeningRef.current) return;
+    localGatewayOpeningRef.current = true;
+    try {
+      const preset = getLocalGatewayPreset(id);
+      if (!preset) return;
+
+      const existingKey = Object.keys(appConfig?.providers ?? {})
+        .filter((key) => appConfig?.providers?.[key]?.localGateway === id)
+        .sort()[0];
+      if (existingKey) {
+        openEdit(existingKey as ProviderProfileKey);
+        const existing = appConfig?.providers?.[existingKey];
+        void runLocalGatewayProbe(id, {
+          baseUrl: existing?.baseUrl,
+          apiKey: existing?.apiKey,
+        });
+        return;
+      }
+
+      const nextDraft = createLocalGatewayDraft(preset);
+      startConnectRequest();
+      setOriginalProfileKey(null);
+      setDraft(nextDraft);
+      setModelRows([]);
+      setError("");
+      setSuccessMessage("");
+      resetConnectState();
+      setEditorOpen(true);
+
+      const probe = await runLocalGatewayProbe(id, {
+        baseUrl: nextDraft.baseUrl,
+        apiKey: nextDraft.apiKey,
+      });
+      if (probe?.available) {
+        await runConnect(nextDraft);
+      }
+    } finally {
+      localGatewayOpeningRef.current = false;
+    }
   };
 
   /**
@@ -1599,6 +1738,9 @@ export function SettingsAPI({
                   onOAuthDisconnect={(providerId) =>
                     setPendingOAuthLogoutProviderId(providerId)
                   }
+                  configuredLocalGateways={configuredLocalGateways}
+                  localGatewayStatus={localGatewayStatus}
+                  onOpenLocalGateway={(id) => void openLocalGateway(id)}
                 />
               </SettingsSection>
             </>
@@ -2665,7 +2807,8 @@ export function SettingsAPI({
           >
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
               <DialogTitle className="text-sm font-medium text-foreground">
-                {isCreating ? t("api.addApi") : t("api.editApi")}
+                {localGatewayPreset?.name ??
+                  (isCreating ? t("api.addApi") : t("api.editApi"))}
               </DialogTitle>
               <DialogClose asChild>
                 <Button
@@ -2680,33 +2823,66 @@ export function SettingsAPI({
             </div>
             <div className="max-h-[calc(88vh-64px)] overflow-y-auto p-5">
               <div className="space-y-5">
-                <div className="space-y-3 border-b border-border/60 py-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <Server className="h-4 w-4" />
-                    {t("api.provider")}
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
-                    {PROVIDER_ORDER.map((provider) => (
-                      <Button
-                        variant="ghost"
-                        key={provider}
-                        type="button"
-                        onClick={() => selectProvider(provider)}
-                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                          draft.provider === provider
-                            ? "border-primary bg-primary/10 font-medium text-primary-text"
-                            : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                        }`}
-                      >
-                        <ProviderBrandIcon
-                          brand={provider}
-                          className="h-4 w-4 flex-shrink-0"
-                        />
-                        {providerOptionLabel(provider, presets, t)}
-                      </Button>
-                    ))}
+                {localGatewayPreset && (
+                  <div className="space-y-2 border-b border-border/60 py-5">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Server className="h-4 w-4" />
+                      {localGatewayPreset.name}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t(localGatewayPreset.keyHintKey)}
+                    </p>
+                    {localGatewayStatus[localGatewayPreset.id]?.state ===
+                      "unavailable" && (
+                      <p className="text-xs text-destructive">
+                        {t("api.localGatewayUnavailableHint")}
+                      </p>
+                    )}
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      onClick={() =>
+                        void window.electronAPI?.openExternal(
+                          localGatewayPreset.docsUrl,
+                        )
+                      }
+                      className="h-auto px-0 text-xs text-primary-text underline underline-offset-2"
+                    >
+                      {t("api.localGatewayDocs")}
+                    </Button>
                   </div>
-                </div>
+                )}
+
+                {/* 本机网关草稿锁定供应商；协议随 /v1 固定为 OpenAI。 */}
+                {!draft.localGateway && (
+                  <div className="space-y-3 border-b border-border/60 py-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Server className="h-4 w-4" />
+                      {t("api.provider")}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
+                      {PROVIDER_ORDER.map((provider) => (
+                        <Button
+                          variant="ghost"
+                          key={provider}
+                          type="button"
+                          onClick={() => selectProvider(provider)}
+                          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                            draft.provider === provider
+                              ? "border-primary bg-primary/10 font-medium text-primary-text"
+                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                          }`}
+                        >
+                          <ProviderBrandIcon
+                            brand={provider}
+                            className="h-4 w-4 flex-shrink-0"
+                          />
+                          {providerOptionLabel(provider, presets, t)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {(draft.provider === "opencode" ||
                   draft.provider === "opencode-go") && (
@@ -2738,7 +2914,7 @@ export function SettingsAPI({
                   </div>
                 )}
 
-                {isCustomDraft && (
+                {isCustomDraft && !draft.localGateway && (
                   <div className="space-y-3 border-b border-border/60 py-5">
                     <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Server className="h-4 w-4" />

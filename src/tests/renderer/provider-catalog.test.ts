@@ -5,6 +5,7 @@ import {
 } from "../../renderer/components/settings/provider-catalog";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import { CODING_SUBSCRIPTIONS } from "../../shared/coding-subscriptions";
+import { getLocalGatewayPreset } from "../../shared/local-gateways";
 
 describe("provider catalog", () => {
   it("每个条目都钉在一个真实存在的来源上", () => {
@@ -20,6 +21,10 @@ describe("provider catalog", () => {
             Object.keys(API_PROVIDER_PRESETS),
             `provider ${entry.id}`,
           ).toContain(entry.id);
+        } else if (entry.kind === "local") {
+          expect(getLocalGatewayPreset(entry.id)?.id, `local ${entry.id}`).toBe(
+            entry.id,
+          );
         } else {
           expect(
             CODING_SUBSCRIPTIONS.some((p) => p.profileKey === entry.id),
@@ -30,11 +35,12 @@ describe("provider catalog", () => {
     }
   });
 
-  it("三类按固定顺序铺开", () => {
+  it("四类按固定顺序铺开", () => {
     expect(PROVIDER_CATALOG.map((c) => c.id)).toEqual([
       "subscription",
       "vendor",
       "relay",
+      "local",
     ]);
   });
 

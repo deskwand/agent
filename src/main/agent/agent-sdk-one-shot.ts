@@ -27,6 +27,7 @@ import type { UsagePurpose } from "../../shared/usage";
 import { normalizeGeneratedTitle } from "../session/session-title-utils";
 import { resolveProviderApiKey } from "./shared-model-runtime";
 import { extractOAuthProviderId } from "../../shared/oauth-utils";
+import { shouldPreserveModelId } from "../../shared/local-gateways";
 import {
   applyPiModelRuntimeOverrides,
   buildSyntheticPiModel,
@@ -120,6 +121,33 @@ function resolveProbeApiKey(
   return "";
 }
 
+/**
+ * 测试的是某个已保存的本机网关 profile 时，把探针配置的 activeProviderKey 指回它。
+ * 否则 runPiAiOneShot 会从「当前激活」的别的 profile 取 localGateway 标记，
+ * 把 opencode-go/kimi-k3 剥成 kimi-k3。
+ */
+function findProbeLocalGatewayProfileKey(
+  config: AppConfig,
+  input: ApiTestInput,
+  effectiveBaseUrl: string | undefined,
+  resolvedCustomProtocol: CustomProtocolType,
+): string | undefined {
+  if (input.provider !== "custom" || resolvedCustomProtocol !== "openai") {
+    return undefined;
+  }
+  if (!effectiveBaseUrl) return undefined;
+  return Object.keys(config.providers ?? {})
+    .filter((key) => {
+      const profile = config.providers[key];
+      if (!profile?.localGateway) return false;
+      const normalized = normalizeOpenAICompatibleBaseUrl(
+        profile.baseUrl?.trim(),
+      );
+      return normalized === effectiveBaseUrl;
+    })
+    .sort()[0];
+}
+
 function buildProbeConfig(input: ApiTestInput, config: AppConfig): AppConfig {
   const resolvedBaseUrl = resolveProbeBaseUrl(input);
   const normalizedInputApiKey =
@@ -145,8 +173,17 @@ function buildProbeConfig(input: ApiTestInput, config: AppConfig): AppConfig {
     normalizedInputApiKey,
     config,
   );
+  const localGatewayProfileKey = findProbeLocalGatewayProfileKey(
+    config,
+    input,
+    effectiveBaseUrl,
+    resolvedCustomProtocol,
+  );
   return {
     ...config,
+    ...(localGatewayProfileKey
+      ? { activeProviderKey: localGatewayProfileKey }
+      : {}),
     provider: input.provider,
     customProtocol: resolvedCustomProtocol,
     apiKey: effectiveApiKey,
@@ -265,6 +302,9 @@ export async function runPiAiOneShot(
     customBaseUrl: effectiveBaseUrl,
     rawProvider: config.provider || "anthropic",
     customProtocol: config.customProtocol,
+    preserveModelId: shouldPreserveModelId(
+      config.providers?.[config.activeProviderKey],
+    ),
   });
 
   if (!piModel) {

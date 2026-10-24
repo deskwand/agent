@@ -58,6 +58,7 @@ export function rowBrand(
   // 不挡住的话会套上 OpenAI 的标。它今天被 configuredProviders 筛掉了，
   // 这里显式挡住，免得哪天被放进来时静默画错。
   if (profileKey === "custom:deskwand") return "custom";
+  if (config.localGateway === "magpie") return "magpie";
   const oauthId = oauthProviderIdForProfile(profileKey);
   const oauthEntry = oauthId
     ? OAUTH_PROVIDERS.find((p) => p.id === oauthId)
@@ -130,7 +131,8 @@ export function ConfiguredProviderList({
             control={
               <>
                 {status?.loggedIn && oauthId && (
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     data-testid={`${oauthId}-oauth-disconnect`}
                     onClick={() => onDisconnect(oauthId)}
@@ -139,7 +141,8 @@ export function ConfiguredProviderList({
                     {t("api.oauthDisconnect")}
                   </Button>
                 )}
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   data-testid={`${profileKey}-edit`}
                   onClick={() => onEdit(profileKey)}
@@ -147,7 +150,8 @@ export function ConfiguredProviderList({
                 >
                   {t("api.editApi")}
                 </Button>
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   data-testid={`${profileKey}-delete`}
                   onClick={() => onDelete(profileKey)}

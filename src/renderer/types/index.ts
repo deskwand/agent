@@ -18,6 +18,7 @@ import type { ChannelInstanceStatus } from "../../shared/ipc-types";
 import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
 import type { PiTuiOpenEvent, PiTuiFrameEvent } from "../../shared/ipc-types";
 import type { SubagentActivity } from "../../shared/subagent-activity";
+import type { LocalGatewayId } from "../../shared/local-gateways";
 import type { AskUserQuestion, AskUserAnswers } from "../../shared/ask-user";
 import type {
   NestedToolCallsUi,
@@ -988,6 +989,8 @@ export interface ApiProviderConfig {
    * 只作为"记忆"：合并时用它把模型默认置为未勾选，不参与展示与执行。
    */
   disabledModels?: string[];
+  /** 本机网关预设；目前只有 magpie。仅对 provider === "custom" 生效。 */
+  localGateway?: LocalGatewayId;
   updatedAt: string;
 }
 

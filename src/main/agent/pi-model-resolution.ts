@@ -28,6 +28,11 @@ export interface PiModelLookupOptions {
   rawProvider?: string;
   customBaseUrl?: string;
   customProtocol?: string;
+  /**
+   * 原样保留模型串作为请求模型 id。仅本机网关这类「id 自带命名空间」的端点使用：
+   * 注册表命中会把 `opencode-go/kimi-k3` 剥成 `kimi-k3`，网关不认。
+   */
+  preserveModelId?: boolean;
 }
 
 export interface PiModelLookupCandidate {
@@ -426,6 +431,20 @@ export function applyPiModelRuntimeOverrides(
   return nextModel;
 }
 
+function resolveRegistryModelWithOverrides(
+  model: Model<Api>,
+  modelString: string,
+  options: PiModelLookupOptions,
+): Model<Api> {
+  const resolved = applyPiModelRuntimeOverrides(model, options);
+  if (!options.preserveModelId || !modelString.includes("/")) {
+    return resolved;
+  }
+  // id 覆盖放在 overrides 之后：能力判定仍按剥前缀后的 id 走（保守），
+  // 这里只保证请求体里的模型名是网关认得的完整串。
+  return { ...resolved, id: modelString } as Model<Api>;
+}
+
 export function resolvePiRegistryModel(
   modelString: string,
   options: PiModelLookupOptions = {},
@@ -439,7 +458,7 @@ export function resolvePiRegistryModel(
       candidate.model,
     );
     if (model) {
-      return applyPiModelRuntimeOverrides(model, options);
+      return resolveRegistryModelWithOverrides(model, modelString, options);
     }
   }
 
@@ -468,13 +487,13 @@ export function resolvePiRegistryModel(
     .sort((a, b) => b.length - a.length)) {
     const match = getModels(provider).find((m) => m.id === modelId);
     if (match) {
-      return applyPiModelRuntimeOverrides(match, options);
+      return resolveRegistryModelWithOverrides(match, modelString, options);
     }
   }
   for (const provider of providers) {
     const match = getModels(provider).find((m) => m.id === modelId);
     if (match) {
-      return applyPiModelRuntimeOverrides(match, options);
+      return resolveRegistryModelWithOverrides(match, modelString, options);
     }
   }
 

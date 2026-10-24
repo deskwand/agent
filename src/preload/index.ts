@@ -30,6 +30,7 @@ import type {
 } from "../shared/ideas";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
+import type { LocalGatewayProbeResult } from "../shared/local-gateways";
 import type {
   ActionResult,
   AddCustomServerInput,
@@ -444,6 +445,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
       baseUrl?: string;
     }): Promise<LocalOllamaDiscoveryResult> =>
       ipcRenderer.invoke("config.discover-local", payload),
+    probeLocalGateway: (payload?: {
+      baseUrl?: string;
+      apiKey?: string;
+    }): Promise<LocalGatewayProbeResult> =>
+      ipcRenderer.invoke("config.probeLocalGateway", payload),
   },
 
   subagent: {
@@ -1250,6 +1256,10 @@ declare global {
         discoverLocal: (payload?: {
           baseUrl?: string;
         }) => Promise<LocalOllamaDiscoveryResult>;
+        probeLocalGateway: (payload?: {
+          baseUrl?: string;
+          apiKey?: string;
+        }) => Promise<LocalGatewayProbeResult>;
       };
       window: {
         minimize: () => void;

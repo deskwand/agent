@@ -19,6 +19,7 @@ import {
 import { resolveProviderApiKey } from "../agent/shared-model-runtime";
 import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import { DESKWAND_PROVIDER_PREFIX } from "../../shared/deskwand-provider";
+import { shouldPreserveModelId } from "../../shared/local-gateways";
 import {
   applyPiModelRuntimeOverrides,
   buildSyntheticPiModel,
@@ -197,6 +198,7 @@ export class ModelResolutionService {
       customBaseUrl: baseUrl,
       rawProvider: providerConfig.provider,
       customProtocol: providerConfig.customProtocol,
+      preserveModelId: shouldPreserveModelId(providerConfig),
     });
 
     if (!piModel) {

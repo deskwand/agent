@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "../../renderer/i18n/config";
 import { ProviderCatalogGrid } from "../../renderer/components/settings/provider-catalog-grid";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
+import type { LocalGatewayId } from "../../shared/local-gateways";
 
 describe("ProviderCatalogGrid", () => {
   let container: HTMLDivElement;
@@ -30,6 +31,9 @@ describe("ProviderCatalogGrid", () => {
           onCreatePlan: vi.fn(),
           onOAuthLogin: vi.fn(),
           onOAuthDisconnect: vi.fn(),
+          configuredLocalGateways: new Set<LocalGatewayId>(),
+          localGatewayStatus: {},
+          onOpenLocalGateway: vi.fn(),
           ...overrides,
         }),
       );
@@ -43,12 +47,49 @@ describe("ProviderCatalogGrid", () => {
     if (root) act(() => root.unmount());
   });
 
-  it("铺开 15 个瓦片和三个分类", () => {
+  it("铺开 16 个瓦片和四个分类", () => {
     render();
-    expect(tiles()).toHaveLength(15);
+    expect(tiles()).toHaveLength(16);
     expect(container.textContent).toContain("Subscription");
     expect(container.textContent).toContain("Providers");
     expect(container.textContent).toContain("Relay");
+    expect(container.textContent).toContain("Local");
+  });
+
+  it("点本机瓦片交回 local gateway id", () => {
+    const onOpenLocalGateway = vi.fn();
+    render({ onOpenLocalGateway });
+    const tile = tiles().find(
+      (b) => b.getAttribute("data-catalog-entry") === "local:magpie",
+    );
+    expect(tile).toBeTruthy();
+    act(() => {
+      tile?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(onOpenLocalGateway).toHaveBeenCalledWith("magpie");
+  });
+
+  it("把探测状态写进 aria-label 并渲染状态点", () => {
+    render({
+      localGatewayStatus: {
+        magpie: { state: "available", modelCount: 128 },
+      },
+    });
+    const tile = tiles().find(
+      (b) => b.getAttribute("data-catalog-entry") === "local:magpie",
+    );
+    expect(tile?.getAttribute("aria-label")).toContain("128");
+    expect(
+      tile?.querySelector('[data-testid="local-gateway-status-magpie"]'),
+    ).not.toBeNull();
+  });
+
+  it("已配置的 Magpie 同时显示已配置字样", () => {
+    render({ configuredLocalGateways: new Set<LocalGatewayId>(["magpie"]) });
+    const tile = tiles().find(
+      (b) => b.getAttribute("data-catalog-entry") === "local:magpie",
+    );
+    expect(tile?.getAttribute("aria-label")).toContain("Configured");
   });
 
   it("每个瓦片的文案都是人读得懂的字，不是原始 i18n key", () => {

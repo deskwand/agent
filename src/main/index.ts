@@ -3226,6 +3226,22 @@ ipcMain.handle(
   },
 );
 
+ipcMain.handle(
+  "config.probeLocalGateway",
+  async (
+    _event,
+    payload?: { baseUrl?: string; apiKey?: string },
+  ): Promise<{ available: boolean; modelCount?: number }> => {
+    try {
+      const { probeLocalGateway } = await import("./config/local-gateway");
+      return await probeLocalGateway(payload);
+    } catch (error) {
+      logError("[Config] Error probing local gateway:", error);
+      return { available: false };
+    }
+  },
+);
+
 // Subagent IPC handlers
 ipcMain.handle("subagent.listAgents", async (_event) => {
   const { scanAgents } = await import("./agent/subagent/agent-list");

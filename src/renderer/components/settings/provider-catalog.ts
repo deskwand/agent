@@ -37,8 +37,8 @@ export const OAUTH_PROVIDERS = [
   },
 ] as const;
 
-export type ProviderCategoryId = "subscription" | "vendor" | "relay";
-export type CatalogEntryKind = "oauth" | "provider" | "plan";
+export type ProviderCategoryId = "subscription" | "vendor" | "relay" | "local";
+export type CatalogEntryKind = "oauth" | "provider" | "plan" | "local";
 
 export interface ProviderCatalogEntry {
   kind: CatalogEntryKind;
@@ -63,6 +63,7 @@ export const CATEGORY_I18N: Record<
   },
   vendor: { title: "api.categoryVendor", hint: "api.categoryVendorHint" },
   relay: { title: "api.categoryRelay", hint: "api.categoryRelayHint" },
+  local: { title: "api.categoryLocal", hint: "api.categoryLocalHint" },
 };
 
 export const PROVIDER_CATALOG: readonly ProviderCatalogCategory[] = [
@@ -96,5 +97,9 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogCategory[] = [
       { kind: "plan", id: "custom:subscription-bailian-coding" },
       { kind: "plan", id: "custom:subscription-ark-coding" },
     ],
+  },
+  {
+    id: "local",
+    entries: [{ kind: "local", id: "magpie" }],
   },
 ];
