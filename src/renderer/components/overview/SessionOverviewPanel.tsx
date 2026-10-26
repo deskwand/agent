@@ -4,8 +4,10 @@ import { useAppStore } from "../../store";
 import { useIsSessionRunning } from "../../store/selectors";
 import { useRepoSummary } from "../../hooks/use-repo-summary";
 import { Button } from "../app-button";
+import { ChangesSection } from "./ChangesSection";
 import { ContextSection } from "./ContextSection";
 import { EnvironmentSection } from "./EnvironmentSection";
+import { OutputsSection } from "./OutputsSection";
 
 /**
  * 会话概览右栏。作为 rightPanelMode = "overview" 的内容使用；
@@ -57,6 +59,8 @@ export function SessionOverviewPanel({ visible }: { visible: boolean }) {
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
         <EnvironmentSection cwd={cwd} repo={repo} />
         <ContextSection />
+        <OutputsSection />
+        <ChangesSection cwd={cwd} repo={repo} />
       </div>
     </div>
   );

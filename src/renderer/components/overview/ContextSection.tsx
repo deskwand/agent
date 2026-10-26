@@ -1,6 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
-import { useActiveContextWindow } from "../../store/selectors";
+import {
+  useActiveContextWindow,
+  useActiveSessionMessages,
+} from "../../store/selectors";
 import { AppProgress } from "../app-progress";
 import {
   computeContextUsage,
@@ -8,22 +11,14 @@ import {
   findLastPromptInputTokens,
   formatTokenCount,
 } from "../../utils/context-usage";
-import type { CompactionState, Message } from "../../types";
+import type { CompactionState } from "../../types";
 import { OverviewSection } from "./OverviewSection";
 
 const IDLE_COMPACTION: CompactionState = { status: "idle" };
-const EMPTY_MESSAGES: Message[] = [];
 
 export function ContextSection() {
   const { t } = useTranslation();
-  // 直接用 useActiveSessionMessages 会在 sessionState 还没建立时每次返回新数组，
-  // zustand 的 useSyncExternalStore 会判定快照不稳定并无限重渲。兜底用模块常量。
-  const messages =
-    useAppStore((s) =>
-      s.activeSessionId
-        ? s.sessionStates[s.activeSessionId]?.messages
-        : undefined,
-    ) ?? EMPTY_MESSAGES;
+  const messages = useActiveSessionMessages();
   const contextWindow = useActiveContextWindow();
   const compaction =
     useAppStore((s) =>

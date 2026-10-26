@@ -27,6 +27,10 @@ import type {
 import type { ImageSource } from "../components/ImageLightbox";
 import type { GlobalNotice, SessionExecutionClock } from "./index";
 
+/** 稳定空数组：selector 每次返回新数组会让 useSyncExternalStore 判定快照不稳定并无限重渲。 */
+const EMPTY_MESSAGES: Message[] = [];
+const EMPTY_TRACE_STEPS: TraceStep[] = [];
+
 // ---------------------------------------------------------------------------
 // Session domain
 // ---------------------------------------------------------------------------
@@ -72,8 +76,8 @@ export function useIsSessionRunning(): boolean {
 export function useActiveSessionMessages(): Message[] {
   return useAppStore((s) =>
     s.activeSessionId
-      ? (s.sessionStates[s.activeSessionId]?.messages ?? [])
-      : [],
+      ? (s.sessionStates[s.activeSessionId]?.messages ?? EMPTY_MESSAGES)
+      : EMPTY_MESSAGES,
   );
 }
 
@@ -82,7 +86,9 @@ export function useActiveSessionMessages(): Message[] {
  * Useful in list components that render session previews.
  */
 export function useSessionMessages(sessionId: string): Message[] {
-  return useAppStore((s) => s.sessionStates[sessionId]?.messages ?? []);
+  return useAppStore(
+    (s) => s.sessionStates[sessionId]?.messages ?? EMPTY_MESSAGES,
+  );
 }
 
 /** Returns the in-progress (streaming) text of the active session's response. */
@@ -194,8 +200,8 @@ export function useActiveExecutionClock(): SessionExecutionClock | undefined {
 export function useActiveTraceSteps(): TraceStep[] {
   return useAppStore((s) =>
     s.activeSessionId
-      ? (s.sessionStates[s.activeSessionId]?.traceSteps ?? [])
-      : [],
+      ? (s.sessionStates[s.activeSessionId]?.traceSteps ?? EMPTY_TRACE_STEPS)
+      : EMPTY_TRACE_STEPS,
   );
 }
 
