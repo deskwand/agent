@@ -207,7 +207,7 @@ export function BrowserPanel({ width }: { width: number }) {
               disabled={!status.canGoBack}
               aria-label={t("browser.back")}
               size="iconSm"
-              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-default"
+              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-hover-surface transition-colors disabled:opacity-30 disabled:cursor-default"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -224,7 +224,7 @@ export function BrowserPanel({ width }: { width: number }) {
               disabled={!status.canGoForward}
               aria-label={t("browser.forward")}
               size="iconSm"
-              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-default"
+              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-hover-surface transition-colors disabled:opacity-30 disabled:cursor-default"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -242,7 +242,7 @@ export function BrowserPanel({ width }: { width: number }) {
               }
               aria-label={reloadLabel}
               size="iconSm"
-              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-hover-surface transition-colors"
             >
               {status.isLoading ? (
                 <X className="w-4 h-4" />
@@ -289,7 +289,7 @@ export function BrowserPanel({ width }: { width: number }) {
               className={`flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
                 pickerActive
                   ? "bg-primary/15 text-primary-text"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  : "text-muted-foreground hover:text-foreground hover:bg-hover-surface"
               }`}
             >
               <MousePointerSquareDashed className="w-3.5 h-3.5" />
@@ -318,7 +318,7 @@ export function BrowserPanel({ width }: { width: number }) {
               disabled={!status.url || status.url === "about:blank"}
               aria-label={t("browser.openExternal")}
               size="iconSm"
-              className="flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-accent"
+              className="flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-hover-surface"
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </Button>
@@ -337,7 +337,7 @@ export function BrowserPanel({ width }: { width: number }) {
               disabled={!status.url || status.url === "about:blank"}
               aria-label={fullscreenLabel}
               size="iconSm"
-              className="flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-accent"
+              className="flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-hover-surface"
             >
               {isBrowserFullscreen ? (
                 <Minimize2 className="w-3.5 h-3.5" />
@@ -357,7 +357,7 @@ export function BrowserPanel({ width }: { width: number }) {
               onClick={handleClose}
               aria-label={t("common.close")}
               size="iconSm"
-              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-hover-surface transition-colors"
             >
               <X className="w-4 h-4" />
             </Button>

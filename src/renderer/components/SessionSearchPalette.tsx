@@ -246,7 +246,9 @@ export function SessionSearchPalette() {
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => void handleSelect(match.session.id)}
                     className={`flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm ${
-                      index === safeIndex ? "bg-accent" : "hover:bg-accent/50"
+                      index === safeIndex
+                        ? "bg-selected-surface"
+                        : "hover:bg-hover-surface"
                     }`}
                   >
                     <span className="min-w-0 flex-1 truncate">
@@ -272,7 +274,7 @@ export function SessionSearchPalette() {
             <button
               type="button"
               onClick={handleNewChat}
-              className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm hover:bg-accent/50"
+              className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm hover:bg-hover-surface"
             >
               <SquarePen className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="flex-1 truncate text-left">
@@ -283,7 +285,7 @@ export function SessionSearchPalette() {
             <button
               type="button"
               onClick={() => void handleOpenFolder()}
-              className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm hover:bg-accent/50"
+              className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm hover:bg-hover-surface"
             >
               <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="flex-1 truncate text-left">

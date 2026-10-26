@@ -108,7 +108,9 @@ describe("plugins view (market / installed)", () => {
     expect(rows.length).toBeGreaterThan(0);
     // 第一行会被自动选中（列表加载完成后默认选第一个）
     expect(rows[0].getAttribute("data-selected")).toBe("true");
-    expect(rows[0].className).toContain("data-[selected=true]:bg-accent");
+    expect(rows[0].className).toContain(
+      "data-[selected=true]:bg-selected-surface",
+    );
     expect(rows[0].className).not.toContain("border-l-2");
     expect(rows[0].className).not.toContain("bg-primary/10");
     expect(rows[1].getAttribute("data-selected")).toBe("false");

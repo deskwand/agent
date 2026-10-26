@@ -92,7 +92,7 @@ export function SkillMdModal({
                 variant="ghost"
                 type="button"
                 aria-label={t("common.close")}
-                className="p-1 rounded-md hover:bg-accent transition-colors shrink-0 h-auto"
+                className="p-1 rounded-md hover:bg-hover-surface transition-colors shrink-0 h-auto"
               >
                 <X className="w-4 h-4 text-muted-foreground" />
               </Button>

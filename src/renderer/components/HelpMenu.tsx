@@ -83,7 +83,7 @@ export function HelpMenu() {
             setMenuOpen(false);
             setShowUpdateDialog(true);
           }}
-          className={`${RAIL_BUTTON_CLASS} relative text-primary-text hover:bg-accent`}
+          className={`${RAIL_BUTTON_CLASS} relative text-primary-text hover:bg-hover-surface`}
         >
           <CircleArrowUp className="w-4 h-4" />
         </Button>
@@ -98,7 +98,7 @@ export function HelpMenu() {
               type="button"
               aria-label={railLabel}
               // aria-haspopup / aria-expanded 由 Radix 的 Trigger 管，不要手写
-              className={`${RAIL_BUTTON_CLASS} relative text-muted-foreground hover:bg-accent hover:text-foreground`}
+              className={`${RAIL_BUTTON_CLASS} relative text-muted-foreground hover:bg-hover-surface hover:text-foreground`}
             >
               <CircleHelp className="w-4 h-4" />
             </Button>

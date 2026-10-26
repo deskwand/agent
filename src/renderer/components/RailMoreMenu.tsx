@@ -77,8 +77,8 @@ export function RailMoreMenu({
         onMouseDown={(event) => event.preventDefault()}
         className={`${RAIL_BUTTON_CLASS} relative ${
           moreCurrent
-            ? "bg-accent text-primary-text"
-            : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            ? "bg-selected-surface text-primary-text"
+            : "text-muted-foreground hover:bg-hover-surface hover:text-foreground"
         }`}
       >
         <Ellipsis className="w-4 h-4" />

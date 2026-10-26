@@ -165,8 +165,8 @@ describe("灵感视图", () => {
     const toggle = buttonByText("ideas.showArchived");
     // Radix Toggle 的标记；手写 aria-pressed + 条件类不会有 data-state
     expect(toggle.getAttribute("data-state")).not.toBeNull();
-    expect(toggle.className, "皮肤来自 ui/toggle.tsx").not.toContain(
-      "bg-accent text-foreground",
+    expect(toggle.className, "开态底来自 selected-surface").toContain(
+      "data-[state=on]:bg-selected-surface",
     );
   });
 

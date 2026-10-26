@@ -136,7 +136,7 @@ export function ConfiguredProviderList({
                     type="button"
                     data-testid={`${oauthId}-oauth-disconnect`}
                     onClick={() => onDisconnect(oauthId)}
-                    className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground"
                   >
                     {t("api.oauthDisconnect")}
                   </Button>
@@ -146,7 +146,7 @@ export function ConfiguredProviderList({
                   type="button"
                   data-testid={`${profileKey}-edit`}
                   onClick={() => onEdit(profileKey)}
-                  className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                  className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground"
                 >
                   {t("api.editApi")}
                 </Button>

@@ -181,7 +181,7 @@ export function AddServerDialog({
           <Button variant="ghost"
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-accent transition-colors h-auto"
+            className="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-hover-surface transition-colors h-auto"
           >
             {t("common.cancel")}
           </Button>

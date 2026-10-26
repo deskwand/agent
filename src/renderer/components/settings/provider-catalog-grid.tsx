@@ -215,7 +215,9 @@ export function ProviderCatalogGrid({
                       onCreateProvider(entry.id as ProviderType);
                     }}
                     className={`flex h-10 w-full min-w-0 items-center gap-2.5 rounded-control px-2.5 text-left text-sm text-foreground ${
-                      disabled ? "cursor-default opacity-60" : "hover:bg-accent"
+                      disabled
+                        ? "cursor-default opacity-60"
+                        : "hover:bg-hover-surface"
                     }`}
                   >
                     {entry.kind === "plan" ? (

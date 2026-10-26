@@ -21,7 +21,7 @@ interface Props<T extends string> {
  * ③ 透传 `data-testid` 给既有用例。
  *
  * ⚠️ 皮肤一律来自 `ui/toggle-group.tsx` / `ui/toggle.tsx`（`size="sm"` 是官方尺寸档，
- * 选中态 `data-[state=on]:bg-accent` 也是官方 base 给的）。调用点**不要**再手写
+ * 选中态底由官方 base 换成仓库的 `data-[state=on]:bg-selected-surface`）。调用点**不要**再手写
  * `h-8 px-2 text-xs` 或自造 hover —— 那正是「迁移到 shadcn 却又自己造一套」的老问题。
  */
 export function SegmentedToggle<T extends string>({

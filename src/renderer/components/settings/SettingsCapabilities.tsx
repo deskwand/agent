@@ -144,7 +144,7 @@ export function SettingsCapabilities({
                   kind,
                 )
               }
-              className="rounded-control border border-border px-2.5 py-1 text-xs text-foreground hover:bg-accent h-auto"
+              className="rounded-control border border-border px-2.5 py-1 text-xs text-foreground hover:bg-hover-surface h-auto"
             >
               {t("settings.capabilities.permission.openSettings")}
             </Button>

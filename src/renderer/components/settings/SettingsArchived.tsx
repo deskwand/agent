@@ -97,7 +97,7 @@ export function SettingsArchived() {
             变体表达不了的差异**逐条覆盖回来** ✗✓ —— 视觉与改前逐字一致 ✓：
             · `h-auto`（ghost 是 h-9 ✓，本仓这颗的高度由 gap 与 py-2 决定 ✓）
             · `px-3 py-2 rounded-xl`（覆盖 base 的 rounded-md ✓）
-            · `hover:bg-accent` + `hover:text-primary-text`（ghost 自带 `hover:bg-accent hover:text-accent-foreground` ✗ —— 本仓的 hover 是**表面色**不是强调色 ✓）
+            · `hover:bg-hover-surface` + `hover:text-primary-text`（ghost 自带 `hover:bg-hover-surface hover:text-accent-foreground` ✗ —— 本仓的 hover 是**表面色**不是强调色 ✓）
             · `disabled:opacity-40 disabled:cursor-not-allowed`（本仓的禁用观感 ✓，与 base 的 `disabled:opacity-50` 不同 ✗）
             · `transition-colors` 与 base 一致 ⇒ 不写 ✓ */}
         <Button
@@ -105,7 +105,7 @@ export function SettingsArchived() {
           type="button"
           onClick={handleBatchRestore}
           disabled={selectedIds.size === 0}
-          className="h-auto gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-primary-text hover:bg-accent hover:text-primary-text disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-auto gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-primary-text hover:bg-hover-surface hover:text-primary-text disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           {t("sidebar.batchRestore")}
@@ -121,7 +121,7 @@ export function SettingsArchived() {
               key={session.id}
               onClick={() => toggleSelect(session.id)}
               className={`group rounded-lg px-3 py-2 transition-colors ${
-                isSelected ? "bg-primary/10" : "hover:bg-accent/60"
+                isSelected ? "bg-primary/10" : "hover:bg-hover-surface"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -159,7 +159,7 @@ export function SettingsArchived() {
                           handleRestore(session.id);
                         }}
                         aria-label={t("sidebar.restore")}
-                        className="h-6 w-6 rounded-lg text-muted-foreground hover:text-primary-text hover:bg-accent"
+                        className="h-6 w-6 rounded-lg text-muted-foreground hover:text-primary-text hover:bg-hover-surface"
                       >
                         <RotateCcw className="w-3 h-3" />
                       </Button>
@@ -179,7 +179,7 @@ export function SettingsArchived() {
                           handlePermanentDelete(session.id);
                         }}
                         aria-label={t("common.delete")}
-                        className="h-6 w-6 rounded-lg text-muted-foreground hover:text-destructive hover:bg-accent"
+                        className="h-6 w-6 rounded-lg text-muted-foreground hover:text-destructive hover:bg-hover-surface"
                       >
                         <Trash2 className="w-3 h-3" />
                       </Button>

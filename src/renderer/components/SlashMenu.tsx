@@ -133,7 +133,7 @@ export function SlashMenu({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === tab.key
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  : "text-muted-foreground hover:bg-hover-surface hover:text-foreground"
               }`}
             >
               {tabIcon}
@@ -231,7 +231,7 @@ export function SlashMenu({
                       event.stopPropagation();
                       onToggleSkillPin(item.skill.name);
                     }}
-                    className={`flex flex-none items-center justify-center rounded-md transition-colors hover:bg-accent ${
+                    className={`flex flex-none items-center justify-center rounded-md transition-colors hover:bg-hover-surface ${
                       pinned ? "text-primary-text" : "text-muted-foreground"
                     }`}
                   >

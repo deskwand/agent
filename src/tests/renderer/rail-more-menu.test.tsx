@@ -161,12 +161,16 @@ describe("触发器（那颗 … 图标）", () => {
 
   it("当前视图在长尾组且未固定 → 高亮；固定之后 → 不再高亮", async () => {
     await mount([], "vault");
-    expect(trigger().className).toContain("bg-accent text-primary-text");
+    expect(trigger().className).toContain(
+      "bg-selected-surface text-primary-text",
+    );
     expect(trigger().getAttribute("aria-current")).toBeNull();
 
     await mount(["vault"], "vault");
-    expect(trigger().className).not.toContain("bg-accent text-primary-text");
-    expect(trigger().className).toContain("hover:bg-accent");
+    expect(trigger().className).not.toContain(
+      "bg-selected-surface text-primary-text",
+    );
+    expect(trigger().className).toContain("hover:bg-hover-surface");
   });
 });
 

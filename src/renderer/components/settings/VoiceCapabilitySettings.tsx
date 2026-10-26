@@ -138,7 +138,7 @@ export function VoiceCapabilitySettings({
                 aria-label={t("settings.capabilities.voice.remove")}
                 disabled={removing}
                 onClick={() => void remove()}
-                className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 h-auto"
+                className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground disabled:opacity-50 h-auto"
               >
                 {t("settings.capabilities.install.delete")}
               </Button>
@@ -194,7 +194,7 @@ export function VoiceCapabilitySettings({
                   // 删了模型就把开关也回到关：不然配置里留着 enabled，下次开机白等一次安装。
                   void emotion.remove().then(() => saveEmotion(false));
                 }}
-                className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 h-auto"
+                className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground disabled:opacity-50 h-auto"
               >
                 {t("settings.capabilities.install.delete")}
               </Button>

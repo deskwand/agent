@@ -17,7 +17,7 @@ export const MENU_PANEL_PADDED_CLASS = `${MENU_PANEL_CLASS} p-1`;
  * 单行菜单项：只放结构与排版，**不放颜色与 hover 底色**。
  *
  * 颜色由四个互斥状态类补齐，调用方按 `disabled → danger → selected → default`
- * 的顺序四选一。若把 text-foreground 或 hover:bg-accent 放进这里，
+ * 的顺序四选一。若把 text-foreground 或 hover:bg-hover-surface 放进这里，
  * 状态类就必须覆盖它们，而 Tailwind 同名属性的输出顺序由主题里的颜色定义顺序决定、
  * 不由 className 书写顺序决定 —— 覆盖结果不可判定。
  */
@@ -25,10 +25,10 @@ export const MENU_ITEM_CLASS =
   "flex h-7 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm transition-colors";
 
 /** 普通态 */
-export const MENU_ITEM_DEFAULT_CLASS = "text-foreground hover:bg-accent";
+export const MENU_ITEM_DEFAULT_CLASS = "text-foreground hover:bg-hover-surface";
 
 /** 选中态（已选值）：底色 + 行尾 Check 图标（图标由使用方渲染） */
-export const MENU_ITEM_SELECTED_CLASS = "text-foreground bg-accent";
+export const MENU_ITEM_SELECTED_CLASS = "text-foreground bg-selected-surface";
 
 /** 危险操作（删除、丢弃） */
 export const MENU_ITEM_DANGER_CLASS =

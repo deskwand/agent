@@ -97,7 +97,7 @@ export function SubagentSettings() {
                   <Button
                     variant="ghost"
                     type="button"
-                    className="p-1 rounded hover:bg-muted h-auto"
+                    className="p-1 rounded hover:bg-hover-surface h-auto"
                     aria-label={t("subagent.editModel") ?? "Edit model"}
                     onClick={() => {
                       setEditingAgent(agent.name);
@@ -158,7 +158,7 @@ export function SubagentSettings() {
                         variant="ghost"
                         type="button"
                         aria-label={t("common.delete")}
-                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-red-500 h-auto"
+                        className="p-1 rounded hover:bg-hover-surface text-muted-foreground hover:text-red-500 h-auto"
                         onClick={() => setDeletingAgent(agent.name)}
                       >
                         <Trash2 size={14} />

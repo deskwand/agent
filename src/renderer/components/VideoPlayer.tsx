@@ -80,7 +80,7 @@ export function VideoPlayer({
           <Button variant="ghost"
             type="button"
             onClick={() => void handleOpenExternal()}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground h-auto"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground h-auto"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             {t("videoPlayer.openExternal")}
@@ -127,7 +127,7 @@ export function VideoPlayer({
           <Button variant="ghost"
             type="button"
             onClick={() => void handleOpenExternal()}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground h-auto"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground h-auto"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             {t("videoPlayer.openExternal")}

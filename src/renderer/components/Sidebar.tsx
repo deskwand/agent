@@ -761,7 +761,7 @@ export function Sidebar({
         }}
         className={`group relative min-h-8 rounded-lg pr-2.5 py-1.5 transition-colors ${
           isProjectSession ? "pl-9" : "pl-3"
-        } ${isActive ? "bg-accent" : "hover:bg-accent/60"}`}
+        } ${isActive ? "bg-selected-surface" : "hover:bg-hover-surface"}`}
       >
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -883,7 +883,7 @@ export function Sidebar({
                       event.stopPropagation();
                       setSessionCompleted(session.id, !session.completedAt);
                     }}
-                    className="rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary-text hover:bg-accent transition-colors"
+                    className="rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary-text hover:bg-hover-surface transition-colors"
                     title={
                       session.completedAt
                         ? t("sidebar.markIncomplete")
@@ -914,7 +914,7 @@ export function Sidebar({
                             variant="ghost"
                             type="button"
                             size="iconXs"
-                            className="rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary-text hover:bg-accent transition-colors"
+                            className="rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary-text hover:bg-hover-surface transition-colors"
                             aria-label={t("sidebar.moreActions")}
                           >
                             <MoreHorizontal className="h-3 w-3" />
@@ -1187,7 +1187,7 @@ export function Sidebar({
                     variant="ghost"
                     type="button"
                     onClick={() => startNewSession()}
-                    className="h-8 w-full justify-start gap-2 rounded-lg px-3 text-sm font-normal text-foreground hover:bg-accent"
+                    className="h-8 w-full justify-start gap-2 rounded-lg px-3 text-sm font-normal text-foreground hover:bg-hover-surface"
                   >
                     <SquarePen className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="truncate">{t("sidebar.newChat")}</span>
@@ -1260,7 +1260,7 @@ export function Sidebar({
                   type="button"
                   onClick={() => openSessionSearch()}
                   aria-label={t("sidebar.searchChat")}
-                  className="h-8 w-8 shrink-0 rounded-lg px-0 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  className="h-8 w-8 shrink-0 rounded-lg px-0 text-muted-foreground hover:bg-hover-surface hover:text-foreground"
                 >
                   <SearchIcon className="h-4 w-4" />
                 </Button>
@@ -1297,7 +1297,7 @@ export function Sidebar({
                         );
                       }
                     }}
-                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors h-auto"
+                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-hover-surface transition-colors h-auto"
                   >
                     <SidebarGroupIcon
                       kind="sessions"
@@ -1345,7 +1345,7 @@ export function Sidebar({
                             !projectsExpanded,
                           );
                         }}
-                        className="min-w-0 flex-1 rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-accent transition-colors h-auto"
+                        className="min-w-0 flex-1 rounded-lg px-3 py-1 flex items-center gap-2 text-[0.8125rem] font-normal leading-5 text-muted-foreground hover:bg-hover-surface transition-colors h-auto"
                       >
                         <SidebarGroupIcon
                           kind="project"
@@ -1454,7 +1454,7 @@ export function Sidebar({
                                       );
                                     }
                                   }}
-                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-sm font-normal leading-5 text-foreground hover:bg-accent transition-colors h-auto"
+                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-sm font-normal leading-5 text-foreground hover:bg-hover-surface transition-colors h-auto"
                                 >
                                   <SidebarGroupIcon
                                     kind="project"
@@ -1660,7 +1660,7 @@ export function Sidebar({
                     variant="ghost"
                     onClick={() => setCreateProjectModalOpen(false)}
                     disabled={isCreatingProject}
-                    className="rounded-xl px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"
+                    className="rounded-xl px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-hover-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"
                   >
                     {t("sidebar.cancel")}
                   </Button>

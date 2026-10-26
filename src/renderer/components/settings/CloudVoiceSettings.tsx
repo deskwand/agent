@@ -257,7 +257,7 @@ export function CloudVoiceSettings({
             <Button variant="ghost"
               type="button"
               data-testid="cloud-preview-button"
-              className="w-20 rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-50"
+              className="w-20 rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-hover-surface disabled:opacity-50"
               onClick={() => {
                 if (preview.state === "playing") preview.stop();
                 else void preview.play(voiceMode.tone ?? "balanced");
@@ -300,7 +300,7 @@ export function CloudVoiceSettings({
           <Button variant="ghost"
             type="button"
             data-testid="cloud-advanced-toggle"
-            className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent"
+            className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-hover-surface"
             onClick={() => setAdvancedOpen((v) => !v)}
           >
             {advancedOpen

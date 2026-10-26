@@ -178,7 +178,7 @@ export function KeyDialog({
             variant="ghost"
             type="button"
             onClick={onClose}
-            className="h-auto px-3 py-1.5 rounded-lg text-sm font-normal text-muted-foreground hover:bg-accent hover:text-muted-foreground"
+            className="h-auto px-3 py-1.5 rounded-lg text-sm font-normal text-muted-foreground hover:bg-hover-surface hover:text-muted-foreground"
           >
             {t("connectors.keyDialog.cancel")}
           </Button>

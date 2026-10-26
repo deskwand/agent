@@ -223,7 +223,7 @@ describe("MessageCard action bar", () => {
         "hover:bg-transparent",
       );
       expect(tokens, `${selector} 不该带 hover 底色`).not.toContain(
-        "hover:bg-accent",
+        "hover:bg-hover-surface",
       );
       for (const slab of ["h-9", "px-4", "py-2", "h-auto"]) {
         expect(tokens, `${selector} 不该再出现 ${slab}`).not.toContain(slab);

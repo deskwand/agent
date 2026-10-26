@@ -134,7 +134,7 @@ describe("SlashMenu menu rows", () => {
   it("does not paint the keyboard highlight in the old accent tint", () => {
     // selectedIndex=0 → 第一行是键盘高亮行
     const rows = skillRows();
-    expect(rows[0]?.classList).toContain("bg-accent");
+    expect(rows[0]?.classList).toContain("bg-selected-surface");
     expect(rows[0]?.classList).not.toContain("bg-primary/10");
   });
 

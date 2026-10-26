@@ -29,7 +29,7 @@ export function MarketplaceCategorySidebar({
           className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
             selectedCategory === null
               ? "bg-primary/10 text-primary-text font-medium"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              : "text-muted-foreground hover:text-foreground hover:bg-hover-surface"
           }`}
         >
           {t("skillMarket.allCategories")}
@@ -48,7 +48,7 @@ export function MarketplaceCategorySidebar({
                 className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors truncate ${
                   selectedCategory === cat.key
                     ? "bg-primary/10 text-primary-text font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    : "text-muted-foreground hover:text-foreground hover:bg-hover-surface"
                 }`}
               >
                 {cat.name}

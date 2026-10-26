@@ -41,7 +41,7 @@ function Row({
       type="button"
       onClick={onClick}
       title={title}
-      className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-accent"
+      className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left hover:bg-hover-surface"
     >
       {content}
     </button>

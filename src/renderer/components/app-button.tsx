@@ -10,10 +10,10 @@ import { cn } from "@renderer/utils/cn";
  * ⚠️ 为什么要这一层（2026-10-09 实测 ✓，两次用户报障的根因 ✓）：
  *
  * **① `ghost` 不能带 `hover:text-accent-foreground`** ✗
- * vendored 的 `ghost` 是 `"hover:bg-accent hover:text-accent-foreground"` ✓，而
+ * vendored 的 `ghost` 是 `"hover:bg-hover-surface hover:text-accent-foreground"` ✓，而
  * `--accent-foreground` 在**部分主题里是白色** ✗（`globals.css` 有 `#ffffff` ✓）。
- * 本仓的按钮**自带 hover 底色**（多为浅灰 `hover:bg-accent` ✓）而**不带 hover 文字色** ✗
- * ⇒ 变体那一条会**替它把文字刷成白色** ⇒ **白字压浅灰，hover/聚焦时整行看不见** ✗✗
+ * 本仓的按钮**自带 hover 底色**（`hover:bg-hover-surface` 墨水叠层 ✓）而**不带 hover 文字色** ✗
+ * ⇒ 变体那一条会**替它把文字刷成白色** ⇒ **白字压浅底（当时是近白的 accent），hover/聚焦时整行看不见** ✗✗
  *（用户截图：输入框的模型芯片、消息区的工具摘要行 ✓）。
  * ⇒ 本表的 `ghost` **不带任何 `hover:text-*`** ✓：hover 时文字**保持自己的颜色** ✓
  *（== 迁移前原生 `<button>` 的行为 ✓✓）。
@@ -42,11 +42,11 @@ const appButtonVariants = cva(
         //（唯一调用方 `SettingsGlobalAgentsMd` 自己写了 `hover:text-foreground`，在 `cn` 里赢 ✓），
         // 但下一个「outline + 自定义浅色 hover 底」的调用方会**复现同一 bug** ✗ ⇒ 用之前先想清楚 ✓。
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+          "border border-input bg-background shadow-sm hover:bg-hover-surface hover:text-accent-foreground",
         secondary:
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         // ⚠️ 与 vendored 的差异①：**没有** `hover:text-accent-foreground` ✓（见文件头说明）。
-        ghost: "hover:bg-accent",
+        ghost: "hover:bg-hover-surface",
         link: "text-primary-text underline-offset-4 hover:underline",
       },
       size: {

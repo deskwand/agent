@@ -109,7 +109,7 @@ export function UsageView() {
             type="button"
             onClick={() => setActiveView("chat")}
             aria-label={t("common.back")}
-            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent h-auto"
+            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-hover-surface h-auto"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Button>

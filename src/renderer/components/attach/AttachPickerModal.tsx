@@ -107,7 +107,7 @@ export function AttachPickerModal({
           <Button variant="ghost"
             type="button"
             onClick={onClose}
-            className="h-9 rounded-xl border border-border px-4 text-sm text-foreground transition-colors hover:bg-accent"
+            className="h-9 rounded-xl border border-border px-4 text-sm text-foreground transition-colors hover:bg-hover-surface"
           >
             {t("common.cancel")}
           </Button>

@@ -56,7 +56,7 @@ export const CodeBlock = memo(function CodeBlock({
         <Button variant="ghost"
           size="iconSm"
           onClick={handleCopy}
-          className="flex items-center justify-center rounded bg-card hover:bg-accent transition-colors"
+          className="flex items-center justify-center rounded bg-card hover:bg-hover-surface transition-colors"
         >
           {copied ? (
             <Check className="w-3.5 h-3.5 text-success" />

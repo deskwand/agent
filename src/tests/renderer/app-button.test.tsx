@@ -18,7 +18,7 @@ describe("app-button 包装层", () => {
   it("ghost 不带 hover:text-accent-foreground（用户报障根因①）", () => {
     const ghost = appButtonVariants({ variant: "ghost" });
     expect(ghost).not.toContain("hover:text-accent-foreground");
-    expect(ghost).toContain("hover:bg-accent");
+    expect(ghost).toContain("hover:bg-hover-surface");
   });
 
   it("真正的 flex 容器才拿到 justify-start", () => {

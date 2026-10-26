@@ -73,6 +73,10 @@ module.exports = {
         "file-neutral": token("file-neutral"),
         "app-chrome": token("app-chrome"),
         "window-close-hover": token("window-close-hover"),
+        // 悬浮 / 选中表面（固定语义层派生，见 globals.css 顶部那段注释）：
+        // 键路径 === 变量名，由 token-alpha.test.ts 锁定。
+        "hover-surface": token("hover-surface"),
+        "selected-surface": token("selected-surface"),
       },
       fontFamily: {
         sans: [

@@ -35,7 +35,8 @@ interface AskUserCardProps {
 // 描述在标题下一行、盒子随内容长高（实测 57px），这四条把该行为还原回来。
 export const OPTION_BASE =
   "w-full rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-default h-auto flex-col items-stretch gap-0 whitespace-normal";
-export const OPTION_IDLE = "border-border/40 bg-muted hover:bg-accent";
+export const OPTION_IDLE =
+  "border-border/40 bg-muted hover:bg-selected-surface";
 export const OPTION_SELECTED = "border-primary bg-primary/10";
 // 选择控件的选项行（choice 的 RadioGroupItem、multiSelect 的原生 checkbox 共用）：
 // 外层是 <label>，点文案/描述与点控件等价；箭头和勾选框自己带 role="radio" / type="checkbox"。
@@ -459,7 +460,7 @@ export function AskUserCard({
                 type="button"
                 disabled={!interactive}
                 onClick={onSkip}
-                className="rounded-lg border border-border/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50 h-auto"
+                className="rounded-lg border border-border/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-hover-surface disabled:opacity-50 h-auto"
               >
                 {t("tool.askUser.skip")}
               </Button>

@@ -41,7 +41,7 @@ export function OpenProjectMenu({
     >
       <button
         type="button"
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-hover-surface"
         onClick={onLocal}
       >
         <FolderOpen className="h-4 w-4 text-muted-foreground" />
@@ -60,7 +60,7 @@ export function OpenProjectMenu({
           <button
             key={host.id}
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-hover-surface"
             onClick={() => onPickHost(host)}
           >
             <Server className="h-4 w-4 text-muted-foreground" />
@@ -74,7 +74,7 @@ export function OpenProjectMenu({
       <div className="my-1 h-px bg-border" />
       <button
         type="button"
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-hover-surface"
         onClick={onAddServer}
       >
         ＋ {t("sandbox.ssh.addServer")}

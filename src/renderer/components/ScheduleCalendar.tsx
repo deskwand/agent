@@ -263,7 +263,7 @@ function DayView({
           {hours.map((h) => (
             <div
               key={h}
-              className="border-t border-border/60 hover:bg-accent/50"
+              className="border-t border-border/60 hover:bg-hover-surface"
               style={{ height: HOUR_HEIGHT }}
               onClick={() => {
                 const d = new Date(date);
@@ -403,7 +403,7 @@ function WeekView({
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="border-t border-border/60 hover:bg-accent/50"
+                    className="border-t border-border/60 hover:bg-hover-surface"
                     style={{ height: HOUR_HEIGHT }}
                     onClick={() => {
                       const d = new Date(day);
@@ -510,7 +510,7 @@ function MonthView({
           return (
             <div
               key={idx}
-              className={`border-r border-b border-border/60 p-1 hover:bg-accent/30 transition-colors ${
+              className={`border-r border-b border-border/60 p-1 hover:bg-hover-surface transition-colors ${
                 inMonth ? "" : "opacity-40"
               } ${idx % 7 === 0 ? "border-l" : ""}`}
               onClick={() => {

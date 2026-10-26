@@ -124,7 +124,7 @@ export function ChatInputQueueBar({
             type="button"
             aria-label={t("steer.remove")}
             // 同上：`X` 写的 `h-3.5 w-3.5` 被 base 的 `[&_svg]:size-4` 顶成 16px（实测；迁移前 14px）
-            className="flex-shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors h-auto [&_svg]:size-3.5"
+            className="flex-shrink-0 rounded p-1 text-muted-foreground hover:bg-hover-surface hover:text-foreground transition-colors h-auto [&_svg]:size-3.5"
             onClick={() => onRemove(item.id)}
           >
             <X className="h-3.5 w-3.5" />

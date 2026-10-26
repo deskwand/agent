@@ -88,7 +88,9 @@ describe("AttachmentTiles", () => {
     const tile = container.querySelector("[title]") as HTMLElement;
     // 可点击的条件信号：2026-10-11 起从手型光标改为 hover 底色
     // （原生行不换光标，见 src/tests/renderer/native-cursor-guard.test.ts）。
-    expect(tile.className).toContain("hover:bg-accent");
+    // 2026-10-26：磁贴静止底是 bg-muted，hover 必须再深一档（hover-surface 叠在上面只差
+    // 1.037），所以这一档用 selected-surface。
+    expect(tile.className).toContain("hover:bg-selected-surface");
     act(() => tile.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
@@ -106,7 +108,7 @@ describe("AttachmentTiles", () => {
   it("没传 onOpen 的文件磁贴不可点击", () => {
     render([fileTile]);
     const tile = container.querySelector("[title]") as HTMLElement;
-    expect(tile.className).not.toContain("hover:bg-accent");
+    expect(tile.className).not.toContain("hover:bg-selected-surface");
   });
 
   it("删除角标补了 px-0：20px 的圆点不再被缺省档撑成 32 宽", () => {

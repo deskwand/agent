@@ -202,7 +202,7 @@ export function Titlebar() {
                   type="button"
                   onClick={handleMinimize}
                   aria-label={t("window.minimize")}
-                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-muted-foreground hover:bg-hover-surface hover:text-foreground transition-colors"
                 >
                   <Minus className="w-4 h-4" />
                 </Button>
@@ -222,7 +222,7 @@ export function Titlebar() {
                   aria-label={
                     isMaximized ? t("window.restore") : t("window.maximize")
                   }
-                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-muted-foreground hover:bg-hover-surface hover:text-foreground transition-colors"
                 >
                   {isMaximized ? (
                     // lucide Copy 的两个错位叠加方框就是 Windows 11 的“还原”字形

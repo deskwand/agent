@@ -413,7 +413,7 @@ export const MessageCard = memo(function MessageCard({
     // `shouldLeftAlign()` 会注入 `justify-start`（它的判据是「原生 `<button class="flex">` 本来就居左」）
     // ⇒ 图标会贴着左边（2026-10-10 实测：左 0 / 右 12；显式 `justify-center` 后 6 / 6 ✓）。
     // ⚠️ `hover:bg-transparent` 也是**有意**的：这排只要颜色反馈、不要灰底（`cn` 合并后 ghost 的
-    // `hover:bg-accent` 会被删掉 ✓；2026-10-10 用户：图标带底色看着重）。
+    // `hover:bg-hover-surface` 会被删掉 ✓；2026-10-10 用户：图标带底色看着重）。
     // 读屏名与 tooltip 同一份来源：图标会在四个字形间变，读屏用户听到的必须是当前那一下的动作。
     const readAloudLabel = voiceRuntimeActive
       ? t("messageCard.readAloudBusy")

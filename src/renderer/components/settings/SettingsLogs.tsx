@@ -279,7 +279,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="shrink-0 p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors h-auto"
+                    className="shrink-0 p-1 rounded hover:bg-hover-surface text-muted-foreground hover:text-foreground transition-colors h-auto"
                     onClick={() => navigator.clipboard.writeText(logsDirectory)}
                     aria-label={t("common.copy")}
                   >
@@ -320,7 +320,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
             variant="ghost"
             onClick={handleOpen}
             disabled={isLoading}
-            className="py-3 px-4 rounded-lg bg-background border border-border/40 text-foreground font-medium hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
+            className="py-3 px-4 rounded-lg bg-background border border-border/40 text-foreground font-medium hover:bg-hover-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
           >
             <Globe className="w-4 h-4" />
             <span className="text-sm">{t("logs.openFolder")}</span>

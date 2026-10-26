@@ -161,7 +161,7 @@ export const BashToolBlock = memo(function BashToolBlock({
       <CollapsibleTrigger asChild>
         <Button
           variant="ghost"
-          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
+          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
         >
           {/* Status icon */}
           <div className="flex-shrink-0 pt-0.5 text-muted-foreground">

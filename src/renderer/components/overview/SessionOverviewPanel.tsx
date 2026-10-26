@@ -41,7 +41,7 @@ export function SessionOverviewPanel({ visible }: { visible: boolean }) {
           size="iconXs"
           onClick={repo.refresh}
           aria-label={t("overview.refresh")}
-          className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+          className="rounded flex items-center justify-center hover:bg-hover-surface text-muted-foreground hover:text-foreground transition-colors"
         >
           <RefreshCw
             className={`w-3.5 h-3.5 ${repo.isLoading ? "animate-spin" : ""}`}
@@ -52,7 +52,7 @@ export function SessionOverviewPanel({ visible }: { visible: boolean }) {
           size="iconSm"
           onClick={toggleOverview}
           aria-label={t("overview.close")}
-          className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+          className="rounded flex items-center justify-center hover:bg-hover-surface text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="w-4 h-4" />
         </Button>

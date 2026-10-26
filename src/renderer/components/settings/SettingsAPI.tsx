@@ -1825,7 +1825,7 @@ export function SettingsAPI({
                         variant="ghost"
                         type="button"
                         onClick={openVisionEditor}
-                        className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                        className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
                       >
                         <Pencil className="h-3 w-3" />
                         {t("api.editApi")}
@@ -2340,7 +2340,7 @@ export function SettingsAPI({
                   variant="ghost"
                   type="button"
                   aria-label={t("common.close")}
-                  className="rounded-lg p-2 hover:bg-accent h-auto"
+                  className="rounded-lg p-2 hover:bg-hover-surface h-auto"
                 >
                   <X className="h-4 w-4 text-muted-foreground" />
                 </Button>
@@ -2613,7 +2613,7 @@ export function SettingsAPI({
                     variant="ghost"
                     type="button"
                     onClick={closeVisionEditor}
-                    className="rounded-lg border border-border/60 px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                    className="rounded-lg border border-border/60 px-4 py-2.5 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
                   >
                     {t("common.cancel")}
                   </Button>
@@ -2676,7 +2676,7 @@ export function SettingsAPI({
                   <AlertDialogFooter className="flex justify-end gap-2">
                     <AlertDialogCancel
                       onClick={closeOAuthDisconnectDialog}
-                      className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                      className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
                     >
                       {t("common.cancel")}
                     </AlertDialogCancel>
@@ -2726,7 +2726,7 @@ export function SettingsAPI({
                 <AlertDialogCancel
                   onClick={closeDeleteDialog}
                   disabled={isDeleting}
-                  className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 h-auto"
+                  className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                 >
                   {t("common.cancel")}
                 </AlertDialogCancel>
@@ -2781,7 +2781,7 @@ export function SettingsAPI({
                   variant="ghost"
                   type="button"
                   onClick={() => setPlanDialogOpen(false)}
-                  className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                  className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
                 >
                   {t("api.done")}
                 </Button>
@@ -2815,7 +2815,7 @@ export function SettingsAPI({
                   variant="ghost"
                   type="button"
                   aria-label={t("common.close")}
-                  className="rounded-lg p-2 hover:bg-accent h-auto"
+                  className="rounded-lg p-2 hover:bg-hover-surface h-auto"
                 >
                   <X className="h-4 w-4 text-muted-foreground" />
                 </Button>
@@ -3027,7 +3027,7 @@ export function SettingsAPI({
                           variant="ghost"
                           type="button"
                           onClick={addModel}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                          className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
                         >
                           <Plus className="h-3 w-3" />
                           {t("api.addCustomModel")}
@@ -3151,7 +3151,7 @@ export function SettingsAPI({
                         .map((row) => (
                           <div
                             key={row.id}
-                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-accent"
+                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-hover-surface"
                           >
                             <input
                               type="checkbox"
@@ -3229,7 +3229,7 @@ export function SettingsAPI({
                         variant="ghost"
                         type="button"
                         onClick={handleConnect}
-                        className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                        className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
                       >
                         {t("api.reconnect")}
                       </Button>
@@ -3251,7 +3251,7 @@ export function SettingsAPI({
                         onClick={() => {
                           void handleSaveDraft();
                         }}
-                        className="inline-flex items-center gap-2 rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                        className="inline-flex items-center gap-2 rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
                       >
                         {t("common.save")}
                       </Button>
@@ -3270,7 +3270,7 @@ export function SettingsAPI({
                         variant="ghost"
                         type="button"
                         onClick={closeEditor}
-                        className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
+                        className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
                       >
                         {t("common.cancel")}
                       </Button>

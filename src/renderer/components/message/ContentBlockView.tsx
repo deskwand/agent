@@ -560,7 +560,7 @@ export const ContentBlockView = memo(function ContentBlockView({
 
         return (
           <div
-            className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border overflow-hidden ${isInteractive ? "hover:bg-accent transition-colors" : ""}`}
+            className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border overflow-hidden ${isInteractive ? "hover:bg-selected-surface transition-colors" : ""}`}
             onClick={() => {
               void (async () => {
                 if (!attachmentPath || !isInteractive) return;

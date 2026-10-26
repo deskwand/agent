@@ -42,7 +42,7 @@ export function CurrencySelect({ value, onChange }: Props) {
         <Button variant="ghost"
           type="button"
           aria-label={`${t("usage.currency")}, ${value}`}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-2xl border border-border/40 bg-background/60 px-2 text-xs whitespace-nowrap text-foreground transition-[background-color] duration-150 hover:bg-accent"
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-2xl border border-border/40 bg-background/60 px-2 text-xs whitespace-nowrap text-foreground transition-[background-color] duration-150 hover:bg-hover-surface"
         >
           <span className="text-muted-foreground">{t("usage.currency")}</span>
           <span className="font-mono">{value}</span>

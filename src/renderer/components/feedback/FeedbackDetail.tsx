@@ -260,7 +260,7 @@ export function FeedbackDetail({
                     {viewer.isAdmin || item.author.isMe ? (
                       <button
                         type="button"
-                        className="ml-auto rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
+                        className="ml-auto rounded p-1 text-muted-foreground hover:bg-hover-surface hover:text-destructive"
                         aria-label={t("feedback.delete.replyAction")}
                         onClick={() => onDeleteReply(item.id)}
                       >

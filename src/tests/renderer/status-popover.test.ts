@@ -414,7 +414,7 @@ describe("StatusPopover", () => {
 
     // 按空白切分成 token 再断言：className 字符串包含的话，关闭态的
     // `hover:bg-accent` 也会让 toContain 通过，那条断言永远不会失败。
-    expect(trigger().className.split(/\s+/)).toContain("bg-accent");
+    expect(trigger().className.split(/\s+/)).toContain("bg-selected-surface");
   });
 
   it("面板外壳复用浮层共享 token，并带入场动画", () => {

@@ -58,6 +58,14 @@
     0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
   --shadow-elevated:
     0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  /* 悬浮 / 选中表面：正文色墨水叠层（2026-10-26）。
+     为什么不用官方 --accent：亮色下它是 #f4f4f5 —— 压在白底 1.099、压在现场
+     量到的侧边栏 #f2f2f3 上 1.017、压在 muted 面 1.000（官方 7 套 base 里
+     --accent ≡ --muted ≡ --secondary）⇒ 后两个场景等于没有反馈。
+     墨水叠层与底色无关：暗色 11% 在 background/card/muted 上给出 1.28–1.40，
+     亮色 6% 在三种底上都给出 1.135（见 hover-surface-tokens.test.ts）。 */
+  --hover-surface: color-mix(in srgb, var(--foreground) 11%, transparent);
+  --selected-surface: color-mix(in srgb, var(--foreground) 18%, transparent);
 }
 
 /* 亮色：只有这几个固定语义值不同（主题变量在 @layer base 的 .light 块里） */
@@ -85,6 +93,8 @@
   --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --hover-surface: color-mix(in srgb, var(--foreground) 6%, transparent);
+  --selected-surface: color-mix(in srgb, var(--foreground) 10%, transparent);
 }
 
 @layer base {

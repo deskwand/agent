@@ -37,11 +37,11 @@ export function TitlebarButton({
   children,
 }: TitlebarButtonProps) {
   // 已开启与未开启是两套互斥的 class 组合，不是靠 CSS 优先级叠加：
-  // Tailwind 输出的 hover: 变体晚于无前缀的 bg-accent，同时存在时会把
-  // 已开启背景盖掉。
+  // Tailwind 输出的 hover: 变体晚于无前缀的 bg-selected-surface，同时存在时会把
+  // 已开启背景盖掉。两个底都在固定语义层派生（原先用官方 --accent）。
   const stateClasses = isOn
-    ? "bg-accent text-primary-text active:scale-[0.96] active:duration-75"
-    : `hover:bg-accent hover:text-foreground active:bg-accent active:scale-[0.96] active:duration-75 ${
+    ? "bg-selected-surface text-primary-text active:scale-[0.96] active:duration-75"
+    : `hover:bg-hover-surface hover:text-foreground active:bg-selected-surface active:scale-[0.96] active:duration-75 ${
         tone === "secondary" ? "text-muted-foreground" : "text-muted-foreground"
       }`;
 

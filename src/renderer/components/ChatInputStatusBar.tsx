@@ -348,7 +348,7 @@ export function ChatInputStatusBar({
                 // ⇒ 不必操心样式表里的先后顺序。
                 // ⚠️ `[&_svg]:size-3` 的作用面是**行内所有 svg**，不只是右侧那个状态图标 ——
                 // 往这一行里再加图标的人要回读这句，否则新图标会被静默压成 12px。
-                className={`flex h-auto w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-normal [&_svg]:size-3 hover:bg-accent/60 ${
+                className={`flex h-auto w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-normal [&_svg]:size-3 hover:bg-hover-surface ${
                   // 已完成的行降一档：面板里可能同时有"上一轮还在跑的"和"本轮已完成的"。
                   // `error` 刻意不降 —— 失败是应该被注意到的信号。
                   row.status === "completed" ? "opacity-60" : ""
@@ -416,7 +416,7 @@ export function ChatInputStatusBar({
             // 写回后实测 28×20px、chevron 12px、字 12px/400 == `min-h-5`。
             // ⚠️ `[&_svg]:size-3` 的作用面是**这枚 chip 里所有 svg** —— 目前只有右侧那个 chevron
             // （进度条是 div，面板走 portal 不在此列），往 chip 里再加图标的人要回读这句。
-            className="flex h-auto min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-left text-xs font-normal text-foreground transition-colors hover:bg-accent [&_svg]:size-3"
+            className="flex h-auto min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-left text-xs font-normal text-foreground transition-colors hover:bg-selected-surface [&_svg]:size-3"
           >
             {hasPlan ? (
               <>
@@ -555,7 +555,7 @@ export function ChatInputStatusBar({
               </Button>
               <Button variant="ghost"
                 type="button"
-                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent text-muted-foreground hover:bg-accent/80 transition-[transform,background-color,color] active:scale-[0.97] h-auto font-normal"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent text-muted-foreground hover:bg-selected-surface transition-[transform,background-color,color] active:scale-[0.97] h-auto font-normal"
                 onClick={() => onGoalCommand("goal:clear")}
               >
                 {t("goal.clear")}

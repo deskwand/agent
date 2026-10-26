@@ -98,7 +98,7 @@ export function SettingsGlobalAgentsMd() {
                 variant="outline"
                 type="button"
                 onClick={handleInsertTemplate}
-                className="h-auto rounded-lg border-border bg-transparent px-3 py-1.5 text-sm font-normal text-foreground shadow-none hover:bg-accent hover:text-foreground"
+                className="h-auto rounded-lg border-border bg-transparent px-3 py-1.5 text-sm font-normal text-foreground shadow-none hover:bg-hover-surface hover:text-foreground"
               >
                 {t("agentsMd.insertTemplate")}
               </Button>

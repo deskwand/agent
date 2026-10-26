@@ -65,7 +65,7 @@ export function FeedbackList({
               variant="ghost"
               onClick={onBack}
               aria-label={t("common.back")}
-              className="-ml-1.5 h-auto rounded-lg p-1.5 transition-colors hover:bg-accent"
+              className="-ml-1.5 h-auto rounded-lg p-1.5 transition-colors hover:bg-hover-surface"
             >
               <ArrowLeft className="h-5 w-5 text-muted-foreground" />
             </Button>
@@ -103,7 +103,7 @@ export function FeedbackList({
               className={cn(
                 "flex-1 rounded-control px-2 py-1 text-xs transition-colors",
                 filter === value
-                  ? "bg-accent text-foreground"
+                  ? "bg-selected-surface text-foreground"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -147,9 +147,9 @@ export function FeedbackList({
                 onClick={() => onSelect(issue.id)}
                 aria-current={issue.id === selectedId ? "true" : undefined}
                 className={cn(
-                  "flex w-full items-start gap-2.5 border-b border-border/40 px-4 py-3 text-left transition-colors hover:bg-accent/40",
+                  "flex w-full items-start gap-2.5 border-b border-border/40 px-4 py-3 text-left transition-colors hover:bg-hover-surface",
                   issue.id === selectedId &&
-                    "bg-accent/60 shadow-[inset_2px_0_0_var(--primary)]",
+                    "bg-selected-surface shadow-[inset_2px_0_0_var(--primary)]",
                 )}
               >
                 <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-muted/50 text-muted-foreground">

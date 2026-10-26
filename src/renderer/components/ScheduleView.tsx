@@ -121,7 +121,7 @@ export function ScheduleView() {
               type="button"
               onClick={() => setShowSchedule(false)}
               aria-label={t("common.back")}
-              className="p-1.5 -ml-1.5 rounded-lg hover:bg-accent transition-colors h-auto"
+              className="p-1.5 -ml-1.5 rounded-lg hover:bg-hover-surface transition-colors h-auto"
             >
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </Button>

@@ -33,7 +33,7 @@ function initialOf(name: string): string {
 }
 
 const LINK_BUTTON_CLASS =
-  "rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-accent";
+  "rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-hover-surface";
 const PRIMARY_BUTTON_CLASS =
   "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50";
 const DANGER_BUTTON_CLASS =
@@ -240,7 +240,7 @@ export function PiMarketDetail({
               </p>
             )}
             <Button variant="ghost"
-              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted/60 h-auto"
+              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-hover-surface h-auto"
               onClick={() => setReloadKey((k) => k + 1)}
             >
               {t("piExtensions.marketRetry")}

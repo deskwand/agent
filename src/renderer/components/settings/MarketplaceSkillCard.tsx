@@ -85,7 +85,7 @@ function MarketplaceCardView({
       <div className="flex justify-end gap-2 mt-3">
         <Button variant="ghost"
           onClick={onViewDetail}
-          className="px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground hover:bg-accent transition-colors h-auto"
+          className="px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground hover:bg-selected-surface transition-colors h-auto"
         >
           {t("skillMarket.viewDetail")}
         </Button>
@@ -165,7 +165,7 @@ function MarketplaceListView({
         <div className="flex items-center gap-1.5 shrink-0">
           <Button variant="ghost"
             onClick={onViewDetail}
-            className="px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors h-auto"
+            className="px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-hover-surface transition-colors h-auto"
           >
             {t("skillMarket.viewDetail")}
           </Button>

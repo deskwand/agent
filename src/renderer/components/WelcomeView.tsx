@@ -540,7 +540,7 @@ export function WelcomeView() {
                 key={entry.id}
                 type="button"
                 onClick={() => handleQuickEntry(entry)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground h-auto"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground h-auto"
               >
                 <QuickEntryIcon icon={entry.icon} />
                 {t(entry.labelKey)}

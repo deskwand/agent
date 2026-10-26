@@ -188,7 +188,7 @@ export function SudoPasswordDialog({ request }: SudoPasswordDialogProps) {
             variant="ghost"
             type="button"
             onClick={handleCancel}
-            className="h-auto flex-1 gap-2 rounded-lg bg-card px-3 py-1.5 text-sm font-normal text-foreground hover:bg-accent hover:text-foreground"
+            className="h-auto flex-1 gap-2 rounded-lg bg-card px-3 py-1.5 text-sm font-normal text-foreground hover:bg-hover-surface hover:text-foreground"
           >
             <X className="w-4 h-4" />
             {t("sudo.cancel")}

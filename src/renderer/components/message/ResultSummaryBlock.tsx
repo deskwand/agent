@@ -131,7 +131,7 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
           <Button
             variant="ghost"
             type="button"
-            className={`group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] transition-colors hover:bg-accent/40 ${
+            className={`group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] transition-colors hover:bg-hover-surface ${
               highlighted ? "ring-2 ring-primary/40" : ""
             }`}
           >

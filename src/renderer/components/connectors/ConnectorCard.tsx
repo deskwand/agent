@@ -195,7 +195,7 @@ export function ConnectorCard({
 
   // grid：发现视图。名称与动作同一行，说明与状态在内容列里各占一行。
   return (
-    <div className="bg-card border border-border/60 rounded-container p-3.5 flex gap-2.5 shadow-card hover:bg-accent">
+    <div className="bg-card border border-border/60 rounded-container p-3.5 flex gap-2.5 shadow-card hover:bg-hover-surface">
       {/* 三分支头像。白底只给厂商 logo（厂商只发布浅底版图）；另两支画的是 text-primary-text，
           深色主题的 accent 放白底上只有 1.86–3.16:1，所以留着 bg-primary/10。
           24px 是内缩 4px 后的图形区；六个图标都是 24×24 viewBox，所以 w-6 h-6 够用。 */}
@@ -262,7 +262,7 @@ function renderAction(
   const primary =
     "h-auto px-2.5 py-1 text-xs rounded-control bg-primary text-white hover:bg-primary/90 transition-colors whitespace-nowrap shadow-none";
   const ghost =
-    "px-2.5 py-1 text-xs rounded-control border border-border text-foreground hover:bg-accent hover:text-foreground transition-colors whitespace-nowrap";
+    "px-2.5 py-1 text-xs rounded-control border border-border text-foreground hover:bg-hover-surface hover:text-foreground transition-colors whitespace-nowrap";
 
   // **邮箱的动作是账号级的**：所有邮箱条目共用 `serverName: "Mail"`，
   // 走 registry 的「移除」会把整台 Mail server（连同其它邮箱）一起删掉。

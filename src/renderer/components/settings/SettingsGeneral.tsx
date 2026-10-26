@@ -144,7 +144,7 @@ export function SettingsGeneral() {
                   <ToggleGroupItem
                     key={option.value}
                     value={option.value}
-                    className="h-auto min-w-0 rounded-none px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=on]:bg-accent data-[state=on]:text-foreground"
+                    className="h-auto min-w-0 rounded-none px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground data-[state=on]:bg-selected-surface data-[state=on]:text-foreground"
                   >
                     {option.label}
                   </ToggleGroupItem>

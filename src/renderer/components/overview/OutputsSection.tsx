@@ -45,7 +45,7 @@ export function OutputsSection() {
             onClick={() => {
               void openArtifact(item.path, item.label);
             }}
-            className="flex w-full items-center gap-2 rounded px-1 py-1 text-left hover:bg-accent"
+            className="flex w-full items-center gap-2 rounded px-1 py-1 text-left hover:bg-hover-surface"
           >
             <FileTypeIcon kind={getFileKind(item.path)} size={14} />
             <span className="min-w-0 flex-1 truncate text-xs text-foreground">
@@ -64,7 +64,7 @@ export function OutputsSection() {
           type="button"
           aria-label={t("overview.outputs.showMore")}
           onClick={() => setExpanded(true)}
-          className="w-full rounded px-1 py-1 text-left text-[11px] text-muted-foreground hover:bg-accent"
+          className="w-full rounded px-1 py-1 text-left text-[11px] text-muted-foreground hover:bg-hover-surface"
         >
           {t("overview.outputs.showMore", { count: hiddenCount })}
         </button>
@@ -73,7 +73,7 @@ export function OutputsSection() {
         <button
           type="button"
           onClick={() => setExpanded(false)}
-          className="w-full rounded px-1 py-1 text-left text-[11px] text-muted-foreground hover:bg-accent"
+          className="w-full rounded px-1 py-1 text-left text-[11px] text-muted-foreground hover:bg-hover-surface"
         >
           {t("overview.outputs.showLess")}
         </button>

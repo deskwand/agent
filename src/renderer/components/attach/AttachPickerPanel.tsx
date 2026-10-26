@@ -234,8 +234,8 @@ export function AttachPickerPanel({
                   added
                     ? "cursor-default opacity-50"
                     : index === highlight
-                      ? "bg-accent"
-                      : "hover:bg-accent"
+                      ? "bg-selected-surface"
+                      : "hover:bg-hover-surface"
                 }`}
               >
                 <span className="w-4 shrink-0">

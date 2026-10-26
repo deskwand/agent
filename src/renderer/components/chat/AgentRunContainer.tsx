@@ -49,7 +49,7 @@ export function AgentRunContainer({
     <div className="border rounded-lg my-2 bg-muted/30">
       {/* 标题栏 */}
       <Button variant="ghost"
-        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 rounded-t-lg"
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-hover-surface rounded-t-lg"
         onClick={() => setCollapsed((v) => !v)}
       >
         {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}

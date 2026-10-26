@@ -100,9 +100,9 @@ describe("MENU_ITEM_CLASS", () => {
 
   it("四个状态类的取值就是契约本身", () => {
     expect(MENU_ITEM_DEFAULT_CLASS).toBe(
-      "text-foreground hover:bg-accent",
+      "text-foreground hover:bg-hover-surface",
     );
-    expect(MENU_ITEM_SELECTED_CLASS).toBe("text-foreground bg-accent");
+    expect(MENU_ITEM_SELECTED_CLASS).toBe("text-foreground bg-selected-surface");
     expect(MENU_ITEM_DANGER_CLASS).toBe("text-destructive hover:bg-destructive/10");
     expect(MENU_ITEM_DISABLED_CLASS).toBe(
       "cursor-not-allowed text-muted-foreground opacity-50",

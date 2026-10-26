@@ -132,7 +132,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
         <div className="mt-6 flex items-center gap-3">
           <Button variant="ghost"
             onClick={() => respondToPermission(permission.toolUseId, "deny")}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-card px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent h-auto"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-card px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-hover-surface h-auto"
           >
             <X className="w-4 h-4" />
             {t("permission.deny")}
@@ -166,7 +166,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
                 respondToPermission(permission.toolUseId, "allow_always");
               }
             }}
-            className="w-full mt-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent h-auto"
+            className="w-full mt-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-hover-surface h-auto"
           >
             {t("permission.alwaysAllow")}
           </Button>
@@ -178,7 +178,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
             <div className="flex gap-2">
               <Button variant="ghost"
                 onClick={() => setPendingAlwaysAllow(false)}
-                className="flex-1 rounded-lg bg-card px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent h-auto"
+                className="flex-1 rounded-lg bg-card px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-hover-surface h-auto"
               >
                 {t("permission.deny")}
               </Button>

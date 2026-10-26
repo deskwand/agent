@@ -250,7 +250,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
               className={`group flex min-w-0 max-w-[180px] shrink-0 items-center gap-1 self-center rounded-lg pl-2 pr-1 py-1 transition-colors ${
                 isActive
                   ? "bg-card text-foreground"
-                  : "text-muted-foreground hover:bg-accent"
+                  : "text-muted-foreground hover:bg-hover-surface"
               }`}
             >
               <TabIcon className="h-3.5 w-3.5 shrink-0" />
@@ -267,7 +267,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
                 data-testid="preview-tab-close"
                 aria-label={t("common.close")}
                 onClick={() => closePreviewTab(item.path)}
-                className={`shrink-0 rounded-md p-0.5 transition-colors hover:bg-accent focus-visible:opacity-100 ${
+                className={`shrink-0 rounded-md p-0.5 transition-colors hover:bg-hover-surface focus-visible:opacity-100 ${
                   isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}
               >
@@ -289,7 +289,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
         <Button variant="ghost"
           type="button"
           onClick={handleOpenExternal}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground h-auto"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground h-auto"
         >
           <ExternalLink className="h-3.5 w-3.5" />
           {t("filePreview.openExternal")}

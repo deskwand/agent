@@ -83,7 +83,7 @@ export function VoiceModeOverlay({
           data-testid="voice-minimize"
           onClick={onMinimize}
           aria-label={t("voiceMode.minimize")}
-          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground"
         >
           <Minus className="h-4 w-4" />
         </Button>
@@ -93,7 +93,7 @@ export function VoiceModeOverlay({
           data-testid="voice-close"
           onClick={onClose}
           aria-label={t("voiceMode.exit")}
-          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground"
         >
           <X className="h-4 w-4" />
         </Button>

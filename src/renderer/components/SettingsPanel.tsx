@@ -245,7 +245,7 @@ export function SettingsPanel({
             type="button"
             onClick={onClose}
             aria-label={t("common.back")}
-            className="p-1.5 -ml-1.5 rounded-lg hover:bg-accent transition-colors h-auto"
+            className="p-1.5 -ml-1.5 rounded-lg hover:bg-hover-surface transition-colors h-auto"
           >
             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </Button>
@@ -289,7 +289,7 @@ export function SettingsPanel({
                       } ${
                         active
                           ? "bg-card font-medium text-foreground"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                          : "text-muted-foreground hover:bg-hover-surface hover:text-foreground"
                       }`}
                     >
                       <tab.icon className="h-4 w-4 flex-shrink-0" />

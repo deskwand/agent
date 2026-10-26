@@ -71,7 +71,7 @@ export function ArtifactPanel() {
                 <div
                   key={artifact.path || artifact.label || `artifact-${index}`}
                   className={`group flex items-center gap-2.5 px-4 py-2 transition-colors ${
-                    canClick ? "hover:bg-accent" : ""
+                    canClick ? "hover:bg-hover-surface" : ""
                   }`}
                   onClick={() => {
                     if (!canClick) return;

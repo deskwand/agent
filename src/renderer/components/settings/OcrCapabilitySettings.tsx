@@ -88,7 +88,7 @@ export function OcrCapabilitySettings() {
                 aria-label={t("settings.capabilities.ocr.remove")}
                 disabled={removing}
                 onClick={() => void remove()}
-                className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 h-auto"
+                className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground disabled:opacity-50 h-auto"
               >
                 {t("settings.capabilities.install.delete")}
               </Button>

@@ -133,7 +133,7 @@ export function CommonProviderSetupsCard({
                   <Button variant="ghost"
                     type="button"
                     onClick={() => onApplySetup(setup.id)}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent h-auto"
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-hover-surface h-auto"
                   >
                     {t("api.guidance.apply")}
                   </Button>

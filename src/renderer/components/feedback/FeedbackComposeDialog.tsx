@@ -86,7 +86,7 @@ export function FeedbackComposeDialog({
               className={cn(
                 "flex-1 rounded-control px-2 py-1.5 text-xs transition-colors",
                 type === value
-                  ? "bg-accent text-foreground"
+                  ? "bg-selected-surface text-foreground"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >

@@ -712,7 +712,7 @@ export function VaultView(): JSX.Element {
             type="button"
             onClick={() => setActiveView("chat")}
             aria-label={t("common.back")}
-            className="p-1.5 -ml-1.5 rounded-lg hover:bg-accent transition-colors"
+            className="p-1.5 -ml-1.5 rounded-lg hover:bg-hover-surface transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -738,7 +738,7 @@ export function VaultView(): JSX.Element {
               <button
                 type="button"
                 aria-label={syncActionLabel}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => void handleSync()}
                 disabled={syncDisabled}
               >
@@ -791,7 +791,7 @@ export function VaultView(): JSX.Element {
                         type="button"
                         aria-label={t("vault.menu.more")}
                         disabled={busy}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <MoreHorizontal className="h-4 w-4" />
                       </button>
@@ -903,7 +903,7 @@ export function VaultView(): JSX.Element {
                 <span className="flex-1" />
                 <button
                   type="button"
-                  className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-accent"
+                  className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-hover-surface"
                   onClick={() => setSelectedSkills(new Set())}
                 >
                   {t("vault.skills.clearSelection")}
@@ -948,7 +948,7 @@ export function VaultView(): JSX.Element {
                   <button
                     type="button"
                     disabled={busy}
-                    className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-hover-surface disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => setPendingLinkConfirm(null)}
                   >
                     {t("vault.skills.cancelAdd")}
@@ -1079,7 +1079,7 @@ export function VaultView(): JSX.Element {
                               aria-label={t("vault.skills.delete", {
                                 name: skill.name,
                               })}
-                              className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
+                              className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-hover-surface hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
                               onClick={() =>
                                 setPendingConfirmation({
                                   kind: "delete-skill",
@@ -1182,7 +1182,7 @@ export function VaultView(): JSX.Element {
                             aria-label={t("vault.action.export", {
                               name: item.path,
                             })}
-                            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-hover-surface hover:text-foreground"
                             onClick={(event) => {
                               if (event.detail > 1) return;
                               void runAction(() =>
@@ -1206,7 +1206,7 @@ export function VaultView(): JSX.Element {
                                 aria-label={t("vault.action.more", {
                                   name: item.path,
                                 })}
-                                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-hover-surface hover:text-foreground"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
                               </button>

@@ -154,7 +154,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({
       <CollapsibleTrigger asChild>
         <Button
           variant="ghost"
-          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
+          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
         >
           {block.isError ? (
             <XCircle className="w-3.5 h-3.5 pt-0.5 text-muted-foreground flex-shrink-0" />

@@ -93,7 +93,9 @@ describe("SegmentedToggle", () => {
     // 官方 ToggleGroup 本身就没有灰底导轨（只有 flex + gap），这条继续成立
     expect(group().className).not.toMatch(/(?:^|\s)bg-muted(?:\s|$)/);
     // 选中态来自 ui/toggle.tsx 的官方 base
-    expect(item("7 天").className).toContain("data-[state=on]:bg-accent");
+    expect(item("7 天").className).toContain(
+      "data-[state=on]:bg-selected-surface",
+    );
     // 调用点不得再手写尺寸档或自造 hover（曾经是 h-8 px-2 text-xs + data-[state=off]:hover:bg-muted/60）
     expect(item("7 天").className).not.toContain(
       "data-[state=off]:hover:bg-muted/60",

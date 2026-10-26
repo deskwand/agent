@@ -22,7 +22,7 @@ import { TitlebarButton } from "./TitlebarButton";
 import { Button } from "./app-button";
 
 const CONTROL_CLASS =
-  "flex shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40";
+  "flex shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground disabled:opacity-40";
 
 export function FeedListenButton(): JSX.Element | null {
   const { t } = useTranslation();

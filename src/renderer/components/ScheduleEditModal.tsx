@@ -203,7 +203,7 @@ export function ScheduleEditModal({
               variant="ghost"
               type="button"
               aria-label={t("common.close")}
-              className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors h-auto"
+              className="p-1 rounded-md hover:bg-hover-surface text-muted-foreground transition-colors h-auto"
             >
               <X size={16} />
             </Button>
@@ -237,7 +237,7 @@ export function ScheduleEditModal({
                 variant="ghost"
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-accent transition-colors h-auto"
+                className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-hover-surface transition-colors h-auto"
               >
                 {t("common.cancel")}
               </Button>
@@ -419,7 +419,7 @@ export function ScheduleEditModal({
                             className={`px-2 py-1 text-xs rounded-md border transition-colors ${
                               active
                                 ? "bg-primary/10 border-primary/30 text-primary-text font-medium"
-                                : "border-border text-muted-foreground hover:bg-accent"
+                                : "border-border text-muted-foreground hover:bg-hover-surface"
                             }`}
                           >
                             {t(wd.labelKey)}
@@ -479,7 +479,7 @@ export function ScheduleEditModal({
                   variant="ghost"
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-accent transition-colors h-auto"
+                  className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-hover-surface transition-colors h-auto"
                 >
                   {t("common.cancel")}
                 </Button>
@@ -649,7 +649,7 @@ function TimePicker({
           variant="ghost"
           type="button"
           onClick={addCustom}
-          className="px-3 py-1 text-xs font-medium rounded-md bg-muted border border-border text-muted-foreground hover:bg-accent transition-colors h-auto"
+          className="px-3 py-1 text-xs font-medium rounded-md bg-muted border border-border text-muted-foreground hover:bg-selected-surface transition-colors h-auto"
         >
           {label}
         </Button>
@@ -663,7 +663,7 @@ function TimePicker({
               key={time}
               type="button"
               onClick={() => toggle(time)}
-              className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-accent ${isSelected ? "text-primary-text bg-primary/5" : "text-muted-foreground"}`}
+              className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-hover-surface ${isSelected ? "text-primary-text bg-primary/5" : "text-muted-foreground"}`}
             >
               <span>{time}</span>
               {isSelected && (

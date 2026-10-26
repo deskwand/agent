@@ -87,7 +87,9 @@ export function StatusPopover({
             // Chromium + 构建 CSS 实测 16px，写回后 20px == 迁移前的原生 `<button>`（`67889f23^`）。
             // 这个触发器里只有环一个 svg，所以 `size-5` 不会误伤别处。
             className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-2xl border border-border/40 transition-colors [&_svg]:size-5 ${
-              open ? "bg-accent" : "bg-background/60 hover:bg-accent"
+              open
+                ? "bg-selected-surface"
+                : "bg-background/60 hover:bg-hover-surface"
             }`}
           >
             <svg

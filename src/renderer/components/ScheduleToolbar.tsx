@@ -58,7 +58,7 @@ export function ScheduleToolbar({
           variant="ghost"
           type="button"
           onClick={onToday}
-          className="px-3 py-1 text-xs font-medium rounded-md border border-border hover:bg-accent text-muted-foreground transition-colors h-auto"
+          className="px-3 py-1 text-xs font-medium rounded-md border border-border hover:bg-hover-surface text-muted-foreground transition-colors h-auto"
         >
           {t("schedule.today")}
         </Button>
@@ -66,7 +66,7 @@ export function ScheduleToolbar({
           variant="ghost"
           type="button"
           onClick={onNavigatePrev}
-          className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors h-auto"
+          className="p-1 rounded-md hover:bg-hover-surface text-muted-foreground transition-colors h-auto"
           aria-label={t("schedule.toolbarPrev")}
         >
           <ChevronLeft size={16} />
@@ -75,7 +75,7 @@ export function ScheduleToolbar({
           variant="ghost"
           type="button"
           onClick={onNavigateNext}
-          className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors h-auto"
+          className="p-1 rounded-md hover:bg-hover-surface text-muted-foreground transition-colors h-auto"
           aria-label={t("schedule.toolbarNext")}
         >
           <ChevronRight size={16} />

@@ -159,7 +159,7 @@ export function MailAccountDialog({
                       setProviderId(p.id);
                       setError("");
                     }}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-left hover:bg-accent transition-colors"
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-left hover:bg-hover-surface transition-colors"
                   >
                     {/* 有厂商图标就画图标（厂商只发布浅底版 logo，必须白底）；
                         没有的仍画预设表里的字母标记。 */}
@@ -187,7 +187,7 @@ export function MailAccountDialog({
               <Button variant="ghost"
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-accent transition-colors h-auto"
+                className="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-hover-surface transition-colors h-auto"
               >
                 {t("common.cancel")}
               </Button>
@@ -204,7 +204,7 @@ export function MailAccountDialog({
                   setProviderId(null);
                   setError("");
                 }}
-                className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent h-auto"
+                className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-hover-surface h-auto"
               >
                 <ArrowLeft className="h-4 w-4 text-muted-foreground" />
               </Button>
@@ -303,7 +303,7 @@ export function MailAccountDialog({
               <Button variant="ghost"
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-accent transition-colors h-auto"
+                className="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-hover-surface transition-colors h-auto"
               >
                 {t("common.cancel")}
               </Button>

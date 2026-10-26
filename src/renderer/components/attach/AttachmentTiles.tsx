@@ -97,7 +97,7 @@ export function AttachmentTiles({ tiles }: { tiles: AttachmentTile[] }) {
               <Button variant="ghost"
                 type="button"
                 onClick={tile.onOpen}
-                className="flex h-full w-full flex-col items-start justify-between gap-1 p-2 text-left transition-colors hover:bg-accent"
+                className="flex h-full w-full flex-col items-start justify-between gap-1 p-2 text-left transition-colors hover:bg-hover-surface"
               >
                 <MousePointerSquareDashed className="h-4 w-4 text-muted-foreground" />
                 <span className="line-clamp-2 break-all text-xs font-medium text-foreground">
@@ -122,7 +122,7 @@ export function AttachmentTiles({ tiles }: { tiles: AttachmentTile[] }) {
             key={tile.key}
             title={tile.hint}
             onClick={tile.onOpen}
-            className={`${TILE_CLASS} flex flex-col items-center justify-center bg-muted px-2${tile.onOpen ? " hover:bg-accent" : ""}`}
+            className={`${TILE_CLASS} flex flex-col items-center justify-center bg-muted px-2${tile.onOpen ? " hover:bg-selected-surface" : ""}`}
           >
             <FileText
               className="h-6 w-6 shrink-0 text-muted-foreground"

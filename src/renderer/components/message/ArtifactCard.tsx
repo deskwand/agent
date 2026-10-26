@@ -358,7 +358,7 @@ export const ArtifactCard = memo(function ArtifactCard({
             return (
               <div
                 key={key}
-                className="flex items-center justify-between rounded-xl border border-border/40 px-3 py-2 transition-colors hover:bg-accent/50"
+                className="flex items-center justify-between rounded-xl border border-border/40 px-3 py-2 transition-colors hover:bg-hover-surface"
                 onClick={() => void handleClickVideo(ref)}
                 role="button"
                 tabIndex={0}
@@ -412,7 +412,9 @@ export const ArtifactCard = memo(function ArtifactCard({
                  ⇒ 单行 56px / 四行 242px（原 72 / 312，已经贴住 max-h-[320px] 才出滚动条）。
                */
               className={`flex items-center justify-between rounded-xl border border-border/40 px-3 py-2 transition-colors outline-none ${
-                reverted ? "cursor-default opacity-50" : "hover:bg-accent/50"
+                reverted
+                  ? "cursor-default opacity-50"
+                  : "hover:bg-hover-surface"
               }`}
               onClick={() => handleClickFile(file)}
               onKeyDown={(e) => {
@@ -488,7 +490,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                     <Button
                       variant="ghost"
                       type="button"
-                      className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-muted-foreground h-auto"
+                      className="rounded-md p-1 text-muted-foreground hover:bg-hover-surface hover:text-muted-foreground h-auto"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!reverted) handleCopyPath(resolvePath(file.path));

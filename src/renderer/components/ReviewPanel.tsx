@@ -325,7 +325,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
             size="iconXs"
             onClick={loadDiffFiles}
             aria-label={t("reviewPanel.refresh")}
-            className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors ml-2"
+            className="rounded flex items-center justify-center hover:bg-hover-surface text-muted-foreground hover:text-foreground transition-colors ml-2"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${loadingFiles ? "animate-spin" : ""}`}
@@ -348,7 +348,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
             }
             size="iconXs"
             aria-label={viewModeLabel}
-            className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="rounded flex items-center justify-center hover:bg-hover-surface text-muted-foreground hover:text-foreground transition-colors"
           >
             <Columns2 className="w-3.5 h-3.5" />
           </Button>
@@ -362,7 +362,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
             size="iconSm"
             onClick={() => setIsFullscreen((f) => !f)}
             aria-label={fullscreenLabel}
-            className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="rounded flex items-center justify-center hover:bg-hover-surface text-muted-foreground hover:text-foreground transition-colors"
           >
             {isFullscreen ? (
               <Minimize2 className="w-4 h-4" />
@@ -379,7 +379,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
             size="iconSm"
             onClick={handleClose}
             aria-label={t("common.close")}
-            className="rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="rounded flex items-center justify-center hover:bg-hover-surface text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-4 h-4" />
           </Button>
@@ -466,8 +466,10 @@ function renderFileList(
         <Button variant="ghost"
           key={file.path}
           onClick={() => loadFileDiff(file.path)}
-          className={`w-full text-left px-3 py-1.5 hover:bg-accent transition-colors ${
-            selectedFile === file.path ? "bg-accent" : ""
+          className={`w-full text-left px-3 py-1.5 transition-colors ${
+            selectedFile === file.path
+              ? "bg-selected-surface"
+              : "hover:bg-hover-surface"
           }`}
         >
           <div className="flex items-center gap-1.5 min-w-0">

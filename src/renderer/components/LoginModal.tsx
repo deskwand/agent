@@ -240,7 +240,7 @@ export function LoginModal({
           <Button variant="ghost"
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-background hover:bg-accent border border-border text-foreground text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 h-auto"
+            className="w-full py-2.5 rounded-lg bg-background hover:bg-hover-surface border border-border text-foreground text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 h-auto"
           >
             <GoogleIcon />
             {t("auth.googleLogin")}
@@ -363,7 +363,7 @@ export function LoginModal({
             <Button variant="ghost"
               onClick={handleSendCode}
               disabled={loading || countdown > 0}
-              className="w-full py-2.5 rounded-lg text-muted-foreground hover:bg-accent text-sm transition-colors disabled:opacity-50"
+              className="w-full py-2.5 rounded-lg text-muted-foreground hover:bg-hover-surface text-sm transition-colors disabled:opacity-50"
             >
               {countdown > 0 ? `${countdown}s` : t("auth.resendCode")}
             </Button>

@@ -237,7 +237,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                 onClick={handleClose}
                 className={`w-full py-2.5 px-4 rounded-xl font-medium transition-colors ${
                   isMac
-                    ? "bg-card hover:bg-muted text-foreground border border-border"
+                    ? "bg-card hover:bg-hover-surface text-foreground border border-border"
                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
                 }`}
               >

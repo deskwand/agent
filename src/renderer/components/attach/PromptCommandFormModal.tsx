@@ -247,7 +247,7 @@ export function PromptCommandFormModal({
                 data-skill-trigger
                 aria-label={t("chat.commandInsertSkillHint")}
                 onClick={() => void openSkillList()}
-                className="inline-flex h-6 items-center gap-1 rounded-lg border border-border bg-card px-2 text-[11.5px] text-foreground transition-colors hover:bg-accent"
+                className="inline-flex h-6 items-center gap-1 rounded-lg border border-border bg-card px-2 text-[11.5px] text-foreground transition-colors hover:bg-hover-surface"
               >
                 <Plus className="h-3 w-3" />
                 {t("chat.commandInsertSkill")}
@@ -279,7 +279,7 @@ export function PromptCommandFormModal({
                       type="button"
                       data-skill-option={skill.name}
                       onClick={() => insertSkillReference(skill.name)}
-                      className="flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-accent h-auto"
+                      className="flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-hover-surface h-auto"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] text-foreground">
@@ -352,7 +352,7 @@ export function PromptCommandFormModal({
           <Button variant="ghost"
             type="button"
             onClick={onClose}
-            className="h-9 rounded-xl border border-border px-4 text-sm text-foreground transition-colors hover:bg-accent"
+            className="h-9 rounded-xl border border-border px-4 text-sm text-foreground transition-colors hover:bg-hover-surface"
           >
             {t("common.cancel")}
           </Button>

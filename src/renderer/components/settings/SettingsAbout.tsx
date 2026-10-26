@@ -153,7 +153,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
                 variant="ghost"
                 onClick={handleCheckUpdate}
                 className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-lg
-                  bg-card text-muted-foreground hover:bg-accent
+                  bg-card text-muted-foreground hover:bg-hover-surface
                   ring-1 ring-border-subtle hover:ring-border-muted
                   transition-all duration-150 h-auto"
               >
@@ -167,7 +167,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
                 variant="ghost"
                 onClick={handleCheckUpdate}
                 className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-lg
-                  bg-card text-muted-foreground hover:bg-accent
+                  bg-card text-muted-foreground hover:bg-hover-surface
                   ring-1 ring-border-subtle hover:ring-border-muted
                   transition-all duration-150 h-auto"
               >

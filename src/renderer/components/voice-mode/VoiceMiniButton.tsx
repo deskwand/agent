@@ -35,7 +35,7 @@ import { Button } from "../app-button";
 
 /** 卡片里那一行控件的统一样式。 */
 const CARD_CONTROL_CLASS =
-  "flex shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+  "flex shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground";
 
 export function VoiceMiniButton(): JSX.Element | null {
   const { t } = useTranslation();

@@ -110,7 +110,7 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
       <CollapsibleTrigger asChild>
         <Button
           variant="ghost"
-          className="w-full px-4 py-3 flex items-center gap-3 bg-muted hover:bg-accent transition-colors h-auto"
+          className="w-full px-4 py-3 flex items-center gap-3 bg-muted hover:bg-selected-surface transition-colors h-auto"
         >
           <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
             <ListTodo className="w-3.5 h-3.5 text-primary-text" />

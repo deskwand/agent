@@ -196,7 +196,7 @@ describe("AppRail 点击路由", () => {
     expect(buttonOrNull("sidebar.vault")).toBeNull();
     expect(
       container.querySelector('button[aria-label="navRail.more"]')!.className,
-    ).toContain("bg-accent text-primary-text");
+    ).toContain("bg-selected-surface text-primary-text");
   });
 
   it("固定之后高亮回到栏上那一格，「更多」不再高亮（D5）", async () => {
@@ -208,7 +208,7 @@ describe("AppRail 点击路由", () => {
     );
     expect(
       container.querySelector('button[aria-label="navRail.more"]')!.className,
-    ).not.toContain("bg-accent text-primary-text");
+    ).not.toContain("bg-selected-surface text-primary-text");
   });
 
   it("固定之后细线恰好在「更多」下方、固定项之上", async () => {

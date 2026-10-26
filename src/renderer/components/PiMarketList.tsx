@@ -165,7 +165,7 @@ export function PiMarketList({
             <Button
               variant="ghost"
               type="button"
-              className="rounded-lg border border-border bg-card px-3 py-1 text-sm text-foreground hover:bg-accent h-auto"
+              className="rounded-lg border border-border bg-card px-3 py-1 text-sm text-foreground hover:bg-hover-surface h-auto"
               onClick={retry}
             >
               {t("piExtensions.marketRetry")}
@@ -188,9 +188,10 @@ export function PiMarketList({
                       type="button"
                       onClick={() => onSelect(pkg)}
                       // shadcn 条目惯例（与 ui/dropdown-menu.tsx 的条目同源）：
-                      // 选中态用 accent 底色表达，靠 data-[selected=true] 而不是自造左竖条。
+                      // 选中态用 selected-surface 底色表达，靠 data-[selected=true] 而不是自造左竖条。
+                      // 不要再叠 data-[selected=true]:hover:*：那会把选中态在悬停时降级成 hover 一档。
                       data-selected={selected}
-                      className="flex w-full flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-accent/50 data-[selected=true]:bg-accent data-[selected=true]:hover:bg-accent"
+                      className="flex w-full flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-hover-surface data-[selected=true]:bg-selected-surface"
                     >
                       <span className="flex w-full min-w-0 items-center gap-2">
                         <span className="min-w-0 truncate text-sm font-semibold text-foreground">

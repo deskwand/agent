@@ -55,7 +55,7 @@ export function ChangesSection({
         type="button"
         onClick={openReview}
         aria-label={t("overview.changes.open")}
-        className="w-full rounded px-1 py-1 text-left hover:bg-accent"
+        className="w-full rounded px-1 py-1 text-left hover:bg-hover-surface"
       >
         <span className="flex items-baseline gap-2">
           <span className="text-sm font-medium tabular-nums text-success">

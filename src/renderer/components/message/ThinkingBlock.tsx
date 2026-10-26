@@ -42,7 +42,7 @@ export const ThinkingBlock = memo(function ThinkingBlock({
       <CollapsibleTrigger asChild>
         <Button
           variant="ghost"
-          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
+          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
         >
           <Brain className="w-3.5 h-3.5 flex-shrink-0 pt-0.5 text-muted-foreground" />
           <div className="min-w-0 flex flex-1 items-baseline gap-x-1 overflow-hidden">

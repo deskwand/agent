@@ -456,7 +456,7 @@ export function AttachMenu({
                 type="button"
                 data-attach-trigger
                 aria-label={t("attachMenu.label")}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -610,7 +610,7 @@ export function AttachMenu({
                             ?.focus();
                         });
                       }}
-                      className={`flex flex-none items-center justify-center rounded-md transition-colors hover:bg-accent ${
+                      className={`flex flex-none items-center justify-center rounded-md transition-colors hover:bg-hover-surface ${
                         pinned ? "text-primary-text" : "text-muted-foreground"
                       }`}
                     >
@@ -721,7 +721,7 @@ export function AttachMenu({
                     aria-label={t("common.edit")}
                     onClick={() => void openEditForm(row.name)}
                     size="iconXs"
-                    className="hidden shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground group-hover:flex group-focus-within:flex"
+                    className="hidden shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-hover-surface hover:text-foreground group-hover:flex group-focus-within:flex"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>

@@ -573,7 +573,7 @@ describe("Sidebar session completion", () => {
     // 成员资格不取决于「谁开着」：它还在组里，没被搬到主排去
     expect(completedGroupHeader(1), "组头还在").toBeTruthy();
     expect(sessionRow("s1"), "行还在组里").toBeTruthy();
-    expect(sessionRow("s1").className).toContain("bg-accent");
+    expect(sessionRow("s1").className).toContain("bg-selected-surface");
   });
 
   // 谓词第三条当年要守的那条需求 —— 行不能从眼前消失 —— 得由别的东西接手：
@@ -597,6 +597,6 @@ describe("Sidebar session completion", () => {
     // 它沉下去了，但组替它开着 ⇒ 仍然可见、仍然高亮
     expect(header?.getAttribute("aria-expanded")).toBe("true");
     expect(sessionRow("s1")).toBeTruthy();
-    expect(sessionRow("s1").className).toContain("bg-accent");
+    expect(sessionRow("s1").className).toContain("bg-selected-surface");
   });
 });

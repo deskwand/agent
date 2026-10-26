@@ -343,7 +343,7 @@ export function SettingsSelect<T extends string>({
             setOpen(true);
           }}
           aria-label={label}
-          className="inline-flex items-center gap-1.5 rounded-control border border-border bg-card px-2.5 py-1 text-xs text-foreground outline-none hover:bg-accent disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-control border border-border bg-card px-2.5 py-1 text-xs text-foreground outline-none hover:bg-hover-surface disabled:opacity-50"
         >
           {current?.swatch}
           <span className="whitespace-nowrap">{current?.label ?? value}</span>
@@ -605,7 +605,7 @@ export function SettingsFormSelect<T extends string>({
           data-testid={testId}
           disabled={disabled}
           aria-label={label}
-          className={`flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 text-left text-sm text-foreground outline-none hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 ${triggerClassName ?? "w-full"}`}
+          className={`flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 text-left text-sm text-foreground outline-none hover:bg-hover-surface disabled:cursor-not-allowed disabled:opacity-60 ${triggerClassName ?? "w-full"}`}
         >
           <span className="truncate">
             {current?.label ?? placeholder ?? value}

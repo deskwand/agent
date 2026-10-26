@@ -1179,7 +1179,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                       variant="ghost"
                       onClick={handleRefreshMarketplace}
                       disabled={marketplaceLoading}
-                      className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                      className="p-1 rounded-md hover:bg-hover-surface text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                       aria-label={t("skillMarket.refresh")}
                     >
                       <RefreshCw
@@ -1269,7 +1269,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                         variant="ghost"
                         onClick={loadMoreMarketplace}
                         disabled={marketplaceLoading}
-                        className="px-4 py-2 rounded-lg bg-muted text-sm text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50 h-auto"
+                        className="px-4 py-2 rounded-lg bg-muted text-sm text-muted-foreground hover:bg-selected-surface transition-colors disabled:opacity-50 h-auto"
                       >
                         {marketplaceLoading ? "..." : t("skillMarket.loadMore")}
                       </Button>
@@ -1390,7 +1390,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                                     variant="ghost"
                                     onClick={() => handleUnshare(skill.name)}
                                     aria-label={t("skillMarket.unshare")}
-                                    className="p-0.5 rounded hover:bg-accent hover:text-destructive transition-colors h-auto"
+                                    className="p-0.5 rounded hover:bg-hover-surface hover:text-destructive transition-colors h-auto"
                                   >
                                     <X className="w-3 h-3" />
                                   </Button>

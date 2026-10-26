@@ -266,7 +266,7 @@ export default function ApiDiagnosticsPanel({
               disabled={disabled || isRunning}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border
               bg-background text-foreground text-sm font-medium
-              hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed
+              hover:bg-hover-surface disabled:opacity-50 disabled:cursor-not-allowed
               transition-colors h-auto"
             >
               <Cpu className="w-4 h-4" />

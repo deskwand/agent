@@ -64,7 +64,7 @@ export function RemoteFolderPicker({
             <button
               key={entry.name}
               type="button"
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-hover-surface"
               onClick={() =>
                 void load(path ? `${path}/${entry.name}` : `/${entry.name}`)
               }

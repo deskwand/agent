@@ -140,7 +140,7 @@ export function ChatInputBottomBar({
                 type="button"
                 onClick={onToggleExpand}
                 aria-label={expandLabel}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-hover-surface transition-colors"
               >
                 {isExpanded ? (
                   <Minimize2 className="w-4 h-4" />

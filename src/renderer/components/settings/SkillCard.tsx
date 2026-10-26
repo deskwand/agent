@@ -42,7 +42,7 @@ function ToggleButton({
           className={`shrink-0 p-1.5 rounded-md transition-colors ${
             enabled
               ? "bg-success/10 text-success hover:bg-success/20"
-              : "bg-muted text-muted-foreground hover:bg-accent"
+              : "bg-muted text-muted-foreground hover:bg-selected-surface"
           }`}
           aria-label={label}
         >

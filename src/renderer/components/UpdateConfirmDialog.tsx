@@ -104,7 +104,7 @@ export function UpdateConfirmDialog({
         <div className="mt-4 flex items-center gap-2 border-t border-border/60 px-5 py-4">
           <Button variant="ghost"
             onClick={onCancel}
-            className="flex-1 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent h-auto"
+            className="flex-1 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-hover-surface h-auto"
           >
             {t("update.later")}
           </Button>

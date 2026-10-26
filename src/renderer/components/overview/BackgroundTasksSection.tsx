@@ -39,7 +39,7 @@ function TaskRow({
       type="button"
       onClick={onClick}
       title={row.description ?? title}
-      className="flex w-full items-start gap-2 rounded px-1 py-1 text-left hover:bg-accent"
+      className="flex w-full items-start gap-2 rounded px-1 py-1 text-left hover:bg-hover-surface"
     >
       <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
       <span className="min-w-0 flex-1">
@@ -95,7 +95,7 @@ export function BackgroundTasksSection() {
           type="button"
           aria-label={t("overview.tasks.finishedCount")}
           onClick={() => setExpanded((value) => !value)}
-          className="w-full rounded px-1 py-1 text-left text-[11px] text-muted-foreground hover:bg-accent"
+          className="w-full rounded px-1 py-1 text-left text-[11px] text-muted-foreground hover:bg-hover-surface"
         >
           {expanded
             ? t("overview.tasks.showLess")

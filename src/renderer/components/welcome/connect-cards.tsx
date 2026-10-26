@@ -57,7 +57,7 @@ const OAUTH_ROWS: readonly OAuthRow[] = [
 ];
 
 const CARD_CLASS =
-  "flex-1 min-w-[150px] rounded-2xl border border-border/40 bg-card px-4 py-3 text-left transition-colors hover:bg-accent";
+  "flex-1 min-w-[150px] rounded-2xl border border-border/40 bg-card px-4 py-3 text-left transition-colors hover:bg-hover-surface";
 
 function errorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -189,7 +189,7 @@ export function ConnectCards({
                 data-testid={`connect-row-${row.id}`}
                 disabled={pending !== null}
                 onClick={() => void runOAuth(row)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-hover-surface disabled:opacity-40"
               >
                 <span className="truncate">
                   {t(row.labelKey)}
@@ -228,7 +228,7 @@ export function ConnectCards({
                     type="button"
                     data-testid={`connect-row-${plan.profileKey}`}
                     disabled={pending !== null}
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-hover-surface disabled:opacity-40"
                   >
                     <span className="truncate">{plan.name}</span>
                     <span className="ml-auto text-xs text-muted-foreground">

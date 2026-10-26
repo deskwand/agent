@@ -263,7 +263,7 @@ describe("VoiceModeOverlay 跟随主题", () => {
     }
     for (const button of buttons) {
       expect(button.className).toContain("text-muted-foreground");
-      expect(button.className).toContain("hover:bg-accent");
+      expect(button.className).toContain("hover:bg-hover-surface");
       expect(button.className).not.toContain("bg-white/10");
       expect(button.className).toContain("titlebar-no-drag"); // 既有约束，别删
     }

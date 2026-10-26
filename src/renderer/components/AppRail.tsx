@@ -120,8 +120,8 @@ export function AppRail({
             aria-current={isActive ? "page" : undefined}
             className={`${RAIL_BUTTON_CLASS} relative ${
               isActive
-                ? "bg-accent text-primary-text"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                ? "bg-selected-surface text-primary-text"
+                : "text-muted-foreground hover:bg-hover-surface hover:text-foreground"
             }`}
           >
             {Icon ? <Icon className="w-4 h-4" /> : null}
@@ -211,8 +211,8 @@ export function AppRail({
               aria-current={isActive ? "page" : undefined}
               className={`${RAIL_BUTTON_CLASS} relative ${
                 isActive
-                  ? "bg-accent text-primary-text"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  ? "bg-selected-surface text-primary-text"
+                  : "text-muted-foreground hover:bg-hover-surface hover:text-foreground"
               }`}
             >
               {Icon ? <Icon className="w-4 h-4" /> : null}
@@ -260,7 +260,7 @@ export function AppRail({
                   aria-label={t("navRail.newVoiceSession")}
                   disabled={voiceCreating || !onCreateVoiceSession}
                   onClick={onCreateVoiceSession}
-                  className={`${RAIL_BUTTON_CLASS} text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50`}
+                  className={`${RAIL_BUTTON_CLASS} text-muted-foreground hover:bg-hover-surface hover:text-foreground disabled:opacity-50`}
                 >
                   <AudioLines className="w-4 h-4" />
                 </Button>

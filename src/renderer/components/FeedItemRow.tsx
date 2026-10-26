@@ -49,7 +49,7 @@ export function FeedItemRow({
         onOpen(item.id);
       }}
       className={`selectable relative flex items-start gap-3 border-b border-border/40 ${PAGE_INSET_X} py-2.5 ${
-        selected ? "bg-card" : "hover:bg-accent"
+        selected ? "bg-card" : "hover:bg-hover-surface"
       }`}
     >
       {selected ? (

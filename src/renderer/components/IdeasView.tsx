@@ -541,7 +541,7 @@ export function IdeasView(): JSX.Element {
             type="button"
             onClick={() => setActiveView("chat")}
             aria-label={t("common.back")}
-            className="p-1.5 -ml-1.5 rounded-lg hover:bg-accent transition-colors"
+            className="p-1.5 -ml-1.5 rounded-lg hover:bg-hover-surface transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -556,7 +556,7 @@ export function IdeasView(): JSX.Element {
               **列表空的时候它也还在**，所以空态不至于只剩一句 ⌘⇧K 教学。
 
               **形状照抄密库页头部那几颗图标键**（同步 / ⋯ / 高级）：普通 button + `h-9 w-9
-              rounded-2xl text-muted-foreground hover:bg-accent` + `Tooltip side="bottom"`，
+              rounded-2xl text-muted-foreground hover:bg-hover-surface` + `Tooltip side="bottom"`，
               16px 图标。理由有二：
                 1. 那套是这个应用**页头动作的既有语言** —— 页头里从来不放带字的按钮；
                 2. 一屏里两颗带字的按钮（这把 ＋ 与详情区的「交给 AI」）会互相抢，
@@ -572,7 +572,7 @@ export function IdeasView(): JSX.Element {
                   keys: captureShortcutLabel(window.electronAPI?.platform),
                 })}
                 onClick={() => openIdeaCapture()}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground"
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -659,8 +659,8 @@ export function IdeasView(): JSX.Element {
                     }}
                     className={`group flex items-start gap-1.5 rounded-md px-2.5 py-2 ${
                       idea.name === ideasSelectedName
-                        ? "bg-accent"
-                        : "hover:bg-muted"
+                        ? "bg-selected-surface"
+                        : "hover:bg-hover-surface"
                     }`}
                   >
                     <div className="min-w-0 flex-1">
@@ -692,7 +692,7 @@ export function IdeasView(): JSX.Element {
                             : "ideas.restoreNamed",
                           { name: idea.excerpt },
                         )}
-                        className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-accent"
+                        className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-hover-surface"
                         onClick={(event) => {
                           event.stopPropagation();
                           void setStatus(
@@ -713,7 +713,7 @@ export function IdeasView(): JSX.Element {
                         aria-label={t("ideas.removeNamed", {
                           name: idea.excerpt,
                         })}
-                        className="grid h-6 w-6 place-items-center rounded-md text-destructive hover:bg-accent"
+                        className="grid h-6 w-6 place-items-center rounded-md text-destructive hover:bg-hover-surface"
                         onClick={(event) => {
                           event.stopPropagation();
                           // 行内入口：回焦目标不记（Radix 的默认值就是这颗键）

@@ -383,7 +383,7 @@ export function SettingsSandbox() {
               variant="ghost"
               onClick={handleCheckStatus}
               disabled={isChecking || isInstalling !== null}
-              className="px-3 py-1.5 rounded-lg bg-accent text-muted-foreground text-xs hover:bg-accent transition-colors disabled:opacity-50 flex items-center gap-1.5 h-auto"
+              className="px-3 py-1.5 rounded-lg bg-accent text-muted-foreground text-xs hover:bg-selected-surface transition-colors disabled:opacity-50 flex items-center gap-1.5 h-auto"
             >
               {isChecking ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -675,7 +675,7 @@ function StatusItem({
           disabled={action.loading}
           className={`px-2.5 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1 ${
             action.variant === "secondary"
-              ? "bg-muted text-muted-foreground hover:bg-accent"
+              ? "bg-muted text-muted-foreground hover:bg-selected-surface"
               : "bg-primary text-primary-foreground hover:bg-primary/90"
           }`}
         >

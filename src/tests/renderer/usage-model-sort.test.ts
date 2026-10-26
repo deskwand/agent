@@ -134,6 +134,6 @@ describe("by-model table sorting", () => {
     const rows = Array.from(container.querySelectorAll("tbody tr"));
     const totalRow = rows[rows.length - 1] as HTMLElement;
     expect(totalRow.className).toContain("hover:bg-transparent");
-    expect(totalRow.className).not.toContain("hover:bg-muted/50");
+    expect(totalRow.className).not.toContain("hover:bg-hover-surface");
   });
 });

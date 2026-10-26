@@ -2125,7 +2125,7 @@ export function ChatView() {
           type="button"
           onClick={scrollToBottomByButton}
           aria-label="Scroll to bottom"
-          className={`absolute right-5 lg:right-8 bottom-6 z-20 w-10 h-10 rounded-full bg-card text-muted-foreground hover:bg-accent hover:text-foreground shadow-elevated transition-all duration-200 flex items-center justify-center ${
+          className={`absolute right-5 lg:right-8 bottom-6 z-20 w-10 h-10 rounded-full bg-card text-muted-foreground hover:bg-hover-surface hover:text-foreground shadow-elevated transition-all duration-200 flex items-center justify-center ${
             showScrollToBottom
               ? "opacity-100 scale-100 pointer-events-auto"
               : "opacity-0 scale-75 pointer-events-none"
@@ -2165,8 +2165,8 @@ export function ChatView() {
         <div className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-0.5 pb-5`}>
           {activeSession?.kind === "voice" && activeSessionId ? (
             <div className="flex items-center justify-center gap-3 py-3">
-              {/* 主色胶囊：走 default 变体，别用 ghost —— ghost 自带 `hover:bg-accent`
-                  （浅灰的 hover 表面色），它在产物里排在 `.bg-primary` 之后，会把这里
+              {/* 主色胶囊：走 default 变体，别用 ghost —— ghost 自带 `hover:bg-hover-surface`
+                  （当时是近白的官方 `--accent`，现为墨水叠层），它在产物里排在 `.bg-primary` 之后，会把这里
                   的主色底顶掉而文字仍是近白的 `--primary-foreground`（2026-10-10 截图：
                   hover 即 1.03:1）。变体自己管底色/文字/hover，这里只保留胶囊几何，
                   `shadow-none` 是因为原按钮本来没有投影（default 变体自带 `shadow`）。 */}
@@ -2219,7 +2219,7 @@ export function ChatView() {
                   variant="ghost"
                   type="button"
                   onClick={() => setUseTextInput(true)}
-                  className="rounded-2xl px-3 py-2 text-muted-foreground hover:bg-accent h-auto"
+                  className="rounded-2xl px-3 py-2 text-muted-foreground hover:bg-hover-surface h-auto"
                 >
                   {t("voiceMode.useText")}
                 </Button>
