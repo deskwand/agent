@@ -95,23 +95,9 @@ export function buildBackgroundAgentRows(
     // 键序 = 最近更新序（store 写入时先删后插 → 最后写入的在末尾）。面板贴底向上长、
     // 首行在最上方，所以反转一下，让刚触发的那个排在最显眼处。
     .reverse()
-    .map(([toolCallId, activity]) => {
-      const lastStep =
-        activity.current ?? activity.steps[activity.steps.length - 1];
-      const alias = activity.name;
-      const zhLabel =
-        alias && locale.startsWith("zh") ? agentNameZhLabel(alias) : undefined;
-      return {
-        toolCallId,
-        name: zhLabel ?? alias,
-        type: activity.type,
-        description: activity.description,
-        status: activity.status,
-        currentLabel: lastStep ? labelFor(lastStep) : undefined,
-        stepCount: activity.stats.toolUses,
-        durationMs: activity.stats.durationMs,
-      };
-    });
+    .map(([toolCallId, activity]) =>
+      toBackgroundAgentRow(toolCallId, activity, labelFor, locale),
+    );
 
   return [
     ...rows.filter((row) => row.status === "running"),
@@ -120,6 +106,29 @@ export function buildBackgroundAgentRows(
       .filter((row) => row.status !== "running")
       .slice(0, MAX_FINISHED_BACKGROUND_ROWS),
   ];
+}
+
+function toBackgroundAgentRow(
+  toolCallId: string,
+  activity: SubagentActivity,
+  labelFor: (step: SubagentStep) => string,
+  locale: string,
+): BackgroundAgentRow {
+  const lastStep =
+    activity.current ?? activity.steps[activity.steps.length - 1];
+  const alias = activity.name;
+  const zhLabel =
+    alias && locale.startsWith("zh") ? agentNameZhLabel(alias) : undefined;
+  return {
+    toolCallId,
+    name: zhLabel ?? alias,
+    type: activity.type,
+    description: activity.description,
+    status: activity.status,
+    currentLabel: lastStep ? labelFor(lastStep) : undefined,
+    stepCount: activity.stats.toolUses,
+    durationMs: activity.stats.durationMs,
+  };
 }
 
 /** 跳转需要的最小消息结构：ChatView 的 `displayedMessages` 结构性满足它。 */
@@ -240,4 +249,36 @@ export function collectCurrentRoundToolCallIds(
 export function stripUpstreamAgentStats(content: string): string {
   if (!content.startsWith("Agent completed in ")) return content;
   return content.replace(/\s*\(\d+ tool uses[^)]*\)/, "");
+}
+
+export interface OverviewBackgroundTasks {
+  running: BackgroundAgentRow[];
+  finished: BackgroundAgentRow[];
+}
+
+/**
+ * 会话概览「后台任务」的行。
+ *
+ * 与状态栏那份（buildBackgroundAgentRows）的区别只有两条：
+ *   · 收**整个会话**的后台子代理，不按「本轮」过滤；
+ *   · 已结束组不截断 —— 折叠与「显示更多」由 UI 决定。
+ * 标签规则完全共用 toBackgroundAgentRow，避免两处漂移。
+ */
+export function buildOverviewBackgroundTasks(
+  activities: Record<string, SubagentActivity> | undefined,
+  labelFor: (step: SubagentStep) => string,
+  locale: string,
+): OverviewBackgroundTasks {
+  const rows = Object.entries(activities ?? {})
+    .filter(([, activity]) => activity.background === true)
+    // 键序 = 最近更新序（store 先删后插），反转后最近的在最前
+    .reverse()
+    .map(([toolCallId, activity]) =>
+      toBackgroundAgentRow(toolCallId, activity, labelFor, locale),
+    );
+
+  return {
+    running: rows.filter((row) => row.status === "running"),
+    finished: rows.filter((row) => row.status !== "running"),
+  };
 }
