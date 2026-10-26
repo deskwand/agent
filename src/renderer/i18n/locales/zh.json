@@ -2888,5 +2888,50 @@
     },
     "resolve": "标记已解决",
     "reopen": "重新打开"
+  },
+  "overview": {
+    "title": "会话概览",
+    "open": "打开会话概览",
+    "close": "关闭会话概览",
+    "refresh": "刷新",
+    "env": {
+      "title": "环境",
+      "location": "运行位置",
+      "local": "本机",
+      "sandbox": "沙盒",
+      "folder": "目录",
+      "branch": "分支",
+      "notRepo": "不是 git 仓库",
+      "readFailed": "读取失败",
+      "noFolder": "未选择目录"
+    },
+    "context": {
+      "title": "上下文",
+      "used": "{{used}} / {{total}}",
+      "estimated": "估算",
+      "compacting": "压缩中…"
+    },
+    "outputs": {
+      "title": "输出内容",
+      "empty": "本会话还没有产物",
+      "showMore": "显示更多 ({{count}})",
+      "showLess": "收起"
+    },
+    "changes": {
+      "title": "更改",
+      "files": "{{count}} 个文件",
+      "untracked": "{{count}} 个未跟踪",
+      "notRepo": "不是 git 仓库",
+      "loading": "读取中…",
+      "failed": "读取失败",
+      "syncing": "同步中，改动可能滞后",
+      "open": "打开代码审查"
+    },
+    "tasks": {
+      "title": "后台任务",
+      "empty": "没有后台任务",
+      "finishedCount": "{{count}} 个已结束",
+      "showLess": "收起"
+    }
   }
 }

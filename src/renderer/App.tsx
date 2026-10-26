@@ -89,6 +89,11 @@ const ReviewPanel = lazy(() =>
     default: module.ReviewPanel,
   })),
 );
+const SessionOverviewPanel = lazy(() =>
+  import("./components/overview/SessionOverviewPanel").then((module) => ({
+    default: module.SessionOverviewPanel,
+  })),
+);
 const BrowserPanel = lazy(() =>
   import("./components/BrowserPanel").then((module) => ({
     default: module.BrowserPanel,
@@ -475,6 +480,8 @@ function App() {
   // （ESC 监听、<video> 播放、review 的全屏覆盖层甚至固定定位漏到整窗）。
   const previewPanelActive = rightPanelVisible && rightPanelMode === "preview";
   const reviewPanelActive = rightPanelVisible && rightPanelMode === "review";
+  const overviewPanelActive =
+    rightPanelVisible && rightPanelMode === "overview";
 
   // 访问过的面板：首次打开后一直挂载，之后只切可见性（React 18 没有 <Activity>，
   // 用 hidden 实现「隐藏但保活」；每块面板的状态因此不会在切换时丢失）
@@ -841,6 +848,23 @@ function App() {
                       key={activeSessionId ?? "none"}
                       visible={reviewPanelActive}
                     />
+                  </Suspense>
+                </PanelErrorBoundary>
+              </div>
+            )}
+
+            {visitedPanels.has("overview") && (
+              <div
+                className={
+                  overviewPanelActive ? "flex flex-1 min-w-0" : "hidden"
+                }
+              >
+                <PanelErrorBoundary
+                  name="SessionOverviewPanel"
+                  fallback={<div className="flex-1 bg-muted" />}
+                >
+                  <Suspense fallback={<div className="flex-1 bg-muted" />}>
+                    <SessionOverviewPanel visible={overviewPanelActive} />
                   </Suspense>
                 </PanelErrorBoundary>
               </div>

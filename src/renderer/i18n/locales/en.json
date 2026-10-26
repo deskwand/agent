@@ -2891,5 +2891,50 @@
     },
     "resolve": "Mark resolved",
     "reopen": "Reopen"
+  },
+  "overview": {
+    "title": "Session overview",
+    "open": "Open session overview",
+    "close": "Close session overview",
+    "refresh": "Refresh",
+    "env": {
+      "title": "Environment",
+      "location": "Runs on",
+      "local": "This computer",
+      "sandbox": "Sandbox",
+      "folder": "Folder",
+      "branch": "Branch",
+      "notRepo": "Not a git repository",
+      "readFailed": "Failed to read",
+      "noFolder": "No folder selected"
+    },
+    "context": {
+      "title": "Context",
+      "used": "{{used}} / {{total}}",
+      "estimated": "estimated",
+      "compacting": "Compacting…"
+    },
+    "outputs": {
+      "title": "Outputs",
+      "empty": "No outputs yet in this session",
+      "showMore": "Show more ({{count}})",
+      "showLess": "Show less"
+    },
+    "changes": {
+      "title": "Changes",
+      "files": "{{count}} files",
+      "untracked": "{{count}} untracked",
+      "notRepo": "Not a git repository",
+      "loading": "Reading…",
+      "failed": "Failed to read",
+      "syncing": "Syncing — changes may lag",
+      "open": "Open code review"
+    },
+    "tasks": {
+      "title": "Background tasks",
+      "empty": "No background tasks",
+      "finishedCount": "{{count}} finished",
+      "showLess": "Show less"
+    }
   }
 }
