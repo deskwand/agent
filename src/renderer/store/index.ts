@@ -290,11 +290,17 @@ interface AppState {
   currencyRate: number | null;
   settingsTab: string | null;
 
-  rightPanelMode: "files" | "browser" | "preview" | "review" | null;
+  rightPanelMode:
+    | "files"
+    | "browser"
+    | "preview"
+    | "review"
+    | "overview"
+    | null;
   previewTabs: PreviewTab[];
   activePreviewTab: string | null;
   /** 进入「上下文面板家族」前是什么（非家族模式）；回到外面世界的出口 */
-  familyEntryOrigin: "files" | "browser" | null;
+  familyEntryOrigin: "files" | "browser" | "overview" | null;
   /** 家族内上一块可见的上下文面板；用后即清 */
   lastVisibleContext: "preview" | "review" | null;
   previewWidth: number | null;
@@ -324,6 +330,8 @@ interface AppState {
   highlightedToolCallId: string | null;
   /** 跳转时要求展开的那条 process summary；被消费后清回 null（只生效一次）。 */
   pendingExpandToolCallId: string | null;
+  /** 概览「后台任务」行点击后的跳转请求；ChatView 消费后清空。 */
+  pendingFocusToolCallId: string | null;
   isConfigured: boolean;
   showConfigModal: boolean;
   setShowLoginModal: (show: boolean) => void;
@@ -392,7 +400,13 @@ interface AppState {
   // Browser fullscreen
   isBrowserFullscreen: boolean;
   browserFullscreenSnapshot: {
-    rightPanelMode: "files" | "browser" | "preview" | "review" | null;
+    rightPanelMode:
+    | "files"
+    | "browser"
+    | "preview"
+    | "review"
+    | "overview"
+    | null;
     contextPanelWidth: number;
   } | null;
   enterBrowserFullscreen: () => void;
@@ -525,6 +539,7 @@ interface AppState {
   toggleFileBrowser: () => void;
   toggleReviewPanel: () => void;
   toggleBrowserPanel: () => void;
+  toggleOverview: () => void;
   setBrowserWidthManual: (manual: boolean) => void;
 
   setPendingPermission: (permission: PermissionRequest | null) => void;
@@ -541,6 +556,8 @@ interface AppState {
   setAppConfig: (config: AppConfig | null) => void;
   highlightToolCallId: (toolCallId: string) => void;
   clearPendingExpandToolCallId: () => void;
+  requestFocusToolCall: (toolCallId: string) => void;
+  clearPendingFocusToolCall: () => void;
   setIsConfigured: (configured: boolean) => void;
   setShowConfigModal: (show: boolean) => void;
   markInitialConfigStatusSeen: () => void;
@@ -762,11 +779,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   currency: readStoredCurrency(),
   currencyRate: null,
   settingsTab: null,
-  rightPanelMode: null as "files" | "browser" | "preview" | "review" | null,
+  rightPanelMode: null as
+    | "files"
+    | "browser"
+    | "preview"
+    | "review"
+    | "overview"
+    | null,
   previewTabs: [] as PreviewTab[],
   officePreviewBusyPath: null as string | null,
   activePreviewTab: null as string | null,
-  familyEntryOrigin: null as "files" | "browser" | null,
+  familyEntryOrigin: null as "files" | "browser" | "overview" | null,
   lastVisibleContext: null as "preview" | "review" | null,
   previewWidth: null as number | null,
   previewWidthManual: false,
@@ -781,6 +804,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   appConfig: null,
   highlightedToolCallId: null,
   pendingExpandToolCallId: null,
+  pendingFocusToolCallId: null,
   isConfigured: false,
   cloudConfig: null,
   topUpOpen: false,
@@ -807,7 +831,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   browserOcclusionIds: new Set<string>(),
   isBrowserFullscreen: false,
   browserFullscreenSnapshot: null as {
-    rightPanelMode: "files" | "browser" | "preview" | "review" | null;
+    rightPanelMode:
+    | "files"
+    | "browser"
+    | "preview"
+    | "review"
+    | "overview"
+    | null;
     contextPanelWidth: number;
   } | null,
   voiceModeOpen: false,
@@ -1672,6 +1702,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  toggleOverview: () =>
+    set((state) => ({
+      rightPanelMode:
+        state.rightPanelMode === "overview" ? null : ("overview" as const),
+      lastVisibleContext: null,
+    })),
+
   openReview: () =>
     set((state) => {
       const sidebarPatch = sidebarSyncForMode(state, "review");
@@ -1870,6 +1907,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   clearPendingExpandToolCallId: () => set({ pendingExpandToolCallId: null }),
+  requestFocusToolCall: (toolCallId) =>
+    set({ pendingFocusToolCallId: toolCallId }),
+  clearPendingFocusToolCall: () => set({ pendingFocusToolCallId: null }),
   setIsConfigured: (configured) => set({ isConfigured: configured }),
   setActiveTeamId: (id) => set({ activeTeamId: id }),
   setActiveTeamName: (name) => set({ activeTeamName: name }),

@@ -569,7 +569,13 @@ function App() {
   // Keep browser at 50% on window resize when in auto mode.
   // Uses refs to avoid re-binding the listener on every sidebar change.
   const resizeGuardRef = useRef<{
-    rightPanelMode: "files" | "browser" | "preview" | "review" | null;
+    rightPanelMode:
+      | "files"
+      | "browser"
+      | "preview"
+      | "review"
+      | "overview"
+      | null;
     browserWidthManual: boolean;
     calcHalfWidth: typeof calcHalfWidth;
   }>(null!);
