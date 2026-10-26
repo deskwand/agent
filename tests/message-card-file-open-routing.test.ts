@@ -18,7 +18,8 @@ function read(relativePath: string): string {
 describe("file open routing goes through the shared classifier", () => {
   const routingFiles = [
     "../src/renderer/components/message/ContentBlockView.tsx",
-    "../src/renderer/components/ArtifactPanel.tsx",
+    // 产物面板的分派在 2026-10-26 提到 use-open-artifact（与概览共用），守卫跟着搬家
+    "../src/renderer/hooks/use-open-artifact.ts",
     "../src/renderer/components/FileBrowser.tsx",
   ];
 

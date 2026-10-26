@@ -861,9 +861,9 @@ function App() {
               >
                 <PanelErrorBoundary
                   name="SessionOverviewPanel"
-                  fallback={<div className="flex-1 bg-muted" />}
+                  fallback={<div className="flex-1 bg-background" />}
                 >
-                  <Suspense fallback={<div className="flex-1 bg-muted" />}>
+                  <Suspense fallback={<div className="flex-1 bg-background" />}>
                     <SessionOverviewPanel visible={overviewPanelActive} />
                   </Suspense>
                 </PanelErrorBoundary>
