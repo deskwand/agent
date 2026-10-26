@@ -1703,11 +1703,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   toggleOverview: () =>
-    set((state) => ({
-      rightPanelMode:
-        state.rightPanelMode === "overview" ? null : ("overview" as const),
-      lastVisibleContext: null,
-    })),
+    set((state) => {
+      const next =
+        state.rightPanelMode === "overview" ? null : ("overview" as const);
+      // 概览本身不收起侧栏，但「从 review 里点回概览」必须把快照还回去，
+      // 否则 sidebarCollapsedBeforePanels 会变成没人再读的孤儿。
+      return {
+        ...sidebarSyncForMode(state, next),
+        rightPanelMode: next,
+        lastVisibleContext: null,
+      };
+    }),
 
   openReview: () =>
     set((state) => {

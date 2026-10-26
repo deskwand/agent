@@ -28,6 +28,21 @@ describe("overview 右栏模式", () => {
     expect(useAppStore.getState().rightPanelMode).toBe("overview");
   });
 
+  it("restores the sidebar snapshot when leaving a review for the overview", () => {
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+
+    useAppStore.getState().toggleOverview();
+    useAppStore.getState().openReview();
+    // 进入 review 是面板家族，自动收起并记快照
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    expect(useAppStore.getState().sidebarCollapsedBeforePanels).toBe(false);
+
+    useAppStore.getState().toggleOverview();
+    expect(useAppStore.getState().rightPanelMode).toBe("overview");
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(useAppStore.getState().sidebarCollapsedBeforePanels).toBeNull();
+  });
+
   it("keeps the sidebar collapsed state when switching to the file browser", () => {
     useAppStore.getState().toggleOverview();
     const collapsed = useAppStore.getState().sidebarCollapsed;

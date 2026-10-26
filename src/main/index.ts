@@ -253,7 +253,12 @@ import {
   partitionArtifactPaths,
   toRepoRelativePath,
 } from "./git-artifact-utils";
-import { EMPTY_REPO_SUMMARY, parseBranchName } from "../shared/repo-summary";
+import {
+  EMPTY_REPO_SUMMARY,
+  isNotAGitRepositoryError,
+  parseBranchName,
+  parseNumstatTotals,
+} from "../shared/repo-summary";
 import {
   createVideoSourceUrl,
   installVideoProtocol,
@@ -2765,32 +2770,44 @@ ipcMain.handle("git.hasChanges", async (_event, dirPath?: string) => {
 
 ipcMain.handle("git.getRepoSummary", async (_event, dirPath?: string) => {
   if (!dirPath) return EMPTY_REPO_SUMMARY;
+  const { execFile } = await import("child_process");
+  const { promisify } = await import("util");
+  const run = promisify(execFile);
+  const git = (args: string[]) =>
+    run("git", args, { cwd: dirPath, timeout: 5000 });
+
+  // 「本来就不是仓库」与「读失败」必须分开：前者返回空快照，后者抛给渲染层
+  // 显示「读取失败」。否则大仓库里一次超时会被谎报成「不是 git 仓库」并缓存 60s。
   try {
-    const { execFile } = await import("child_process");
-    const { promisify } = await import("util");
-    const execFileAsync = promisify(execFile);
-    const [branchResult, statusResult, files] = await Promise.all([
-      execFileAsync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
-        cwd: dirPath,
-        timeout: 5000,
-      }),
-      execFileAsync("git", ["status", "--porcelain"], {
-        cwd: dirPath,
-        timeout: 5000,
-      }),
-      runGitDiffStat(dirPath),
-    ]);
-    return {
-      isRepo: true,
-      branch: parseBranchName(branchResult.stdout),
-      additions: files.reduce((total, file) => total + file.additions, 0),
-      deletions: files.reduce((total, file) => total + file.deletions, 0),
-      changedFiles: countChangedFilesFromPorcelain(statusResult.stdout),
-      untracked: countUntrackedFilesFromPorcelain(statusResult.stdout),
-    };
-  } catch {
-    return EMPTY_REPO_SUMMARY;
+    await git(["rev-parse", "--is-inside-work-tree"]);
+  } catch (error) {
+    const stderr = String((error as { stderr?: unknown } | null)?.stderr ?? "");
+    if (isNotAGitRepositoryError(stderr)) return EMPTY_REPO_SUMMARY;
+    throw error;
   }
+
+  // 空仓库（还没有 commit）读不到 HEAD，分支记为 null，但依然是仓库
+  let branch: string | null = null;
+  try {
+    const { stdout } = await git(["rev-parse", "--abbrev-ref", "HEAD"]);
+    branch = parseBranchName(stdout);
+  } catch {
+    branch = null;
+  }
+
+  const [numstat, status] = await Promise.all([
+    git(["diff", "HEAD", "--numstat"]),
+    git(["status", "--porcelain"]),
+  ]);
+  const totals = parseNumstatTotals(numstat.stdout);
+  return {
+    isRepo: true,
+    branch,
+    additions: totals.additions,
+    deletions: totals.deletions,
+    changedFiles: countChangedFilesFromPorcelain(status.stdout),
+    untracked: countUntrackedFilesFromPorcelain(status.stdout),
+  };
 });
 
 ipcMain.handle(

@@ -27,20 +27,20 @@ async function fetchSummary(cwd: string, force: boolean): Promise<RepoSummary> {
   if (pending) return pending;
 
   const run = (async () => {
-    try {
-      const api = window.electronAPI?.git;
-      if (!api?.getRepoSummary) {
-        throw new Error("git bridge unavailable");
-      }
-      const summary = await api.getRepoSummary(cwd);
-      cache.set(cwd, { summary, at: Date.now() });
-      return summary;
-    } finally {
-      inFlight.delete(cwd);
+    const api = window.electronAPI?.git;
+    if (!api?.getRepoSummary) {
+      throw new Error("git bridge unavailable");
     }
+    const summary = await api.getRepoSummary(cwd);
+    cache.set(cwd, { summary, at: Date.now() });
+    return summary;
   })();
   inFlight.set(cwd, run);
-  return run;
+  // 只删自己这一条：先 set 再挂 finally，否则同步抛错的 promise 会永久留在
+  // inFlight 里，让该 cwd 的后续每次刷新都拿到同一个拒绝。
+  return run.finally(() => {
+    if (inFlight.get(cwd) === run) inFlight.delete(cwd);
+  });
 }
 
 /** 测试用：清空缓存与在飞请求。 */

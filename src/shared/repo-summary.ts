@@ -25,3 +25,24 @@ export function parseBranchName(stdout: string): string | null {
   const name = stdout.trim();
   return name.length > 0 ? name : null;
 }
+
+/** `git diff HEAD --numstat` 的输出 → 增删总数。二进制文件（`-`）按 0 计。 */
+export function parseNumstatTotals(stdout: string): {
+  additions: number;
+  deletions: number;
+} {
+  let additions = 0;
+  let deletions = 0;
+  for (const line of stdout.split("\n")) {
+    const match = line.match(/^(\d+|-)\t(\d+|-)\t/);
+    if (!match) continue;
+    additions += match[1] === "-" ? 0 : Number(match[1]);
+    deletions += match[2] === "-" ? 0 : Number(match[2]);
+  }
+  return { additions, deletions };
+}
+
+/** 只有「本来就不是仓库」才算空快照；超时、git 缺失等失败必须让调用方看到错误。 */
+export function isNotAGitRepositoryError(stderr: string | undefined): boolean {
+  return /not a git repository/i.test(stderr ?? "");
+}

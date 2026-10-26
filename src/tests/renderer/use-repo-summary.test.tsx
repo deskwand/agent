@@ -143,6 +143,24 @@ describe("useRepoSummary", () => {
     expect(getRepoSummary).toHaveBeenCalledTimes(2);
   });
 
+  it("retries after a bridge failure instead of caching the rejection", async () => {
+    delete (window as unknown as { electronAPI?: unknown }).electronAPI;
+
+    act(() => {
+      root.render(<Probe cwd="/repo" visible refetchKey="first" />);
+    });
+    await flush();
+    expect(output(container)).toBe("error:git bridge unavailable");
+
+    mockApi(async () => summary("main"));
+    await act(async () =>
+      root.render(<Probe cwd="/repo" visible refetchKey="second" />),
+    );
+    await flush();
+
+    expect(output(container)).toBe("main");
+  });
+
   it("drops a stale response when the cwd changes", async () => {
     const first = deferred<RepoSummary>();
     const second = deferred<RepoSummary>();
