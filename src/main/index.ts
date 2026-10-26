@@ -249,9 +249,11 @@ import { shouldDisableHardwareAcceleration } from "./gpu-policy";
 import { fetchOpenRouterModels } from "./config/openrouter-models";
 import {
   countChangedFilesFromPorcelain,
+  countUntrackedFilesFromPorcelain,
   partitionArtifactPaths,
   toRepoRelativePath,
 } from "./git-artifact-utils";
+import { EMPTY_REPO_SUMMARY, parseBranchName } from "../shared/repo-summary";
 import {
   createVideoSourceUrl,
   installVideoProtocol,
@@ -2758,6 +2760,36 @@ ipcMain.handle("git.hasChanges", async (_event, dirPath?: string) => {
     };
   } catch {
     return { isRepo: false, changeCount: 0 };
+  }
+});
+
+ipcMain.handle("git.getRepoSummary", async (_event, dirPath?: string) => {
+  if (!dirPath) return EMPTY_REPO_SUMMARY;
+  try {
+    const { execFile } = await import("child_process");
+    const { promisify } = await import("util");
+    const execFileAsync = promisify(execFile);
+    const [branchResult, statusResult, files] = await Promise.all([
+      execFileAsync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+        cwd: dirPath,
+        timeout: 5000,
+      }),
+      execFileAsync("git", ["status", "--porcelain"], {
+        cwd: dirPath,
+        timeout: 5000,
+      }),
+      runGitDiffStat(dirPath),
+    ]);
+    return {
+      isRepo: true,
+      branch: parseBranchName(branchResult.stdout),
+      additions: files.reduce((total, file) => total + file.additions, 0),
+      deletions: files.reduce((total, file) => total + file.deletions, 0),
+      changedFiles: countChangedFilesFromPorcelain(statusResult.stdout),
+      untracked: countUntrackedFilesFromPorcelain(statusResult.stdout),
+    };
+  } catch {
+    return EMPTY_REPO_SUMMARY;
   }
 });
 

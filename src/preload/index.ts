@@ -41,6 +41,7 @@ import type {
   MailAccountView,
 } from "../shared/mail-accounts";
 import type { EngineInstallState } from "../shared/engine-install";
+import type { RepoSummary } from "../shared/repo-summary";
 import type {
   CapabilityPermissions,
   PermissionKind,
@@ -397,6 +398,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       dirPath?: string,
     ): Promise<{ isRepo: boolean; changeCount: number }> =>
       ipcRenderer.invoke("git.hasChanges", dirPath),
+    getRepoSummary: (dirPath?: string): Promise<RepoSummary> =>
+      ipcRenderer.invoke("git.getRepoSummary", dirPath),
     revertFiles: (
       cwd: string,
       paths: string[],
@@ -1220,6 +1223,7 @@ declare global {
         hasChanges: (
           dirPath?: string,
         ) => Promise<{ isRepo: boolean; changeCount: number }>;
+        getRepoSummary: (dirPath?: string) => Promise<RepoSummary>;
         revertFiles: (
           cwd: string,
           paths: string[],
