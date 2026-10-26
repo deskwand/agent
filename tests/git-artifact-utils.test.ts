@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import path from "node:path";
 import {
   countChangedFilesFromPorcelain,
+  countUntrackedFilesFromPorcelain,
   partitionArtifactPaths,
 } from "../src/main/git-artifact-utils";
 
@@ -34,5 +35,24 @@ describe("git artifact utils", () => {
         path.join(cwd, "notes/todo.md"),
       ],
     });
+  });
+});
+
+describe("countUntrackedFilesFromPorcelain", () => {
+  it("counts only ?? lines", () => {
+    const status = [
+      " M src/main/index.ts",
+      "?? tmp/new-file.ts",
+      "R  src/old-name.ts -> src/new-name.ts",
+      "?? notes/todo.md",
+      "",
+    ].join("\n");
+
+    expect(countUntrackedFilesFromPorcelain(status)).toBe(2);
+  });
+
+  it("returns zero for an empty or clean worktree", () => {
+    expect(countUntrackedFilesFromPorcelain("")).toBe(0);
+    expect(countUntrackedFilesFromPorcelain("\n \n")).toBe(0);
   });
 });

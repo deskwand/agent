@@ -61,3 +61,14 @@ export function partitionArtifactPaths(
 
   return { trackedRelativePaths, untrackedAbsolutePaths };
 }
+
+/** porcelain 里的未跟踪项（`?? path`）。rename 行（`R  a -> b`）不算未跟踪。 */
+export function countUntrackedFilesFromPorcelain(stdout: string): number {
+  let count = 0;
+  for (const rawLine of stdout.split(/\r?\n/)) {
+    const line = rawLine.trimEnd();
+    if (!line) continue;
+    if (line.startsWith("??")) count += 1;
+  }
+  return count;
+}
