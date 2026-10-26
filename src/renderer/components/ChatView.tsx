@@ -30,7 +30,12 @@ import {
   isVoiceHeldElsewhere,
 } from "../utils/voice/voice-owner";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
-import { resolveDisplayedContextUsage } from "../utils/context-usage";
+import {
+  computeContextUsage,
+  contextUsageLevel,
+  findLastPromptInputTokens,
+  formatTokenCount,
+} from "../utils/context-usage";
 import { formatTokenSpeed } from "../utils/token-speed";
 import { MessageCard } from "./MessageCard";
 import { projectNestedToolMessages } from "../utils/nested-tool-display";
@@ -619,13 +624,10 @@ export function ChatView() {
     backgroundRows,
   ]);
 
-  const lastInputTokens = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const value = messages[i].tokenUsage?.totalPromptInput;
-      if (value && value > 0) return value;
-    }
-    return 0;
-  }, [messages]);
+  const lastInputTokens = useMemo(
+    () => findLastPromptInputTokens(messages),
+    [messages],
+  );
   const latestAssistantUsage = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
@@ -635,21 +637,19 @@ export function ChatView() {
     }
     return undefined;
   }, [messages]);
-  const displayedContextUsage = resolveDisplayedContextUsage(
+  const contextUsage = computeContextUsage(
     lastInputTokens,
     compaction.estimatedTokens,
+    contextWindow,
   );
-  const displayedContextTokens = displayedContextUsage.tokens;
-  const contextUsagePercentage =
-    displayedContextTokens !== null && contextWindow && contextWindow > 0
-      ? Math.min((displayedContextTokens / contextWindow) * 100, 100)
-      : 0;
-  const contextRingColorClass =
-    contextUsagePercentage > 95
-      ? "text-destructive"
-      : contextUsagePercentage > 80
-        ? "text-warning"
-        : "text-primary-text";
+  const displayedContextUsage = contextUsage;
+  const displayedContextTokens = contextUsage.tokens;
+  const contextUsagePercentage = contextUsage.percentage;
+  const contextRingColorClass = {
+    destructive: "text-destructive",
+    warning: "text-warning",
+    default: "text-primary-text",
+  }[contextUsageLevel(contextUsage.percentage)];
   const showExactUsageDetails = !displayedContextUsage.isEstimated;
   const cacheHitRate =
     showExactUsageDetails &&
@@ -2361,12 +2361,6 @@ export function ChatView() {
       <VoiceDownloadConfirm engine={voiceEngine} />
     </div>
   );
-}
-
-function formatTokenCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
 }
 
 export function getVisibleMessageEndIndex(
