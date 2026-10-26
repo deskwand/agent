@@ -401,12 +401,12 @@ interface AppState {
   isBrowserFullscreen: boolean;
   browserFullscreenSnapshot: {
     rightPanelMode:
-    | "files"
-    | "browser"
-    | "preview"
-    | "review"
-    | "overview"
-    | null;
+      | "files"
+      | "browser"
+      | "preview"
+      | "review"
+      | "overview"
+      | null;
     contextPanelWidth: number;
   } | null;
   enterBrowserFullscreen: () => void;
@@ -832,12 +832,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   isBrowserFullscreen: false,
   browserFullscreenSnapshot: null as {
     rightPanelMode:
-    | "files"
-    | "browser"
-    | "preview"
-    | "review"
-    | "overview"
-    | null;
+      | "files"
+      | "browser"
+      | "preview"
+      | "review"
+      | "overview"
+      | null;
     contextPanelWidth: number;
   } | null,
   voiceModeOpen: false,

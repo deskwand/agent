@@ -25,7 +25,11 @@ describe("git artifact utils", () => {
     expect(
       partitionArtifactPaths(
         cwd,
-        ["src/tracked.ts", ".tmp/generated.md", path.join(cwd, "notes/todo.md")],
+        [
+          "src/tracked.ts",
+          ".tmp/generated.md",
+          path.join(cwd, "notes/todo.md"),
+        ],
         tracked,
       ),
     ).toEqual({
