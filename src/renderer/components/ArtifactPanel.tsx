@@ -1,23 +1,12 @@
-import { useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
-import { resolveArtifactPath } from "../utils/artifact-path";
-import {
-  extractFilePathFromToolInput,
-  extractFilePathFromToolOutput,
-} from "../utils/tool-output-path";
-import { getArtifactLabel, getArtifactSteps } from "../utils/artifact-steps";
+import { buildArtifactItems } from "../utils/artifact-steps";
 import { Layers, Loader2 } from "lucide-react";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
-import { openFilePathInBrowser } from "../utils/open-in-browser";
-import {
-  extOf,
-  resolveFileReferencePath,
-  resolveOpenAction,
-} from "../utils/open-file-by-ext";
-import { openOfficePreview } from "../utils/office-preview-runner";
 import { OpenWithSystemAppButton } from "./OpenWithSystemAppButton";
+import { useOpenArtifact } from "../hooks/use-open-artifact";
 import type { TraceStep } from "../types";
 
 const EMPTY_STEPS: TraceStep[] = [];
@@ -28,9 +17,8 @@ export function ArtifactPanel() {
   const sessions = useAppStore((s) => s.sessions);
   const sessionStates = useAppStore((s) => s.sessionStates);
   const workingDir = useAppStore((s) => s.workingDir);
-  const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const officePreviewBusyPath = useAppStore((s) => s.officePreviewBusyPath);
-  const openPreview = useAppStore((s) => s.openPreview);
+  const { openArtifact, canOpenPath } = useOpenArtifact();
 
   const ss = activeSessionId ? sessionStates[activeSessionId] : undefined;
   const steps = ss?.traceSteps ?? EMPTY_STEPS;
@@ -38,70 +26,11 @@ export function ArtifactPanel() {
     ? sessions.find((s) => s.id === activeSessionId)
     : null;
   const currentWorkingDir = activeSession?.cwd || workingDir;
-  const { displayArtifactSteps } = getArtifactSteps(steps);
-  const canOpenPath =
-    typeof window !== "undefined" && !!window.electronAPI?.openPath;
 
-  const handleClick = useCallback(
-    async (artifactPath: string, label: string) => {
-      const resolvedArtifact = await resolveFileReferencePath(
-        artifactPath,
-        currentWorkingDir,
-      );
-      const action = resolveOpenAction(extOf(resolvedArtifact));
-      if (action === "browser") {
-        openFilePathInBrowser(resolvedArtifact);
-        return;
-      }
-      if (action === "preview") {
-        openPreview({ path: resolvedArtifact, name: label });
-      } else if (action === "office") {
-        void openOfficePreview(resolvedArtifact, {
-          t,
-          onSuccess: (outPath) => openFilePathInBrowser(outPath),
-          onFailure: () => {
-            void window.electronAPI?.openPath?.(resolvedArtifact);
-            setGlobalNotice({
-              id: `office-preview-failed-${Date.now()}`,
-              type: "warning",
-              message: t("filePreview.officeRenderFailed"),
-            });
-          },
-        });
-      } else if (canOpenPath) {
-        const result = await window.electronAPI.openPath(resolvedArtifact);
-        if (result.error) {
-          setGlobalNotice({
-            id: `artifact-open-failed-${Date.now()}`,
-            type: "warning",
-            message: t("context.openFailed", { error: result.error }),
-          });
-        }
-      }
-    },
-    [canOpenPath, currentWorkingDir, openPreview, setGlobalNotice, t],
+  const displayArtifacts = useMemo(
+    () => buildArtifactItems(steps, currentWorkingDir),
+    [currentWorkingDir, steps],
   );
-
-  const displayArtifacts = useMemo(() => {
-    const seenPaths = new Set<string>();
-    const items: Array<{ label: string; path: string }> = [];
-
-    for (const step of displayArtifactSteps) {
-      const fallbackPath =
-        extractFilePathFromToolOutput(step.toolOutput) ||
-        extractFilePathFromToolInput(step.toolInput);
-      if (!fallbackPath) continue;
-
-      const resolvedPath = resolveArtifactPath(fallbackPath, currentWorkingDir);
-      const key = resolvedPath.trim();
-      if (!key || seenPaths.has(key)) continue;
-
-      seenPaths.add(key);
-      items.push({ label: getArtifactLabel(fallbackPath), path: resolvedPath });
-    }
-
-    return items;
-  }, [currentWorkingDir, displayArtifactSteps]);
 
   return (
     <>
@@ -146,7 +75,7 @@ export function ArtifactPanel() {
                   }`}
                   onClick={() => {
                     if (!canClick) return;
-                    handleClick(artifactPath, label);
+                    void openArtifact(artifactPath, label);
                   }}
                   title={artifactPath || undefined}
                 >

@@ -1,48 +1,54 @@
-import { describe, it, expect } from 'vitest';
-import type { TraceStep } from '../src/renderer/types';
-import { getArtifactSteps, getArtifactLabel } from '../src/renderer/utils/artifact-steps';
+import { describe, it, expect } from "vitest";
+import type { TraceStep } from "../src/renderer/types";
+import {
+  getArtifactSteps,
+  getArtifactLabel,
+} from "../src/renderer/utils/artifact-steps";
 
-describe('getArtifactSteps', () => {
-  it('includes completed Write tool calls as file steps when no artifacts exist', () => {
+describe("getArtifactSteps", () => {
+  it("includes completed Write tool calls as file steps when no artifacts exist", () => {
     const steps: TraceStep[] = [
       {
-        id: 'call_write',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Write',
-        toolName: 'Write',
-        toolOutput: 'File created successfully at: /tmp/monthly_report_2026.xlsx',
+        id: "call_write",
+        type: "tool_call",
+        status: "completed",
+        title: "Write",
+        toolName: "Write",
+        toolOutput:
+          "File created successfully at: /tmp/monthly_report_2026.xlsx",
         timestamp: Date.now(),
       },
       {
-        id: 'call_bash',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Bash',
-        toolName: 'Bash',
-        toolOutput: '-rw-r--r-- 1 user staff 1234 Feb 3 14:14 monthly_report_2026.xlsx',
+        id: "call_bash",
+        type: "tool_call",
+        status: "completed",
+        title: "Bash",
+        toolName: "Bash",
+        toolOutput:
+          "-rw-r--r-- 1 user staff 1234 Feb 3 14:14 monthly_report_2026.xlsx",
         timestamp: Date.now(),
       },
     ];
 
-    const { artifactSteps, fileSteps, displayArtifactSteps } = getArtifactSteps(steps);
+    const { artifactSteps, fileSteps, displayArtifactSteps } =
+      getArtifactSteps(steps);
 
     expect(artifactSteps).toHaveLength(0);
     expect(fileSteps).toHaveLength(1);
     expect(displayArtifactSteps).toHaveLength(1);
-    expect(displayArtifactSteps[0].toolName).toBe('Write');
+    expect(displayArtifactSteps[0].toolName).toBe("Write");
   });
 
-  it('uses toolInput path when toolOutput does not include a path', () => {
+  it("uses toolInput path when toolOutput does not include a path", () => {
     const steps: TraceStep[] = [
       {
-        id: 'call_write_input_only',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Write',
-        toolName: 'Write',
-        toolInput: { path: '/tmp/from-input-only.txt', content: 'hello' },
-        toolOutput: 'File created',
+        id: "call_write_input_only",
+        type: "tool_call",
+        status: "completed",
+        title: "Write",
+        toolName: "Write",
+        toolInput: { path: "/tmp/from-input-only.txt", content: "hello" },
+        toolOutput: "File created",
         timestamp: Date.now(),
       },
     ];
@@ -52,19 +58,19 @@ describe('getArtifactSteps', () => {
     expect(displayArtifactSteps).toHaveLength(1);
   });
 
-  it('uses wrapped write tool output from runtime traces', () => {
+  it("uses wrapped write tool output from runtime traces", () => {
     const steps: TraceStep[] = [
       {
-        id: 'call_write_wrapped',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'write',
-        toolName: 'write',
+        id: "call_write_wrapped",
+        type: "tool_call",
+        status: "completed",
+        title: "write",
+        toolName: "write",
         toolOutput: JSON.stringify({
           content: [
             {
-              type: 'text',
-              text: 'Successfully wrote 2986 bytes to agent_papers_summary.html',
+              type: "text",
+              text: "Successfully wrote 2986 bytes to agent_papers_summary.html",
             },
           ],
         }),
@@ -75,19 +81,23 @@ describe('getArtifactSteps', () => {
     const { fileSteps, displayArtifactSteps } = getArtifactSteps(steps);
     expect(fileSteps).toHaveLength(1);
     expect(displayArtifactSteps).toHaveLength(1);
-    expect(displayArtifactSteps[0].toolName).toBe('write');
+    expect(displayArtifactSteps[0].toolName).toBe("write");
   });
 
-  it('includes completed Edit tool calls as file steps when no artifacts exist', () => {
+  it("includes completed Edit tool calls as file steps when no artifacts exist", () => {
     const steps: TraceStep[] = [
       {
-        id: 'call_edit',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Edit',
-        toolName: 'Edit',
-        toolInput: { path: '/tmp/notes.md', old_string: 'old', new_string: 'new' },
-        toolOutput: 'File edited: /tmp/notes.md',
+        id: "call_edit",
+        type: "tool_call",
+        status: "completed",
+        title: "Edit",
+        toolName: "Edit",
+        toolInput: {
+          path: "/tmp/notes.md",
+          old_string: "old",
+          new_string: "new",
+        },
+        toolOutput: "File edited: /tmp/notes.md",
         timestamp: Date.now(),
       },
     ];
@@ -95,18 +105,18 @@ describe('getArtifactSteps', () => {
     const { fileSteps, displayArtifactSteps } = getArtifactSteps(steps);
     expect(fileSteps).toHaveLength(1);
     expect(displayArtifactSteps).toHaveLength(1);
-    expect(displayArtifactSteps[0].toolName).toBe('Edit');
+    expect(displayArtifactSteps[0].toolName).toBe("Edit");
   });
 
-  it('filters out file steps without any resolvable file path', () => {
+  it("filters out file steps without any resolvable file path", () => {
     const steps: TraceStep[] = [
       {
-        id: 'call_write_no_path',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Write',
-        toolName: 'Write',
-        toolOutput: 'File created successfully',
+        id: "call_write_no_path",
+        type: "tool_call",
+        status: "completed",
+        title: "Write",
+        toolName: "Write",
+        toolOutput: "File created successfully",
         timestamp: Date.now(),
       },
     ];
@@ -116,25 +126,25 @@ describe('getArtifactSteps', () => {
     expect(displayArtifactSteps).toHaveLength(0);
   });
 
-  it('deduplicates repeated updates for the same file path', () => {
+  it("deduplicates repeated updates for the same file path", () => {
     const steps: TraceStep[] = [
       {
-        id: 'write_1',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Write',
-        toolName: 'Write',
-        toolOutput: 'File created successfully at: /tmp/repeated.txt',
+        id: "write_1",
+        type: "tool_call",
+        status: "completed",
+        title: "Write",
+        toolName: "Write",
+        toolOutput: "File created successfully at: /tmp/repeated.txt",
         timestamp: Date.now(),
       },
       {
-        id: 'write_2',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Write',
-        toolName: 'Write',
-        toolInput: { path: '/tmp/repeated.txt', content: 'updated' },
-        toolOutput: 'Updated',
+        id: "write_2",
+        type: "tool_call",
+        status: "completed",
+        title: "Write",
+        toolName: "Write",
+        toolInput: { path: "/tmp/repeated.txt", content: "updated" },
+        toolOutput: "Updated",
         timestamp: Date.now(),
       },
     ];
@@ -144,111 +154,121 @@ describe('getArtifactSteps', () => {
     expect(displayArtifactSteps).toHaveLength(1);
   });
 
-  it('keeps artifact summaries and concrete file operations in the display list', () => {
+  it("keeps artifact summaries and concrete file operations in the display list", () => {
     const steps: TraceStep[] = [
       {
-        id: 'artifact_1',
-        type: 'tool_result',
-        status: 'completed',
-        title: 'artifact',
-        toolName: 'artifact',
+        id: "artifact_1",
+        type: "tool_result",
+        status: "completed",
+        title: "artifact",
+        toolName: "artifact",
         toolOutput: '{"path":"/tmp/report.xlsx"}',
         timestamp: Date.now(),
       },
       {
-        id: 'call_write',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Write',
-        toolName: 'Write',
-        toolOutput: 'File created successfully at: /tmp/other.xlsx',
+        id: "call_write",
+        type: "tool_call",
+        status: "completed",
+        title: "Write",
+        toolName: "Write",
+        toolOutput: "File created successfully at: /tmp/other.xlsx",
         timestamp: Date.now(),
       },
     ];
 
-    const { artifactSteps, fileSteps, displayArtifactSteps } = getArtifactSteps(steps);
+    const { artifactSteps, fileSteps, displayArtifactSteps } =
+      getArtifactSteps(steps);
 
     // displayArtifactSteps is the artifact summaries + file steps; the
     // panel deduplicates by resolved path downstream.
     expect(artifactSteps).toHaveLength(1);
     expect(fileSteps).toHaveLength(1);
     expect(displayArtifactSteps).toHaveLength(2);
-    expect(displayArtifactSteps[0].toolName).toBe('artifact');
-    expect(displayArtifactSteps[1].toolName).toBe('Write');
+    expect(displayArtifactSteps[0].toolName).toBe("artifact");
+    expect(displayArtifactSteps[1].toolName).toBe("Write");
   });
 
-  it('shows completed edit steps alongside artifact summaries', () => {
+  it("shows completed edit steps alongside artifact summaries", () => {
     const steps: TraceStep[] = [
       {
-        id: 'artifact_1',
-        type: 'tool_result',
-        status: 'completed',
-        title: 'artifact',
-        toolName: 'artifact',
+        id: "artifact_1",
+        type: "tool_result",
+        status: "completed",
+        title: "artifact",
+        toolName: "artifact",
         toolOutput: '{"path":"/tmp/report.xlsx"}',
         timestamp: Date.now(),
       },
       {
-        id: 'call_edit',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Edit',
-        toolName: 'Edit',
-        toolInput: { path: '/tmp/notes.md', old_string: 'old', new_string: 'new' },
-        toolOutput: 'File edited: /tmp/notes.md',
+        id: "call_edit",
+        type: "tool_call",
+        status: "completed",
+        title: "Edit",
+        toolName: "Edit",
+        toolInput: {
+          path: "/tmp/notes.md",
+          old_string: "old",
+          new_string: "new",
+        },
+        toolOutput: "File edited: /tmp/notes.md",
         timestamp: Date.now(),
       },
     ];
 
-    const { artifactSteps, fileSteps, displayArtifactSteps } = getArtifactSteps(steps);
+    const { artifactSteps, fileSteps, displayArtifactSteps } =
+      getArtifactSteps(steps);
 
     expect(artifactSteps).toHaveLength(1);
     expect(fileSteps).toHaveLength(1);
     expect(displayArtifactSteps).toHaveLength(2);
-    expect(displayArtifactSteps[1].toolName).toBe('Edit');
+    expect(displayArtifactSteps[1].toolName).toBe("Edit");
   });
 
-  it('keeps both the artifact summary and the write step covering the same path', () => {
+  it("keeps both the artifact summary and the write step covering the same path", () => {
     const steps: TraceStep[] = [
       {
-        id: 'artifact_1',
-        type: 'tool_result',
-        status: 'completed',
-        title: 'artifact',
-        toolName: 'artifact',
+        id: "artifact_1",
+        type: "tool_result",
+        status: "completed",
+        title: "artifact",
+        toolName: "artifact",
         toolOutput: '{"path":"/tmp/report.xlsx"}',
         timestamp: Date.now(),
       },
       {
-        id: 'call_write',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Write',
-        toolName: 'Write',
-        toolInput: { path: '/tmp/report.xlsx', content: 'hello' },
-        toolOutput: 'File written: /tmp/report.xlsx',
+        id: "call_write",
+        type: "tool_call",
+        status: "completed",
+        title: "Write",
+        toolName: "Write",
+        toolInput: { path: "/tmp/report.xlsx", content: "hello" },
+        toolOutput: "File written: /tmp/report.xlsx",
         timestamp: Date.now(),
       },
     ];
 
-    const { artifactSteps, fileSteps, displayArtifactSteps } = getArtifactSteps(steps);
+    const { artifactSteps, fileSteps, displayArtifactSteps } =
+      getArtifactSteps(steps);
 
     // Both are retained here; the panel deduplicates by resolved path.
     expect(artifactSteps).toHaveLength(1);
     expect(fileSteps).toHaveLength(1);
     expect(displayArtifactSteps).toHaveLength(2);
-    expect(displayArtifactSteps[1].toolName).toBe('Write');
+    expect(displayArtifactSteps[1].toolName).toBe("Write");
   });
 
-  it('includes screenshot tools when they return a concrete output path', () => {
+  it("includes screenshot tools when they return a concrete output path", () => {
     const steps: TraceStep[] = [
       {
-        id: 'shot_1',
-        type: 'tool_result',
-        status: 'completed',
-        title: 'screenshot',
-        toolName: 'screenshot',
-        toolOutput: JSON.stringify({ path: '/tmp/screenshot_1.png', size: 12345 }),
+        id: "shot_1",
+        type: "tool_result",
+        status: "completed",
+        title: "screenshot",
+        toolName: "screenshot",
+        toolOutput: JSON.stringify({
+          path: "/tmp/screenshot_1.png",
+          size: 12345,
+        }),
         timestamp: Date.now(),
       },
     ];
@@ -257,49 +277,55 @@ describe('getArtifactSteps', () => {
 
     expect(fileSteps).toHaveLength(1);
     expect(displayArtifactSteps).toHaveLength(1);
-    expect(displayArtifactSteps[0].toolName).toBe('screenshot');
+    expect(displayArtifactSteps[0].toolName).toBe("screenshot");
   });
 
-  it('includes artifact summaries in the display list even without file steps', () => {
+  it("includes artifact summaries in the display list even without file steps", () => {
     const steps: TraceStep[] = [
       {
-        id: 'artifact_only',
-        type: 'tool_result',
-        status: 'completed',
-        title: 'artifact',
-        toolName: 'artifact',
+        id: "artifact_only",
+        type: "tool_result",
+        status: "completed",
+        title: "artifact",
+        toolName: "artifact",
         toolOutput: '{"path":"/tmp/report.xlsx"}',
         timestamp: Date.now(),
       },
     ];
 
-    const { artifactSteps, fileSteps, displayArtifactSteps } = getArtifactSteps(steps);
+    const { artifactSteps, fileSteps, displayArtifactSteps } =
+      getArtifactSteps(steps);
 
     expect(artifactSteps).toHaveLength(1);
     expect(fileSteps).toHaveLength(0);
     expect(displayArtifactSteps).toHaveLength(1);
-    expect(displayArtifactSteps[0].toolName).toBe('artifact');
+    expect(displayArtifactSteps[0].toolName).toBe("artifact");
   });
 
-  it('excludes Bash tool from file steps (relies on recent-files fallback)', () => {
+  it("excludes Bash tool from file steps (relies on recent-files fallback)", () => {
     const steps: TraceStep[] = [
       {
-        id: 'call_bash_create',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Bash',
-        toolName: 'Bash',
-        toolOutput: 'File created successfully at: /tmp/generated.docx',
+        id: "call_bash_create",
+        type: "tool_call",
+        status: "completed",
+        title: "Bash",
+        toolName: "Bash",
+        toolOutput: "File created successfully at: /tmp/generated.docx",
         timestamp: Date.now(),
       },
       {
-        id: 'call_bash_python',
-        type: 'tool_call',
-        status: 'completed',
-        title: 'Bash',
-        toolName: 'bash',
+        id: "call_bash_python",
+        type: "tool_call",
+        status: "completed",
+        title: "Bash",
+        toolName: "bash",
         toolOutput: JSON.stringify({
-          content: [{ type: 'text', text: 'Successfully wrote 2986 bytes to /tmp/report.html' }],
+          content: [
+            {
+              type: "text",
+              text: "Successfully wrote 2986 bytes to /tmp/report.html",
+            },
+          ],
         }),
         timestamp: Date.now(),
       },
@@ -312,19 +338,58 @@ describe('getArtifactSteps', () => {
     expect(displayArtifactSteps).toHaveLength(0);
   });
 
-  it('formats label from full path', () => {
-    expect(getArtifactLabel('/Users/haoqing/tmp/simple.md')).toBe('simple.md');
+  it("formats label from full path", () => {
+    expect(getArtifactLabel("/Users/haoqing/tmp/simple.md")).toBe("simple.md");
   });
 
-  it('uses basename when path exists even if name provided', () => {
-    expect(getArtifactLabel('/Users/haoqing/tmp/simple.md', '自定义名称')).toBe('simple.md');
+  it("uses basename when path exists even if name provided", () => {
+    expect(getArtifactLabel("/Users/haoqing/tmp/simple.md", "自定义名称")).toBe(
+      "simple.md",
+    );
   });
 
-  it('uses name when path is empty', () => {
-    expect(getArtifactLabel('', '自定义名称')).toBe('自定义名称');
+  it("uses name when path is empty", () => {
+    expect(getArtifactLabel("", "自定义名称")).toBe("自定义名称");
   });
 
-  it('prefers basename over translated name', () => {
-    expect(getArtifactLabel('/Users/haoqing/tmp/simple.pptx', '简单PPT演示文稿')).toBe('simple.pptx');
+  it("prefers basename over translated name", () => {
+    expect(
+      getArtifactLabel("/Users/haoqing/tmp/simple.pptx", "简单PPT演示文稿"),
+    ).toBe("simple.pptx");
+  });
+});
+
+import { buildArtifactItems } from "../src/renderer/utils/artifact-steps";
+
+describe("buildArtifactItems", () => {
+  it("resolves, dedupes and labels written files", () => {
+    const steps: TraceStep[] = [
+      {
+        id: "call_write",
+        type: "tool_call",
+        status: "completed",
+        title: "Write",
+        toolName: "Write",
+        toolOutput: "File created successfully at: /repo/notes/a.md",
+        timestamp: 1,
+      },
+      {
+        id: "call_write_again",
+        type: "tool_call",
+        status: "completed",
+        title: "Write",
+        toolName: "Write",
+        toolOutput: "File created successfully at: /repo/notes/a.md",
+        timestamp: 2,
+      },
+    ];
+
+    expect(buildArtifactItems(steps, "/repo")).toEqual([
+      { label: "a.md", path: "/repo/notes/a.md" },
+    ]);
+  });
+
+  it("returns an empty list when nothing was written", () => {
+    expect(buildArtifactItems([], "/repo")).toEqual([]);
   });
 });

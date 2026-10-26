@@ -3,6 +3,7 @@ import {
   extractFilePathFromToolInput,
   extractFilePathFromToolOutput,
 } from "./tool-output-path";
+import { resolveArtifactPath } from "./artifact-path";
 
 const FILE_TOOL_NAMES = new Set([
   "write_file",
@@ -89,4 +90,33 @@ export function getArtifactSteps(steps: TraceStep[]): ArtifactStepResult {
     fileSteps,
     displayArtifactSteps: [...artifactSteps, ...fileSteps],
   };
+}
+
+export interface ArtifactItem {
+  label: string;
+  path: string;
+}
+
+/** traceSteps → 去重后的产物条目（label + 解析后的绝对路径）。产物面板与概览共用。 */
+export function buildArtifactItems(
+  steps: TraceStep[],
+  cwd: string | null | undefined,
+): ArtifactItem[] {
+  const { displayArtifactSteps } = getArtifactSteps(steps);
+  const seen = new Set<string>();
+  const items: ArtifactItem[] = [];
+
+  for (const step of displayArtifactSteps) {
+    const rawPath =
+      extractFilePathFromToolOutput(step.toolOutput) ||
+      extractFilePathFromToolInput(step.toolInput);
+    if (!rawPath) continue;
+    const resolvedPath = resolveArtifactPath(rawPath, cwd);
+    const key = resolvedPath.trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    items.push({ label: getArtifactLabel(rawPath), path: resolvedPath });
+  }
+
+  return items;
 }
