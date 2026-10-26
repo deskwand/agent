@@ -30,6 +30,7 @@ import {
   isVoiceHeldElsewhere,
 } from "../utils/voice/voice-owner";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
+import { usePendingFocusToolCall } from "../hooks/use-pending-focus-tool-call";
 import {
   computeContextUsage,
   contextUsageLevel,
@@ -1216,6 +1217,8 @@ export function ChatView() {
     },
     [displayedMessages, highlightToolCallId, handleDockTickSelect],
   );
+
+  usePendingFocusToolCall(handleSelectBackgroundAgent);
 
   const isHydratingHistoryState = shouldShowHydratingHistoryState(
     activeSessionId,

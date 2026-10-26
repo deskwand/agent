@@ -4,6 +4,7 @@ import { useAppStore } from "../../store";
 import { useIsSessionRunning } from "../../store/selectors";
 import { useRepoSummary } from "../../hooks/use-repo-summary";
 import { Button } from "../app-button";
+import { BackgroundTasksSection } from "./BackgroundTasksSection";
 import { ChangesSection } from "./ChangesSection";
 import { ContextSection } from "./ContextSection";
 import { EnvironmentSection } from "./EnvironmentSection";
@@ -61,6 +62,7 @@ export function SessionOverviewPanel({ visible }: { visible: boolean }) {
         <ContextSection />
         <OutputsSection />
         <ChangesSection cwd={cwd} repo={repo} />
+        <BackgroundTasksSection />
       </div>
     </div>
   );
