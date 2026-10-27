@@ -9,7 +9,6 @@ import {
   FolderOpen,
   Diff,
   Globe,
-  Package,
   PanelRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -58,8 +57,6 @@ export function Titlebar() {
   const toggleOverview = useAppStore((s) => s.toggleOverview);
   const isOverviewOpen = useAppStore((s) => s.rightPanelMode === "overview");
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
-  const toggleArtifactPanel = useAppStore((s) => s.toggleArtifactPanel);
-  const isArtifactPanelOpen = useAppStore((s) => s.isArtifactPanelOpen);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const startNewSession = useAppStore((s) => s.startNewSession);
@@ -88,11 +85,11 @@ export function Titlebar() {
   const rightToolbar = (
     <div className="titlebar-no-drag pr-1 flex items-center justify-end gap-0.5">
       <TitlebarButton
-        label={t("artifactPanel.toggle", "产物面板")}
-        isOn={isArtifactPanelOpen}
-        onClick={toggleArtifactPanel}
+        label={isOverviewOpen ? t("overview.close") : t("overview.open")}
+        isOn={isOverviewOpen}
+        onClick={toggleOverview}
       >
-        <Package className="w-3.5 h-3.5" />
+        <PanelRight className="w-3.5 h-3.5" />
       </TitlebarButton>
       <TitlebarButton
         label={
@@ -115,13 +112,6 @@ export function Titlebar() {
         onClick={toggleBrowserPanel}
       >
         <Globe className="w-3.5 h-3.5" />
-      </TitlebarButton>
-      <TitlebarButton
-        label={isOverviewOpen ? t("overview.close") : t("overview.open")}
-        isOn={isOverviewOpen}
-        onClick={toggleOverview}
-      >
-        <PanelRight className="w-3.5 h-3.5" />
       </TitlebarButton>
       {/* 探测中（`null`）不渲染：先占一格再抹掉并不比直接不渲染更安静 —— Chromium 实测
           丢掉这一格的 30px 会把前三颗整体推右 30px，占位只是把那次跳动挪到了非仓库那一边。

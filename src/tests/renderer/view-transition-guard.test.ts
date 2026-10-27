@@ -1,6 +1,6 @@
 // 视图转场与滚动方式守卫（第 40 / 43 项）。
 //
-// 第 40 项只钉**视图级**挂载淡入：ArtifactPanel / WelcomeView。
+// 第 40 项只钉**视图级**挂载淡入：WelcomeView。
 // 内容级 animate-fade-in（ThinkingBlock、ToolResultBlock、BashToolBlock、FileToolBlock、
 // ToolUseBlock 共 12 处）是刻意的流式渐显，不在本项口径内 —— 所以**不能**全仓扫描。
 // ScheduleEditModal 的遮罩淡入也刻意保留；Task 2 迁移后它的外壳（含遮罩淡入/缩放）
@@ -25,10 +25,7 @@ import { RENDERER } from "./theme-css-helpers";
 const VIEW_FADE = "animate-fade" + "-in";
 
 /** 视图级组件 —— 这些文件里不允许出现挂载淡入。 */
-const VIEW_FILES = [
-  "components/ArtifactPanel.tsx",
-  "components/WelcomeView.tsx",
-];
+const VIEW_FILES = ["components/WelcomeView.tsx"];
 
 function read(rel: string): string {
   return fs.readFileSync(path.join(RENDERER, rel), "utf8");

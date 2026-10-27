@@ -14,7 +14,7 @@ import { resetIsGitRepoCacheForTests } from "../../renderer/hooks/use-is-git-rep
 
 // 用真实挂载而不是 renderToStaticMarkup：zustand v5 的 useSyncExternalStore 在
 // SSR 下用的是 getInitialState() 作为 server snapshot，setState 对 SSR 结果无效，
-// 而本测试需要设置 activeSessionId / isArtifactPanelOpen 才能覆盖到对应分支。
+// 而本测试需要设置 activeSessionId / rightPanelMode 才能覆盖到对应分支。
 let container: HTMLDivElement;
 let root: Root;
 
@@ -74,7 +74,7 @@ describe("标题栏操作按钮", () => {
     expect(titled).toEqual([]);
   });
 
-  it("5 个操作按钮都有 aria-label", async () => {
+  it("4 个操作按钮都有 aria-label，产物面板按钮已移除", async () => {
     const el = await mountTitlebar();
     // 代码审查那颗要等 git 探针落地才渲染（前提由本文件的两个 beforeEach 给齐）
     await act(async () => {
@@ -84,10 +84,10 @@ describe("标题栏操作按钮", () => {
     //   sidebarCollapsed=false    → context.collapsePanel（左簇开合按钮）
     //   rightPanelMode=null       → titlebar.fileBrowser / titlebar.builtInBrowser
     //   rightPanelMode!=="review" → reviewPanel.title
-    //   isArtifactPanelOpen=false → artifactPanel.toggle
+    //   rightPanelMode=null       → overview.open
     // 折叠态的 ✎（sidebar.newChat）由 titlebar-left-cluster.test.ts 覆盖
     for (const key of [
-      "artifactPanel.toggle",
+      "overview.open",
       "titlebar.fileBrowser",
       "titlebar.builtInBrowser",
       "reviewPanel.title",
@@ -95,6 +95,10 @@ describe("标题栏操作按钮", () => {
     ]) {
       expect(el.querySelector(`[aria-label="${key}"]`), key).not.toBeNull();
     }
+    // 产物面板已删除：它唯一的入口不该再回来
+    expect(
+      el.querySelector('[aria-label="artifactPanel.toggle"]'),
+    ).toBeNull();
   });
 
   it("每个按钮都是 Tooltip 的触发器（没有漏包的）", async () => {
@@ -135,12 +139,12 @@ describe("标题栏操作按钮", () => {
   });
 
   it("面板开启时该按钮切到 on 叠层", async () => {
-    useAppStore.setState({ isArtifactPanelOpen: true });
+    useAppStore.setState({ rightPanelMode: "overview" });
     const el = await mountTitlebar();
-    const artifact = el.querySelector<HTMLElement>(
-      '[aria-label="artifactPanel.toggle"]',
+    const overview = el.querySelector<HTMLElement>(
+      '[aria-label="overview.close"]',
     )!;
-    expect(artifact.className).toMatch(/(?:^|\s)bg-selected-surface(?:\s|$)/);
+    expect(overview.className).toMatch(/(?:^|\s)bg-selected-surface(?:\s|$)/);
     // 开态不再要求"没有 hover:bg-accent"：app-button 的 ghost 变体自带 hover:bg-accent，
     // 而开态用的是裸 bg-accent（更高一档的实心底）—— 两者共存是预期。
   });

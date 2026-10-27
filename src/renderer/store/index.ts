@@ -310,7 +310,6 @@ interface AppState {
   reviewWidth: number | null;
   reviewWidthManual: boolean;
   reviewTargetFile: string | null;
-  isArtifactPanelOpen: boolean;
 
   // Permission
   pendingPermission: PermissionRequest | null;
@@ -534,8 +533,6 @@ interface AppState {
   openReview: () => void;
   closeReview: () => void;
   setReviewTargetFile: (path: string | null) => void;
-  toggleArtifactPanel: () => void;
-  setArtifactPanelOpen: (open: boolean) => void;
   toggleFileBrowser: () => void;
   toggleReviewPanel: () => void;
   toggleBrowserPanel: () => void;
@@ -796,7 +793,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   reviewWidth: null as number | null,
   reviewWidthManual: false,
   reviewTargetFile: null,
-  isArtifactPanelOpen: false,
   pendingPermission: null,
   pendingSudoPassword: null,
   pendingAskUsers: {},
@@ -1689,9 +1685,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   setShowApps: (show) => set({ activeView: show ? "apps" : "chat" }),
   setSettingsTab: (tab) => set({ settingsTab: tab }),
   setReviewTargetFile: (path) => set({ reviewTargetFile: path }),
-  toggleArtifactPanel: () =>
-    set((state) => ({ isArtifactPanelOpen: !state.isArtifactPanelOpen })),
-  setArtifactPanelOpen: (open) => set({ isArtifactPanelOpen: open }),
   toggleFileBrowser: () =>
     set((state) => {
       const next = state.rightPanelMode === "files" ? null : "files";

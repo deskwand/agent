@@ -103,9 +103,6 @@ vi.mock("../../renderer/components/ReviewPanel", () => ({
 vi.mock("../../renderer/components/BrowserPanel", () => ({
   BrowserPanel: () => null,
 }));
-vi.mock("../../renderer/components/ArtifactPanel", () => ({
-  ArtifactPanel: () => null,
-}));
 vi.mock("../../renderer/components/FilePreviewPanel", () => ({
   FilePreviewPanel: () => null,
 }));

@@ -44,7 +44,7 @@ function reviewButton(): HTMLButtonElement | null {
 /** 右簇（含那颗按钮）的直接子元素数量 —— 占位与不占位靠它区分。 */
 function rightClusterChildren(): number {
   const anchor = container.querySelector(
-    'button[aria-label="artifactPanel.toggle"]',
+    'button[aria-label="titlebar.fileBrowser"]',
   );
   return anchor?.parentElement?.children.length ?? -1;
 }
@@ -127,7 +127,7 @@ describe("顶栏代码审查入口", () => {
 
     expect(reviewButton()).toBeNull();
     expect(
-      container.querySelector('button[aria-label="artifactPanel.toggle"]'),
+      container.querySelector('button[aria-label="titlebar.fileBrowser"]'),
     ).not.toBeNull();
     expect(
       container.querySelector('button[aria-label="titlebar.fileBrowser"]'),
@@ -150,13 +150,13 @@ describe("顶栏代码审查入口", () => {
     // 结论没回来之前不占位：先占一格再抹掉并不比直接不渲染更安静
     //（丢这一格的 30px 会把前三颗整体推右，占位只是把那次跳动挪到非仓库那一边）
     expect(reviewButton()).toBeNull();
-    expect(rightClusterChildren()).toBe(4);
+    expect(rightClusterChildren()).toBe(3);
 
     gate.resolve({ isRepo: true, changeCount: 1 });
     await flush();
 
     expect(reviewButton()).not.toBeNull();
-    expect(rightClusterChildren()).toBe(5);
+    expect(rightClusterChildren()).toBe(4);
   });
 
   it("没有活动会话：既不渲染按钮，也不占位", async () => {
@@ -167,7 +167,7 @@ describe("顶栏代码审查入口", () => {
     await flush();
 
     expect(reviewButton()).toBeNull();
-    expect(rightClusterChildren()).toBe(4);
+    expect(rightClusterChildren()).toBe(3);
   });
 
   it("切会话：从仓库切到非仓库，按钮消失", async () => {
@@ -191,7 +191,7 @@ describe("顶栏代码审查入口", () => {
     await flush();
 
     expect(reviewButton()).toBeNull();
-    expect(rightClusterChildren()).toBe(4);
+    expect(rightClusterChildren()).toBe(3);
   });
 
   it("切会话：从非仓库切到仓库，按钮出现", async () => {

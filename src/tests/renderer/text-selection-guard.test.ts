@@ -118,7 +118,6 @@ const SELECTABLE_SURFACES = [
   "components/ChatView.tsx",
   "components/ReviewPanel.tsx",
   "components/FeedItemRow.tsx",
-  "components/ArtifactPanel.tsx",
   "components/FeedReaderPane.tsx",
   "components/GlobalNoticeToast.tsx",
   "components/ApiDiagnosticsPanel.tsx",

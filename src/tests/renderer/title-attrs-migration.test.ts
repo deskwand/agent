@@ -61,7 +61,6 @@ function nativeTitleCount(relPath: string): number {
  */
 const ALLOWED_NATIVE_TITLES: Record<string, number> = {
   // —— 截断文本 / 路径 / 选择器看全文 ——
-  "components/ArtifactPanel.tsx": 1, // 产物完整路径
   "components/attach/AttachmentTiles.tsx": 2, // 元素/文件磁贴的完整路径或密库标识
   "components/ChatInputQueueBar.tsx": 4, // 队列项全文、图片 chip、文件名、CSS selector
   "components/ChatView.tsx": 1, // 注入条目全文

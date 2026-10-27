@@ -92,7 +92,7 @@ export function VoiceMiniButton(): JSX.Element | null {
 
       <div
         data-testid="voice-mini-card"
-        /* z-[60]：要盖过内容区右上的产物面板（`ArtifactPanel.tsx` 是 z-50），
+        /* z-[60]：要盖过内容区右上的浮层（文件预览 / 图片浮层都是 z-50），
            又必须低于灯箱（z-[100]）。`titlebar-no-drag` 写在卡片自己身上，
            不靠祖先继承 —— 断言要能直接看见它。 */
         className="titlebar-no-drag invisible absolute right-0 top-full z-[60] w-[20rem] pt-2 opacity-0 transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"

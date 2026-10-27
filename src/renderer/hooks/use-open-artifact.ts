@@ -1,7 +1,7 @@
 /**
  * 产物按扩展名分派打开方式（浏览器 / 预览 / Office / 系统应用）。
- * 从 ArtifactPanel 提取：产物面板与概览「输出内容」必须行为一致，
- * 复制一份必然漂移。
+ * 概览「输出内容」是当前唯一调用方；以后再加产出入口时复用这里，
+ * 复制一份必然漂移（原先的产物面板就是第二份，已于 2026-10-26 移除）。
  */
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";

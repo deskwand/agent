@@ -1333,10 +1333,6 @@
     "contextUsage": "上下文用量",
     "contextUsageLabel": "{{used}} / {{total}}"
   },
-  "artifactPanel": {
-    "title": "产物",
-    "toggle": "产物面板"
-  },
   "voiceMode": {
     "start": "开始语音",
     "resume": "继续语音",

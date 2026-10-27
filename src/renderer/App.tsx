@@ -99,11 +99,6 @@ const BrowserPanel = lazy(() =>
     default: module.BrowserPanel,
   })),
 );
-const ArtifactPanel = lazy(() =>
-  import("./components/ArtifactPanel").then((module) => ({
-    default: module.ArtifactPanel,
-  })),
-);
 const FilePreviewPanel = lazy(() =>
   import("./components/FilePreviewPanel").then((module) => ({
     default: module.FilePreviewPanel,
@@ -163,7 +158,6 @@ function App() {
   const hasBrowserOcclusion = useAppStore(
     (state) => state.browserOcclusionIds.size > 0,
   );
-  const isArtifactPanelOpen = useAppStore((s) => s.isArtifactPanelOpen);
   const sidebarWidth = useAppStore((s) => s.sidebarWidth);
   const contextPanelWidth = useAppStore((s) => s.contextPanelWidth);
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
@@ -729,12 +723,6 @@ function App() {
               </PanelErrorBoundary>
             ) : (
               <WelcomeView />
-            )}
-            {/* Artifact floating panel */}
-            {isArtifactPanelOpen && (
-              <Suspense fallback={null}>
-                <ArtifactPanel />
-              </Suspense>
             )}
           </main>
 

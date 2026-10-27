@@ -77,12 +77,12 @@ describe("顶栏播放控件", () => {
       widgets().querySelector('[data-testid="voice-mini-orb"]'),
     ).not.toBeNull();
 
-    // 顺序：播放控件在前、四个面板按钮在后（图中如此）。
+    // 顺序：播放控件在前、三个面板按钮在后（图中如此）。
     // 只断言「它是第一个子元素」不够 —— 面板簇被删掉时那样也会绿，
-    // 所以顺手断言同一容器里确实还有产物面板按钮。
+    // 所以顺手断言同一容器里确实还有面板按钮。
     const cluster = widgets().parentElement as HTMLElement;
     const panelButton = cluster.querySelector(
-      'button[aria-label="artifactPanel.toggle"]',
+      'button[aria-label="overview.open"]',
     );
     expect(panelButton).not.toBeNull();
     expect(

@@ -1334,10 +1334,6 @@
     "contextUsage": "Context Usage",
     "contextUsageLabel": "{{used}} / {{total}}"
   },
-  "artifactPanel": {
-    "title": "Artifacts",
-    "toggle": "Artifact Panel"
-  },
   "voiceMode": {
     "start": "Start voice",
     "resume": "Resume voice",
