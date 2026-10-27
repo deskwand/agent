@@ -3,8 +3,12 @@ export type FileTextPart =
   | { type: "file"; value: string };
 export type FileChildPart = FileTextPart | { type: "node"; value: unknown };
 
+// 助手正文里的文件引用链接。
+// ⚠️ `whitespace-pre-wrap` 与 ReferenceToken 的那条同源：它渲染成 `app-button` 的
+// `<Button>`，base 带 `whitespace-nowrap`，而 `.prose-chat` 是 `overflow-x-clip` ——
+// 长路径不折行就会被正文盒无声裁掉。`break-all` 单独压不住 nowrap，必须显式换掉。
 const fileLinkButtonClassName =
-  "text-primary-text hover:text-primary-text underline underline-offset-2 text-left break-all inline-block";
+  "text-primary-text hover:text-primary-text underline underline-offset-2 text-left break-all inline-block whitespace-pre-wrap";
 
 export function getFileLinkButtonClassName(): string {
   return fileLinkButtonClassName;

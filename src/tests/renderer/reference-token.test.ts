@@ -95,4 +95,21 @@ describe("ReferenceToken", () => {
     //（比 `.tt-anchor` 更强 ✓ —— 它证明的是「被 Radix 接管了」✓，而不只是「被套了一层」✓）。
     expect(container.querySelector("[data-state]")).not.toBeNull();
   });
+
+  it("可点击 token 不继承 Button 的 whitespace-nowrap（长路径必须能折行）", () => {
+    // 2026-10-26 用户报障：气泡里的长文件路径把整列撑出屏幕。根因是迁移到 shadcn
+    // `<Button>` 后 base 带了 `whitespace-nowrap`，`break-all` 被它压住 ⇒ 一个 680px 的
+    // 路径 chip 在 672px 的正文里不折行、被聊天列裁掉。这里锁住合并后的类串：
+    // nowrap 必须被调用方的 pre-wrap 顶掉（`cn` 同族合并，jsdom 量不了布局，就锁机制）。
+    render(
+      React.createElement(ReferenceToken, {
+        kind: "file",
+        label: `/Users/someone/${"a".repeat(200)}.plist`,
+        onClick: () => {},
+      }),
+    );
+    const button = container.querySelector("button")!;
+    expect(button.className).not.toMatch(/\bwhitespace-nowrap\b/);
+    expect(button.className).toMatch(/\bwhitespace-pre-wrap\b/);
+  });
 });

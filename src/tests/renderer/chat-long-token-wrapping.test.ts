@@ -15,6 +15,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { getFileLinkButtonClassName } from "../../renderer/utils/file-link";
 import { RENDERER, classNameAt, cssFlat } from "./theme-css-helpers";
 
 const messageCard = fs.readFileSync(
@@ -51,6 +52,12 @@ describe("助手正文：长 token 折行，代码块保持横滚", () => {
     expect(cssFlat).toMatch(
       /\.prose-chat\s*\{[^}]*overflow-wrap:\s*break-word;/,
     );
+  });
+
+  it("助手正文的文件引用按钮同样声明折行（不被 app-button 的 nowrap 压住）", () => {
+    // 同一根因的用户侧修复见 ReferenceToken.tsx：`<Button>` 的 base 带 `whitespace-nowrap`，
+    // 而 `.prose-chat` 是 `overflow-x-clip` ⇒ 长路径会被直接裁掉。
+    expect(getFileLinkButtonClassName()).toContain("whitespace-pre-wrap");
   });
 
   it("代码块复位为 overflow-wrap: normal", () => {

@@ -52,11 +52,19 @@ export function ReferenceToken({
     </>
   );
 
+  // ⚠️ `whitespace-pre-wrap` 不是装饰：`app-button` 的 base 里有 `whitespace-nowrap`
+  // （按钮默认不折行 ✓），而气泡里的文件 token 可能是几百字符的路径 —— 单行放不下时
+  // 它会撑出气泡、被聊天列 `overflow-x-hidden` 无声裁掉（2026-10-26 用户报障
+  // 「用户消息区排版超出屏幕了」✓：`/Users/.../officecli.update` 实测 680px 宽，
+  // 容器只有 672px ✗）。`break-all` 单独压不住 nowrap；这里靠 `cn` 的同族合并
+  // 把 base 的 nowrap 换成 pre-wrap（与输入框 token 的 nowrap **有意不同**：
+  // 那边是原子 chip，必须整块；这里是正文回显，长路径必须能折行 ✓）。
   const body = onClick ? (
-    <Button variant="ghost"
+    <Button
+      variant="ghost"
       type="button"
       onClick={onClick}
-      className={`${BASE_CLASS} break-all text-left`}
+      className={`${BASE_CLASS} break-all whitespace-pre-wrap text-left`}
     >
       {inner}
     </Button>
