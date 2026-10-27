@@ -1360,9 +1360,14 @@ describe("TopUpModal 页签（ui/tabs 语义与滚动归属）", () => {
   // role=tablist/tab/tabpanel、没有 aria-selected、没有方向键语义。这里锁原语接管后的行为，
   // 并保住布局归属：固定高度面板是 Tabs Root（asChild 合并到 DialogContent），
   // 滚动/flex/gap 归各 TabsContent —— 面板自己不 flex-1，避免双重滚动条。
+  // 面板必须是 flex 容器（gap-4 才有作用），但 `flex` 会顶掉 Radix 给非当前值面板打的
+  // `hidden`：preflight 的 `[hidden]:where(:not([hidden="until-found"]))` 与 `.flex` 同
+  // specificity 却更早，后面的 display 胜出 ⇒ 空壳照常按 flex-1 占掉一半高度（记录页上方
+  // 一片空白）。变体选择器抬一层 specificity，删掉它这个 bug 就回来。
   const PANEL_CLASSES = [
     "mt-4",
     "flex",
+    "data-[state=inactive]:hidden",
     "min-h-0",
     "flex-1",
     "flex-col",

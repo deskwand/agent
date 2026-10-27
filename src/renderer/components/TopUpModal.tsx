@@ -297,10 +297,13 @@ export function TopUpModal({
               min-h-0 才能让 overflow-y-auto 真的滚而不是把面板撑高。 */}
             {/* 面板内容仍按原值条件渲染：Radix 把非当前值面板留在 DOM 里（hidden 空壳），
                 不补这层守卫的话历史列表会在充值页一打开就挂载并拉订单 —— 迁移前是切到才挂载。
-                面板壳保留，只为 a11y（role=tabpanel + aria 关联）。 */}
+                面板壳保留，只为 a11y（role=tabpanel + aria 关联）。
+                空壳必须显式 `data-[state=inactive]:hidden`：面板是 flex 容器，而 preflight 的
+                `[hidden]:where(:not([hidden="until-found"]))` 与 `.flex` 同 specificity、位置更早 ⇒
+                不带这条变体时空壳照常参与纵向 flex 分配（两个面板都 flex-1），剩下一半高度是空白。 */}
             <TabsContent
               value="topup"
-              className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6"
+              className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6 data-[state=inactive]:hidden"
             >
               {tab === "topup" && (
                 <>
@@ -505,7 +508,7 @@ export function TopUpModal({
             </TabsContent>
             <TabsContent
               value="history"
-              className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6"
+              className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6 data-[state=inactive]:hidden"
             >
               {tab === "history" && <TopUpHistory cloudApi={cloudApi} />}
             </TabsContent>
