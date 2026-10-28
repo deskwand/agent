@@ -29,7 +29,7 @@ export function SessionOverviewPanel({ visible }: { visible: boolean }) {
   });
 
   return (
-    <div className="flex h-full min-w-0 flex-col bg-background">
+    <div className="flex h-full w-full min-w-0 flex-1 flex-col bg-background">
       <div className="flex shrink-0 items-center gap-2 border-b border-border/20 px-4 py-2">
         <LayoutList className="w-4 h-4 text-primary-text" />
         <span className="text-sm font-medium text-foreground">

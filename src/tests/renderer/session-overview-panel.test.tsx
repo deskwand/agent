@@ -72,6 +72,18 @@ afterEach(async () => {
 });
 
 describe("SessionOverviewPanel", () => {
+  it("declares full-width flex sizing classes for the resizable slot", async () => {
+    await act(async () => {
+      root.render(<SessionOverviewPanel visible={false} />);
+    });
+
+    const panel = container.firstElementChild;
+    // jsdom has no layout engine: pin the flex sizing contract used by the slot.
+    expect(panel?.classList.contains("flex-1")).toBe(true);
+    expect(panel?.classList.contains("w-full")).toBe(true);
+    expect(panel?.classList.contains("min-w-0")).toBe(true);
+  });
+
   it("shows the folder, branch and context usage for a repo session", async () => {
     mockRepo({
       isRepo: true,
