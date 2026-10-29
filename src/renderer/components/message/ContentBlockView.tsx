@@ -74,7 +74,6 @@ export function getCodeRenderMode(
 export const ContentBlockView = memo(function ContentBlockView({
   block,
   isUser,
-  isStreaming,
   allBlocks,
   message,
   artifactExpansion,
@@ -92,8 +91,12 @@ export const ContentBlockView = memo(function ContentBlockView({
   const openLightbox = useAppStore((s) => s.openLightbox);
   const openPreview = useAppStore((s) => s.openPreview);
 
-  const resolveFilePath = (value: string) =>
-    resolvePathAgainstWorkspace(value, currentWorkingDir);
+  // useCallback 承重：它进用户气泡 components 的 useMemo 依赖，每帧新建箭头会把
+  // MessageMarkdown 的 memo 打穿 —— 流式输出时每个 chunk 都会重跑一遍 markdown 解析。
+  const resolveFilePath = useCallback(
+    (value: string) => resolvePathAgainstWorkspace(value, currentWorkingDir),
+    [currentWorkingDir],
+  );
 
   // 该文件原本有两处一模一样的"在文件夹中显示"实现；抽成一个局部函数供两处复用
   // （路由兜底 + chip 上那个独立按钮）。
@@ -169,7 +172,8 @@ export const ContentBlockView = memo(function ContentBlockView({
   );
 
   const renderFileButton = (value: string, key?: string) => (
-    <Button variant="ghost"
+    <Button
+      variant="ghost"
       key={key}
       type="button"
       onClick={() => handleFilePathClick(value)}
@@ -256,7 +260,8 @@ export const ContentBlockView = memo(function ContentBlockView({
           // 四种分流共用同一个按钮外壳：原先四个几乎相同的 <Button variant="ghost"> 只差 onClick，
           // 合并后少掉 ~40 行重复，也让分流集中在一处。
           return (
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               type="button"
               onClick={() => void openLocalFile()}
               className={getFileLinkButtonClassName()}
@@ -439,23 +444,22 @@ export const ContentBlockView = memo(function ContentBlockView({
 
         if (!text) {
           return (
-            <span className={`text-muted-foreground italic ${isUser ? "" : "pl-1"}`}>
+            <span
+              className={`text-muted-foreground italic ${isUser ? "" : "pl-1"}`}
+            >
               {t("messageCard.emptyText")}
             </span>
           );
         }
 
-        // Simple text display for user messages, Markdown for assistant
+        // 用户气泡：markdown + 行内 token 交给 UserTextWithTokens（见设计 §0）。
         if (isUser) {
           return (
-            <p className="message-user-text text-foreground whitespace-pre-wrap break-words text-left">
-              <UserTextWithTokens
-                text={text}
-                resolveFilePath={resolveFilePath}
-                onFileClick={handleFilePathClick}
-              />
-              {isStreaming && <span className="eff-cursor" />}
-            </p>
+            <UserTextWithTokens
+              text={text}
+              resolveFilePath={resolveFilePath}
+              onFileClick={handleFilePathClick}
+            />
           );
         }
 

@@ -81,3 +81,72 @@ export function stripLeadingSkillToken(text: string): string {
   if (!match) return text;
   return text.slice(match[0].length);
 }
+
+/**
+ * 用户气泡的「行首令牌」在进入 markdown 之前换成的载体字符。
+ *
+ * 为什么不是「先渲染 chip、再渲染 markdown」：markdown 的第一个段落是块级盒子，
+ * chip 会被挤到正文上一行，而今天它和首句在同一行。塞进首段的行内 code span 里，
+ * 位置天然正确，也不需要计数器（StrictMode 双渲染会让计数器错位）或 CSS 覆盖。
+ *
+ * 用私用区字符而不是 `@ref:` 之类可读前缀：用户敲得出可读前缀，敲不出这个。
+ */
+export const USER_TOKEN_SENTINEL = "\uE000";
+
+export interface UserTokenPayload {
+  kind: "skill" | "command";
+  /** 显示文本：技能 = 纯名字，命令 = display_name 或缺省含斜杠的原名 */
+  label: string;
+  /** 原文片段：命令 chip 的 tooltip 用得到 */
+  raw: string;
+}
+
+const PAYLOAD_SEP = "|";
+
+/**
+ * 用户正文 → markdown 源：**行首**令牌换成一段行内 code 里的哨兵载荷，其余原样。
+ *
+ * 只产出显示用的源；发送给模型、落盘的字符串仍是原文（缓存安全）。
+ */
+export function toUserMarkdown(
+  text: string,
+  commandLabels: ReadonlyMap<string, string> = new Map<string, string>(),
+): string {
+  const token = resolveLeadingToken(text, commandLabels);
+  if (!token) return text;
+  // 载荷住在 code span 里，反引号会提前闭合它（令牌名理论上可以含反引号）
+  const clean = (value: string) => value.replace(/`/g, "");
+  const encoded = [
+    USER_TOKEN_SENTINEL,
+    token.kind,
+    encodeURIComponent(clean(token.raw)),
+    encodeURIComponent(clean(token.label)),
+    USER_TOKEN_SENTINEL,
+  ].join(PAYLOAD_SEP);
+  return `\`${encoded}\`${text.slice(token.raw.length)}`;
+}
+
+/**
+ * 从 code span 的文本内容里解回令牌；不是哨兵载荷就返回 null。
+ *
+ * 任何形状都不抛：伪造的载荷只影响显示（chip 不是链接，点不动），不该让气泡白屏。
+ */
+export function parseUserTokenValue(value: string): UserTokenPayload | null {
+  if (!value.startsWith(USER_TOKEN_SENTINEL)) return null;
+  const parts = value.split(PAYLOAD_SEP);
+  if (parts.length !== 5) return null;
+  const [head, kind, raw, label, tail] = parts;
+  if (head !== USER_TOKEN_SENTINEL || tail !== USER_TOKEN_SENTINEL) {
+    return null;
+  }
+  if (kind !== "skill" && kind !== "command") return null;
+  try {
+    return {
+      kind,
+      raw: decodeURIComponent(raw),
+      label: decodeURIComponent(label),
+    };
+  } catch {
+    return null;
+  }
+}

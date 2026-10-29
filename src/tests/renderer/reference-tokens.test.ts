@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseUserTokenValue,
   resolveLeadingToken,
   stripLeadingSkillToken,
+  toUserMarkdown,
+  USER_TOKEN_SENTINEL,
 } from "../../renderer/utils/reference-tokens";
 
 const NO_COMMANDS = new Map<string, string>();
@@ -73,7 +76,8 @@ describe("resolveLeadingToken", () => {
 
   it("技能前缀优先于命令分支", () => {
     expect(
-      resolveLeadingToken("/skill:foo", new Map([["skill:foo", "/skill:foo"]]))?.kind,
+      resolveLeadingToken("/skill:foo", new Map([["skill:foo", "/skill:foo"]]))
+        ?.kind,
     ).toBe("skill");
   });
 
@@ -127,5 +131,67 @@ describe("stripLeadingSkillToken", () => {
   it("空串与空白原样返回", () => {
     expect(stripLeadingSkillToken("")).toBe("");
     expect(stripLeadingSkillToken("   ")).toBe("   ");
+  });
+});
+
+describe("toUserMarkdown", () => {
+  const labels = new Map([["plan", "/plan 计划"]]);
+
+  it("行首技能变成哨兵 code span，正文（含原有空格）原样跟在后面", () => {
+    const out = toUserMarkdown("/skill:apple-design 把间距统一一下", labels);
+    expect(out.startsWith("`" + USER_TOKEN_SENTINEL)).toBe(true);
+    // raw 不含尾随空格（SKILL_PATTERN 是 (\S+)），所以这里有一个空格
+    expect(out.endsWith("` 把间距统一一下")).toBe(true);
+    expect(out).not.toContain("/skill:");
+    const value = /^`([^`]+)`/.exec(out)?.[1] ?? "";
+    expect(parseUserTokenValue(value)).toEqual({
+      kind: "skill",
+      label: "apple-design",
+      raw: "/skill:apple-design",
+    });
+  });
+
+  it("行首命令保留原文，供 chip 的 tooltip 使用", () => {
+    const out = toUserMarkdown("/plan 排一下", labels);
+    const value = /^`([^`]+)`/.exec(out)?.[1] ?? "";
+    expect(parseUserTokenValue(value)).toEqual({
+      kind: "command",
+      label: "/plan 计划",
+      raw: "/plan",
+    });
+  });
+
+  it("技能名带点或中文也认得出来", () => {
+    const out = toUserMarkdown("/skill:技能名 改", labels);
+    const value = /^`([^`]+)`/.exec(out)?.[1] ?? "";
+    expect(parseUserTokenValue(value)?.label).toBe("技能名");
+  });
+
+  it("句中 /skill: 与普通文本原样返回（含换行）", () => {
+    expect(toUserMarkdown("帮我用 /skill:x 改", labels)).toBe(
+      "帮我用 /skill:x 改",
+    );
+    expect(toUserMarkdown("/tmp 目录\n第二行", labels)).toBe(
+      "/tmp 目录\n第二行",
+    );
+  });
+
+  it("行首非白名单命令 /word 保持纯文本", () => {
+    expect(toUserMarkdown("/unknown 收一下", labels)).toBe("/unknown 收一下");
+  });
+
+  it("载荷里的反引号被剥掉，不会撑破 code span", () => {
+    const out = toUserMarkdown("/skill:a`b 改", labels);
+    const value = /^`([^`]+)`/.exec(out)?.[1] ?? "";
+    expect(value).not.toContain("`");
+    expect(parseUserTokenValue(value)?.label).toBe("ab");
+  });
+
+  it("parseUserTokenValue 对任何输入都不抛，且不认残缺载荷", () => {
+    expect(parseUserTokenValue("普通文本")).toBeNull();
+    expect(parseUserTokenValue(USER_TOKEN_SENTINEL)).toBeNull();
+    expect(
+      parseUserTokenValue(USER_TOKEN_SENTINEL + "|x|%E0%A4%A|y|"),
+    ).toBeNull();
   });
 });

@@ -956,6 +956,17 @@
     letter-spacing: -0.01em;
   }
 
+  /* 气泡里的 markdown 段距：`.prose-chat p` 的 12px 是给助手长正文的，
+     套进气泡会把三行消息撑成五行的观感。首块贴顶已由 `.prose-chat > :first-child`
+     负责，这里只收段距并让末段贴底（同特异性，必须写在后面）。 */
+  .message-user-text .prose-chat p {
+    margin-bottom: 0.5rem;
+  }
+
+  .message-user-text .prose-chat p:last-child {
+    margin-bottom: 0;
+  }
+
   /* contenteditable 没有原生 placeholder，用 :empty 伪元素补。 */
   .chat-editor:empty::before {
     content: attr(data-placeholder);
