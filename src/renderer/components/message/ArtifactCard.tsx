@@ -22,6 +22,7 @@ import { openFilePathInBrowser } from "../../utils/open-in-browser";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { Button } from "../app-button";
 import { useIsGitRepo } from "../../hooks/use-is-git-repo";
+import { usePaneSessionId } from "../split/pane-context";
 
 interface ArtifactCardProps {
   files: ResultFileEntry[];
@@ -113,8 +114,9 @@ export const ArtifactCard = memo(function ArtifactCard({
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const { isElectron } = useIPC();
 
+  const paneSessionId = usePaneSessionId();
   const activeSessionCwd = useAppStore((s) => {
-    const sid = s.activeSessionId;
+    const sid = paneSessionId;
     if (!sid) return undefined;
     const session = (s.sessions as Session[]).find((ses) => ses.id === sid);
     return session?.cwd || undefined;

@@ -312,10 +312,11 @@ interface AppState {
   reviewTargetFile: string | null;
 
   // Permission
-  pendingPermission: PermissionRequest | null;
+  // 按 toolUseId 索引（插入顺序即到达顺序，支持多会话并发）
+  pendingPermissions: Record<string, PermissionRequest>;
 
   // Sudo password
-  pendingSudoPassword: SudoPasswordRequest | null;
+  pendingSudoPasswords: Record<string, SudoPasswordRequest>;
 
   // Ask user (ask_user tool): 按toolCallId 索引的待答提问（支持多会话并发）
   pendingAskUsers: Record<string, AskUserRequest>;
@@ -539,9 +540,11 @@ interface AppState {
   toggleOverview: () => void;
   setBrowserWidthManual: (manual: boolean) => void;
 
-  setPendingPermission: (permission: PermissionRequest | null) => void;
+  addPendingPermission: (request: PermissionRequest) => void;
+  removePendingPermission: (toolUseId: string) => void;
 
-  setPendingSudoPassword: (request: SudoPasswordRequest | null) => void;
+  addPendingSudoPassword: (request: SudoPasswordRequest) => void;
+  removePendingSudoPassword: (toolUseId: string) => void;
 
   setPendingAskUser: (request: AskUserRequest) => void;
   clearPendingAskUser: (toolCallId: string) => void;
@@ -793,8 +796,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   reviewWidth: null as number | null,
   reviewWidthManual: false,
   reviewTargetFile: null,
-  pendingPermission: null,
-  pendingSudoPassword: null,
+  pendingPermissions: {},
+  pendingSudoPasswords: {},
   pendingAskUsers: {},
   settings: defaultSettings,
   appConfig: null,
@@ -1853,10 +1856,36 @@ export const useAppStore = create<AppState>((set, get) => ({
   setReviewWidthManual: (manual) => set({ reviewWidthManual: manual }),
 
   // Permission actions
-  setPendingPermission: (permission) => set({ pendingPermission: permission }),
+  addPendingPermission: (request) =>
+    set((s) => ({
+      pendingPermissions: {
+        ...s.pendingPermissions,
+        [request.toolUseId]: request,
+      },
+    })),
+  removePendingPermission: (toolUseId) =>
+    set((s) => {
+      if (!(toolUseId in s.pendingPermissions)) return s;
+      const rest = { ...s.pendingPermissions };
+      delete rest[toolUseId];
+      return { pendingPermissions: rest };
+    }),
 
   // Sudo password actions
-  setPendingSudoPassword: (request) => set({ pendingSudoPassword: request }),
+  addPendingSudoPassword: (request) =>
+    set((s) => ({
+      pendingSudoPasswords: {
+        ...s.pendingSudoPasswords,
+        [request.toolUseId]: request,
+      },
+    })),
+  removePendingSudoPassword: (toolUseId) =>
+    set((s) => {
+      if (!(toolUseId in s.pendingSudoPasswords)) return s;
+      const rest = { ...s.pendingSudoPasswords };
+      delete rest[toolUseId];
+      return { pendingSudoPasswords: rest };
+    }),
 
   // Ask user actions
   setPendingAskUser: (request) =>

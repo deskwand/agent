@@ -6,6 +6,8 @@ interface ResizeHandleProps {
   onDoubleClick?: () => void;
   position?: "left" | "right";
   className?: string;
+  /** 拖动轴向；默认 "x"（按 clientX）。"y" 用于上下分割线（按 clientY）。 */
+  axis?: "x" | "y";
   /**
    * 拖动开始/结束通知。面板在拖动期间必须关掉宽度过渡：
    * 过渡会把每一帧的宽度变化再延迟 300ms，让面板永远追不上光标（1:1 跟手的前提）。
@@ -27,6 +29,7 @@ export function ResizeHandle({
   onDoubleClick,
   className,
   onDraggingChange,
+  axis = "x",
 }: ResizeHandleProps) {
   const [isDragging, setIsDragging] = useState(false);
   const startXRef = useRef(0);
@@ -42,11 +45,14 @@ export function ResizeHandle({
     return () => onDraggingChangeRef.current?.(false);
   }, [isDragging]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    startXRef.current = e.clientX;
-    setIsDragging(true);
-  }, []);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      startXRef.current = axis === "y" ? e.clientY : e.clientX;
+      setIsDragging(true);
+    },
+    [axis],
+  );
 
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
@@ -57,10 +63,11 @@ export function ResizeHandle({
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!isDragging) return;
-      onResize(e.clientX - startXRef.current);
-      startXRef.current = e.clientX;
+      const pos = axis === "y" ? e.clientY : e.clientX;
+      onResize(pos - startXRef.current);
+      startXRef.current = pos;
     },
-    [isDragging, onResize],
+    [isDragging, onResize, axis],
   );
 
   useEffect(() => {
@@ -70,7 +77,7 @@ export function ResizeHandle({
     document.addEventListener("mouseup", handleMouseUp);
 
     // Prevent text selection while dragging
-    document.body.style.cursor = "col-resize";
+    document.body.style.cursor = axis === "y" ? "row-resize" : "col-resize";
     document.body.style.userSelect = "none";
 
     return () => {
@@ -79,19 +86,29 @@ export function ResizeHandle({
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handleMouseMove, handleMouseUp, axis]);
 
   return (
     <div
-      className={`relative w-1 shrink-0 cursor-col-resize group ${className || ""}`.trim()}
+      className={`relative shrink-0 group ${
+        axis === "y" ? "h-1 cursor-row-resize" : "w-1 cursor-col-resize"
+      } ${className || ""}`.trim()}
       onMouseDown={handleMouseDown}
       onDoubleClick={onDoubleClick}
     >
       {/* Expanded hit area */}
-      <div className="absolute inset-y-0 -left-[2px] -right-[2px]" />
+      <div
+        className={
+          axis === "y"
+            ? "absolute inset-x-0 -top-[2px] -bottom-[2px]"
+            : "absolute inset-y-0 -left-[2px] -right-[2px]"
+        }
+      />
       {/* Visual indicator on hover/drag */}
       <div
-        className={`absolute inset-y-0 left-0 w-px transition-colors ${
+        className={`absolute transition-colors ${
+          axis === "y" ? "inset-x-0 top-0 h-px" : "inset-y-0 left-0 w-px"
+        } ${
           isDragging ? "bg-primary" : "bg-transparent group-hover:bg-primary/30"
         }`}
       />

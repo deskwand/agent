@@ -21,6 +21,7 @@ import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
 import type { Session } from "../../types";
 import type { InlineArtifactInfo } from "../../utils/inline-artifacts";
 import { Button } from "../app-button";
+import { usePaneSessionId } from "../split/pane-context";
 
 /** 每次展开都重新取 URL：签名是进程内的，应用重启后就失效了。 */
 type LoadState =
@@ -48,8 +49,9 @@ export function ArtifactInlineFrame({
   // 模型给的是相对工作区的路径（<file_references> 规则要求如此），而主进程的 cwd 是
   // 应用启动目录（打包后从 Dock 启动就是 `/`）——不解析就是 stat(ENOENT) → null → 失败行。
   // 解析方式与 ArtifactCard 保持一致。
+  const paneSessionId = usePaneSessionId();
   const activeSessionCwd = useAppStore((s) => {
-    const sid = s.activeSessionId;
+    const sid = paneSessionId;
     if (!sid) return undefined;
     const session = (s.sessions as Session[]).find((ses) => ses.id === sid);
     return session?.cwd || undefined;
@@ -95,7 +97,8 @@ export function ArtifactInlineFrame({
 
   if (!expanded) {
     return (
-      <Button variant="ghost"
+      <Button
+        variant="ghost"
         type="button"
         onClick={() => onToggle(artifact.path)}
         className="flex min-h-9 w-full items-center gap-2 rounded-md border border-border bg-muted px-2 py-1.5 text-left text-xs text-foreground hover:bg-selected-surface h-auto"
@@ -109,7 +112,8 @@ export function ArtifactInlineFrame({
   return (
     <div className="overflow-hidden rounded-md border border-border bg-card">
       <div className="flex min-h-9 items-center gap-2 border-b border-border bg-muted px-2 py-1.5">
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           data-testid="artifact-inline-toggle"
           onClick={() => onToggle(artifact.path)}
@@ -121,7 +125,8 @@ export function ArtifactInlineFrame({
         <div className="ml-auto flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 aria-label={t("artifact.inline.reload")}
                 onClick={() => setReloadToken((token) => token + 1)}
@@ -138,7 +143,8 @@ export function ArtifactInlineFrame({
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 aria-label={t("artifact.inline.openInBrowser")}
                 onClick={handleOpenInBrowser}
@@ -160,7 +166,8 @@ export function ArtifactInlineFrame({
           className="flex items-center gap-2 px-3 py-4 text-xs text-destructive"
         >
           <span>{t("artifact.inline.failed")}</span>
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
             className="underline h-auto px-0 hover:bg-transparent hover:text-current"

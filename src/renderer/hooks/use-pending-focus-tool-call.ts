@@ -7,6 +7,7 @@ import { useAppStore } from "../store";
 
 export function usePendingFocusToolCall(
   onFocus: (toolCallId: string) => void,
+  enabled = true,
 ): void {
   const pendingToolCallId = useAppStore((s) => s.pendingFocusToolCallId);
   const clearPendingFocusToolCall = useAppStore(
@@ -14,8 +15,8 @@ export function usePendingFocusToolCall(
   );
 
   useEffect(() => {
-    if (!pendingToolCallId) return;
+    if (!enabled || !pendingToolCallId) return;
     onFocus(pendingToolCallId);
     clearPendingFocusToolCall();
-  }, [pendingToolCallId, onFocus, clearPendingFocusToolCall]);
+  }, [enabled, pendingToolCallId, onFocus, clearPendingFocusToolCall]);
 }

@@ -6,6 +6,7 @@ import {
   useRef,
   useCallback,
   useState,
+  useMemo,
 } from "react";
 import { useAppStore } from "./store";
 import {
@@ -16,7 +17,7 @@ import {
   useGlobalNotice,
   useSandboxSetupState,
   useSandboxSyncStatus,
-  usePendingDialogs,
+  useOrphanPendingDialogs,
 } from "./store/selectors";
 import { useIPC } from "./hooks/useIPC";
 import { useSpeakerInterrupts } from "./hooks/useFeedListen";
@@ -38,7 +39,6 @@ import {
   panelWidthTransitionClass,
   resolvePanelWidth,
 } from "./utils/panel-width";
-import { WelcomeView } from "./components/WelcomeView";
 import { VaultView } from "./components/VaultView";
 import { UsageView } from "./components/UsageView";
 import { FeedView } from "./components/FeedView";
@@ -66,6 +66,12 @@ import { useSessionSearchShortcut } from "./hooks/useSessionSearchShortcut";
 import { SessionSearchPalette } from "./components/SessionSearchPalette";
 import { ImageLightbox } from "./components/ImageLightbox";
 import { useImageLightboxState } from "./store/selectors";
+import {
+  installSplitLayoutSync,
+  useSplitLayoutStore,
+} from "./store/split-layout";
+import { SplitLayout } from "./components/split/SplitLayout";
+import { visiblePaneSessionIds } from "./store/split-tree";
 import { PanelErrorBoundary } from "./components/PanelErrorBoundary";
 import type { AppConfig } from "./types";
 import type { GlobalNoticeAction } from "./store";
@@ -74,11 +80,6 @@ import {
   shouldSuppressVisibleBrowser,
 } from "./utils/browser-visibility";
 
-const ChatView = lazy(() =>
-  import("./components/ChatView").then((module) => ({
-    default: module.ChatView,
-  })),
-);
 const FileBrowser = lazy(() =>
   import("./components/FileBrowser").then((module) => ({
     default: module.FileBrowser,
@@ -134,7 +135,27 @@ function App() {
   const { progress: sandboxSetupProgress, isComplete: isSandboxSetupComplete } =
     useSandboxSetupState();
   const sandboxSyncStatus = useSandboxSyncStatus();
-  const { pendingPermission, pendingSudoPassword } = usePendingDialogs();
+  const splitRoot = useSplitLayoutStore((s) => s.root);
+  const isBrowserFullscreen = useAppStore((s) => s.isBrowserFullscreen);
+  // SplitLayout 只在聊天视图且非浏览器全屏时挂载，其余时候授权弹窗要兜底。
+  const visibleSessionIds = useMemo(
+    () =>
+      visiblePaneSessionIds(
+        splitRoot,
+        activeView === "chat" && !isBrowserFullscreen,
+      ),
+    [splitRoot, activeView, isBrowserFullscreen],
+  );
+  const { permission: pendingPermission, sudo: pendingSudoPassword } =
+    useOrphanPendingDialogs(visibleSessionIds);
+  const setActiveSession = useAppStore((s) => s.setActiveSession);
+  const orphanPermissionTitle = useAppStore(
+    (s) => s.sessions.find((x) => x.id === pendingPermission?.sessionId)?.title,
+  );
+  const orphanSudoTitle = useAppStore(
+    (s) =>
+      s.sessions.find((x) => x.id === pendingSudoPassword?.sessionId)?.title,
+  );
   // 三路音频互停（整条朗读 / 订阅收听 / 划词朗读）。挂这里而不是功能组件里：
   // 它管的是全局规则，挂在某个按钮上会随那个组件的位置变化而静默失效。
   useSpeakerInterrupts();
@@ -162,7 +183,6 @@ function App() {
   const contextPanelWidth = useAppStore((s) => s.contextPanelWidth);
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const setContextPanelWidth = useAppStore((s) => s.setContextPanelWidth);
-  const isBrowserFullscreen = useAppStore((s) => s.isBrowserFullscreen);
   const exitBrowserFullscreen = useAppStore((s) => s.exitBrowserFullscreen);
   const browserWidthManual = useAppStore((s) => s.browserWidthManual);
   const setBrowserWidthManual = useAppStore((s) => s.setBrowserWidthManual);
@@ -192,6 +212,8 @@ function App() {
   const appLive = useRef(true);
   useWindowSize();
   const initialized = useRef(false);
+
+  useEffect(() => installSplitLayoutSync(), []);
 
   useEffect(() => {
     appLive.current = true;
@@ -711,18 +733,8 @@ function App() {
               <UsageView />
             ) : activeView === "feedback" ? (
               <FeedbackView />
-            ) : activeSessionId ? (
-              <PanelErrorBoundary
-                name="ChatView"
-                resetKey={activeSessionId}
-                fallback={<MainPanelFallback />}
-              >
-                <Suspense fallback={<MainPanelFallback />}>
-                  <ChatView />
-                </Suspense>
-              </PanelErrorBoundary>
             ) : (
-              <WelcomeView />
+              <SplitLayout />
             )}
           </main>
 
@@ -881,7 +893,13 @@ function App() {
       )}
 
       {/* Permission Dialog */}
-      {pendingPermission && <PermissionDialog permission={pendingPermission} />}
+      {pendingPermission && (
+        <PermissionDialog
+          permission={pendingPermission}
+          sessionTitle={orphanPermissionTitle}
+          onJump={() => setActiveSession(pendingPermission.sessionId)}
+        />
+      )}
 
       {/* Pi Extension dialogs (ui requests + trust prompt) */}
       <ExtensionDialogs
@@ -903,7 +921,11 @@ function App() {
 
       {/* Sudo Password Dialog */}
       {pendingSudoPassword && (
-        <SudoPasswordDialog request={pendingSudoPassword} />
+        <SudoPasswordDialog
+          request={pendingSudoPassword}
+          sessionTitle={orphanSudoTitle}
+          onJump={() => setActiveSession(pendingSudoPassword.sessionId)}
+        />
       )}
 
       {/* Config Modal */}

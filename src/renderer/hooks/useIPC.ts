@@ -463,14 +463,11 @@ function registerSharedIpcListener(): () => void {
           break;
 
         case "permission.request":
-          store.setPendingPermission(event.payload);
+          store.addPendingPermission(event.payload);
           break;
 
         case "permission.dismiss": {
-          const currentPermission = useAppStore.getState().pendingPermission;
-          if (currentPermission?.toolUseId === event.payload.toolUseId) {
-            store.setPendingPermission(null);
-          }
+          store.removePendingPermission(event.payload.toolUseId);
           break;
         }
 
@@ -525,14 +522,11 @@ function registerSharedIpcListener(): () => void {
           break;
 
         case "sudo.password.request":
-          store.setPendingSudoPassword(event.payload);
+          store.addPendingSudoPassword(event.payload);
           break;
 
         case "sudo.password.dismiss": {
-          const currentSudo = useAppStore.getState().pendingSudoPassword;
-          if (currentSudo?.toolUseId === event.payload.toolUseId) {
-            store.setPendingSudoPassword(null);
-          }
+          store.removePendingSudoPassword(event.payload.toolUseId);
           break;
         }
 
@@ -749,7 +743,7 @@ export function useIPC() {
   const updateSession = useAppStore((s) => s.updateSession);
   const addMessage = useAppStore((s) => s.addMessage);
   const setLoading = useAppStore((s) => s.setLoading);
-  const setPendingPermission = useAppStore((s) => s.setPendingPermission);
+  const removePendingPermission = useAppStore((s) => s.removePendingPermission);
   const clearActiveTurn = useAppStore((s) => s.clearActiveTurn);
   const activateNextTurn = useAppStore((s) => s.activateNextTurn);
   const clearPendingTurns = useAppStore((s) => s.clearPendingTurns);
@@ -1379,9 +1373,9 @@ export function useIPC() {
         type: "permission.response",
         payload: { toolUseId, result },
       });
-      setPendingPermission(null);
+      removePendingPermission(toolUseId);
     },
-    [send, setPendingPermission],
+    [send, removePendingPermission],
   );
 
   const submitAskUser = useCallback(
@@ -1394,7 +1388,9 @@ export function useIPC() {
     [send],
   );
 
-  const setPendingSudoPassword = useAppStore((s) => s.setPendingSudoPassword);
+  const removePendingSudoPassword = useAppStore(
+    (s) => s.removePendingSudoPassword,
+  );
 
   const respondToSudoPassword = useCallback(
     (toolUseId: string, password: string | null) => {
@@ -1402,9 +1398,9 @@ export function useIPC() {
         type: "sudo.password.response",
         payload: { toolUseId, password },
       });
-      setPendingSudoPassword(null);
+      removePendingSudoPassword(toolUseId);
     },
-    [send, setPendingSudoPassword],
+    [send, removePendingSudoPassword],
   );
 
   const selectFolder = useCallback(async (): Promise<string | null> => {

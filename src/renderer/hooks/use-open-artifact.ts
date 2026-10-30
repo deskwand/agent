@@ -13,6 +13,7 @@ import {
 } from "../utils/open-file-by-ext";
 import { openFilePathInBrowser } from "../utils/open-in-browser";
 import { openOfficePreview } from "../utils/office-preview-runner";
+import { usePaneSessionId } from "../components/split/pane-context";
 
 export function useOpenArtifact(): {
   openArtifact: (pathValue: string, label: string) => Promise<void>;
@@ -20,8 +21,9 @@ export function useOpenArtifact(): {
 } {
   const { t } = useTranslation();
   const workingDir = useAppStore((s) => s.workingDir);
+  const paneSessionId = usePaneSessionId();
   const activeSessionCwd = useAppStore((s) => {
-    const sid = s.activeSessionId;
+    const sid = paneSessionId;
     if (!sid) return undefined;
     return s.sessions.find((session) => session.id === sid)?.cwd;
   });

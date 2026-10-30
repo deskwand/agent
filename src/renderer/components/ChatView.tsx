@@ -8,15 +8,18 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  useActiveSessionId,
-  useCurrentSession,
-  useActiveSessionMessages,
-  useActivePartialContent,
-  useActiveTurn,
-  usePendingTurns,
-  useActiveExecutionClock,
   useAppConfig,
+  useSessionActiveTurn,
+  useSessionExecutionClock,
+  useSessionMessages,
+  useSessionPartialMessage,
+  useSessionPendingTurns,
 } from "../store/selectors";
+import {
+  useIsFocusedPane,
+  usePaneSession,
+  usePaneSessionId,
+} from "./split/pane-context";
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { usePushToTalk } from "../hooks/usePushToTalk";
@@ -266,13 +269,18 @@ const EMPTY_VIDEO_REFERENCES: VideoReference[] = [];
 export function ChatView() {
   const { t, i18n } = useTranslation();
   // Scoped selectors — each subscription only re-renders when its slice changes
-  const activeSessionId = useActiveSessionId();
-  const activeSession = useCurrentSession();
-  const messages = useActiveSessionMessages();
-  const { partialMessage } = useActivePartialContent();
-  const activeTurn = useActiveTurn();
-  const pendingTurns = usePendingTurns();
-  const activeExecutionClock = useActiveExecutionClock();
+  // 区域会话（类别 1）：Provider 外回退全局 activeSessionId，变量名保持不变以减小 diff。
+  const activeSessionId = usePaneSessionId();
+  const activeSession = usePaneSession();
+  // 类别 2：是否为聚焦区域，门控按住说话 / 语音占用 / 自动聚焦 / 跳转卡片。
+  const isFocusedPane = useIsFocusedPane();
+  const isFocusedPaneRef = useRef(isFocusedPane);
+  isFocusedPaneRef.current = isFocusedPane;
+  const messages = useSessionMessages(activeSessionId);
+  const partialMessage = useSessionPartialMessage(activeSessionId);
+  const activeTurn = useSessionActiveTurn(activeSessionId);
+  const pendingTurns = useSessionPendingTurns(activeSessionId);
+  const activeExecutionClock = useSessionExecutionClock(activeSessionId);
 
   const appConfig = useAppConfig();
   const contextWindow = useAppStore((s) =>
@@ -532,6 +540,13 @@ export function ChatView() {
     },
     [],
   );
+  // 分屏：录音只能在聚焦区域开始；录音中焦点移到别的区域时按卸载同一套逻辑收掉，
+  // 否则这一路还占着麦克风，聚焦区域的按住说话却被互斥挡住。
+  useEffect(() => {
+    if (!isFocusedPane && voiceStatusRef.current !== "idle") {
+      void voiceCancelRef.current();
+    }
+  }, [isFocusedPane]);
 
   // 记住这次录音是不是「按住说话」启动的。
   // 不记的话：用户点按钮开始录音后，手滑按一下右 Option 再松开，
@@ -560,7 +575,9 @@ export function ChatView() {
     // 占用者不是自己时同理 —— 卡片正在录，这一键不该抢麦。
     // 再加一条：记一笔的浮层开着时也不抢 —— 不让路的话，按住右 Option 会转写进
     // **浮层背后看不见的输入框**。
-    Boolean(voiceEngineConfig?.enabled) &&
+    // 类别 2：只有聚焦区域响应按住说话。
+    isFocusedPane &&
+      Boolean(voiceEngineConfig?.enabled) &&
       !voiceModeOpen &&
       isPushToTalkAllowed(voiceInputOwner) &&
       !ideaCaptureOpen &&
@@ -1218,7 +1235,8 @@ export function ChatView() {
     [displayedMessages, highlightToolCallId, handleDockTickSelect],
   );
 
-  usePendingFocusToolCall(handleSelectBackgroundAgent);
+  // 类别 2：只有聚焦区域消费「跳到某张卡片」请求（请求是一次性的，未聚焦区域不能抢先清掉）。
+  usePendingFocusToolCall(handleSelectBackgroundAgent, isFocusedPane);
 
   const isHydratingHistoryState = shouldShowHydratingHistoryState(
     activeSessionId,
@@ -1616,7 +1634,8 @@ export function ChatView() {
   }, []); // ResizeObserver is stable — no need to recreate on message count changes
 
   useEffect(() => {
-    chatInputRef.current?.focus();
+    // 类别 2：自动聚焦输入框只在聚焦区域执行。
+    if (isFocusedPaneRef.current) chatInputRef.current?.focus();
     // 重置跟随状态，覆盖旧会话中用户手动上滚的残留
     isAtBottomRef.current = true;
     previousScrollTopRef.current = 0;
@@ -1700,7 +1719,9 @@ export function ChatView() {
       // 里 setActiveSession 会让 App 换掉子树），那时 clear() 因为 ref 为 null 根本
       // 没跑，卸载 flush 会把刚发出去的文本写回槽位。这一行让"发出即清"不再依赖时序。
       removeDraft(submittedSessionId);
-      setTimeout(() => chatInputRef.current?.focus(), 0);
+      setTimeout(() => {
+        if (isFocusedPaneRef.current) chatInputRef.current?.focus();
+      }, 0);
       return;
     }
 
@@ -1729,7 +1750,9 @@ export function ChatView() {
       removeDraft(submittedSessionId);
     } finally {
       setIsSubmitting(false);
-      setTimeout(() => chatInputRef.current?.focus(), 0);
+      setTimeout(() => {
+        if (isFocusedPaneRef.current) chatInputRef.current?.focus();
+      }, 0);
     }
   };
 

@@ -1,6 +1,8 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import { usePaneId } from "./split/pane-context";
+import { useSplitLayoutStore } from "../store/split-layout";
 import { useAppConfig } from "../store/selectors";
 import { useIPC } from "../hooks/useIPC";
 import { attachmentKeySet } from "../utils/attached-files";
@@ -73,6 +75,7 @@ export function WelcomeView() {
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
   const { startSession, invoke, isElectron } = useIPC();
+  const paneId = usePaneId();
   // 浮层开关放 store：欢迎页的第一句语音会创建会话，随后应用切到聊天视图，
   // 状态留着，浮层就能跟着过去接着用，而不是随本视图卸载而关掉。
   const voiceModeOpen = useAppStore((state) => state.voiceModeOpen);
@@ -481,6 +484,8 @@ export function WelcomeView() {
     }
 
     setIsSubmitting(true);
+    // 新会话落到发起提交的区域（startSession 返回时聚焦的可能已是别的区域）。
+    if (paneId) useSplitLayoutStore.getState().markNewSessionTarget(paneId);
     try {
       const sessionTitle = getInitialSessionTitle(
         data.text,
@@ -504,6 +509,7 @@ export function WelcomeView() {
         removeDraft(NEW_SESSION_DRAFT_KEY);
       }
     } finally {
+      useSplitLayoutStore.getState().markNewSessionTarget(null);
       setIsSubmitting(false);
     }
   };

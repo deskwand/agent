@@ -23,6 +23,8 @@ import type {
   Settings,
   AppConfig,
   TurnState,
+  PermissionRequest,
+  SudoPasswordRequest,
 } from "../types";
 import type { ImageSource } from "../components/ImageLightbox";
 import type { GlobalNotice, SessionExecutionClock } from "./index";
@@ -85,9 +87,11 @@ export function useActiveSessionMessages(): Message[] {
  * Returns the messages for an arbitrary session by ID.
  * Useful in list components that render session previews.
  */
-export function useSessionMessages(sessionId: string): Message[] {
-  return useAppStore(
-    (s) => s.sessionStates[sessionId]?.messages ?? EMPTY_MESSAGES,
+export function useSessionMessages(sessionId: string | null): Message[] {
+  return useAppStore((s) =>
+    sessionId
+      ? (s.sessionStates[sessionId]?.messages ?? EMPTY_MESSAGES)
+      : EMPTY_MESSAGES,
   );
 }
 
@@ -334,16 +338,6 @@ export function useWorkingDir(): string | null {
   return useAppStore((s) => s.workingDir);
 }
 
-/** Returns pending permission and sudo-password requests. */
-export function usePendingDialogs() {
-  return useAppStore(
-    useShallow((s) => ({
-      pendingPermission: s.pendingPermission,
-      pendingSudoPassword: s.pendingSudoPassword,
-    })),
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Image lightbox domain
 // ---------------------------------------------------------------------------
@@ -388,5 +382,96 @@ export function selectEffectiveTheme(
 export function useEffectiveTheme(): "dark" | "light" {
   return useAppStore((s) =>
     selectEffectiveTheme(s.settings.theme, s.systemDarkMode),
+  );
+}
+
+/** 某会话待答的授权请求，按到达顺序。 */
+export function usePendingPermissionsForSession(
+  sessionId: string | null,
+): PermissionRequest[] {
+  return useAppStore(
+    useShallow((s) =>
+      sessionId
+        ? Object.values(s.pendingPermissions).filter(
+            (p) => p.sessionId === sessionId,
+          )
+        : [],
+    ),
+  );
+}
+
+/** 某会话待答的 sudo 密码请求，按到达顺序。 */
+export function usePendingSudoForSession(
+  sessionId: string | null,
+): SudoPasswordRequest[] {
+  return useAppStore(
+    useShallow((s) =>
+      sessionId
+        ? Object.values(s.pendingSudoPasswords).filter(
+            (p) => p.sessionId === sessionId,
+          )
+        : [],
+    ),
+  );
+}
+
+/** 第一条所属会话不在任何区域里的授权 / sudo 请求（App 根节点兜底弹窗用）。 */
+export function useOrphanPendingDialogs(
+  visibleSessionIds: ReadonlySet<string>,
+): {
+  permission: PermissionRequest | null;
+  sudo: SudoPasswordRequest | null;
+} {
+  return useAppStore(
+    useShallow((s) => ({
+      permission:
+        Object.values(s.pendingPermissions).find(
+          (p) => !visibleSessionIds.has(p.sessionId),
+        ) ?? null,
+      sudo:
+        Object.values(s.pendingSudoPasswords).find(
+          (p) => !visibleSessionIds.has(p.sessionId),
+        ) ?? null,
+    })),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-session (pane-scoped) variants of the active-session selectors above.
+// ---------------------------------------------------------------------------
+
+const EMPTY_TURNS: TurnState[] = [];
+
+/** 指定会话（分屏区域）正在流式输出的文本。 */
+export function useSessionPartialMessage(sessionId: string | null): string {
+  return useAppStore((s) =>
+    sessionId ? (s.sessionStates[sessionId]?.partialMessage ?? "") : "",
+  );
+}
+
+/** 指定会话的活动轮次（无则 null）。 */
+export function useSessionActiveTurn(
+  sessionId: string | null,
+): TurnState | null {
+  return useAppStore((s) =>
+    sessionId ? (s.sessionStates[sessionId]?.activeTurn ?? null) : null,
+  );
+}
+
+/** 指定会话排队中的轮次。 */
+export function useSessionPendingTurns(sessionId: string | null): TurnState[] {
+  return useAppStore((s) =>
+    sessionId
+      ? (s.sessionStates[sessionId]?.pendingTurns ?? EMPTY_TURNS)
+      : EMPTY_TURNS,
+  );
+}
+
+/** 指定会话的执行计时记录。 */
+export function useSessionExecutionClock(
+  sessionId: string | null,
+): SessionExecutionClock | undefined {
+  return useAppStore((s) =>
+    sessionId ? s.sessionStates[sessionId]?.executionClock : undefined,
   );
 }

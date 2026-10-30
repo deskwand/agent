@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
-import { useCurrentSession } from "../store/selectors";
+import { usePaneSession } from "./split/pane-context";
 import { useIPC } from "../hooks/useIPC";
 import { stripLeadingSkillToken } from "../utils/reference-tokens";
 import { attachmentKey, mergeAttachedFiles } from "../utils/attached-files";
@@ -464,7 +464,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     }, [showSlashMenu]);
 
     // --- Load extension commands for slash menu (per active session cwd) ---
-    const activeSessionCwd = useCurrentSession()?.cwd;
+    const activeSessionCwd = usePaneSession()?.cwd;
     useEffect(() => {
       if (!isElectron || !window.electronAPI?.piCommands) return;
       let disposed = false;

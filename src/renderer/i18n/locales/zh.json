@@ -2929,5 +2929,25 @@
       "finishedCount": "{{count}} 个已结束",
       "showLess": "收起"
     }
+  },
+  "split": {
+    "morePermissions": "还有 {{count}} 条待处理的授权请求",
+    "permissionFromSession": "来自会话「{{name}}」的授权请求",
+    "jumpToSession": "跳转到该会话",
+    "moreSudoRequests": "还有 {{count}} 个 sudo 请求",
+    "splitRight": "向右分割",
+    "splitDown": "向下分割",
+    "closePane": "关闭区域",
+    "limitReached": "最多同时打开 4 个区域",
+    "notEnoughSpace": "空间不足，无法继续分割",
+    "openInSplitRight": "在右侧分屏打开",
+    "openInSplitDown": "在下方分屏打开",
+    "openInPane": "已在分屏中打开（第 {{index}} / {{count}} 个区域）",
+    "status": {
+      "running": "运行中",
+      "awaitingPermission": "等待授权",
+      "done": "已完成",
+      "error": "出错"
+    }
   }
 }

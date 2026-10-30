@@ -45,6 +45,18 @@ import {
   type SidebarProjectGroup,
 } from "../utils/sidebar-session-groups";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
+import { Columns2, Rows2 } from "lucide-react";
+import { SESSION_DRAG_MIME } from "./split/PaneDropZones";
+import { useSplitRectsStore } from "./split/split-rects-context";
+import { useSplitLayoutStore } from "../store/split-layout";
+import { PaneLocator } from "./split/PaneLocator";
+import {
+  canSplit,
+  countLeaves,
+  listLeaves,
+  MAX_PANES,
+  type SplitDir,
+} from "../store/split-tree";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,6 +95,8 @@ export function Sidebar({
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const sessionStates = useAppStore((s) => s.sessionStates);
   const pendingAskUsers = useAppStore((s) => s.pendingAskUsers);
+  const pendingPermissions = useAppStore((s) => s.pendingPermissions);
+  const pendingSudoPasswords = useAppStore((s) => s.pendingSudoPasswords);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
   const workingDir = useAppStore((s) => s.workingDir);
   const setWorkingDir = useAppStore((s) => s.setWorkingDir);
@@ -170,10 +184,17 @@ export function Sidebar({
     () => buildSidebarSessionGroups(sessions, "", sidebarPins),
     [sessions, sidebarPins],
   );
+  // 「等待回答」含 ask_user 与待处理的授权 / sudo 请求（分屏下授权不再弹全局模态窗）。
   const sessionHasPendingAskUser = useCallback(
     (sessionId: string) =>
-      Object.values(pendingAskUsers).some((r) => r.sessionId === sessionId),
-    [pendingAskUsers],
+      Object.values(pendingAskUsers).some((r) => r.sessionId === sessionId) ||
+      Object.values(pendingPermissions).some(
+        (r) => r.sessionId === sessionId,
+      ) ||
+      Object.values(pendingSudoPasswords).some(
+        (r) => r.sessionId === sessionId,
+      ),
+    [pendingAskUsers, pendingPermissions, pendingSudoPasswords],
   );
   const runningGroupKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -730,6 +751,32 @@ export function Sidebar({
     ],
   );
 
+  // 分屏入口：作用于聚焦区域；到上限或空间不足时置灰。
+  const splitRoot = useSplitLayoutStore((s) => s.root);
+  const focusedPaneId = useSplitLayoutStore((s) => s.focusedPaneId);
+  // 分屏时已在某个区域打开的会话：标题提亮一级，并在标题前画迷你布局图。
+  const openInPaneIds = useMemo(() => {
+    const leaves = listLeaves(splitRoot);
+    return leaves.length > 1
+      ? new Set(leaves.flatMap((l) => (l.sessionId ? [l.sessionId] : [])))
+      : new Set<string>();
+  }, [splitRoot]);
+  const splitPane = useSplitLayoutStore((s) => s.splitPane);
+  const focusedPaneRect = useSplitRectsStore((s) => s.rects.get(focusedPaneId));
+  const splitAvailability = useMemo(() => {
+    const check = (dir: SplitDir) =>
+      countLeaves(splitRoot) < MAX_PANES &&
+      (!focusedPaneRect || canSplit(splitRoot, focusedPaneRect, dir).ok);
+    return { row: check("row"), column: check("column") };
+  }, [splitRoot, focusedPaneRect]);
+  const openInSplit = (sessionId: string, dir: SplitDir) => {
+    setSessionMenu(null);
+    setShowSettings(false);
+    setShowSchedule(false);
+    setShowApps(false);
+    splitPane(focusedPaneId, dir, "after", sessionId);
+  };
+
   const renderSessionItem = (
     session: Session,
     showRelativeTime: boolean,
@@ -737,6 +784,7 @@ export function Sidebar({
     showCompletedMark = true,
   ) => {
     const isActive = activeSessionId === session.id;
+    const isOpenInPane = openInPaneIds.has(session.id);
     const hasPendingAskUser = sessionHasPendingAskUser(session.id);
     const hasStatusIndicator = isSessionBusy(
       session,
@@ -752,6 +800,11 @@ export function Sidebar({
       <div
         key={session.id}
         data-session-id={session.id}
+        draggable={editingSessionId !== session.id}
+        onDragStart={(event) => {
+          event.dataTransfer.setData(SESSION_DRAG_MIME, session.id);
+          event.dataTransfer.effectAllowed = "move";
+        }}
         onClick={() => void handleSessionClick(session.id)}
         onMouseEnter={() => setHoveredSessionId(session.id)}
         onMouseLeave={() => {
@@ -771,6 +824,7 @@ export function Sidebar({
                 aria-label={t("voiceMode.sessionLabel")}
               />
             ) : null}
+            {isOpenInPane && <PaneLocator sessionId={session.id} />}
             {editingSessionId === session.id ? (
               <Input
                 autoFocus
@@ -796,7 +850,7 @@ export function Sidebar({
             ) : (
               <div
                 className={`text-sm font-normal leading-5 truncate flex-1 ${
-                  isActive
+                  isActive || isOpenInPane
                     ? "text-foreground"
                     : session.completedAt && showCompletedMark
                       ? "text-muted-foreground/60"
@@ -927,7 +981,7 @@ export function Sidebar({
                     </Tooltip>
                     <DropdownMenuContent
                       align="end"
-                      className="w-36"
+                      className="w-44"
                       // ⚠️ 同一个坑 ✓：菜单项里有「删除」→ 它打开 `ConfirmDialog` ✓，
                       // 而 Radix 在菜单关闭时会把焦点**归还给触发器** ✗ → 抢走对话框的焦点 ✓。
                       //（项目菜单那边实测过 ✓：`activeElement` 是那颗 chevron ✗。）
@@ -979,6 +1033,22 @@ export function Sidebar({
                       >
                         <SquarePen className="h-4 w-4 text-muted-foreground" />
                         <span>{t("sidebar.rename")}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="h-7 gap-2"
+                        disabled={!splitAvailability.row}
+                        onClick={() => openInSplit(session.id, "row")}
+                      >
+                        <Columns2 className="h-4 w-4 text-muted-foreground" />
+                        <span>{t("split.openInSplitRight")}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="h-7 gap-2"
+                        disabled={!splitAvailability.column}
+                        onClick={() => openInSplit(session.id, "column")}
+                      >
+                        <Rows2 className="h-4 w-4 text-muted-foreground" />
+                        <span>{t("split.openInSplitDown")}</span>
                       </DropdownMenuItem>
                       {session.status !== "running" && (
                         <>

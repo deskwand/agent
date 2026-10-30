@@ -2932,5 +2932,25 @@
       "finishedCount": "{{count}} finished",
       "showLess": "Show less"
     }
+  },
+  "split": {
+    "morePermissions": "{{count}} more pending permission requests",
+    "permissionFromSession": "Permission request from session \"{{name}}\"",
+    "jumpToSession": "Go to session",
+    "moreSudoRequests": "{{count}} more sudo request(s)",
+    "splitRight": "Split right",
+    "splitDown": "Split down",
+    "closePane": "Close pane",
+    "limitReached": "At most 4 panes can be open at once",
+    "notEnoughSpace": "Not enough space to split further",
+    "openInSplitRight": "Open in split right",
+    "openInSplitDown": "Open in split below",
+    "openInPane": "Open in split view (pane {{index}} of {{count}})",
+    "status": {
+      "running": "Running",
+      "awaitingPermission": "Awaiting permission",
+      "done": "Done",
+      "error": "Error"
+    }
   }
 }

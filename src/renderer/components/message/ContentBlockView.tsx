@@ -45,6 +45,7 @@ import {
 import { openOfficePreview } from "../../utils/office-preview-runner";
 import type { ContentBlockViewProps } from "./types";
 import { Button } from "../app-button";
+import { usePaneSessionId } from "../split/pane-context";
 
 const MessageMarkdown = lazy(() =>
   import("../MessageMarkdown").then((module) => ({
@@ -79,7 +80,7 @@ export const ContentBlockView = memo(function ContentBlockView({
   artifactExpansion,
 }: ContentBlockViewProps) {
   const { t } = useTranslation();
-  const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const activeSessionId = usePaneSessionId();
   const sessions = useAppStore((s) => s.sessions);
   const workingDir = useAppStore((s) => s.workingDir);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
