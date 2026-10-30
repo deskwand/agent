@@ -242,7 +242,11 @@ async function listOpenAICompatible(
     for await (const model of await client.models.list()) {
       const id = typeof model.id === "string" ? model.id.trim() : "";
       if (!id) continue;
-      raw.push({ id, label: id });
+      raw.push({
+        id,
+        label: readEndpointModelLabel(model, id),
+        ...readEndpointModelMetadata(model),
+      });
     }
     const { models, filtered } = filterChatModels(raw);
     return { ok: true, models, source: "live", filtered };
@@ -410,4 +414,61 @@ export async function listProviderModels(
     return await listOpenAICompatible(input);
   }
   return unsupportedResult();
+}
+
+type EndpointModelRecord = Record<string, unknown>;
+
+function asEndpointRecord(value: unknown): EndpointModelRecord | undefined {
+  return value !== null && typeof value === "object"
+    ? (value as EndpointModelRecord)
+    : undefined;
+}
+
+function readPositiveInt(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : undefined;
+}
+
+function readInputModalities(value: unknown): ("text" | "image")[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const kept = Array.from(
+    new Set(
+      value.filter(
+        (item): item is "text" | "image" => item === "text" || item === "image",
+      ),
+    ),
+  );
+  return kept.length > 0 ? kept : undefined;
+}
+
+/**
+ * 端点自己上报的模型元数据（Magpie 的 /v1/models）。字段缺失或类型不对时返回
+ * 空对象 —— OpenAI 官方、DeepSeek、Ollama 这类不报元数据的端点行为不变。
+ */
+function readEndpointModelMetadata(
+  raw: unknown,
+): Pick<ProviderModelEntry, "contextWindow" | "maxTokens" | "input"> {
+  const record = asEndpointRecord(raw);
+  if (!record) return {};
+
+  const contextWindow =
+    readPositiveInt(record.context_window) ??
+    readPositiveInt(record.context_length);
+  const maxTokens = readPositiveInt(record.max_output_tokens);
+  const input = readInputModalities(asEndpointRecord(record.modalities)?.input);
+
+  return {
+    ...(contextWindow === undefined ? {} : { contextWindow }),
+    ...(maxTokens === undefined ? {} : { maxTokens }),
+    ...(input === undefined ? {} : { input }),
+  };
+}
+
+/** 端点给的显示名（Magpie 的 display_name）；空白则回落 id */
+function readEndpointModelLabel(raw: unknown, id: string): string {
+  const displayName = asEndpointRecord(raw)?.display_name;
+  return typeof displayName === "string" && displayName.trim()
+    ? displayName.trim()
+    : id;
 }

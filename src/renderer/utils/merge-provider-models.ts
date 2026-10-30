@@ -29,6 +29,11 @@ export interface MergeProviderModelsInput {
   disabled: string[];
   defaultModel: string;
   modelSource: ApiProviderModel["source"];
+  /**
+   * 端点没返回的已保存模型是否删除。只在用户显式「重新连接」时为 true：
+   * 打开弹窗的后台静默刷新只刷元数据，否则手填的别名会被默默删掉。
+   */
+  dropMissingModels?: boolean;
 }
 
 export interface MergeProviderModelsResult {
@@ -100,8 +105,9 @@ export function mergeProviderModels(
     );
   }
 
-  // 2) 端点独有的追加在末尾，按 id 排序，标「新增」
-  // 已保存的元数据优先于端点上报的：用户手填的上下文不能每次刷新被端点值顶掉。
+  // 2) 端点独有的追加在末尾，按 id 排序
+  // 元数据以端点为准：Magpie 这类端点会随模型换代改上下文/图片能力。
+  // 用户钉住的字段（contextWindowPinned / inputPinned）除外。
   const liveOnly = Array.from(liveById.values())
     .filter((model) => !known.has(model.id))
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -112,19 +118,29 @@ export function mergeProviderModels(
       blankRow(model.id, model.name, {
         isNew: true,
         enabled: !disabled.has(model.id),
-        contextWindow: saved?.contextWindow ?? model.contextWindow,
-        maxTokens: saved?.maxTokens ?? model.maxTokens,
-        input: saved?.input ?? model.input,
+        contextWindow: saved?.contextWindowPinned
+          ? saved.contextWindow
+          : (model.contextWindow ?? saved?.contextWindow),
+        maxTokens: model.maxTokens ?? saved?.maxTokens,
+        input: saved?.inputPinned ? saved.input : (model.input ?? saved?.input),
         contextWindowPinned: saved?.contextWindowPinned,
         inputPinned: saved?.inputPinned,
       }),
     );
   }
 
-  // 3) 本地已有、但目录与端点都没有的：保留并保持启用
-  const savedOnly = input.saved
-    .filter((model) => !known.has(model.id))
-    .sort((left, right) => left.id.localeCompare(right.id));
+  // 3) 本地已有、但目录与端点都没有的
+  // 只有显式重连（dropMissingModels）才把端点没返回的当作下线删掉；
+  // 静默刷新、没拿到列表（live === null）时保留，断网/打开弹窗不丢配置。
+  const endpointAuthoritative =
+    input.dropMissingModels === true &&
+    Array.isArray(input.live) &&
+    input.live.length > 0;
+  const savedOnly = endpointAuthoritative
+    ? []
+    : input.saved
+        .filter((model) => !known.has(model.id))
+        .sort((left, right) => left.id.localeCompare(right.id));
   for (const model of savedOnly) {
     known.add(model.id);
     rows.push(

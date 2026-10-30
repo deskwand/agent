@@ -290,3 +290,96 @@ describe("listProviderModels — openrouter", () => {
     expect(result.ok).toBe(true);
   });
 });
+
+describe("listProviderModels — endpoint metadata", () => {
+  beforeEach(() => {
+    openaiListMock.mockReset();
+  });
+
+  it("reads context window, output cap, image support and display name", async () => {
+    openaiListMock.mockResolvedValue(
+      paged([
+        {
+          id: "opencode-go/glm-5.2",
+          display_name: "GLM-5.2",
+          context_length: 1000000,
+          context_window: 1000000,
+          max_output_tokens: 131072,
+          modalities: { input: ["text"] },
+        },
+        {
+          id: "auto/gpt-5.6-luna",
+          display_name: "GPT-5.6 Luna",
+          context_window: 922000,
+          max_output_tokens: 128000,
+          modalities: { input: ["text", "image"] },
+        },
+        // 上游没给 modalities 的模型（Magpie 里的 GLM-5.1）：不能凭空判成支持图片
+        { id: "opencode-go/glm-5.1", display_name: "GLM-5.1" },
+      ]),
+    );
+
+    const result = await listProviderModels({
+      provider: "custom",
+      customProtocol: "openai",
+      apiKey: "magpie",
+      baseUrl: "http://127.0.0.1:3425/v1",
+    });
+
+    expect(result.source).toBe("live");
+    expect(result.models).toEqual([
+      {
+        id: "opencode-go/glm-5.2",
+        label: "GLM-5.2",
+        contextWindow: 1000000,
+        maxTokens: 131072,
+        input: ["text"],
+      },
+      {
+        id: "auto/gpt-5.6-luna",
+        label: "GPT-5.6 Luna",
+        contextWindow: 922000,
+        maxTokens: 128000,
+        input: ["text", "image"],
+      },
+      { id: "opencode-go/glm-5.1", label: "GLM-5.1" },
+    ]);
+  });
+
+  it("leaves metadata off when the endpoint reports none", async () => {
+    openaiListMock.mockResolvedValue(paged([{ id: "gpt-5.4" }]));
+
+    const result = await listProviderModels({
+      provider: "openai",
+      apiKey: "sk-test",
+    });
+
+    expect(result.models).toEqual([{ id: "gpt-5.4", label: "gpt-5.4" }]);
+  });
+
+  it("ignores unusable metadata instead of writing NaN or 0", async () => {
+    openaiListMock.mockResolvedValue(
+      paged([
+        {
+          id: "relay-model",
+          display_name: "   ",
+          context_window: "1000000",
+          context_length: 0,
+          max_output_tokens: -5,
+          modalities: { input: ["text", "video"] },
+        },
+      ]),
+    );
+
+    const result = await listProviderModels({
+      provider: "custom",
+      customProtocol: "openai",
+      apiKey: "sk-relay",
+      baseUrl: "https://relay.example.com/v1",
+    });
+
+    expect(result.models).toEqual([
+      { id: "relay-model", label: "relay-model", input: ["text"] },
+    ]);
+  });
+});

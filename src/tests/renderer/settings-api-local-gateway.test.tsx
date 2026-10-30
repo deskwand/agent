@@ -10,6 +10,7 @@ import type {
   ApiProviderConfig,
   AppConfig,
   DiagnosticResult,
+  ProviderModelInfo,
 } from "../../renderer/types";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import { normalizeCodemodeConfig } from "../../shared/codemode-config";
@@ -50,7 +51,9 @@ const magpieModels = [
   { id: "auto/gpt-5.6-luna", name: "GPT-5.6 Luna" },
 ];
 
-function liveDiagnostics(models = magpieModels): DiagnosticResult {
+function liveDiagnostics(
+  models: ProviderModelInfo[] = magpieModels,
+): DiagnosticResult {
   return {
     steps: [
       { name: "dns", status: "ok", latencyMs: 1 },
@@ -399,5 +402,118 @@ describe("SettingsAPI local gateway entry", () => {
       config: ApiProviderConfig;
     };
     expect(saved.config.localGateway).toBe("magpie");
+  });
+  it("refreshes metadata on open and drops stale rows only on an explicit reconnect", async () => {
+    const stale: ApiProviderConfig = {
+      ...magpieProfile,
+      defaultModel: "opencode-go/kimi-k2",
+      models: [
+        {
+          id: "opencode-go/kimi-k2",
+          label: "Kimi K2",
+          source: "custom",
+          contextWindow: 272000,
+        },
+        {
+          id: "auto/gpt-5.6-luna",
+          label: "auto/gpt-5.6-luna",
+          source: "custom",
+          contextWindow: 272000,
+        },
+      ],
+    };
+    const config = buildConfig({
+      providers: { "custom:magpie": stale },
+      activeProviderKey: "custom:magpie",
+    });
+    (
+      window.electronAPI.config.get as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(config);
+    diagnose.mockResolvedValue(
+      liveDiagnostics([
+        {
+          id: "opencode-go/kimi-k3",
+          name: "Kimi K3",
+          contextWindow: 1000000,
+          maxTokens: 131072,
+          input: ["text", "image"],
+        },
+      ]),
+    );
+
+    await act(async () => {
+      root.render(React.createElement(SettingsAPI, {}));
+    });
+    await settle();
+    await act(async () => {
+      tileFor("local:magpie").dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    await settle();
+
+    // 打开弹窗只做静默刷新：端点没返回的行保留，用户手填的别名不会被删
+    expect(
+      editorDialog().querySelector(
+        '[data-testid="model-row-opencode-go/kimi-k2"]',
+      ),
+    ).not.toBeNull();
+
+    const reconnected = await act(async () => {
+      clickButton(editorDialog(), "Reconnect");
+    });
+    expect(reconnected).toBeUndefined();
+    await settle();
+
+    const calls = saveProvider.mock.calls;
+    const payload = calls[calls.length - 1]?.[0] as {
+      config: { models: Array<Record<string, unknown>>; defaultModel: string };
+    };
+    expect(payload.config.models).toEqual([
+      {
+        id: "opencode-go/kimi-k3",
+        label: "Kimi K3",
+        source: "custom",
+        contextWindow: 1000000,
+        maxTokens: 131072,
+        input: ["text", "image"],
+      },
+    ]);
+    expect(payload.config.defaultModel).toBe("opencode-go/kimi-k3");
+    expect(
+      editorDialog().querySelector(
+        '[data-testid="model-row-opencode-go/kimi-k2"]',
+      ),
+    ).toBeNull();
+  });
+
+  it("leaves the saved list alone when the endpoint returns an empty list", async () => {
+    const config = buildConfig({
+      providers: { "custom:magpie": magpieProfile },
+      activeProviderKey: "custom:magpie",
+    });
+    (
+      window.electronAPI.config.get as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(config);
+    diagnose.mockResolvedValue(liveDiagnostics([]));
+
+    await act(async () => {
+      root.render(React.createElement(SettingsAPI, {}));
+    });
+    await settle();
+    await act(async () => {
+      tileFor("local:magpie").dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    await settle();
+
+    expect(saveProvider).not.toHaveBeenCalled();
+    expect(
+      editorDialog().querySelector(
+        '[data-testid="model-row-opencode-go/kimi-k3"]',
+      ),
+    ).not.toBeNull();
+    expect(editorDialog().textContent).toContain("no models yet");
   });
 });

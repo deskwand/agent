@@ -1084,6 +1084,15 @@ export function SettingsAPI({
     }
 
     const live = result.modelsSource === "live" ? (result.models ?? []) : null;
+    // 空列表等同于「没拿到」：既不能报连接成功，也不能拿它去合并清空草稿。
+    if (isCustom && live !== null && live.length === 0) {
+      fail(
+        draftValue.localGateway
+          ? t("api.localGatewayNoModels")
+          : t("api.modelsManualHint"),
+      );
+      return;
+    }
     const merge = mergeProviderModels({
       catalog: catalogForDraft(draftValue),
       live,
@@ -1091,6 +1100,9 @@ export function SettingsAPI({
       disabled: draftValue.disabledModels ?? [],
       defaultModel: draftValue.defaultModel,
       modelSource: isCustom ? "custom" : "preset",
+      // 打开弹窗的静默刷新只刷元数据；只有显式「重新连接」才把端点没返回的
+      // 模型当作下线删掉，否则手填的别名会在用户没操作时被删。
+      dropMissingModels: !silent,
     });
     applyMergeToDraft(merge);
 

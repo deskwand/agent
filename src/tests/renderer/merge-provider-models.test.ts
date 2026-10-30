@@ -188,3 +188,133 @@ describe("mergeProviderModels keeps user overrides", () => {
     expect(row?.contextWindowPinned).toBeUndefined();
   });
 });
+
+describe("mergeProviderModels treats a non-empty live list as authoritative", () => {
+  it("drops saved models the endpoint no longer returns", () => {
+    const result = mergeProviderModels({
+      catalog: [],
+      live: [{ id: "glm-5.2", name: "GLM-5.2", contextWindow: 1000000 }],
+      saved: [
+        {
+          id: "glm-5.2",
+          label: "GLM-5.2",
+          source: "custom",
+          contextWindow: 1000000,
+        },
+        {
+          id: "glm-5.0",
+          label: "GLM-5.0",
+          source: "custom",
+          contextWindow: 128000,
+        },
+      ],
+      disabled: ["glm-5.0"],
+      defaultModel: "glm-5.0",
+      modelSource: "custom",
+      dropMissingModels: true,
+    });
+
+    expect(result.rows.map((row) => row.id)).toEqual(["glm-5.2"]);
+    expect(result.enabled.map((model) => model.id)).toEqual(["glm-5.2"]);
+    // 被删模型的 disabled 记录一并清掉，默认模型回落到仍在的行
+    expect(result.disabled).toEqual([]);
+    expect(result.defaultModel).toBe("glm-5.2");
+  });
+
+  it("refreshes unpinned metadata from the endpoint", () => {
+    const result = mergeProviderModels({
+      catalog: [],
+      live: [
+        {
+          id: "glm-5.2",
+          name: "GLM-5.2",
+          contextWindow: 1000000,
+          maxTokens: 131072,
+          input: ["text"],
+        },
+      ],
+      saved: [
+        {
+          id: "glm-5.2",
+          label: "glm-5.2",
+          source: "custom",
+          contextWindow: 272000,
+        },
+      ],
+      disabled: [],
+      defaultModel: "glm-5.2",
+      modelSource: "custom",
+    });
+
+    expect(result.rows[0]).toMatchObject({
+      id: "glm-5.2",
+      label: "GLM-5.2",
+      contextWindow: 1000000,
+      maxTokens: 131072,
+      input: ["text"],
+    });
+  });
+
+  it("keeps the saved list when the endpoint could not be read", () => {
+    const result = mergeProviderModels({
+      catalog: [],
+      live: null,
+      saved: [
+        {
+          id: "glm-5.2",
+          label: "GLM-5.2",
+          source: "custom",
+          contextWindow: 272000,
+        },
+      ],
+      disabled: [],
+      defaultModel: "glm-5.2",
+      modelSource: "custom",
+    });
+
+    expect(result.rows.map((row) => row.id)).toEqual(["glm-5.2"]);
+    expect(result.rows[0]?.contextWindow).toBe(272000);
+  });
+
+  it("keeps the saved list when the live list is empty", () => {
+    const result = mergeProviderModels({
+      catalog: [],
+      live: [],
+      saved: [{ id: "glm-5.2", label: "GLM-5.2", source: "custom" }],
+      disabled: [],
+      defaultModel: "glm-5.2",
+      modelSource: "custom",
+    });
+
+    expect(result.rows.map((row) => row.id)).toEqual(["glm-5.2"]);
+  });
+});
+
+describe("mergeProviderModels only drops missing rows on an explicit reconnect", () => {
+  it("keeps rows the endpoint omitted when dropMissingModels is not set", () => {
+    const result = mergeProviderModels({
+      catalog: [],
+      live: [{ id: "glm-5.2", name: "GLM-5.2", contextWindow: 1000000 }],
+      saved: [
+        {
+          id: "glm-5.2",
+          label: "glm-5.2",
+          source: "custom",
+          contextWindow: 272000,
+        },
+        // 用户手填、端点在 /models 里没列出的别名
+        { id: "glm-5-alias", label: "glm-5-alias", source: "custom" },
+      ],
+      disabled: [],
+      defaultModel: "glm-5.2",
+      modelSource: "custom",
+    });
+
+    expect(result.rows.map((row) => row.id)).toEqual([
+      "glm-5.2",
+      "glm-5-alias",
+    ]);
+    // 元数据仍然会被刷新
+    expect(result.rows[0]?.contextWindow).toBe(1000000);
+  });
+});
