@@ -271,6 +271,43 @@ describe("locateForkEntryId", () => {
       expect(locateForkEntryId(entries, i)).toBe(msgs[i].id);
     }
   });
+
+  // 真实会话里 pi 会写 role=system 的 message entry（环境/工具变更时）。
+  // entriesToMessages 不渲染它，定位分叉点时如果照旧把它算进去，分叉点会
+  // 整体提前 —— 用户看到分叉成功，实际却少了好几条消息。
+  it("skips system message entries exactly like entriesToMessages does", () => {
+    const withSystem = [
+      {
+        type: "message",
+        id: "u1",
+        parentId: null,
+        timestamp: "t1",
+        message: { role: "user", content: [], timestamp: 1 },
+      },
+      {
+        type: "message",
+        id: "sys1",
+        parentId: "u1",
+        timestamp: "t2",
+        message: { role: "system", content: "", timestamp: 2 },
+      },
+      {
+        type: "message",
+        id: "a1",
+        parentId: "sys1",
+        timestamp: "t3",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "回答" }],
+          timestamp: 3,
+        },
+      },
+    ] as unknown as SessionEntry[];
+
+    const msgs = entriesToMessages(withSystem, "s1");
+    expect(msgs.map((m) => m.id)).toEqual(["u1", "a1"]);
+    expect(locateForkEntryId(withSystem, 1)).toBe("a1");
+  });
 });
 
 describe("entriesToMessages 的 usage 口径", () => {

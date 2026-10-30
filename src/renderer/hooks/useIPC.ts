@@ -1327,12 +1327,18 @@ export function useIPC() {
   );
 
   const forkSession = useCallback(
-    async (sessionId: string, messageId: string, titleSuffix: string) => {
+    async (
+      sessionId: string,
+      messageId: string,
+      titleSuffix: string,
+      anchor?: string | null,
+      anchorAt?: number | null,
+    ) => {
       let session: Session | undefined;
       try {
         session = await invoke<Session>({
           type: "session.fork",
-          payload: { sessionId, messageId, titleSuffix },
+          payload: { sessionId, messageId, titleSuffix, anchor, anchorAt },
         });
       } catch (e) {
         useAppStore.getState().setGlobalNotice({

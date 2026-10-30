@@ -500,6 +500,10 @@ export type ClientEvent =
         sessionId: string;
         messageId: string;
         titleSuffix: string;
+        /** 分叉点锚点：实时 id 与 JSONL entry id 不同名时用它定位（见 shared/fork-anchor） */
+        anchor?: string | null;
+        /** 锚点消息的时间戳：同一段文本出现多次时按它挑最接近的那条 */
+        anchorAt?: number | null;
       };
     }
   | {

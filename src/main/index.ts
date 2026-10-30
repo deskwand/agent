@@ -5033,6 +5033,8 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.sessionId,
         event.payload.messageId,
         event.payload.titleSuffix,
+        event.payload.anchor,
+        event.payload.anchorAt,
       );
 
     case "session.command":

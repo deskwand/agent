@@ -13,6 +13,7 @@
  */
 import { sliceCachedPage } from "./message-paging";
 import { entriesToMessages, locateForkEntryId } from "./entries-to-messages";
+import { findForkAnchorIndex } from "../../shared/fork-anchor";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { ElementSelectionRef } from "../../shared/ipc-types";
 import type { TurnProfileName } from "../../shared/voice-mode";
@@ -603,13 +604,18 @@ export class SessionManager {
     sessionId: string,
     messageId: string,
     titleSuffix: string,
+    forkAnchor?: string | null,
+    forkAnchorAt?: number | null,
   ): Promise<Session> {
     const source = this.loadSession(sessionId);
     if (!source) throw new Error(t("errors.forkSessionNotFound"));
-    // 优先 messageCache（含实时 uuidv4），fallback getMessages（entries）
-    const messages =
-      this.messageCache.get(sessionId) ?? this.getMessages(sessionId);
-    const forkIdx = messages.findIndex((m) => m.id === messageId);
+    const resolved = this.resolveForkPoint(
+      sessionId,
+      messageId,
+      forkAnchor ?? null,
+      forkAnchorAt ?? null,
+    );
+    const { messages, forkIdx } = resolved;
     if (forkIdx < 0) throw new Error(t("errors.forkPointNotFound"));
     const target = messages[forkIdx];
     if (target.role !== "assistant" || isToolResultMessage(target)) {
@@ -635,10 +641,14 @@ export class SessionManager {
       if (!sourceFile) {
         throw new Error(t("errors.forkNoJsonl"));
       }
-      // 定位 entry id：messages 与 entries 顺序一致（时间序），
-      // 第 forkIdx 条 message entry 即分叉点对应的 entry。
-      const entries = this.entriesReader ? this.entriesReader(sessionId) : null;
-      const forkEntryId = locateForkEntryId(entries, forkIdx);
+      // 定位 entry id：在 entries 列表里解析出来的直接用它的 id；只有回退到
+      // messageCache（消息还没落盘）时才按序号去 entries 里找。
+      const forkEntryId =
+        resolved.entryId ??
+        locateForkEntryId(
+          this.entriesReader ? this.entriesReader(sessionId) : null,
+          forkIdx,
+        );
       if (!forkEntryId) {
         throw new Error(t("errors.forkPointUnresolved"));
       }
@@ -662,6 +672,73 @@ export class SessionManager {
       }
       throw error;
     }
+  }
+
+  /**
+   * 定位分叉点。
+   *
+   * 渲染层的消息 id 有两个来源：entry id（历史水合）与实时 uuidv4（流式）。
+   * messageCache 一旦被重建/清理，实时 id 就查不到 —— 但它对应的 entry 还在，
+   * 所以先用锚点（首块内容）在权威 entries 列表里找同一条消息；缓存里命中的
+   * 消息也尽量换到 entry 上定位：缓存可能夹着没落盘的消息（错误气泡等），
+   * 直接按序号去 entries 里找会整体错位。
+   */
+  private resolveForkPoint(
+    sessionId: string,
+    messageId: string,
+    forkAnchor: string | null,
+    forkAnchorAt: number | null,
+  ): { messages: Message[]; forkIdx: number; entryId: string | null } {
+    const entries = this.entriesReader ? this.entriesReader(sessionId) : null;
+    const fromEntries = entries ? entriesToMessages(entries, sessionId) : null;
+    const cached =
+      this.messageCache.get(sessionId) ?? this.getMessages(sessionId);
+
+    // 1) 权威 entries 列表：先 id 后锚点，命中即拿到准确的 entry id
+    const entryHit = locateInMessages(
+      fromEntries,
+      messageId,
+      forkAnchor,
+      forkAnchorAt,
+    );
+    if (fromEntries && entryHit >= 0) {
+      const target = fromEntries[entryHit];
+      if (target.id !== messageId) {
+        logWarn("[SessionManager] Fork point resolved by anchor:", {
+          sessionId,
+          messageId,
+          entryId: target.id,
+        });
+      }
+      return {
+        messages: fromEntries,
+        forkIdx: entryHit,
+        entryId: String(target.id),
+      };
+    }
+
+    // 2) 实时缓存：消息可能还没落盘，此时只能靠缓存本身
+    const cacheHit = locateInMessages(
+      cached,
+      messageId,
+      forkAnchor,
+      forkAnchorAt,
+    );
+    if (cacheHit >= 0) {
+      const target = cached[cacheHit];
+      if (target.id !== messageId) {
+        logWarn(
+          "[SessionManager] Fork point resolved by anchor in live cache:",
+          {
+            sessionId,
+            messageId,
+            anchoredId: target.id,
+          },
+        );
+      }
+      return { messages: cached, forkIdx: cacheHit, entryId: null };
+    }
+    return { messages: fromEntries ?? cached, forkIdx: -1, entryId: null };
   }
 
   // Create a new session object
@@ -2788,4 +2865,17 @@ export function attachmentDestFilename(
 /** 内容摘要前 8 位：短到能进文件名，长到实际唯一。 */
 function sha256Short(contents: Buffer): string {
   return createHash("sha256").update(contents).digest("hex").slice(0, 8);
+}
+
+/** 在消息列表里定位分叉点：先按 id 精确命中，再按锚点兜底；找不到返回 -1。 */
+function locateInMessages(
+  messages: Message[] | null,
+  messageId: string,
+  forkAnchor: string | null,
+  forkAnchorAt: number | null,
+): number {
+  if (!messages) return -1;
+  const byId = messages.findIndex((m) => m.id === messageId);
+  if (byId >= 0) return byId;
+  return findForkAnchorIndex(messages, forkAnchor, forkAnchorAt);
 }

@@ -67,6 +67,7 @@ import {
   splitArtifactBlocks,
 } from "../utils/inline-artifacts";
 import { mergeSteerEntries, resolveAnchorMessageId } from "../steer-entries";
+import { buildForkAnchor } from "../../shared/fork-anchor";
 import {
   buildProcessSummaryDisplayBlock,
   collectResultFiles,
@@ -1168,13 +1169,22 @@ export function ChatView() {
       if (!activeSession) return;
       if (forkInFlightRef.current) return;
       forkInFlightRef.current = true;
+      // 卡片可能是合并后的（纯工具消息并进了前一条助手消息），
+      // 锚点取消息自己的原始内容，两边才算得出同一个值
+      const raw = messages.find((m) => m.id === message.id) ?? message;
       try {
-        await forkSession(activeSession.id, message.id, t("chat.forkSuffix"));
+        await forkSession(
+          activeSession.id,
+          message.id,
+          t("chat.forkSuffix"),
+          buildForkAnchor(raw),
+          raw.timestamp,
+        );
       } finally {
         forkInFlightRef.current = false;
       }
     },
-    [activeSession, forkSession, t],
+    [activeSession, forkSession, messages, t],
   );
 
   const handleDockTickSelect = useCallback(
