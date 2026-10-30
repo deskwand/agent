@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   availablePanelWidth,
+  clampBrowserWidth,
   clampPreviewWidth,
   clampReviewWidth,
   initialPreviewWidth,
@@ -39,11 +40,13 @@ describe("panel width", () => {
       contextPanelWidth: 288,
       previewWidth: 700,
       reviewWidth: 1100,
+      browserWidth: null as number | null,
     };
     expect(resolvePanelWidth("preview", widths, 1600)).toBe(700);
     expect(resolvePanelWidth("review", widths, 1600)).toBe(1100);
     expect(resolvePanelWidth("files", widths, 1600)).toBe(288);
-    expect(resolvePanelWidth("browser", widths, 1600)).toBe(288);
+    // 浏览器没被拖过时是半屏，不再借用共用的上下文宽度
+    expect(resolvePanelWidth("browser", widths, 1600)).toBe(800);
     expect(
       resolvePanelWidth("preview", { ...widths, previewWidth: null }, 1600),
     ).toBe(288);
@@ -54,6 +57,7 @@ describe("panel width", () => {
       contextPanelWidth: 288,
       previewWidth: 960,
       reviewWidth: null,
+      browserWidth: null as number | null,
     };
     // 1600px 窗口下拖到 960，缩到 1000px 窗口时读出值收敛
     expect(resolvePanelWidth("preview", widths, 1000)).toBe(700);
@@ -72,5 +76,28 @@ describe("panel width", () => {
     expect(initialReviewWidth(1435, true, 280)).toBe(1076);
     // 窄窗口下 0.75 与 0.85 两个比例都要收敛
     expect(initialReviewWidth(600, true, 280)).toBe(450);
+  });
+
+  // 回归：浏览器面板的宽度独占一格。它开面板时按半屏、随窗口大小重算，
+  // 若写进共用的 contextPanelWidth，后开的概览/文件浏览器会继承浏览器宽度。
+  it("gives the browser its own slot instead of the shared context width", () => {
+    const widths = {
+      contextPanelWidth: 288,
+      previewWidth: null,
+      reviewWidth: null,
+      browserWidth: 900,
+    };
+    expect(resolvePanelWidth("browser", widths, 1600)).toBe(900);
+    // 概览与文件浏览器仍然读共用宽度，不被浏览器带跑
+    expect(resolvePanelWidth("overview", widths, 1600)).toBe(288);
+    expect(resolvePanelWidth("files", widths, 1600)).toBe(288);
+  });
+
+  it("clamps a dragged browser width to its minimum and to the window", () => {
+    expect(clampBrowserWidth(100, 1600)).toBe(350);
+    expect(clampBrowserWidth(900, 1600)).toBe(900);
+    expect(clampBrowserWidth(2000, 1600)).toBe(1600);
+    // 窗口比下限还窄时，下限让位给窗口
+    expect(clampBrowserWidth(900, 300)).toBe(300);
   });
 });

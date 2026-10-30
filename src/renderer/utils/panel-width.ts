@@ -87,10 +87,13 @@ export interface PanelWidths {
   contextPanelWidth: number;
   previewWidth: number | null;
   reviewWidth: number | null;
+  /** 浏览器独占的一格；null = 用户没拖过，按半屏算 */
+  browserWidth: number | null;
 }
 
 /** 槽位实际宽度：每块面板用自己的宽度（读出时收敛到窗口能给的范围内，
- *  这样窗口放大后用户原来拖的宽度会回来），其余模式仍用共用的 contextPanelWidth。 */
+ *  这样窗口放大后用户原来拖的宽度会回来）。浏览器靠 browserWidth 独占（null 即半屏），
+ *  文件浏览器 / 概览仍共用 contextPanelWidth —— 它们不会自己改这个值。 */
 export function resolvePanelWidth(
   mode: RightPanelMode,
   widths: PanelWidths,
@@ -102,7 +105,12 @@ export function resolvePanelWidth(
   if (mode === "review" && widths.reviewWidth !== null) {
     return clampReviewWidth(widths.reviewWidth, available);
   }
-  return widths.contextPanelWidth;
+  if (mode === "browser") {
+    return widths.browserWidth === null
+      ? initialBrowserWidth(available)
+      : clampBrowserWidth(widths.browserWidth, available);
+  }
+  return clampContextWidth(widths.contextPanelWidth, available);
 }
 
 /**
@@ -115,4 +123,56 @@ export function resolvePanelWidth(
  */
 export function panelWidthTransitionClass(dragging: boolean): string {
   return dragging ? "" : "transition-[width] duration-300 ease-in-out";
+}
+
+/**
+ * 浏览器面板：默认半屏，用户拖过之后用自己的宽度。
+ *
+ * 这两条以前写在 App 的 effect 里（开面板 / 窗口 resize 时把半屏写进共用的
+ * contextPanelWidth），于是「开过浏览器之后打开概览」会继承浏览器的半屏宽度 ——
+ * 共用的那一格被别的面板改写了。现在改成读出时按可用宽度现算，
+ * 浏览器不再在 store 里留一个会腐坏别人宽度的中间值。
+ */
+export const BROWSER_MIN_WIDTH = 350;
+/** 浏览器默认占比：半屏 */
+const BROWSER_DEFAULT_RATIO = 0.5;
+
+export function browserWidthBounds(available: number): {
+  min: number;
+  max: number;
+} {
+  // 窗口比下限还窄时，下限让位给窗口：面板不能宽过可用宽度
+  const min = Math.min(BROWSER_MIN_WIDTH, available);
+  return { min, max: Math.max(min, available) };
+}
+
+export function clampBrowserWidth(width: number, available: number): number {
+  const { min, max } = browserWidthBounds(available);
+  return Math.max(min, Math.min(max, Math.round(width)));
+}
+
+/** 浏览器面板的默认宽度：可用宽度的半屏。 */
+export function initialBrowserWidth(available: number): number {
+  return clampBrowserWidth(available * BROWSER_DEFAULT_RATIO, available);
+}
+
+/** 文件浏览器 / 概览共用的上下文宽度：拖拽边界。 */
+export const CONTEXT_MIN_WIDTH = 280;
+export const CONTEXT_MAX_WIDTH = 480;
+/** 共用上下文宽度的默认值（双击分隔条回到这里，也是 store 的初始值）。 */
+export const CONTEXT_DEFAULT_WIDTH = 288;
+
+export function contextWidthBounds(available: number): {
+  min: number;
+  max: number;
+} {
+  return {
+    min: CONTEXT_MIN_WIDTH,
+    max: Math.max(CONTEXT_MIN_WIDTH, Math.min(CONTEXT_MAX_WIDTH, available)),
+  };
+}
+
+export function clampContextWidth(width: number, available: number): number {
+  const { min, max } = contextWidthBounds(available);
+  return Math.max(min, Math.min(max, Math.round(width)));
 }

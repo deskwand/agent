@@ -32,8 +32,11 @@ import { isSidebarAllowed } from "./utils/nav-rail";
 import { ResizeHandle } from "./components/ResizeHandle";
 import {
   availablePanelWidth,
+  clampBrowserWidth,
+  clampContextWidth,
   clampPreviewWidth,
   clampReviewWidth,
+  CONTEXT_DEFAULT_WIDTH,
   initialPreviewWidth,
   initialReviewWidth,
   panelWidthTransitionClass,
@@ -184,7 +187,8 @@ function App() {
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const setContextPanelWidth = useAppStore((s) => s.setContextPanelWidth);
   const exitBrowserFullscreen = useAppStore((s) => s.exitBrowserFullscreen);
-  const browserWidthManual = useAppStore((s) => s.browserWidthManual);
+  const browserWidth = useAppStore((s) => s.browserWidth);
+  const setBrowserWidth = useAppStore((s) => s.setBrowserWidth);
   const setBrowserWidthManual = useAppStore((s) => s.setBrowserWidthManual);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
 
@@ -527,7 +531,7 @@ function App() {
   );
   const panelWidth = resolvePanelWidth(
     rightPanelMode,
-    { contextPanelWidth, previewWidth, reviewWidth },
+    { contextPanelWidth, previewWidth, reviewWidth, browserWidth },
     panelAvailableWidth,
   );
 
@@ -566,20 +570,9 @@ function App() {
     toggleBrowserPanel,
   ]);
 
-  // Stable 50%-width calculator for browser panel
-  const calcHalfWidth = useCallback(() => {
-    const available = sidebarTakesSpace
-      ? window.innerWidth - sidebarWidth
-      : window.innerWidth;
-    return Math.round(available / 2);
-  }, [sidebarTakesSpace, sidebarWidth]);
-
-  // Auto-set browser panel to 50% width when opened in auto mode
-  useEffect(() => {
-    if (rightPanelMode === "browser" && !browserWidthManual) {
-      setContextPanelWidth(calcHalfWidth());
-    }
-  }, [rightPanelMode, browserWidthManual, calcHalfWidth, setContextPanelWidth]);
+  // 浏览器面板的宽度不再写进共用的 contextPanelWidth：那会让「开过浏览器之后
+  // 打开概览 / 文件浏览器」继承浏览器的半屏宽度。半屏是读出时按可用宽度现算的
+  // （见 utils/panel-width 的 resolvePanelWidth），用户拖过之后才有自己的宽度。
 
   // 事件类弹窗（充值 / 扩展队列）关闭时的回焦 fallback：入口按钮/菜单项可能已经卸载，
   // 或无有效返回目标，此时回到内容区根容器（tabIndex=-1，不进 Tab 顺序）。
@@ -588,39 +581,6 @@ function App() {
   // takeReturnFocusTarget 读取并立即清空 —— 关闭后回焦到这个真实入口，而不是 <main> fallback。
   // （纯局部 ref，不进 store / 不做全局 focus 模块）
   const topUpTriggerRef = useRef<HTMLElement | null>(null);
-
-  // Keep browser at 50% on window resize when in auto mode.
-  // Uses refs to avoid re-binding the listener on every sidebar change.
-  const resizeGuardRef = useRef<{
-    rightPanelMode:
-      | "files"
-      | "browser"
-      | "preview"
-      | "review"
-      | "overview"
-      | null;
-    browserWidthManual: boolean;
-    calcHalfWidth: typeof calcHalfWidth;
-  }>(null!);
-  resizeGuardRef.current = {
-    rightPanelMode,
-    browserWidthManual,
-    calcHalfWidth,
-  };
-
-  useEffect(() => {
-    const handleResize = () => {
-      const {
-        rightPanelMode: mode,
-        browserWidthManual: manual,
-        calcHalfWidth: calc,
-      } = resizeGuardRef.current;
-      if (mode !== "browser" || manual) return;
-      setContextPanelWidth(calc());
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [setContextPanelWidth]);
 
   // When user manually closes the browser panel (any mode transition away from browser),
   // mark it as dismissed so MCP navigations won't force-reopen it.
@@ -756,14 +716,16 @@ function App() {
                   setReviewWidthManual(true);
                   return;
                 }
-                setBrowserWidthManual(true);
+                if (rightPanelMode === "browser") {
+                  setBrowserWidth(
+                    clampBrowserWidth(panelWidth - delta, panelAvailableWidth),
+                  );
+                  setBrowserWidthManual(true);
+                  return;
+                }
+                // 文件浏览器 / 概览共用这一格
                 setContextPanelWidth(
-                  Math.max(
-                    rightPanelMode === "browser" ? 350 : 280,
-                    rightPanelMode === "browser"
-                      ? contextPanelWidth - delta
-                      : Math.min(480, contextPanelWidth - delta),
-                  ),
+                  clampContextWidth(panelWidth - delta, panelAvailableWidth),
                 );
               }}
               onDoubleClick={() => {
@@ -789,8 +751,15 @@ function App() {
                   );
                   return;
                 }
-                setBrowserWidthManual(false);
-                setContextPanelWidth(calcHalfWidth());
+                if (rightPanelMode === "browser") {
+                  // null = 回到「随窗口算的半屏」，不是钉在一个当时的数上
+                  setBrowserWidthManual(false);
+                  setBrowserWidth(null);
+                  return;
+                }
+                setContextPanelWidth(
+                  clampContextWidth(CONTEXT_DEFAULT_WIDTH, panelAvailableWidth),
+                );
               }}
               onDraggingChange={setIsPanelDragging}
               position="left"
@@ -809,7 +778,7 @@ function App() {
                 fallback={<div className="flex-1 bg-muted" />}
               >
                 <Suspense fallback={<div className="flex-1 bg-muted" />}>
-                  <BrowserPanel width={contextPanelWidth} />
+                  <BrowserPanel width={panelWidth} />
                 </Suspense>
               </PanelErrorBoundary>
             )}

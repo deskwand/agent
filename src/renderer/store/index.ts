@@ -29,7 +29,11 @@ import type {
   AskUserRequest,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
-import { initialPreviewWidth, initialReviewWidth } from "../utils/panel-width";
+import {
+  CONTEXT_DEFAULT_WIDTH,
+  initialPreviewWidth,
+  initialReviewWidth,
+} from "../utils/panel-width";
 import type { RightPanelMode } from "../utils/browser-visibility";
 import type { ImageSource } from "../components/ImageLightbox";
 import { USAGE_CURRENCIES, type CurrencyCode } from "../../shared/usage";
@@ -260,6 +264,8 @@ interface AppState {
   sidebarCollapsedBeforePanels: boolean | null;
   sidebarWidth: number;
   contextPanelWidth: number;
+  /** 浏览器面板自己的宽度；null = 用户没拖过，按可用宽度的半屏算 */
+  browserWidth: number | null;
   browserWidthManual: boolean;
   activeView: ActiveView;
   // ---- 动态（feed）----
@@ -538,6 +544,7 @@ interface AppState {
   toggleReviewPanel: () => void;
   toggleBrowserPanel: () => void;
   toggleOverview: () => void;
+  setBrowserWidth: (width: number | null) => void;
   setBrowserWidthManual: (manual: boolean) => void;
 
   addPendingPermission: (request: PermissionRequest) => void;
@@ -757,7 +764,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarCollapsed: false,
   sidebarCollapsedBeforePanels: null,
   sidebarWidth: 280,
-  contextPanelWidth: 288,
+  contextPanelWidth: CONTEXT_DEFAULT_WIDTH,
+  browserWidth: null as number | null,
   browserWidthManual: false,
   activeView: "chat",
   feedEnabled: false,
@@ -1780,9 +1788,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...sidebarSyncForMode(state, "browser"),
         lastVisibleContext: null,
         rightPanelMode: "browser",
+        browserWidth: null,
         browserWidthManual: false,
       };
     }),
+  setBrowserWidth: (width) => set({ browserWidth: width }),
   setBrowserWidthManual: (manual) => set({ browserWidthManual: manual }),
 
   setOfficePreviewBusyPath: (path) => set({ officePreviewBusyPath: path }),
