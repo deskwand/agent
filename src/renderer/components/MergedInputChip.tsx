@@ -63,6 +63,7 @@ export function MergedInputChip({
   const [panelView, setPanelView] = useState<"list" | "thinking">("list");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
+  const [panelMaxWidth, setPanelMaxWidth] = useState<number | null>(null);
 
   // WelcomeView 的输入框垂直居中，芯片上方的可用空间远小于 100vh - 12rem。
   // 超出 main 的 overflow-hidden 的顶部会被裁掉且点不到，因此按面板上方的实际可用高度取上限。
@@ -78,7 +79,10 @@ export function MergedInputChip({
   const updatePanelMaxHeight = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
-    const bottom = trigger.getBoundingClientRect().top - MENU_PANEL_OFFSET_PX;
+    const rect = trigger.getBoundingClientRect();
+    // End alignment and disabled collision flipping must still respect the left viewport edge.
+    if (rect.right > 8) setPanelMaxWidth(Math.floor(rect.right - 8));
+    const bottom = rect.top - MENU_PANEL_OFFSET_PX;
     // 无布局信息（jsdom 等）时保留 className 上的默认上限
     if (bottom <= 0) return;
     const available = Math.max(0, Math.floor(bottom - MENU_TOP_SAFE_AREA_PX));
@@ -161,7 +165,8 @@ export function MergedInputChip({
       const selected =
         group.profileKey === activeProviderProfileKey && item.id === model;
       return (
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           key={`${group.profileKey}:${item.id}`}
           type="button"
           onClick={() => onSelectModel(group.profileKey, item.id)}
@@ -198,7 +203,8 @@ export function MergedInputChip({
   );
 
   const renderBackRow = () => (
-    <Button variant="ghost"
+    <Button
+      variant="ghost"
       type="button"
       onClick={() => setPanelView("list")}
       className={`${MENU_ITEM_CLASS} text-muted-foreground hover:bg-hover-surface`}
@@ -211,7 +217,8 @@ export function MergedInputChip({
   const renderThinkingRow = () => (
     <>
       <div className={MENU_SEPARATOR_CLASS} />
-      <Button variant="ghost"
+      <Button
+        variant="ghost"
         type="button"
         onClick={() => setPanelView("thinking")}
         className={`${MENU_ITEM_CLASS} justify-between font-medium ${MENU_ITEM_DEFAULT_CLASS}`}
@@ -248,7 +255,8 @@ export function MergedInputChip({
     <Popover open={menuOpen} onOpenChange={handleOpenChange}>
       <div className="relative inline-flex">
         <PopoverTrigger asChild>
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             ref={triggerRef}
             type="button"
             disabled={disabled}
@@ -284,11 +292,12 @@ export function MergedInputChip({
             avoidCollisions={false}
             // role="dialog" 由 Radix 的 PopoverContent 提供，不手写（写了会重复）
             aria-label={t("chat.model")}
-            style={
-              panelMaxHeight === null
-                ? undefined
-                : { maxHeight: `${panelMaxHeight}px` }
-            }
+            style={{
+              maxHeight:
+                panelMaxHeight === null ? undefined : `${panelMaxHeight}px`,
+              maxWidth:
+                panelMaxWidth === null ? undefined : `${panelMaxWidth}px`,
+            }}
             className={`${MENU_PANEL_PADDED_CLASS} ${
               panelView === "thinking" ? "w-[12rem]" : "w-[20rem]"
             } max-h-[min(32rem,calc(100vh_+_-12rem))] overflow-y-auto`}
@@ -297,7 +306,8 @@ export function MergedInputChip({
               <>
                 {renderBackRow()}
                 {thinkingLevelOptions.map((level) => (
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     key={level}
                     type="button"
                     onClick={() => {

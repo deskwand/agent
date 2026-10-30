@@ -44,6 +44,7 @@ const groupedStatus = (
 ): NonNullable<ProcessSummaryDisplayBlock["status"]> => ({
   running: false,
   failed: true,
+  failedCount: 1,
   unfinished: false,
   unavailable: false,
   ...(firstFailedToolCallId ? { firstFailedToolCallId } : {}),
@@ -133,7 +134,63 @@ describe("codemode tool group UI", () => {
     return all.slice(1);
   }
 
-  it("结果组折叠时不再显示失败提示，外部高亮请求仍展开并高亮失败子项", () => {
+  it.each(["zh", "en"])(
+    "process summary keeps a localized failure count outside clipped text (%s)",
+    async (language) => {
+      await i18n.changeLanguage(language);
+      const block = {
+        type: "process-summary",
+        items: [],
+        summary: { readCount: 2 },
+        status: groupedStatus(),
+      } as unknown as ProcessSummaryDisplayBlock;
+      act(() =>
+        root.render(
+          createElement(ProcessSummaryBlock, { block, allBlocks: [] }),
+        ),
+      );
+      const suffix = container.querySelector<HTMLElement>(
+        "[data-tool-group-failure-count]",
+      )!;
+      expect(suffix.textContent).toBe(
+        i18n.t("tool.grouped.failedCount", { count: 1 }),
+      );
+      expect(suffix.classList.contains("shrink-0")).toBe(true);
+      expect(suffix.parentElement?.getAttribute("aria-expanded")).toBe("false");
+    },
+  );
+
+  it("successful process and result summaries have no failure suffix", () => {
+    const status = { ...groupedStatus(), failed: false, failedCount: 0 };
+    const process = {
+      type: "process-summary",
+      items: [],
+      summary: { readCount: 1 },
+      status,
+    } as unknown as ProcessSummaryDisplayBlock;
+    const result = {
+      type: "result-summary",
+      items: [],
+      files: [],
+      summary: { editedFiles: 0, writtenFiles: 0 },
+      status,
+    } as Extract<DisplayBlock, { type: "result-summary" }>;
+    act(() =>
+      root.render(
+        createElement(
+          "div",
+          null,
+          createElement(ProcessSummaryBlock, { block: process }),
+          createElement(ResultSummaryBlock, { block: result }),
+        ),
+      ),
+    );
+    expect(
+      container.querySelector("[data-tool-group-failure-count]"),
+    ).toBeNull();
+  });
+
+  it("结果组折叠显示失败计数，外部高亮请求仍展开并高亮失败子项", () => {
     const failedChild = child({
       id: "write-1",
       name: "write",
@@ -178,6 +235,9 @@ describe("codemode tool group UI", () => {
       ),
     );
 
+    expect(
+      container.querySelector("button[aria-expanded]")?.textContent,
+    ).toContain("（1 个失败）");
     // 提示条整条移除（2026-10-10 决定）：折叠态只剩摘要行，失败明细在展开里。
     expect(container.textContent).not.toContain(
       i18n.t("tool.grouped.failedOperations"),

@@ -147,4 +147,21 @@ describe("PermissionDialog 外壳", () => {
     expect(labels).toContain(i18n.t("permission.deny"));
     expect(labels).toContain(i18n.t("permission.alwaysAllow"));
   });
+
+  it("二次确认文案走 i18n，不出现硬编码英文", async () => {
+    await render(<PermissionDialog permission={permission} />);
+    const alwaysAllow = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === i18n.t("permission.alwaysAllow"),
+    );
+    expect(alwaysAllow).toBeTruthy();
+    await act(async () => {
+      alwaysAllow!.click();
+    });
+    // bash 属高危工具 ⇒ 第一次点击只进确认态，不应发出应答
+    expect(respondToPermission).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain(
+      i18n.t("permission.alwaysAllowConfirm", { toolName: "bash" }),
+    );
+    expect(document.body.textContent).not.toContain("Are you sure");
+  });
 });

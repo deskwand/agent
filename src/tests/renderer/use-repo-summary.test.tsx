@@ -199,3 +199,28 @@ describe("useRepoSummary", () => {
     expect(output(container)).toBe("error:git missing");
   });
 });
+
+it("shares an in-flight cwd request between two visible panes", async () => {
+  const pending = deferred<RepoSummary>();
+  const getRepoSummary = mockApi(() => pending.promise);
+  await act(async () =>
+    root.render(
+      <>
+        <Probe cwd="/shared" visible />
+        <Probe cwd="/shared" visible />
+      </>,
+    ),
+  );
+  await flush();
+  expect(getRepoSummary).toHaveBeenCalledTimes(1);
+  await act(async () => pending.resolve(summary("shared-branch")));
+  await flush();
+  expect(
+    [...container.querySelectorAll('[data-testid="out"]')].map(
+      (node) => node.textContent,
+    ),
+  ).toEqual(["shared-branch", "shared-branch"]);
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  await flush();
+  expect(getRepoSummary).toHaveBeenCalledTimes(1);
+});

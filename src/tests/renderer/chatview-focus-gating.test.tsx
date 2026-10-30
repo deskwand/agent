@@ -9,11 +9,16 @@ import { useSplitLayoutStore } from "../../renderer/store/split-layout";
 import type { MountedPath, Session } from "../../renderer/types";
 import type * as VoiceInputModule from "../../renderer/hooks/useVoiceInput";
 
+const modelActions = vi.hoisted(() => ({
+  setModel: vi.fn(),
+  setThinking: vi.fn(),
+}));
 const pushToTalkCalls: unknown[][] = [];
 const focusCalls: string[] = [];
 const voiceMock = { status: "idle", cancel: vi.fn(async () => {}) };
 
 vi.mock("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 
@@ -39,8 +44,8 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => ({
     continueSession: vi.fn(),
     stopSession: vi.fn(),
-    setSessionThinkingLevel: vi.fn(),
-    setSessionProviderModel: vi.fn(),
+    setSessionThinkingLevel: modelActions.setThinking,
+    setSessionProviderModel: modelActions.setModel,
     isElectron: false,
   }),
 }));
@@ -49,7 +54,7 @@ vi.mock("../../renderer/components/ChatInput", async () => {
   const ReactModule = await import("react");
   return {
     ChatInput: ReactModule.forwardRef(function MockChatInput(
-      props: { draftKey?: string },
+      props: { draftKey?: string; footerSlot?: React.ReactNode },
       ref,
     ) {
       ReactModule.useImperativeHandle(ref, () => ({
@@ -63,7 +68,7 @@ vi.mock("../../renderer/components/ChatInput", async () => {
         isEmpty: () => true,
         selectFiles: () => {},
       }));
-      return ReactModule.createElement("div");
+      return ReactModule.createElement("div", null, props.footerSlot);
     }),
   };
 });
@@ -183,6 +188,73 @@ describe("ChatView focus gating", () => {
       );
     });
   }
+
+  it("an unfocused pane footer changes its own session model and thinking", async () => {
+    modelActions.setModel.mockClear();
+    modelActions.setThinking.mockClear();
+    useAppStore.setState({
+      appConfig: {
+        model: "model-a",
+        activeProviderKey: "custom:test",
+        thinkingLevel: "medium",
+        providers: {
+          "custom:test": {
+            name: "Test",
+            apiKey: "k",
+            defaultModel: "model-a",
+            customProtocol: "anthropic",
+            models: [
+              { id: "model-a", label: "Model A" },
+              { id: "model-b", label: "Model B" },
+            ],
+          },
+        },
+      },
+    } as never);
+    await renderPane2();
+    const trigger = container.querySelector<HTMLButtonElement>(
+      'button[aria-haspopup="dialog"]',
+    )!;
+    await act(async () => trigger.click());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const choose = (text: string) =>
+      [...document.body.querySelectorAll<HTMLButtonElement>("button")].find(
+        (b) => b.textContent?.trim() === text,
+      )!;
+    await act(async () => choose("Model B").click());
+    expect(modelActions.setModel).toHaveBeenCalledExactlyOnceWith(
+      "S2",
+      "custom:test",
+      "model-b",
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const currentTrigger = container.querySelector<HTMLButtonElement>(
+      'button[aria-haspopup="dialog"]',
+    )!;
+    if (currentTrigger.getAttribute("aria-expanded") !== "true")
+      await act(async () => currentTrigger.click());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await act(async () => {
+      const row = [
+        ...document.body.querySelectorAll<HTMLButtonElement>("button"),
+      ].find((b) => b.textContent?.startsWith("modelMenu.thinkingWithValue"));
+      if (!row)
+        throw new Error(document.body.textContent ?? "missing thinking row");
+      row.click();
+    });
+    await act(async () => choose("chat.thinkingLevel.high").click());
+    expect(modelActions.setThinking).toHaveBeenCalledExactlyOnceWith(
+      "S2",
+      "high",
+    );
+    expect(useAppStore.getState().activeSessionId).toBe("S1");
+  });
 
   it("未聚焦区域的 push-to-talk 被禁用，聚焦后恢复", async () => {
     useAppStore.setState({

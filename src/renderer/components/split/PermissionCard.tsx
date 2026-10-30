@@ -168,7 +168,9 @@ export function PermissionCard({
       ) : (
         <div className="mt-2 p-3 bg-warning/10 border border-warning/20 rounded-xl">
           <p className="text-sm text-warning mb-2">
-            {`Are you sure you want to always allow "${permission.toolName}"? This tool can modify your system.`}
+            {t("permission.alwaysAllowConfirm", {
+              toolName: permission.toolName,
+            })}
           </p>
           <div className="flex gap-2">
             <Button
@@ -176,7 +178,7 @@ export function PermissionCard({
               onClick={() => setPendingAlwaysAllow(false)}
               className="flex-1 rounded-lg bg-card px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-hover-surface h-auto"
             >
-              {t("permission.deny")}
+              {t("permission.cancelAlwaysAllow")}
             </Button>
             <Button
               variant="ghost"
@@ -186,7 +188,7 @@ export function PermissionCard({
               }}
               className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-auto"
             >
-              {t("permission.alwaysAllow")}
+              {t("permission.confirmAlwaysAllow")}
             </Button>
           </div>
         </div>

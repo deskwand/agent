@@ -155,15 +155,24 @@ describe("MergedInputChip (single-panel)", () => {
 
   // 面板经 portal 挂到 document.body（触发器仍在 container 里）—— 面板与触发器分开查。
 
+  it("keeps an end-aligned menu inside the viewport near its left edge", async () => {
+    stubLayout({ triggerTop: 300, triggerRight: 260 });
+    render();
+    await openPanel();
+    expect(panel().style.maxWidth).toBe("252px");
+  });
+
   // jsdom 没有布局，手动给出触发器与面板的坐标，模拟 WelcomeView 中输入框垂直居中、
   // 面板上方空间不足的场景（真实修复前的值可参考菜单高度 ≈ 100vh - 12rem）。
   // panelBottom 默认给 Radix 定位完成前的那一帧：wrapper 带着 translate(0, -200%)，
   // 面板整个落在视口上方，getBoundingClientRect 的 bottom 是负的。
   function stubLayout({
     triggerTop,
+    triggerRight = 500,
     panelBottom = triggerTop - 512,
   }: {
     triggerTop: number;
+    triggerRight?: number;
     panelBottom?: number;
   }) {
     HTMLElement.prototype.getBoundingClientRect = function () {
@@ -172,7 +181,7 @@ describe("MergedInputChip (single-panel)", () => {
           top: triggerTop,
           bottom: triggerTop + 36,
           left: 0,
-          right: 0,
+          right: triggerRight,
           width: 0,
           height: 36,
           x: 0,
@@ -375,14 +384,14 @@ describe("MergedInputChip (single-panel)", () => {
     });
     await openPanel();
     // 列表层直接可见思考行，不需要先钻进「自定义」视图
-    const thinkingRow = Array.from(document.body.querySelectorAll("button")).find(
-      (b) => b.textContent?.includes("modelMenu.thinkingWithValue"),
-    );
+    const thinkingRow = Array.from(
+      document.body.querySelectorAll("button"),
+    ).find((b) => b.textContent?.includes("modelMenu.thinkingWithValue"));
     click(thinkingRow);
     expect(panel().textContent).toContain("chat.thinkingLevel.high");
-    const highButton = Array.from(document.body.querySelectorAll("button")).find(
-      (b) => b.textContent?.includes("chat.thinkingLevel.high"),
-    );
+    const highButton = Array.from(
+      document.body.querySelectorAll("button"),
+    ).find((b) => b.textContent?.includes("chat.thinkingLevel.high"));
     click(highButton);
     expect(baseProps.onSelectThinkingLevel).toHaveBeenCalledWith("high");
     // 自动回列表层，仍看得到分组

@@ -102,6 +102,7 @@ import {
   suppressNextInputQueueDrain,
 } from "../utils/input-queue-drain";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
+import { ChatInputFooterBar, WorkspaceChip } from "./ChatInputFooterBar";
 import { toMicButtonProps } from "./VoiceMicButton";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
 import { getCapabilityGate } from "../capabilities/capability-gate";
@@ -2268,27 +2269,9 @@ export function ChatView() {
               placeholder={t("chat.typeMessage")}
               cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
               textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed py-2 overflow-hidden"
-              bottomSlot={
-                <ChatInputBottomBar
-                  onAttach={() => chatInputRef.current?.selectFiles()}
-                  cwd={activeSessionCwd}
-                  onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
-                  attachedKeys={attachedKeys}
-                  onAttachMenuDismiss={() => chatInputRef.current?.focus()}
-                  onCommandEntry={(command) => {
-                    if (command === "compact") {
-                      // 复用既有压缩路径（handleCompact 内部已守无会话/压缩中/有活跃回合）
-                      handleCommand("compact");
-                      return;
-                    }
-                    chatInputRef.current?.insertCommandChip("goal");
-                  }}
-                  onInsertPromptCommand={(name) =>
-                    chatInputRef.current?.insertCommandChip(name)
-                  }
-                  onInsertSkill={(name) =>
-                    chatInputRef.current?.insertSkillChip(name)
-                  }
+              footerSlot={
+                <ChatInputFooterBar
+                  leftSlot={<WorkspaceChip cwd={activeSessionCwd ?? null} />}
                   model={activeModel}
                   modelOptions={modelOptions}
                   activeProviderProfileKey={activeProviderProfileKey}
@@ -2353,6 +2336,29 @@ export function ChatView() {
                   contextUsagePercentage={contextUsagePercentage}
                   contextRingColorClass={contextRingColorClass}
                   contextStatusDetails={contextStatusDetails}
+                />
+              }
+              bottomSlot={
+                <ChatInputBottomBar
+                  onAttach={() => chatInputRef.current?.selectFiles()}
+                  cwd={activeSessionCwd}
+                  onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
+                  attachedKeys={attachedKeys}
+                  onAttachMenuDismiss={() => chatInputRef.current?.focus()}
+                  onCommandEntry={(command) => {
+                    if (command === "compact") {
+                      // 复用既有压缩路径（handleCompact 内部已守无会话/压缩中/有活跃回合）
+                      handleCommand("compact");
+                      return;
+                    }
+                    chatInputRef.current?.insertCommandChip("goal");
+                  }}
+                  onInsertPromptCommand={(name) =>
+                    chatInputRef.current?.insertCommandChip(name)
+                  }
+                  onInsertSkill={(name) =>
+                    chatInputRef.current?.insertSkillChip(name)
+                  }
                   canStop={canStop}
                   onStop={handleStop}
                   isSubmitting={isSubmitting}

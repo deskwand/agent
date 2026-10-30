@@ -15,7 +15,6 @@ import {
 import {
   ChatInputBottomBar,
   shouldShowExpandButton,
-  type ModelOptionGroup,
 } from "../../renderer/components/ChatInputBottomBar";
 
 vi.mock("react-i18next", () => ({
@@ -36,33 +35,11 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
 
 type BarProps = React.ComponentProps<typeof ChatInputBottomBar>;
 
-const modelOptions: ModelOptionGroup[] = [
-  {
-    profileKey: "profile-a" as never,
-    groupLabel: "Provider A",
-    items: [{ id: "model-1", name: "Model One" }],
-  },
-];
-
 /** 底栏除「随内容变化的两个 prop」之外的必填/可选 prop。 */
 const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
   onAttach: () => {},
   onAddFiles: () => {},
   attachedKeys: new Set<string>(),
-  model: "model-1",
-  modelOptions,
-  activeProviderProfileKey: "profile-a" as never,
-  onSelectModel: () => {},
-  thinkingLevel: "medium" as never,
-  thinkingLevelOptions: ["off", "medium"] as never[],
-  onSelectThinkingLevel: () => {},
-  contextUsagePercentage: 0,
-  contextRingColorClass: "",
-  contextStatusDetails: {
-    usedLabel: "0",
-    totalLabel: "0",
-    cacheHitRate: "--",
-  },
   canStop: false,
   onStop: () => {},
   isSubmitting: false,

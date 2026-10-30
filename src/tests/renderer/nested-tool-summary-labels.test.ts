@@ -40,6 +40,7 @@ it("distinguishes successful empty scripts from running or failed scripts with E
   const status = {
     running: false,
     failed: true,
+    failedCount: 1,
     unfinished: false,
     unavailable: false,
   };

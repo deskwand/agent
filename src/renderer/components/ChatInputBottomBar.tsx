@@ -1,11 +1,8 @@
-import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { ThinkingLevel, ProviderProfileKey } from "../types";
+import type { ProviderProfileKey } from "../types";
 import { ArrowUp, Square, Maximize2, Minimize2 } from "lucide-react";
-import { MergedInputChip } from "./MergedInputChip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { AttachMenu } from "./attach/AttachMenu";
-import { StatusPopover } from "./StatusPopover";
 import { VoiceMicButton, type VoiceMicButtonProps } from "./VoiceMicButton";
 import type { ChatInputAttachedFile } from "./ChatInput";
 import { Button } from "./app-button";
@@ -30,8 +27,6 @@ export interface ContextStatusDetails {
 
 export interface ChatInputBottomBarProps {
   onAttach: () => void;
-  /** 左簇首位（附件按钮之前）的宿主自定义位。缺省 = 不渲染。 */
-  leadingSlot?: ReactNode;
   /** 当前会话工作目录，透传给 AttachMenu */
   cwd?: string;
   /** 选择器选出的附件 */
@@ -48,17 +43,6 @@ export interface ChatInputBottomBarProps {
   onInsertPromptCommand?: (name: string) => void;
   /** 技能入口：宿主把 /skill:<name> 插进输入框。缺省 = 本宿主不支持技能引用 */
   onInsertSkill?: (name: string) => void;
-  model: string;
-  modelOptions: ModelOptionGroup[];
-  activeProviderProfileKey: ProviderProfileKey;
-  onSelectModel: (profileKey: ProviderProfileKey, modelId: string) => void;
-  modelMenuDisabled?: boolean;
-  thinkingLevel: ThinkingLevel;
-  thinkingLevelOptions: ThinkingLevel[];
-  onSelectThinkingLevel: (level: ThinkingLevel) => void;
-  contextUsagePercentage: number;
-  contextRingColorClass: string;
-  contextStatusDetails: ContextStatusDetails;
   canStop: boolean;
   onStop: () => void;
   isSubmitting: boolean;
@@ -79,7 +63,6 @@ export interface ChatInputBottomBarProps {
 
 export function ChatInputBottomBar({
   onAttach,
-  leadingSlot,
   cwd,
   onAddFiles,
   attachedKeys,
@@ -88,17 +71,6 @@ export function ChatInputBottomBar({
   onCommandEntry,
   onInsertPromptCommand,
   onInsertSkill,
-  model,
-  modelOptions,
-  activeProviderProfileKey,
-  onSelectModel,
-  modelMenuDisabled = false,
-  thinkingLevel,
-  thinkingLevelOptions,
-  onSelectThinkingLevel,
-  contextUsagePercentage,
-  contextRingColorClass,
-  contextStatusDetails,
   canStop,
   onStop,
   isSubmitting,
@@ -119,7 +91,6 @@ export function ChatInputBottomBar({
   return (
     <div className="mt-3 flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-0.5">
-        {leadingSlot}
         <AttachMenu
           cwd={cwd}
           onPickLocalFiles={onAttach}
@@ -157,24 +128,6 @@ export function ChatInputBottomBar({
       </div>
 
       <div className="flex min-w-0 items-center justify-end gap-2">
-        {/* Merged model + thinking chip */}
-        <MergedInputChip
-          model={model}
-          modelOptions={modelOptions}
-          activeProviderProfileKey={activeProviderProfileKey}
-          onSelectModel={onSelectModel}
-          modelMenuDisabled={modelMenuDisabled}
-          thinkingLevel={thinkingLevel}
-          thinkingLevelOptions={thinkingLevelOptions}
-          onSelectThinkingLevel={onSelectThinkingLevel}
-        />
-
-        <StatusPopover
-          contextUsagePercentage={contextUsagePercentage}
-          contextRingColorClass={contextRingColorClass}
-          contextStatusDetails={contextStatusDetails}
-        />
-
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -217,6 +170,8 @@ export function ChatInputBottomBar({
  * 残留：底栏宽 < 400px 时显隐会让模型 chip 左边缘最多移动 38px（宽度让给 chip 截断）。
  * 放在右 cluster 就不能这么做：右 cluster 是右边缘锚定的，删掉中间一个槽位会把它左边
  * 的 chip 与上下文环右推 44px；而且保留槽位会留下一个很难看的空档。
+ *
+ * 模型与上下文已迁到卡外页脚；显隐规则保持原样。
  */
 export function shouldShowExpandButton(
   isExpanded: boolean,

@@ -472,3 +472,54 @@ it("counts diff content beginning with triple signs consistently with result sum
     removedLines: 1,
   });
 });
+
+it("counts ordinary failures from their results", () => {
+  const block = processSummary([
+    toolUse("a", "read", { path: "src/a.ts" }),
+    toolResult("a", { isError: true }),
+    toolUse("b", "read", { path: "src/b.ts" }),
+    toolResult("b", { isError: true }),
+  ]);
+  expect(block.status).toMatchObject({ failed: true, failedCount: 2 });
+});
+
+it("counts a failed parent once when all children succeed", () => {
+  const block = processSummary([
+    toolUse("a", "read", {}, trace({ parentStatus: "error" })),
+    toolUse("b", "read", {}, trace({ parentStatus: "error" })),
+  ]);
+  expect(block.status).toMatchObject({
+    failed: true,
+    failedCount: 1,
+    firstFailedToolCallId: "code-1",
+  });
+});
+
+it("counts parent and child failures by distinct IDs", () => {
+  const block = processSummary([
+    toolUse("a", "read", {}, trace({ status: "error", parentStatus: "error" })),
+    toolUse("b", "read", {}, trace({ parentStatus: "error" })),
+  ]);
+  expect(block.status?.failedCount).toBe(2);
+});
+
+it("does not count the same empty failed script twice", () => {
+  const block = processSummary([
+    toolUse(
+      "code-1",
+      "codemode",
+      {},
+      trace({ status: "error", parentStatus: "error" }),
+    ),
+  ]);
+  expect(block.status?.failedCount).toBe(1);
+});
+
+it("does not report successful or unfinished calls as failed", () => {
+  for (const status of ["ok", "running", "unfinished"] as const) {
+    const block = processSummary([
+      toolUse("a", "read", {}, trace({ status, parentStatus: status })),
+    ]);
+    expect(block.status).toMatchObject({ failed: false, failedCount: 0 });
+  }
+});

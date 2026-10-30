@@ -49,6 +49,8 @@ export interface ResultSummary {
 export interface ToolGroupStatusUi {
   running: boolean;
   failed: boolean;
+  /** Distinct failed calls in this group, including parent scripts. */
+  failedCount: number;
   unfinished: boolean;
   unavailable: boolean;
   firstFailedToolCallId?: string;
@@ -427,13 +429,16 @@ function buildGroupStatus(
   if (traces.length === 0 && failedItems.length === 0) {
     return undefined;
   }
+  const failedIds = new Set(failedItems.map((item) => item.id));
+  for (const trace of traces) {
+    if (trace.parentStatus === "error") failedIds.add(trace.parentToolCallId);
+  }
   return {
     running: traces.some(
       (trace) => trace.status === "running" || trace.parentStatus === "running",
     ),
-    failed:
-      failedItems.length > 0 ||
-      traces.some((trace) => trace.parentStatus === "error"),
+    failed: failedIds.size > 0,
+    failedCount: failedIds.size,
     unfinished: traces.some(
       (trace) =>
         trace.status === "unfinished" || trace.parentStatus === "unfinished",
@@ -948,4 +953,11 @@ export function collectResultFiles(
   }
 
   return [...files.values()];
+}
+
+/** A compact failure marker shared by process and result summaries. */
+export function formatFailureSuffix(failedCount: number, t: TFunction): string {
+  return failedCount > 0
+    ? t("tool.grouped.failedCount", { count: failedCount })
+    : "";
 }

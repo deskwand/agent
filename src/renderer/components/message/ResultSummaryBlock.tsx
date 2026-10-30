@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import type { Message, ContentBlock } from "../../types";
 import {
   formatResultSummaryLabel,
+  formatFailureSuffix,
   type DisplayBlock,
 } from "../../utils/tool-display-blocks";
 import { extractFilePathFromToolInput } from "../../utils/tool-output-path";
@@ -36,6 +37,7 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
   message,
 }: ResultSummaryBlockProps) {
   const { t } = useTranslation();
+  const failureSuffix = formatFailureSuffix(block.status?.failedCount ?? 0, t);
   const [expanded, setExpanded] = useState(false);
   const files = block.files;
   const failedToolCallId = block.status?.firstFailedToolCallId;
@@ -135,10 +137,18 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
               highlighted ? "ring-2 ring-primary/40" : ""
             }`}
           >
-            <span className="inline-flex items-center gap-1 min-w-0 truncate font-medium text-foreground">
+            <span className="inline-flex flex-1 items-center gap-1 min-w-0 truncate font-medium text-foreground">
               <Pencil className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
               {formatResultSummaryLabel(block.summary, t)}
             </span>
+            {failureSuffix ? (
+              <span
+                data-tool-group-failure-count
+                className="shrink-0 whitespace-nowrap text-destructive"
+              >
+                {failureSuffix}
+              </span>
+            ) : null}
             <span className="inline-flex w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground">
               {expanded ? (
                 <ChevronDown className="h-3.5 w-3.5" />

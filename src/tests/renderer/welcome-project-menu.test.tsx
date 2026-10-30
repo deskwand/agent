@@ -7,6 +7,7 @@
  * （同一张视图的发送链路）。写法照它们：jsdom + react-dom/client + act，
  * 仓里没有 @testing-library。
  */
+import type { RepoSummary } from "../../shared/repo-summary";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +17,7 @@ const ui = vi.hoisted(() => ({
   startSession: vi.fn(),
   invoke: vi.fn(),
   isElectron: true,
+  repo: null as RepoSummary | null,
 }));
 
 vi.mock("react-i18next", () => ({
@@ -34,6 +36,14 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
   }),
 }));
 
+vi.mock("../../renderer/hooks/use-repo-summary", () => ({
+  useRepoSummary: () => ({
+    summary: ui.repo,
+    isLoading: false,
+    error: null,
+    refresh: vi.fn(),
+  }),
+}));
 import { WelcomeView } from "../../renderer/components/WelcomeView";
 import { useAppStore } from "../../renderer/store";
 import type { Session } from "../../renderer/types";
@@ -135,6 +145,7 @@ async function submitFirstMessage(text: string): Promise<void> {
 }
 
 beforeEach(() => {
+  ui.repo = null;
   vi.clearAllMocks();
   ui.isElectron = true;
   ui.startSession.mockResolvedValue(null);
@@ -357,6 +368,27 @@ describe("切项目后的模型 / 思考档", () => {
     },
   };
 
+  it("未配置模型时隐藏仓库上下文", async () => {
+    ui.repo = {
+      isRepo: true,
+      branch: "main",
+      additions: 1,
+      deletions: 0,
+      changedFiles: 1,
+      untracked: 0,
+    };
+    useAppStore.setState({
+      appConfig: appConfig as never,
+      isConfigured: false,
+    });
+    await render();
+    expect(
+      container.querySelector('[data-testid="welcome-repo-context"]'),
+    ).toBeNull();
+    expect(container.textContent).not.toContain(
+      "welcome.repo.suggestion.review-changes",
+    );
+  });
   it("切到项目：应用该项目记住的模型与思考档", async () => {
     localStorage.setItem(
       "deskwand.pm." + encodeURIComponent("/work/beta"),
@@ -458,4 +490,54 @@ describe("切项目后的模型 / 思考档", () => {
     expect(container.textContent).toContain("Beta Model");
     expect(container.textContent).not.toContain("Alpha Model");
   });
+});
+
+it("仓库建议只填输入框，不创建会话；切项目后旧建议清除", async () => {
+  ui.repo = {
+    isRepo: true,
+    branch: "main",
+    additions: 2,
+    deletions: 0,
+    changedFiles: 1,
+    untracked: 1,
+  };
+  await render();
+  expect(container.textContent).toContain("welcome.repo.dirty");
+  const button = [
+    ...container.querySelectorAll<HTMLButtonElement>("button"),
+  ].find(
+    (element) =>
+      element.textContent?.trim() === "welcome.repo.suggestion.review-changes",
+  );
+  expect(button).toBeTruthy();
+  await act(async () => button!.click());
+  expect(
+    container.querySelector<HTMLElement>("[data-placeholder]")?.textContent,
+  ).toContain("welcome.repo.prompt.reviewChanges");
+  expect(ui.startSession).not.toHaveBeenCalled();
+  ui.repo = null;
+  await act(async () => useAppStore.setState({ workingDir: "/work/beta" }));
+  expect(container.textContent).not.toContain(
+    "welcome.repo.suggestion.review-changes",
+  );
+  expect(
+    container.querySelector('[data-testid="welcome-repo-context"]'),
+  ).not.toBeNull();
+});
+
+it("无 cwd 不渲染仓库上下文区域", async () => {
+  useAppStore.setState({ workingDir: null });
+  await render();
+  expect(
+    container.querySelector('[data-testid="welcome-repo-context"]'),
+  ).toBeNull();
+});
+
+it("short panes have a constrained scroll container with reachable content", async () => {
+  await render();
+  const shell = container.firstElementChild!;
+  expect(shell.classList.contains("min-h-0")).toBe(true);
+  expect(shell.classList.contains("overflow-y-auto")).toBe(true);
+  expect(shell.firstElementChild?.classList.contains("shrink-0")).toBe(true);
+  expect(shell.firstElementChild?.classList.contains("my-auto")).toBe(true);
 });

@@ -27,6 +27,20 @@
     "free": "Free"
   },
   "welcome": {
+    "repo": {
+      "branch": "{{branch}}",
+      "dirty": "{{count}} changed",
+      "suggestion": {
+        "run-tests": "Run the tests",
+        "review-changes": "Review these changes",
+        "explain-last-commit": "Explain the last commit"
+      },
+      "prompt": {
+        "runTests": "Read the repository test instructions first. Run tests relevant to the current changes, or the recommended tests when there are no changes. List failing cases and explain why.",
+        "reviewChanges": "Review the current changes and explain each one and its risks.",
+        "explainLast": "Explain what the last commit did and why."
+      }
+    },
     "title": "How can I help you today?",
     "titleWithProject": "How can I help you today in project \"{{projectName}}\"?",
     "projectMenu": {
@@ -1144,6 +1158,7 @@
     "fileBrowser": "File Browser"
   },
   "chat": {
+    "workspaceChip": "Workspace: {{path}}",
     "sendMessage": "Send message",
     "processing": "Thinking…",
     "sending": "Sending…",
@@ -1579,6 +1594,9 @@
     "now": "now"
   },
   "permission": {
+    "alwaysAllowConfirm": "Allow \"{{toolName}}\" from now on? This tool can modify your system.",
+    "cancelAlwaysAllow": "Cancel",
+    "confirmAlwaysAllow": "Allow always",
     "permissionRequired": "Permission Required",
     "tool": "Tool:",
     "input": "Input:",
@@ -1772,6 +1790,7 @@
     "actionReadPdf": "Read PDF",
     "labelReadPdf": "Read PDF {{path}}",
     "grouped": {
+      "failedCount": "({{count}} failed)",
       "readFiles_one": "Read {{count}} file",
       "readFiles_other": "Read {{count}} files",
       "browsedDirectories_one": "Browsed {{count}} directory",

@@ -1,3 +1,8 @@
+import { useRepoSummary } from "../hooks/use-repo-summary";
+import {
+  formatRepoFacts,
+  welcomeRepoSuggestions,
+} from "../welcome-repo-suggestions";
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
@@ -39,6 +44,7 @@ import {
 } from "./ChatInput";
 import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
+import { ChatInputFooterBar } from "./ChatInputFooterBar";
 import { toMicButtonProps } from "./VoiceMicButton";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
@@ -139,6 +145,11 @@ export function WelcomeView() {
     Boolean(voiceEngineConfig?.enabled) && !voiceModeOpen && !ideaCaptureOpen,
   );
   const showConnectCards = appConfig !== null && !isConfigured;
+  const { summary: repoSummary } = useRepoSummary(workingDir, {
+    visible: !showConnectCards && Boolean(workingDir),
+  });
+  const repoFacts = formatRepoFacts(repoSummary, t);
+  const repoSuggestions = welcomeRepoSuggestions(repoSummary);
   const projectName = (() => {
     if (!workingDir) return "";
     return workingDir.split(/[\\/]/).filter(Boolean).pop() || "";
@@ -516,15 +527,49 @@ export function WelcomeView() {
 
   return (
     <div
-      className={`flex-1 flex flex-col items-center justify-center ${PAGE_INSET_X} py-10 md:py-14`}
+      className={`flex-1 min-h-0 flex flex-col items-center overflow-y-auto ${PAGE_INSET_X} py-10 md:py-14`}
     >
-      <div className="max-w-[52.5rem] w-full space-y-7">
+      <div className="my-auto max-w-[52.5rem] w-full shrink-0 space-y-7">
         <div className="space-y-4 text-center">
           <p className="text-base font-medium tracking-[-0.02em] text-muted-foreground text-center">
             {showProjectTitle
               ? t("welcome.titleWithProject", { projectName })
               : t("welcome.title")}
           </p>
+          {!showConnectCards && workingDir ? (
+            <div
+              data-testid="welcome-repo-context"
+              className="flex h-28 min-w-0 flex-col items-center justify-center gap-2"
+            >
+              {repoFacts ? (
+                <p
+                  className="max-w-full truncate text-center text-xs text-muted-foreground"
+                  title={repoFacts}
+                >
+                  {repoFacts}
+                </p>
+              ) : null}
+              {repoSuggestions.length > 0 ? (
+                <div className="flex w-full flex-wrap justify-center gap-2">
+                  {repoSuggestions.map((suggestion) => (
+                    <Button
+                      variant="ghost"
+                      key={suggestion.id}
+                      type="button"
+                      onClick={() =>
+                        chatInputRef.current?.appendPromptExample(
+                          t(suggestion.promptKey),
+                        )
+                      }
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground h-auto"
+                    >
+                      {t(`welcome.repo.suggestion.${suggestion.id}`)}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {showConnectCards && (
@@ -585,32 +630,16 @@ export function WelcomeView() {
           }
           cardClassName={`rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4${showConnectCards ? " cursor-not-allowed" : ""}`}
           textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed overflow-hidden"
-          bottomSlot={
+          footerSlot={
             showConnectCards ? undefined : (
-              <ChatInputBottomBar
-                leadingSlot={
+              <ChatInputFooterBar
+                leftSlot={
                   <ProjectMenuChip
                     workingDir={workingDir}
                     projects={projects}
                     onSelectProject={(cwd) => void handleSelectProject(cwd)}
                   />
                 }
-                onAttach={() => chatInputRef.current?.selectFiles()}
-                // 把工作目录一并交给附件菜单：不然选了项目后它的「工作区」入口还是
-                // 置灰的（`attachMenu.disabled.noWorkspace` 只看 cwd），项目级 slash
-                // 命令也取不到 —— 那会让人觉得这枚 chip 是假的。ChatView 传的是
-                // `activeSessionCwd`，这里是同一个语义：本会话将要用哪个目录。
-                cwd={workingDir ?? undefined}
-                onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
-                attachedKeys={attachedKeys}
-                onAttachMenuDismiss={() => chatInputRef.current?.focus()}
-                onInsertPromptCommand={(name) =>
-                  chatInputRef.current?.insertCommandChip(name)
-                }
-                onInsertSkill={(name) =>
-                  chatInputRef.current?.insertSkillChip(name)
-                }
-                attachMenuDirection="down"
                 model={selectedModel}
                 modelOptions={modelOptions}
                 activeProviderProfileKey={selectedProviderProfileKey}
@@ -672,6 +701,28 @@ export function WelcomeView() {
                   totalLabel: contextWindowTotal,
                   cacheHitRate: "--",
                 }}
+              />
+            )
+          }
+          bottomSlot={
+            showConnectCards ? undefined : (
+              <ChatInputBottomBar
+                onAttach={() => chatInputRef.current?.selectFiles()}
+                // 把工作目录一并交给附件菜单：不然选了项目后它的「工作区」入口还是
+                // 置灰的（`attachMenu.disabled.noWorkspace` 只看 cwd），项目级 slash
+                // 命令也取不到 —— 那会让人觉得这枚 chip 是假的。ChatView 传的是
+                // `activeSessionCwd`，这里是同一个语义：本会话将要用哪个目录。
+                cwd={workingDir ?? undefined}
+                onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
+                attachedKeys={attachedKeys}
+                onAttachMenuDismiss={() => chatInputRef.current?.focus()}
+                onInsertPromptCommand={(name) =>
+                  chatInputRef.current?.insertCommandChip(name)
+                }
+                onInsertSkill={(name) =>
+                  chatInputRef.current?.insertSkillChip(name)
+                }
+                attachMenuDirection="down"
                 canStop={false}
                 onStop={() => {}}
                 isSubmitting={isSubmitting}

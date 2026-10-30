@@ -14,7 +14,6 @@ import {
   ChatInputBottomBar,
   type ChatInputBottomBarProps,
 } from "../../renderer/components/ChatInputBottomBar";
-import type { ModelOptionGroup } from "../../renderer/components/ChatInputBottomBar";
 
 vi.mock("react-i18next", () => ({
   // 占位不可省：底栏会走到 StatusPopover → utils/i18n-format → i18n/config，
@@ -23,32 +22,10 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-const modelOptions: ModelOptionGroup[] = [
-  {
-    profileKey: "profile-a" as never,
-    groupLabel: "Provider A",
-    items: [{ id: "model-1", name: "Model One" }],
-  },
-];
-
 const baseProps: ChatInputBottomBarProps = {
   onAttach: () => {},
   onAddFiles: () => {},
   attachedKeys: new Set<string>(),
-  model: "model-1",
-  modelOptions,
-  activeProviderProfileKey: "profile-a" as never,
-  onSelectModel: () => {},
-  thinkingLevel: "medium",
-  thinkingLevelOptions: ["off", "medium"],
-  onSelectThinkingLevel: () => {},
-  contextUsagePercentage: 0,
-  contextRingColorClass: "text-primary",
-  contextStatusDetails: {
-    usedLabel: "0",
-    totalLabel: "0",
-    cacheHitRate: "--",
-  },
   canStop: false,
   onStop: () => {},
   isSubmitting: false,

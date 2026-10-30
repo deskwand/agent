@@ -199,6 +199,7 @@ describe("ProcessSummaryBlock highlight and expand", () => {
       status: {
         running: false,
         failed: true,
+        failedCount: 1,
         unfinished: false,
         unavailable: false,
         firstFailedToolCallId: "child",

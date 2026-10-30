@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 //
-// 这个文件守的是**接线层**，不是面板内部：从底栏真实入口点圆环，确认额度块会出现。
+// 这个文件守的是**接线层**，不是面板内部：从页脚真实入口点圆环，确认额度块会出现。
 //
 // 为什么需要它：本次修的 bug（已登录的 Codex 额度在 deepseek 会话里不显示）根因就在
-// 底栏/面板这一层的一道条件闸门（曾经的 `if (!open || !providerId) return;`）。
-// `status-popover.test.ts` 直接渲染 StatusPopover，绕过了底栏——若有人在
-// `ChatInputBottomBar` 处重新加条件渲染（或另一类闸门），那里的用例**全都不会红**。
+// 页脚/面板这一层的一道条件闸门（曾经的 `if (!open || !providerId) return;`）。
+// `status-popover.test.ts` 直接渲染 StatusPopover，绕过了页脚——若有人在
+// `ChatInputFooterBar` 处重新加条件渲染（或另一类闸门），那里的用例**全都不会红**。
 // 之前唯一驱动这条链路的 `quota-provider-id.test.ts` 随「profile key → 适配器 id」
 // 推导一起被删除，所以这里补回接线层的护栏。
 
@@ -13,9 +13,9 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  ChatInputBottomBar,
-  type ChatInputBottomBarProps,
-} from "../../renderer/components/ChatInputBottomBar";
+  ChatInputFooterBar,
+  type ChatInputFooterBarProps,
+} from "../../renderer/components/ChatInputFooterBar";
 import type { ModelOptionGroup } from "../../renderer/components/ChatInputBottomBar";
 
 vi.mock("react-i18next", () => ({
@@ -31,10 +31,7 @@ const modelOptions: ModelOptionGroup[] = [
   },
 ];
 
-const baseProps: ChatInputBottomBarProps = {
-  onAttach: () => {},
-  onAddFiles: () => {},
-  attachedKeys: new Set<string>(),
+const baseProps: ChatInputFooterBarProps = {
   model: "gpt-5.6-luna",
   modelOptions,
   activeProviderProfileKey: "openrouter" as never,
@@ -49,16 +46,6 @@ const baseProps: ChatInputBottomBarProps = {
     totalLabel: "258K",
     cacheHitRate: "--",
   },
-  canStop: false,
-  onStop: () => {},
-  isSubmitting: false,
-  hasInputContent: false,
-  voice: {
-    status: "idle",
-    level: 0,
-    seconds: 0,
-    onToggle: () => {},
-  },
 };
 
 const quota = [
@@ -72,7 +59,7 @@ const quota = [
   },
 ];
 
-describe("底栏到额度块的接线", () => {
+describe("页脚到额度块的接线", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -94,10 +81,10 @@ describe("底栏到额度块的接线", () => {
     return list;
   }
 
-  function render(props: Partial<ChatInputBottomBarProps> = {}) {
+  function render(props: Partial<ChatInputFooterBarProps> = {}) {
     act(() => {
       root.render(
-        React.createElement(ChatInputBottomBar, { ...baseProps, ...props }),
+        React.createElement(ChatInputFooterBar, { ...baseProps, ...props }),
       );
     });
   }
@@ -106,7 +93,7 @@ describe("底栏到额度块的接线", () => {
    * 圆环触发按钮 —— **按它自己的 aria-label 精确取** ✓，**不靠「唯一性」** ✗。
    *
    * ⚠️ 2026-10-09：这里原来是 `querySelector('button[aria-haspopup="dialog"]')` ✓，
-   * 靠「底栏里只有一颗」这个假设 ✗。而 `MergedInputChip` 与 `StatusPopover` 都迁到
+   * 靠「页脚里只有一颗」这个假设 ✗。而 `MergedInputChip` 与 `StatusPopover` 都迁到
    * Radix 后，**两颗触发器自己都会带 `aria-haspopup="dialog"`**（Radix 的 Trigger 给的 ✓）
    * ⇒ 那个选择器会命中 **模型+思考 chip** ✗，于是点开的是**模型面板**、
    * 「打开刷新额度」自然不发生 ✓✓（症状是 `list` 只被调 1 次 ✗）。
@@ -119,7 +106,7 @@ describe("底栏到额度块的接线", () => {
     );
     expect(
       dialogTriggers.length,
-      "底栏的 dialog 触发器数量（迁移后是 2：模型 chip + 额度圆环）",
+      "页脚的 dialog 触发器数量（迁移后是 2：模型 chip + 额度圆环）",
     ).toBe(2);
     // 本文件的 `react-i18next` mock 让 `t` 原样返回 key ✓（见文件顶部 ✓）
     // ⇒ 圆环的 `aria-label` 就是字面量 `"statusPopover.ringTooltip"` ✓。

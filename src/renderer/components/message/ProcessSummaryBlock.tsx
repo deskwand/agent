@@ -19,6 +19,7 @@ import {
 import type { Message, ContentBlock } from "../../types";
 import {
   getProcessSummaryFragments,
+  formatFailureSuffix,
   type DisplayBlock,
   type ProcessSummaryFragment,
 } from "../../utils/tool-display-blocks";
@@ -77,6 +78,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
   message,
 }: ProcessSummaryBlockProps) {
   const { t } = useTranslation();
+  const failureSuffix = formatFailureSuffix(block.status?.failedCount ?? 0, t);
   const [expanded, setExpanded] = useState(false);
   const fragments = getProcessSummaryFragments(block.summary, t, block.status);
   const failedToolCallId = block.status?.firstFailedToolCallId;
@@ -145,7 +147,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
               highlighted ? "ring-2 ring-primary/40" : ""
             }`}
           >
-            <span className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-nowrap">
+            <span className="flex flex-1 items-center gap-1.5 min-w-0 overflow-hidden flex-nowrap">
               {fragments.map((frag, fi) => (
                 <span
                   key={fi}
@@ -169,6 +171,14 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 </span>
               ))}
             </span>
+            {failureSuffix ? (
+              <span
+                data-tool-group-failure-count
+                className="shrink-0 whitespace-nowrap text-destructive"
+              >
+                {failureSuffix}
+              </span>
+            ) : null}
             <span className="inline-flex w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground">
               {expanded ? (
                 <ChevronDown className="h-3.5 w-3.5" />

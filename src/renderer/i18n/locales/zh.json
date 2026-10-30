@@ -27,6 +27,20 @@
     "free": "免费"
   },
   "welcome": {
+    "repo": {
+      "branch": "{{branch}}",
+      "dirty": "{{count}} 个改动",
+      "suggestion": {
+        "run-tests": "跑一遍测试",
+        "review-changes": "看看这些改动",
+        "explain-last-commit": "解释上一个提交"
+      },
+      "prompt": {
+        "runTests": "先读取这个仓库的测试说明，运行与当前改动相关的测试；没有改动时运行项目推荐的测试。列出失败用例并说明原因。",
+        "reviewChanges": "看看当前这几个改动，逐条说清改了什么、有没有风险。",
+        "explainLast": "解释上一个提交做了什么，为什么要这么改。"
+      }
+    },
     "title": "今天我能为您做些什么？",
     "titleWithProject": "在项目「{{projectName}}」中，今天我能为您做些什么？",
     "projectMenu": {
@@ -1144,6 +1158,7 @@
     "fileBrowser": "文件浏览器"
   },
   "chat": {
+    "workspaceChip": "工作目录：{{path}}",
     "sendMessage": "发送消息",
     "processing": "思考中…",
     "sending": "发送中…",
@@ -1578,6 +1593,9 @@
     "now": "刚刚"
   },
   "permission": {
+    "alwaysAllowConfirm": "确定要始终允许「{{toolName}}」吗？这个工具可以修改你的系统。",
+    "cancelAlwaysAllow": "取消",
+    "confirmAlwaysAllow": "确定允许",
     "permissionRequired": "需要权限",
     "tool": "工具：",
     "input": "输入：",
@@ -1771,6 +1789,7 @@
     "actionReadPdf": "读取 PDF",
     "labelReadPdf": "读取 PDF {{path}}",
     "grouped": {
+      "failedCount": "（{{count}} 个失败）",
       "readFiles_one": "已读取 {{count}} 个文件",
       "readFiles_other": "已读取 {{count}} 个文件",
       "browsedDirectories_one": "已浏览 {{count}} 个目录",

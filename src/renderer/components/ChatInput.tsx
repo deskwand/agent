@@ -123,6 +123,8 @@ interface ChatInputProps {
   cardClassName: string;
   textareaClassName: string;
   bottomSlot: React.ReactNode;
+  /** Persistent settings rendered outside the input card. */
+  footerSlot?: React.ReactNode;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   slashMenuDirection?: "up" | "down";
@@ -164,6 +166,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       cardClassName,
       textareaClassName,
       bottomSlot,
+      footerSlot,
       isExpanded = false,
       onToggleExpand,
       slashMenuDirection,
@@ -1255,6 +1258,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             )}
             {/* Input card */}
             <div
+              data-testid="chat-input-card"
               className={`transition-colors ${isDragging ? "ring-2 ring-primary bg-primary/5" : ""} ${cardClassName}`}
             >
               <AttachmentTiles tiles={attachmentTiles} />
@@ -1432,6 +1436,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               />
               {bottomSlot}
             </div>
+            {footerSlot ? (
+              <div data-testid="chat-input-footer">{footerSlot}</div>
+            ) : null}
           </div>
         </form>
       </>
