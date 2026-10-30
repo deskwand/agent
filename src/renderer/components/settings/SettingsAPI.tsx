@@ -11,7 +11,6 @@ import {
   Key,
   Loader2,
   Pencil,
-  PlugZap,
   Plus,
   Search,
   Server,
@@ -19,7 +18,6 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import ApiDiagnosticsPanel from "../ApiDiagnosticsPanel";
 import { mergeProviderModels } from "../../utils/merge-provider-models";
 import type {
   MergeProviderModelsResult,
@@ -68,19 +66,27 @@ import {
 } from "../../../shared/web-access";
 import { ProviderBrandIcon, resolveProviderBrand } from "./provider-icons";
 import { resolveProviderDisplayName } from "../../utils/model-label";
-import { isFreeModel } from "../../utils/free-model";
 import {
-  SettingsCard,
   SettingsContentSection,
   SettingsFormSelect,
-  SettingsRow,
   SettingsSection,
   SettingsSwitch,
 } from "./shared";
 import { CodingSubscriptionCards } from "./coding-subscription-cards";
 import { OAUTH_PROVIDERS } from "./provider-catalog";
-import { ConfiguredProviderList } from "./configured-provider-list";
-import { ProviderCatalogGrid } from "./provider-catalog-grid";
+import ApiDiagnosticsPanel from "../ApiDiagnosticsPanel";
+import { ProviderCatalogPage } from "./api/provider-catalog-page";
+import { ProviderCredentialForm } from "./api/provider-credential-form";
+import { ProviderDetailPage } from "./api/provider-detail-page";
+import {
+  API_VIEW_LIST,
+  backFrom,
+  openCatalog,
+  openDetail,
+  pickCatalogEntry,
+  type ApiView,
+} from "./api/api-view";
+import { ProviderListPage } from "./api/provider-list-page";
 import { Input } from "../ui/input";
 import { Button } from "../app-button";
 import { DialogClose, DialogContent, DialogTitle } from "../ui/dialog";
@@ -145,20 +151,6 @@ const ZHIPU_REGIONS = [
     id: "global",
     baseUrl: "https://api.z.ai/api/paas/v4",
     labelKey: "api.zhipuRegionGlobal",
-  },
-] as const;
-
-/** OpenCode 计划：Zen（按量付费）与 Go / Go Plus（订阅，含用量限额，Go Plus 额度更高），同一账号同一 API Key */
-const OPENCODE_PLANS = [
-  {
-    id: "zen",
-    provider: "opencode" as const,
-    labelKey: "api.opencodePlanZen",
-  },
-  {
-    id: "go",
-    provider: "opencode-go" as const,
-    labelKey: "api.opencodePlanGo",
   },
 ] as const;
 
@@ -513,7 +505,6 @@ export function SettingsAPI({
   const oauthDisconnectReturnFocus = useReturnFocus(rootRef);
   const deleteDialogReturnFocus = useReturnFocus(rootRef);
   const planDialogReturnFocus = useReturnFocus(rootRef);
-  const editorDialogReturnFocus = useReturnFocus(rootRef);
   const setAppConfig = useAppStore((state) => state.setAppConfig);
   const setIsConfigured = useAppStore((state) => state.setIsConfigured);
   const [presets, setPresets] = useState<ProviderPresets>(
@@ -528,9 +519,11 @@ export function SettingsAPI({
   const [connectState, setConnectState] = useState<
     "idle" | "connecting" | "connected" | "failed"
   >("idle");
-  const [diagResult, setDiagResult] = useState<DiagnosticResult | null>(null);
+  const [diagResultView, setDiagResult] = useState<DiagnosticResult | null>(
+    null,
+  );
   const [modelRows, setModelRows] = useState<ProviderModelRow[]>([]);
-  const [modelFilter, setModelFilter] = useState("");
+  const [, setModelFilter] = useState("");
   const [connectMessage, setConnectMessage] = useState("");
 
   const resetConnectState = () => {
@@ -564,9 +557,9 @@ export function SettingsAPI({
     setEditorOpen(false);
     resetConnectState();
   };
-  const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [, setError] = useState("");
+  const [, setSuccessMessage] = useState("");
+  const [, setEditorOpen] = useState(false);
   const [draft, setDraft] = useState<ProviderDraft | null>(null);
   const [originalProfileKey, setOriginalProfileKey] =
     useState<ProviderProfileKey | null>(null);
@@ -578,6 +571,9 @@ export function SettingsAPI({
   const [activeTab, setActiveTab] = useState<
     "main" | "vision" | "search" | "utility"
   >("main");
+
+  // ── 视图状态机：列表 → 目录 → 添加 / 详情 ──
+  const [view, setView] = useState<ApiView>(API_VIEW_LIST);
 
   // ── Search / webAccess state ──
   const [searchDraft, setSearchDraft] = useState<WebAccessConfig | null>(null);
@@ -763,21 +759,8 @@ export function SettingsAPI({
     return ids;
   }, [appConfig]);
 
-  const isCreating = originalProfileKey === null;
   const isCustomDraft = draft?.provider === "custom";
-  const modelFilterNeedle = modelFilter.trim().toLowerCase();
   // 保留原始下标：行编辑按 index 定位（手工行的 id 可以是空串，不能用 id 做 key）
-  const visibleModelRows = modelRows
-    .map((row, index) => ({ row, index }))
-    .filter(
-      ({ row }) =>
-        !modelFilterNeedle ||
-        row.id.toLowerCase().includes(modelFilterNeedle) ||
-        row.label.toLowerCase().includes(modelFilterNeedle),
-    );
-  const localGatewayPreset = draft?.localGateway
-    ? getLocalGatewayPreset(draft.localGateway)
-    : undefined;
 
   const openCreate = (provider: ProviderType = "openrouter") => {
     startConnectRequest();
@@ -995,8 +978,11 @@ export function SettingsAPI({
    * `silent` = 打开编辑弹窗时的后台刷新（设计 §4.5）：失败只在顶部留一行
    * 提示并保留本地列表，不弹出诊断面板、不打断用户。
    */
-  const runConnect = async (draftValue: ProviderDraft, silent = false) => {
-    if (!window.electronAPI) return;
+  const runConnect = async (
+    draftValue: ProviderDraft,
+    silent = false,
+  ): Promise<boolean> => {
+    if (!window.electronAPI) return false;
     const requestId = startConnectRequest();
     const isStale = () => connectRequestRef.current !== requestId;
     const sanitized = sanitizeDraft(draftValue, presets);
@@ -1006,11 +992,11 @@ export function SettingsAPI({
     const alreadySaved = Boolean(appConfig?.providers?.[sanitized.profileKey]);
 
     const fail = (message?: string) => {
-      if (isStale()) return;
+      if (isStale()) return false;
       if (silent) {
         setConnectMessage(message ?? t("api.modelsRefreshFailed"));
         setConnectState("idle");
-        return;
+        return false;
       }
       if (message) setConnectMessage(message);
       setConnectState("failed");
@@ -1018,11 +1004,11 @@ export function SettingsAPI({
 
     if (requiresApiKey(sanitized.provider) && !sanitized.apiKey) {
       setError(t("api.enterApiKey"));
-      return;
+      return false;
     }
     if (isCustom && !sanitized.baseUrl) {
       setError(t("api.enterBaseUrl"));
-      return;
+      return false;
     }
 
     setError("");
@@ -1040,10 +1026,10 @@ export function SettingsAPI({
         sanitized.defaultModel,
         sanitized.disabledModels ?? [],
       );
-      if (isStale()) return;
+      if (isStale()) return false;
       if (!savedFirst) {
         setConnectState("idle");
-        return;
+        return false;
       }
     }
 
@@ -1064,15 +1050,15 @@ export function SettingsAPI({
             ? connectError.message
             : String(connectError),
       );
-      return;
+      return false;
     }
 
-    if (isStale()) return;
+    if (isStale()) return false;
     setDiagResult(result);
 
     if (result.skippedReason) {
       fail(t("api.modelsBusy"));
-      return;
+      return false;
     }
     if (!result.overallOk) {
       fail(
@@ -1080,7 +1066,7 @@ export function SettingsAPI({
           ? t("api.localGatewayAuthFailed")
           : undefined,
       );
-      return;
+      return false;
     }
 
     const live = result.modelsSource === "live" ? (result.models ?? []) : null;
@@ -1091,7 +1077,7 @@ export function SettingsAPI({
           ? t("api.localGatewayNoModels")
           : t("api.modelsManualHint"),
       );
-      return;
+      return false;
     }
     const merge = mergeProviderModels({
       catalog: catalogForDraft(draftValue),
@@ -1113,7 +1099,7 @@ export function SettingsAPI({
           ? t("api.localGatewayNoModels")
           : t("api.modelsManualHint"),
       );
-      return;
+      return false;
     }
 
     // 有可用的启用集才写回：预设供应商已在前面用内置目录兜底落过盘。
@@ -1126,7 +1112,7 @@ export function SettingsAPI({
       );
       if (!persisted) {
         fail();
-        return;
+        return false;
       }
     }
 
@@ -1140,8 +1126,9 @@ export function SettingsAPI({
     } else {
       setConnectMessage(t("api.connected"));
     }
-  };
 
+    return true;
+  };
   const handleConnect = () => {
     if (draft) void runConnect(draft);
   };
@@ -1183,7 +1170,12 @@ export function SettingsAPI({
         apiKey: nextDraft.apiKey,
       });
       if (probe?.available) {
-        await runConnect(nextDraft);
+        // 一键连上就回列表，不把用户留在表单里
+        if (await runConnect(nextDraft)) {
+          startConnectRequest();
+          resetConnectState();
+          setView(API_VIEW_LIST);
+        }
       }
     } finally {
       localGatewayOpeningRef.current = false;
@@ -1198,7 +1190,20 @@ export function SettingsAPI({
   const handleSaveDraft = async () => {
     if (!draft || !window.electronAPI) return;
     if (modelRows.length === 0) {
-      await handleSave();
+      // 「仍然保存」不要求模型：连不上端点时也要能先把凭证留下，
+      // 模型列表留空，列表页会标「未获取模型」。
+      const sanitized = sanitizeDraft(draft, presets);
+      const ok = await persistModels(
+        sanitized,
+        sanitized.models,
+        sanitized.defaultModel,
+        sanitized.disabledModels ?? [],
+      );
+      if (ok) {
+        startConnectRequest();
+        resetConnectState();
+        setView(API_VIEW_LIST);
+      }
       return;
     }
     const sanitized = sanitizeDraft(draft, presets);
@@ -1294,78 +1299,8 @@ export function SettingsAPI({
   };
 
   /** 只改本地行（输入过程中的每个字符），落盘交给 commitRow */
-  const patchRow = (index: number, patch: Partial<ProviderModelRow>) => {
-    setModelRows((prev) =>
-      prev.map((row, rowIndex) =>
-        rowIndex === index ? { ...row, ...patch } : row,
-      ),
-    );
-  };
-
-  const commitRow = (index: number) => {
-    const row = modelRows[index];
-    if (!row) return;
-    commitRows(modelRows);
-  };
-
-  const addModelRow = () => {
-    setModelRows((prev) => [
-      ...prev,
-      {
-        id: "",
-        label: "",
-        isNew: true,
-        enabled: true,
-        isDefault: false,
-        manual: true,
-      },
-    ]);
-  };
-
-  const removeModelRow = (index: number) => {
-    commitRows(modelRows.filter((_, rowIndex) => rowIndex !== index));
-  };
-
-  const toggleModel = (index: number) => {
-    const target = modelRows[index];
-    if (!target) return;
-    const enabledNow = modelRows.filter(
-      (row) => row.enabled && row.id.trim(),
-    ).length;
-    if (target.enabled && enabledNow <= 1) {
-      setConnectMessage(t("api.atLeastOneModel"));
-      return;
-    }
-    setConnectMessage("");
-    commitRows(
-      modelRows.map((row, rowIndex) =>
-        rowIndex === index ? { ...row, enabled: !row.enabled } : row,
-      ),
-    );
-  };
-
-  const setDefaultModelRow = (id: string) => {
-    if (!modelRows.some((row) => row.id === id && row.enabled)) return;
-    commitRows(modelRows.map((row) => ({ ...row, isDefault: row.id === id })));
-  };
 
   /** 图片能力：改完立即落盘（与勾选一致），并钉住，避免端点元数据把它改回去 */
-  const toggleRowImage = (index: number) => {
-    const row = modelRows[index];
-    if (!row) return;
-    const supportsImage = row.input?.includes("image") ?? false;
-    commitRows(
-      modelRows.map((current, rowIndex) =>
-        rowIndex === index
-          ? {
-              ...current,
-              input: supportsImage ? ["text"] : ["text", "image"],
-              inputPinned: true,
-            }
-          : current,
-      ),
-    );
-  };
 
   // ── Vision model save (from modal) ──
   const handleVisionSave = async () => {
@@ -1478,6 +1413,48 @@ export function SettingsAPI({
     setVisionDraft((prev) => ({ ...prev, apiKey: provider.apiKey }));
   };
 
+  /** 设为当前：只改 activeProviderKey，不动供应商本身。 */
+  const handleSetActive = async (profileKey: ProviderProfileKey) => {
+    if (!window.electronAPI) return;
+    try {
+      const saved = await window.electronAPI.config.save({
+        activeProviderKey: profileKey,
+        activeProfileKey: profileKey,
+      });
+      applyConfig(saved.config);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : String(saveError),
+      );
+    }
+  };
+
+  /** 详情页就地改名：空值不覆盖已有名称。 */
+  const handleRename = async (profileKey: ProviderProfileKey, name: string) => {
+    const provider = appConfig?.providers?.[profileKey];
+    if (!provider || !name.trim() || !window.electronAPI) return;
+    try {
+      const saved = await window.electronAPI.config.saveProvider({
+        profileKey,
+        config: { ...provider, name: name.trim() },
+      });
+      applyConfig(saved.config);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : String(saveError),
+      );
+    }
+  };
+
+  /** 添加流程：连接成功后回列表；失败留在当前页。 */
+  const runConnectAndClose = async (next: ProviderDraft) => {
+    const ok = await runConnect(next);
+    if (!ok) return;
+    startConnectRequest();
+    resetConnectState();
+    setView(API_VIEW_LIST);
+  };
+
   const requestDelete = (profileKey: ProviderProfileKey) => {
     setPendingDeleteProfileKey(profileKey);
     setError("");
@@ -1509,34 +1486,6 @@ export function SettingsAPI({
     } finally {
       setIsDeleting(false);
     }
-  };
-
-  const selectProvider = (provider: ProviderType) => {
-    startConnectRequest();
-    setDraft((current) => {
-      const next = createEmptyDraft(
-        provider,
-        presets,
-        current?.customProtocol || "anthropic",
-      );
-      return {
-        ...next,
-        apiKey: current?.apiKey || "",
-      };
-    });
-  };
-
-  const selectCustomProtocol = (protocol: CustomProtocolType) => {
-    setDraft((current) => {
-      if (!current || current.provider !== "custom") {
-        const next = createEmptyDraft("custom", presets, protocol);
-        return {
-          ...next,
-          apiKey: current?.apiKey || "",
-        };
-      }
-      return { ...current, customProtocol: protocol };
-    });
   };
 
   // ── OAuth handlers ──
@@ -1642,52 +1591,6 @@ export function SettingsAPI({
     onSaved?.();
   };
 
-  const updateDraft = (patch: Partial<ProviderDraft>) => {
-    // 改连接参数后「已连接」不再成立：否则底部只剩「重新连接 / 完成」，
-    // 「完成」会把刚改的 Key、名称或端点静默丢掉。
-    if ("apiKey" in patch || "name" in patch || "baseUrl" in patch) {
-      setConnectState((current) =>
-        current === "connected" ? "idle" : current,
-      );
-    }
-    setDraft((current) => {
-      if (!current) return current;
-      const next = { ...current, ...patch };
-      if (next.provider !== "custom") {
-        next.profileKey = profileKeyFromProvider(
-          next.provider,
-          next.customProtocol,
-        );
-      }
-      return next;
-    });
-  };
-
-  /**
-   * 已配置列表（或空态）。
-   * 标题块在 embedded 时隐藏，但列表本身照常渲染 —— 与改动前一致。
-   */
-  const configuredList =
-    configuredProviders.length === 0 ? (
-      <SettingsCard>
-        <SettingsRow
-          title={t("api.configuredListEmptyTitle")}
-          description={t("api.configuredListEmpty")}
-        />
-      </SettingsCard>
-    ) : (
-      <ConfiguredProviderList
-        rows={configuredProviders}
-        presets={presets}
-        oauthStatuses={oauthStatuses}
-        onEdit={openEdit}
-        onDelete={requestDelete}
-        onDisconnect={(providerId) =>
-          setPendingOAuthLogoutProviderId(providerId)
-        }
-      />
-    );
-
   if (isLoadingConfig) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-3">
@@ -1773,47 +1676,234 @@ export function SettingsAPI({
         <TabsContent value="main" className="max-w-[1080px] space-y-5">
           {(activeTab === "main" || embedded) && (
             <>
-              {!embedded && (
-                <SettingsSection
-                  title={t("api.configuredListTitle")}
-                  description={t("api.configuredListDesc")}
-                >
-                  {configuredList}
-                </SettingsSection>
+              {view.kind === "list" && (
+                <>
+                  {!embedded && (
+                    <SettingsSection
+                      title={t("api.configuredListTitle")}
+                      description={t("api.configuredListDesc")}
+                    >
+                      <ProviderListPage
+                        rows={configuredProviders}
+                        activeProfileKey={
+                          appConfig?.activeProviderKey ?? "openrouter"
+                        }
+                        presets={presets}
+                        oauthStatuses={oauthStatuses}
+                        onOpen={(profileKey) => {
+                          openEdit(profileKey);
+                          setView(openDetail(profileKey, "main"));
+                        }}
+                        onAdd={() => setView(openCatalog("main"))}
+                        onSetActive={(profileKey) =>
+                          void handleSetActive(profileKey)
+                        }
+                        onDelete={requestDelete}
+                        onDisconnect={(providerId) =>
+                          setPendingOAuthLogoutProviderId(providerId)
+                        }
+                      />
+                    </SettingsSection>
+                  )}
+                  {embedded && (
+                    <ProviderListPage
+                      rows={configuredProviders}
+                      activeProfileKey={
+                        appConfig?.activeProviderKey ?? "openrouter"
+                      }
+                      presets={presets}
+                      oauthStatuses={oauthStatuses}
+                      onOpen={(profileKey) => {
+                        openEdit(profileKey);
+                        setView(openDetail(profileKey, "main"));
+                      }}
+                      onAdd={() => setView(openCatalog("main"))}
+                      onSetActive={(profileKey) =>
+                        void handleSetActive(profileKey)
+                      }
+                      onDelete={requestDelete}
+                      onDisconnect={(providerId) =>
+                        setPendingOAuthLogoutProviderId(providerId)
+                      }
+                    />
+                  )}
+                </>
               )}
 
-              {embedded && configuredList}
-
-              {embedded && (
-                <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={() => openCreate()}
-                  className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  {t("api.addApi")}
-                </Button>
-              )}
-
-              <SettingsSection title={t("api.addApi")}>
-                <ProviderCatalogGrid
+              {view.kind === "catalog" && (
+                <ProviderCatalogPage
                   presets={presets}
                   configuredProfileKeys={configuredProfileKeys}
                   oauthStatuses={oauthStatuses}
                   oauthLoading={oauthLoading}
                   oauthErrors={oauthErrors}
-                  onCreateProvider={openCreate}
-                  onCreatePlan={() => setPlanDialogOpen(true)}
-                  onOAuthLogin={handleOAuthLogin}
+                  configuredLocalGateways={configuredLocalGateways}
+                  localGatewayStatus={localGatewayStatus}
+                  onBack={() => setView(backFrom(view))}
+                  onPickEntry={(entry) => {
+                    if (entry.kind === "plan") {
+                      setPlanDialogOpen(true);
+                      return;
+                    }
+                    if (entry.kind === "cloud") {
+                      openCreate("openrouter");
+                      setView(pickCatalogEntry(view, entry));
+                      return;
+                    }
+                    if (entry.id === "custom") {
+                      openCreate("custom");
+                      setView(pickCatalogEntry(view, entry));
+                      return;
+                    }
+                    openCreate(entry.id as ProviderType);
+                    setView(pickCatalogEntry(view, entry));
+                  }}
+                  onOAuthLogin={(providerId) =>
+                    void handleOAuthLogin(providerId)
+                  }
                   onOAuthDisconnect={(providerId) =>
                     setPendingOAuthLogoutProviderId(providerId)
                   }
-                  configuredLocalGateways={configuredLocalGateways}
-                  localGatewayStatus={localGatewayStatus}
-                  onOpenLocalGateway={(id) => void openLocalGateway(id)}
+                  onOpenLocalGateway={(id) => {
+                    // 已配过就走详情（改凭证 / 看模型），否则进添加页
+                    const existing = Object.keys(
+                      appConfig?.providers ?? {},
+                    ).find(
+                      (key) => appConfig?.providers?.[key]?.localGateway === id,
+                    );
+                    if (existing) {
+                      openEdit(existing as ProviderProfileKey);
+                      setView(
+                        openDetail(existing as ProviderProfileKey, "main"),
+                      );
+                    } else {
+                      setView(pickCatalogEntry(view, { kind: "local", id }));
+                    }
+                    void openLocalGateway(id);
+                  }}
+                  onOpenConfigured={(profileKey) => {
+                    openEdit(profileKey);
+                    setView(openDetail(profileKey, "main"));
+                  }}
                 />
-              </SettingsSection>
+              )}
+
+              {view.kind === "add" && draft && (
+                <ProviderCredentialForm
+                  entry={view.entry}
+                  presets={presets}
+                  initial={{
+                    name: draft.name,
+                    apiKey: draft.apiKey,
+                    baseUrl: draft.baseUrl,
+                    customProtocol: draft.customProtocol,
+                  }}
+                  submitLabel={t("api.addProviderSubmit")}
+                  busy={connectState === "connecting"}
+                  errorText={
+                    connectState === "failed" ? connectMessage : undefined
+                  }
+                  onSubmit={(values) => {
+                    const next = {
+                      ...draft,
+                      name: values.name,
+                      apiKey: values.apiKey,
+                      baseUrl: values.baseUrl,
+                      customProtocol: values.customProtocol,
+                    };
+                    setDraft(next);
+                    void runConnectAndClose(next);
+                  }}
+                  onCancel={() => setView(backFrom(view))}
+                  notice={
+                    draft.localGateway ? (
+                      <div
+                        data-testid="local-gateway-notice"
+                        className="space-y-1.5 rounded-lg border border-border/60 bg-background px-3 py-2.5"
+                      >
+                        <p className="text-xs text-muted-foreground">
+                          {t(
+                            getLocalGatewayPreset(draft.localGateway)
+                              ?.keyHintKey ?? "api.localGatewayKeyHint",
+                          )}
+                        </p>
+                        {localGatewayStatus[draft.localGateway]?.state ===
+                          "unavailable" && (
+                          <p className="text-xs text-destructive">
+                            {t("api.localGatewayUnavailableHint")}
+                          </p>
+                        )}
+                        <Button
+                          variant="ghost"
+                          type="button"
+                          onClick={() =>
+                            void window.electronAPI?.openExternal(
+                              getLocalGatewayPreset(draft.localGateway!)
+                                ?.docsUrl ?? "",
+                            )
+                          }
+                          className="h-auto px-0 text-xs text-primary-text hover:underline"
+                        >
+                          {t("api.localGatewayDocs")}
+                        </Button>
+                      </div>
+                    ) : null
+                  }
+                  diagnostics={
+                    connectState === "failed" && diagResultView ? (
+                      <ApiDiagnosticsPanel
+                        result={diagResultView}
+                        isRunning={false}
+                        onRunDiagnostics={() => void handleConnect()}
+                        showActions={false}
+                      />
+                    ) : null
+                  }
+                  secondaryAction={
+                    connectState === "failed"
+                      ? {
+                          label: t("api.saveAnyway"),
+                          onClick: () => void handleSaveDraft(),
+                        }
+                      : undefined
+                  }
+                />
+              )}
+
+              {view.kind === "detail" &&
+                appConfig?.providers?.[view.profileKey] && (
+                  <ProviderDetailPage
+                    profileKey={view.profileKey}
+                    config={appConfig.providers[view.profileKey]!}
+                    presets={presets}
+                    modelRows={modelRows}
+                    connectState={connectState}
+                    connectMessage={connectMessage}
+                    onBack={() => setView(backFrom(view))}
+                    onRename={(name) =>
+                      void handleRename(view.profileKey, name)
+                    }
+                    onSaveCredentials={(values) => {
+                      if (!draft) return;
+                      const next = {
+                        ...draft,
+                        apiKey: values.apiKey,
+                        baseUrl: values.baseUrl,
+                        customProtocol: values.customProtocol,
+                      };
+                      setDraft(next);
+                      void handleSave();
+                    }}
+                    onTest={() => void handleConnect()}
+                    onModelsChange={setModelRows}
+                    onModelsCommit={(rows) => commitRows(rows)}
+                    onDelete={() => requestDelete(view.profileKey)}
+                    allowManualModels={
+                      appConfig.providers[view.profileKey]?.provider ===
+                      "custom"
+                    }
+                  />
+                )}
             </>
           )}
         </TabsContent>
@@ -2856,514 +2946,6 @@ export function SettingsAPI({
                 >
                   {t("api.done")}
                 </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </OccludingDialog>
-      )}
-
-      {draft && (
-        <OccludingDialog
-          open={editorOpen && !!draft}
-          onOpenChange={(open) => {
-            if (!open) closeEditor();
-          }}
-        >
-          <DialogContent
-            className="mx-4 max-h-[88vh] w-full max-w-[900px] overflow-hidden rounded-2xl border border-border/60 bg-background p-0 gap-0 [&>button]:hidden"
-            aria-describedby={undefined}
-            onInteractOutside={(event) => event.preventDefault()}
-            onEscapeKeyDown={(event) => event.preventDefault()}
-            {...editorDialogReturnFocus.focusHandlers}
-          >
-            <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-              <DialogTitle className="text-sm font-medium text-foreground">
-                {localGatewayPreset?.name ??
-                  (isCreating ? t("api.addApi") : t("api.editApi"))}
-              </DialogTitle>
-              <DialogClose asChild>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  aria-label={t("common.close")}
-                  className="rounded-lg p-2 hover:bg-hover-surface h-auto"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </DialogClose>
-            </div>
-            <div className="max-h-[calc(88vh-64px)] overflow-y-auto p-5">
-              <div className="space-y-5">
-                {localGatewayPreset && (
-                  <div className="space-y-2 border-b border-border/60 py-5">
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Server className="h-4 w-4" />
-                      {localGatewayPreset.name}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {t(localGatewayPreset.keyHintKey)}
-                    </p>
-                    {localGatewayStatus[localGatewayPreset.id]?.state ===
-                      "unavailable" && (
-                      <p className="text-xs text-destructive">
-                        {t("api.localGatewayUnavailableHint")}
-                      </p>
-                    )}
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      onClick={() =>
-                        void window.electronAPI?.openExternal(
-                          localGatewayPreset.docsUrl,
-                        )
-                      }
-                      className="h-auto px-0 text-xs text-primary-text underline underline-offset-2"
-                    >
-                      {t("api.localGatewayDocs")}
-                    </Button>
-                  </div>
-                )}
-
-                {/* 本机网关草稿锁定供应商；协议随 /v1 固定为 OpenAI。 */}
-                {!draft.localGateway && (
-                  <div className="space-y-3 border-b border-border/60 py-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Server className="h-4 w-4" />
-                      {t("api.provider")}
-                    </label>
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
-                      {PROVIDER_ORDER.map((provider) => (
-                        <Button
-                          variant="ghost"
-                          key={provider}
-                          type="button"
-                          onClick={() => selectProvider(provider)}
-                          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                            draft.provider === provider
-                              ? "border-primary bg-primary/10 font-medium text-primary-text"
-                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                          }`}
-                        >
-                          <ProviderBrandIcon
-                            brand={provider}
-                            className="h-4 w-4 flex-shrink-0"
-                          />
-                          {providerOptionLabel(provider, presets, t)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {(draft.provider === "opencode" ||
-                  draft.provider === "opencode-go") && (
-                  <div className="space-y-3 border-b border-border/60 py-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Globe2 className="h-4 w-4" />
-                      {t("api.opencodePlan")}
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {OPENCODE_PLANS.map((plan) => (
-                        <Button
-                          variant="ghost"
-                          key={plan.id}
-                          type="button"
-                          onClick={() => selectProvider(plan.provider)}
-                          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                            draft.provider === plan.provider
-                              ? "border-primary bg-primary/10 font-medium text-primary-text"
-                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                          }`}
-                        >
-                          {t(plan.labelKey)}
-                        </Button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {t("api.opencodePlanHint")}
-                    </p>
-                  </div>
-                )}
-
-                {isCustomDraft && !draft.localGateway && (
-                  <div className="space-y-3 border-b border-border/60 py-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Server className="h-4 w-4" />
-                      {t("api.protocol")}
-                    </label>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      {(["anthropic", "openai", "gemini"] as const).map(
-                        (protocol) => (
-                          <Button
-                            variant="ghost"
-                            key={protocol}
-                            type="button"
-                            onClick={() => selectCustomProtocol(protocol)}
-                            className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                              draft.customProtocol === protocol
-                                ? "border-primary bg-primary/10 font-medium text-primary-text"
-                                : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                            }`}
-                          >
-                            {protocol}
-                          </Button>
-                        ),
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {modelRows.length === 0 && !isCustomDraft && (
-                  <div className="space-y-3 border-b border-border/60 py-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <PlugZap className="h-4 w-4" />
-                      {t("api.modelsSection")}
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      {t("api.modelsConnectHint")}
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-3 border-b border-border/60 py-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <Pencil className="h-4 w-4" />
-                    {t("api.customName")}
-                  </label>
-                  <Input
-                    type="text"
-                    value={draft.name}
-                    onChange={(event) =>
-                      updateDraft({ name: event.target.value })
-                    }
-                    placeholder={t("api.customNamePlaceholder")}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
-                  />
-                </div>
-
-                <div className="space-y-3 border-b border-border/60 py-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <Key className="h-4 w-4" />
-                    {t("api.apiKey")}
-                  </label>
-                  <Input
-                    type="password"
-                    value={draft.apiKey}
-                    onChange={(event) =>
-                      updateDraft({ apiKey: event.target.value })
-                    }
-                    placeholder={
-                      modelsPresetForDraft(
-                        draft.provider,
-                        draft.customProtocol,
-                        presets,
-                      ).keyPlaceholder || t("api.enterApiKey")
-                    }
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
-                  />
-                </div>
-
-                {isCustomDraft && (
-                  <div className="space-y-3 border-b border-border/60 py-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Server className="h-4 w-4" />
-                      {t("api.baseUrl")}
-                    </label>
-                    <Input
-                      type="text"
-                      value={draft.baseUrl}
-                      onChange={(event) =>
-                        updateDraft({ baseUrl: event.target.value })
-                      }
-                      placeholder={
-                        modelsPresetForDraft(
-                          draft.provider,
-                          draft.customProtocol,
-                          presets,
-                        ).baseUrl
-                      }
-                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
-                    />
-                  </div>
-                )}
-
-                {connectState === "failed" && diagResult && (
-                  <div className="border-b border-border/60 py-5">
-                    <ApiDiagnosticsPanel
-                      result={diagResult}
-                      isRunning={false}
-                      onRunDiagnostics={handleConnect}
-                      showActions={false}
-                    />
-                  </div>
-                )}
-
-                {(modelRows.length > 0 || isCustomDraft) && (
-                  <div className="space-y-3 border-b border-border/60 py-5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label className="text-sm font-medium text-foreground">
-                        {t("api.modelsSection")}
-                      </label>
-                      <span className="text-xs text-muted-foreground">
-                        {t("api.modelsEnabledCount", {
-                          enabled: modelRows.filter(
-                            (row) => row.enabled && row.id.trim(),
-                          ).length,
-                          total: modelRows.filter((row) => row.id.trim())
-                            .length,
-                        })}
-                      </span>
-                    </div>
-
-                    <Input
-                      type="text"
-                      value={modelFilter}
-                      onChange={(event) => setModelFilter(event.target.value)}
-                      placeholder={t("api.modelsSearch")}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-
-                    {modelRows.length === 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {t("api.selectPresetModelsHint")}
-                      </p>
-                    )}
-
-                    <div
-                      data-testid="model-rows"
-                      className="max-h-80 space-y-1 overflow-y-auto"
-                    >
-                      {visibleModelRows.map(({ row, index }) => {
-                        const rowKey = row.id || `manual-${index}`;
-                        const supportsImage =
-                          row.input?.includes("image") ?? false;
-                        return (
-                          <div
-                            key={`${rowKey}-${index}`}
-                            className="rounded-lg px-2 py-1.5 hover:bg-hover-surface"
-                          >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                data-testid={`model-row-${row.id}`}
-                                checked={row.enabled}
-                                onChange={() => toggleModel(index)}
-                                className="rounded"
-                              />
-                              {row.manual || !row.id ? (
-                                <Input
-                                  type="text"
-                                  value={row.id}
-                                  placeholder={t("api.modelId")}
-                                  data-testid={`model-id-${index}`}
-                                  onChange={(event) =>
-                                    patchRow(index, {
-                                      id: event.target.value,
-                                      label: event.target.value,
-                                    })
-                                  }
-                                  onBlur={() => commitRow(index)}
-                                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
-                                />
-                              ) : (
-                                <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                                  {row.label}
-                                  {row.label !== row.id && (
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      {row.id}
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                              {row.isNew && (
-                                <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary-text">
-                                  {t("api.modelsNew")}
-                                </span>
-                              )}
-                              {isFreeModel({
-                                id: row.id,
-                                label: row.label,
-                              }) && (
-                                <span className="shrink-0 rounded-md border border-success/40 bg-success/10 px-1.5 py-0.5 text-[10px] text-success">
-                                  {t("common.free")}
-                                </span>
-                              )}
-                              <Button
-                                variant="ghost"
-                                type="button"
-                                onClick={() => setDefaultModelRow(row.id)}
-                                disabled={!row.enabled || !row.id.trim()}
-                                className={`rounded-md border px-1.5 py-0.5 text-[10px] transition-colors ${
-                                  row.isDefault
-                                    ? "border-primary bg-primary/10 text-primary-text"
-                                    : "border-border/60 text-muted-foreground hover:border-border hover:text-muted-foreground"
-                                } disabled:opacity-40`}
-                              >
-                                {t("api.modelsDefault")}
-                              </Button>
-                              {isCustomDraft && (
-                                <Button
-                                  variant="ghost"
-                                  type="button"
-                                  onClick={() => removeModelRow(index)}
-                                  aria-label={t("common.delete")}
-                                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-auto"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                            <div className="mt-1 flex items-center gap-2 pl-6">
-                              <Input
-                                type="number"
-                                value={row.contextWindow ?? ""}
-                                data-testid={`model-context-${row.id}`}
-                                placeholder={t("api.contextWindowPlaceholder")}
-                                title={t("api.contextWindowHint")}
-                                onChange={(event) => {
-                                  const parsed = Number(event.target.value);
-                                  patchRow(index, {
-                                    contextWindow:
-                                      event.target.value && parsed > 0
-                                        ? Math.round(parsed)
-                                        : undefined,
-                                    contextWindowPinned: Boolean(
-                                      event.target.value && parsed > 0,
-                                    ),
-                                  });
-                                }}
-                                onBlur={() => commitRow(index)}
-                                className="w-36 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 h-auto shadow-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                              />
-                              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <input
-                                  type="checkbox"
-                                  data-testid={`model-image-${row.id}`}
-                                  checked={supportsImage}
-                                  onChange={() => toggleRowImage(index)}
-                                  className="rounded"
-                                />
-                                {t("api.supportsImage")}
-                              </label>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {isCustomDraft && (
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        onClick={addModelRow}
-                        className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
-                      >
-                        <Plus className="h-3 w-3" />
-                        {t("api.addCustomModel")}
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {error && (
-                  <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                    {error}
-                  </div>
-                )}
-                {successMessage && (
-                  <div className="flex items-center gap-2 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
-                    <CheckCircle className="h-4 w-4 flex-shrink-0" />
-                    {successMessage}
-                  </div>
-                )}
-
-                {connectMessage && (
-                  <p
-                    className={`text-xs ${
-                      connectState === "failed"
-                        ? "text-destructive"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {connectMessage}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-end gap-2">
-                  {connectState === "connected" ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        onClick={handleConnect}
-                        className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
-                      >
-                        {t("api.reconnect")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        onClick={closeEditor}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary/90 h-auto"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        {t("api.done")}
-                      </Button>
-                    </>
-                  ) : connectState === "failed" ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        onClick={() => {
-                          void handleSaveDraft();
-                        }}
-                        className="inline-flex items-center gap-2 rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
-                      >
-                        {t("common.save")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        onClick={handleConnect}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary/90 h-auto"
-                      >
-                        {t("api.retryConnect")}
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        onClick={closeEditor}
-                        className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
-                      >
-                        {t("common.cancel")}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        onClick={handleConnect}
-                        disabled={connectState === "connecting"}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
-                      >
-                        {connectState === "connecting" ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            {t("api.connecting")}
-                          </>
-                        ) : (
-                          <>
-                            <PlugZap className="h-4 w-4" />
-                            {t("api.connect")}
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
-                </div>
               </div>
             </div>
           </DialogContent>

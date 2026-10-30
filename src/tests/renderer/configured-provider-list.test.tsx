@@ -1,16 +1,13 @@
 // @vitest-environment jsdom
-import React from "react";
-import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+// 组件本身已由 provider-list-page.tsx 取代；这里只保留行品牌与 OAuth profile 的解析规则，
+// 它们是列表页与详情页共用的纯函数。
+import { describe, expect, it } from "vitest";
 import "../../renderer/i18n/config";
 import {
-  ConfiguredProviderList,
   oauthProviderIdForProfile,
   rowBrand,
 } from "../../renderer/components/settings/configured-provider-list";
 import type { ApiProviderConfig } from "../../renderer/types";
-import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 
 const openrouterConfig: ApiProviderConfig = {
   provider: "openrouter",
@@ -26,114 +23,7 @@ const openrouterConfig: ApiProviderConfig = {
   updatedAt: "2024-01-01T00:00:00.000Z",
 };
 
-describe("ConfiguredProviderList", () => {
-  let container: HTMLDivElement;
-  let root: Root;
-
-  const render = (
-    props: Partial<React.ComponentProps<typeof ConfiguredProviderList>> = {},
-  ) => {
-    container = document.createElement("div");
-    document.body.innerHTML = "";
-    document.body.appendChild(container);
-    root = createRoot(container);
-    act(() => {
-      root.render(
-        React.createElement(ConfiguredProviderList, {
-          rows: [{ profileKey: "openrouter", config: openrouterConfig }],
-          presets: API_PROVIDER_PRESETS,
-          oauthStatuses: {},
-          onEdit: vi.fn(),
-          onDelete: vi.fn(),
-          onDisconnect: vi.fn(),
-          ...props,
-        }),
-      );
-    });
-  };
-
-  afterEach(() => {
-    if (root) act(() => root.unmount());
-  });
-
-  it("副文案给出 host 与模型数", () => {
-    render();
-    expect(container.textContent).toContain("openrouter.ai");
-    expect(container.textContent).toContain("2 models");
-  });
-
-  it("OAuth 已登录的行给出已登录文案，且不重复 provider 名", () => {
-    render({
-      oauthStatuses: {
-        openrouter: { loggedIn: true, providerName: "OpenRouter" },
-      },
-    });
-    expect(container.textContent).toContain("Signed in");
-    // 标题已经是 provider 名，副文案里不再重复一遍
-    expect(container.textContent?.match(/OpenRouter/g)?.length).toBe(1);
-    expect(
-      container.querySelector('[data-testid="openrouter-oauth-disconnect"]'),
-    ).not.toBeNull();
-  });
-
-  it("oauth profile 的 name 为空时，标题回退到目录里的 provider 名", () => {
-    render({
-      rows: [
-        {
-          profileKey: "oauth:openai-codex",
-          config: {
-            ...openrouterConfig,
-            provider: "oauth",
-            name: "",
-            baseUrl: "",
-            apiKey: "",
-          },
-        },
-      ],
-    });
-    expect(container.textContent).toContain("OpenAI Codex");
-    expect(container.textContent).not.toContain("oauth");
-  });
-
-  it("没登录的行不显示断开按钮", () => {
-    render();
-    expect(
-      container.querySelector('[data-testid="openrouter-oauth-disconnect"]'),
-    ).toBeNull();
-  });
-
-  it("点断开把 provider id 交回调用方", () => {
-    const onDisconnect = vi.fn();
-    render({
-      onDisconnect,
-      oauthStatuses: {
-        openrouter: { loggedIn: true, providerName: "OpenRouter" },
-      },
-    });
-    act(() => {
-      container
-        .querySelector('[data-testid="openrouter-oauth-disconnect"]')
-        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    expect(onDisconnect).toHaveBeenCalledWith("openrouter");
-  });
-
-  it("编辑与删除按钮把 profile key 交回调用方", () => {
-    const onEdit = vi.fn();
-    const onDelete = vi.fn();
-    render({ onEdit, onDelete });
-    act(() => {
-      container
-        .querySelector('[data-testid="openrouter-edit"]')
-        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      container
-        .querySelector('[data-testid="openrouter-delete"]')
-        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    expect(onEdit).toHaveBeenCalledWith("openrouter");
-    expect(onDelete).toHaveBeenCalledWith("openrouter");
-  });
-
+describe("configured provider row helpers", () => {
   it("oauth: 前缀的 profile key 能还原出 provider id", () => {
     expect(oauthProviderIdForProfile("openrouter")).toBe("openrouter");
     expect(oauthProviderIdForProfile("oauth:openai-codex")).toBe(
@@ -170,21 +60,5 @@ describe("ConfiguredProviderList", () => {
         customProtocol: "anthropic",
       }),
     ).toBe("anthropic");
-  });
-
-  it("预设 provider 显示预设名，不是裸 id", () => {
-    render({
-      rows: [
-        {
-          profileKey: "deepseek",
-          config: {
-            ...openrouterConfig,
-            provider: "deepseek",
-            baseUrl: "https://api.deepseek.com",
-          },
-        },
-      ],
-    });
-    expect(container.textContent).toContain("DeepSeek");
   });
 });

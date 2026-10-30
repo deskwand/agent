@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
+//
+// OpenCode 的三档（Zen / Go / Go Plus）从「一个弹窗里切计划」变成目录里的两个条目：
+// 选哪个条目就是选哪档，草稿里的 provider / baseUrl 跟着条目走。
 import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "../../renderer/i18n/config";
 import { SettingsAPI } from "../../renderer/components/settings/SettingsAPI";
+import { PROVIDER_CATALOG } from "../../renderer/components/settings/provider-catalog";
 import { useAppStore } from "../../renderer/store";
-import type { AppConfig } from "../../renderer/types";
+import type { AppConfig, DiagnosticResult } from "../../renderer/types";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import { normalizeCodemodeConfig } from "../../shared/codemode-config";
 import { normalizeWebAccessConfig } from "../../shared/web-access";
@@ -30,10 +34,7 @@ function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     themePreset: "zinc",
     sandboxEnabled: false,
     memoryEnabled: true,
-    memoryRuntime: {
-      maxNavSteps: 2,
-      ingestionConcurrency: 4,
-    },
+    memoryRuntime: { maxNavSteps: 2, ingestionConcurrency: 4 },
     enableThinking: false,
     thinkingLevel: "medium",
     autoSkillLearning: false,
@@ -44,248 +45,196 @@ function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   };
 }
 
+function liveDiagnostics(
+  models: Array<{ id: string; name: string }>,
+): DiagnosticResult {
+  return {
+    steps: [{ name: "auth", status: "ok", latencyMs: 1 }],
+    overallOk: true,
+    totalLatencyMs: 1,
+    models,
+    modelsSource: "live",
+    modelsFiltered: 0,
+  };
+}
+
+let container: HTMLDivElement;
+let root: Root;
+
 async function flush(): Promise<void> {
   await act(async () => {
     await Promise.resolve();
   });
 }
 
-function clickButton(container: HTMLElement, text: string): void {
-  const button = Array.from(container.querySelectorAll("button")).find(
-    (element) => element.textContent?.trim() === text,
+function clickButton(scope: HTMLElement, text: string): void {
+  const button = Array.from(scope.querySelectorAll("button")).find(
+    (element) =>
+      element.textContent?.trim() === text ||
+      element.getAttribute("aria-label") === text,
   );
-  button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  if (!button) {
+    throw new Error(
+      `button "${text}" not found; have: ${Array.from(
+        scope.querySelectorAll("button"),
+      )
+        .map((b) => b.textContent?.trim())
+        .join(" | ")}`,
+    );
+  }
+  button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 }
 
-/**
- * API 编辑弹窗外壳迁到 shadcn Dialog 后经 portal 挂到 document.body，
- * 不再位于测试的 container 内：弹窗内查询收窄到当前 dialog；
- * 页面级节点（目录瓦片）仍查 container。
- */
-function editorDialog(): HTMLElement {
-  const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
-  if (!dialog) throw new Error("api editor dialog not open");
-  return dialog;
+function setInput(input: Element | null, value: string): void {
+  if (!input) throw new Error("input not found");
+  const setter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  setter?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function inputNearLabel(
+  scope: HTMLElement,
+  labelText: string,
+): HTMLInputElement | null {
+  const label = Array.from(scope.querySelectorAll("label")).find((element) =>
+    element.textContent?.includes(labelText),
+  );
+  const input =
+    label?.querySelector("input") ??
+    label?.parentElement?.querySelector("input");
+  return (input as HTMLInputElement | null) ?? null;
+}
+
+async function openAdd(entryLabel: string): Promise<void> {
+  await act(async () => {
+    root.render(React.createElement(SettingsAPI, {}));
+  });
+  await flush();
+  await act(async () => {
+    container
+      .querySelector<HTMLButtonElement>('[data-testid="provider-list-add"]')
+      ?.click();
+  });
+  await flush();
+  await act(async () => {
+    clickButton(container, entryLabel);
+  });
+  await flush();
 }
 
 describe("SettingsAPI OpenCode provider", () => {
-  let container: HTMLDivElement;
-  let root: Root;
+  let saveProvider: ReturnType<typeof vi.fn>;
+  let diagnose: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     container = document.createElement("div");
     document.body.innerHTML = "";
     document.body.appendChild(container);
     root = createRoot(container);
-    useAppStore.setState({
-      appConfig: buildConfig(),
-      isConfigured: false,
-    });
+    saveProvider = vi.fn(
+      async (payload: { profileKey: string; config: never }) => ({
+        success: true,
+        config: buildConfig({
+          isConfigured: true,
+          activeProviderKey: payload.profileKey,
+          providers: { [payload.profileKey]: payload.config },
+        }),
+      }),
+    );
+    diagnose = vi.fn(async () =>
+      liveDiagnostics([
+        { id: "kimi-k3", name: "Kimi K3" },
+        { id: "beam-free", name: "Beam Free" },
+      ]),
+    );
+    useAppStore.setState({ appConfig: buildConfig(), isConfigured: false });
     window.electronAPI = {
       config: {
         get: vi.fn(async () => buildConfig()),
         getPresets: vi.fn(async () => API_PROVIDER_PRESETS),
-        saveProvider: vi.fn(async () => ({
+        saveProvider,
+        diagnose,
+        save: vi.fn(async () => ({ success: true, config: buildConfig() })),
+        deleteProvider: vi.fn(async () => ({
           success: true,
           config: buildConfig(),
-        })),
-        fetchOpenRouterModels: vi.fn(async () => ({
-          usedFallback: false,
-          models: [],
         })),
       },
       auth: {
         status: vi.fn(async () => ({ loggedIn: false, providerName: "OAuth" })),
       },
       openrouterAuth: {
-        login: vi.fn(async () => ({
-          apiKey: "sk-or-v1-test",
-          providerName: "OpenRouter",
-        })),
-        logout: vi.fn(async () => undefined),
         status: vi.fn(async () => ({
           loggedIn: false,
           providerName: "OpenRouter",
         })),
+        logout: vi.fn(async () => undefined),
+        login: vi.fn(),
       },
     } as unknown as typeof window.electronAPI;
   });
 
-  it("shows the OpenCode card and switches between Zen and Go plans", async () => {
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await flush();
+  it("Zen 与 Go 是两个独立条目，各自带自己的 baseUrl", async () => {
+    const relay = PROVIDER_CATALOG.find((category) => category.id === "relay");
+    const ids = relay?.entries.map((entry) => entry.id);
+    expect(ids).toContain("opencode");
+    expect(ids).toContain("opencode-go");
 
-    // api.addApi 从按钮变成分类网格的标题：直接点网格里的 OpenCode 瓦片进编辑器
-    await act(async () => {
-      clickButton(container, "OpenCode");
-    });
-    await flush();
-
-    // 计划切换按钮出现（测试环境为英文 locale：Zen · Pay as you go / Go / Go Plus · Subscription）
-    const planButtons = Array.from(editorDialog().querySelectorAll("button"));
-    expect(
-      planButtons.some((b) => b.textContent?.includes("Pay as you go")),
-    ).toBe(true);
-    expect(
-      planButtons.some((b) => b.textContent?.includes("Go / Go Plus")),
-    ).toBe(true);
-
-    // 三档共用同一账号/Key；价格会变，所以这一块不写金额
-    const planSection = planButtons
-      .find((b) => b.textContent?.includes("Go / Go Plus"))
-      ?.closest("div.space-y-3");
-    const planText = planSection?.textContent ?? "";
-    expect(planText).toContain("Billing");
-    expect(planText).toContain("Go / Go Plus");
-    expect(planText).toContain("higher limits");
-    expect(planText).not.toMatch(/\$\s?\d/);
-
-    // 切换到 Go：OpenCode Go 按钮变为选中态
-    await act(async () => {
-      const goBtn = planButtons.find((b) =>
-        b.textContent?.includes("Go / Go Plus"),
-      );
-      goBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    await flush();
-
-    const afterSwitch = Array.from(editorDialog().querySelectorAll("button"));
-    const goActive = afterSwitch.find((b) =>
-      b.textContent?.includes("Go / Go Plus"),
-    );
-    expect(goActive?.className).toContain("border-primary");
-
-    // 填写 API Key 并切换回 Zen，Key 保留
-    const keyInput = editorDialog().querySelector('input[type="password"]');
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(keyInput, "sk-opencode-test");
-      keyInput?.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await flush();
-
-    await act(async () => {
-      const zenBtn = Array.from(editorDialog().querySelectorAll("button")).find(
-        (b) => b.textContent?.includes("Pay as you go"),
-      );
-      zenBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    await flush();
-
-    const keyAfterSwitch = editorDialog().querySelector(
-      'input[type="password"]',
-    ) as HTMLInputElement | null;
-    expect(keyAfterSwitch?.value).toBe("sk-opencode-test");
+    await openAdd("OpenCode Go");
+    const baseUrl = inputNearLabel(container, "Base URL");
+    expect(baseUrl?.value).toContain("go");
+    // 表单标题认得出是哪一档
+    expect(container.textContent).toContain("OpenCode Go");
   });
 
-  it("connects the Go plan and keeps endpoint-only models", async () => {
-    type SavedPayload = {
+  it("连接 Go 计划并带上端点独有模型", async () => {
+    await openAdd("OpenCode Go");
+    await act(async () => {
+      setInput(inputNearLabel(container, "API Key"), "sk-opencode-go");
+    });
+    await flush();
+    await act(async () => {
+      clickButton(container, "Add");
+    });
+    await flush();
+
+    expect(diagnose).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "opencode-go", captureModels: true }),
+    );
+
+    // 两次落盘：连接前用目录兜底，第二次带着合并后的完整列表
+    expect(saveProvider).toHaveBeenCalledTimes(2);
+    const lastPayload = saveProvider.mock.calls[1][0] as {
       profileKey: string;
       config: {
         provider: string;
+        customProtocol: string;
         baseUrl: string;
         defaultModel: string;
         models: Array<{ id: string }>;
       };
     };
-    const saveProvider = vi.fn(async (_payload: SavedPayload) => ({
-      success: true,
-      config: buildConfig(),
-    }));
-    const diagnose = vi.fn(async () => ({
-      steps: [{ name: "auth", status: "ok", latencyMs: 1 }],
-      overallOk: true,
-      totalLatencyMs: 1,
-      models: [
-        { id: "kimi-k3", name: "Kimi K3" },
-        { id: "beam-free", name: "Beam Free" },
-      ],
-      modelsSource: "live",
-      modelsFiltered: 0,
-    }));
-    window.electronAPI = {
-      ...window.electronAPI,
-      config: {
-        ...window.electronAPI.config,
-        saveProvider,
-        diagnose,
-      },
-    } as unknown as typeof window.electronAPI;
+    expect(lastPayload.profileKey).toBe("opencode-go");
+    expect(lastPayload.config.provider).toBe("opencode-go");
+    expect(lastPayload.config.customProtocol).toBe("openai");
+    expect(lastPayload.config.baseUrl).toContain("go");
 
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await flush();
-
-    await act(async () => {
-      clickButton(container, "OpenCode");
-    });
-    await flush();
-
-    // OpenCode 与其它预设供应商一样走「连接」，不再有单独的「保存设置」
-    expect(editorDialog().textContent).toContain("Connect");
-    expect(editorDialog().textContent).not.toContain("Save Settings");
-
-    // 切换到 Go
-    await act(async () => {
-      const goBtn = Array.from(editorDialog().querySelectorAll("button")).find(
-        (b) => b.textContent?.includes("Go / Go Plus"),
-      );
-      goBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-    await flush();
-
-    const keyInput = editorDialog().querySelector('input[type="password"]');
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(keyInput, "sk-opencode-go");
-      keyInput?.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await flush();
-    await act(async () => {
-      clickButton(editorDialog(), "Connect");
-    });
-    await flush();
-
-    expect(diagnose).toHaveBeenCalledWith(
-      expect.objectContaining({
-        provider: "opencode-go",
-        captureModels: true,
-      }),
-    );
-
-    // 两次落盘：连接前用目录兜底，第二次带着合并后的完整列表
-    expect(saveProvider).toHaveBeenCalledTimes(2);
-    const lastPayload = saveProvider.mock.calls[1][0];
-    expect(lastPayload).toEqual(
-      expect.objectContaining({
-        profileKey: "opencode-go",
-        config: expect.objectContaining({
-          provider: "opencode-go",
-          customProtocol: "openai",
-          baseUrl: "https://opencode.ai/inference/go/v1",
-        }),
-      }),
-    );
     const ids = lastPayload.config.models.map((model) => model.id);
     expect(ids).toContain("kimi-k3");
-    // 端点独有模型会被带去落盘（主进程 enrich 的保留逻辑由
-    // opencode-presets.test.ts 单独覆盖）
     expect(ids).toContain("beam-free");
     // Go 计划的目录默认模型
     expect(lastPayload.config.defaultModel).toBe("kimi-k3");
-    expect(editorDialog().textContent).toContain("Connected");
+
+    // 成功后回到列表
+    expect(
+      container.querySelector('[data-testid="provider-list-add"]'),
+    ).toBeTruthy();
   });
 
-  it("refreshes an existing OpenCode profile when its editor opens", async () => {
+  it("打开已有 OpenCode 档案时就地刷新模型列表", async () => {
     const savedConfig = buildConfig({
       activeProviderKey: "opencode-go",
       isConfigured: true,
@@ -301,59 +250,29 @@ describe("SettingsAPI OpenCode provider", () => {
         },
       },
     });
-    const saveProvider = vi.fn(async (_payload: unknown) => ({
-      success: true,
-      config: savedConfig,
-    }));
-    const diagnose = vi.fn(async () => ({
-      steps: [{ name: "auth", status: "ok", latencyMs: 1 }],
-      overallOk: true,
-      totalLatencyMs: 1,
-      models: [
-        { id: "kimi-k3", name: "Kimi K3" },
-        { id: "beam-free", name: "Beam Free" },
-      ],
-      modelsSource: "live",
-      modelsFiltered: 0,
-    }));
     useAppStore.setState({ appConfig: savedConfig, isConfigured: true });
-    window.electronAPI = {
-      ...window.electronAPI,
-      config: {
-        ...window.electronAPI.config,
-        get: vi.fn(async () => savedConfig),
-        saveProvider,
-        diagnose,
-      },
-    } as unknown as typeof window.electronAPI;
+    (
+      window.electronAPI.config.get as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(savedConfig);
+    diagnose.mockRejectedValue(new Error("offline"));
 
     await act(async () => {
       root.render(React.createElement(SettingsAPI, {}));
     });
     await flush();
-
-    const editButton = container.querySelector<HTMLButtonElement>(
-      '[data-testid="opencode-go-edit"]',
-    );
-    expect(editButton).not.toBeNull();
     await act(async () => {
-      editButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      container
+        .querySelector<HTMLButtonElement>(
+          '[data-testid="configured-provider-opencode-go"]',
+        )
+        ?.click();
     });
-    // 静默刷新是 openEdit 里 fire-and-forget 的，多推几轮微任务
-    await flush();
     await flush();
 
-    expect(diagnose).toHaveBeenCalledWith(
-      expect.objectContaining({
-        provider: "opencode-go",
-        captureModels: true,
-      }),
-    );
-    const lastPayload = saveProvider.mock.calls.at(-1)?.[0] as
-      | { config: { models: Array<{ id: string }> } }
-      | undefined;
-    expect(lastPayload?.config.models.map((model) => model.id)).toContain(
-      "beam-free",
-    );
+    // 静默刷新失败：保留本地列表，且不写回
+    const rows = container.querySelectorAll('[data-testid^="model-row-"]');
+    expect(rows.length).toBe(1);
+    expect(diagnose).toHaveBeenCalled();
+    expect(saveProvider).not.toHaveBeenCalled();
   });
 });

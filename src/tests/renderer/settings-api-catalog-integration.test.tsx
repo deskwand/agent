@@ -110,7 +110,19 @@ describe("SettingsAPI catalog integration", () => {
     await flush();
   };
 
+  /** 目录页在「添加供应商」后面，第一次点瓦片前先推入目录。 */
+  const ensureCatalog = async () => {
+    if (container.querySelector("[data-catalog-entry]")) return;
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="provider-list-add"]')
+        ?.click();
+    });
+    await flush();
+  };
+
   const clickEntry = async (entryKey: string) => {
+    await ensureCatalog();
     const tile = container.querySelector(`[data-catalog-entry="${entryKey}"]`);
     expect(tile, `tile ${entryKey}`).not.toBeNull();
     await act(async () => {
@@ -124,11 +136,7 @@ describe("SettingsAPI catalog integration", () => {
    * 不再位于测试的 container 内：弹窗内查询收窄到当前 dialog；
    * 页面级节点（目录瓦片、已配置角标）仍查 container。
    */
-  const editorDialog = (): HTMLElement => {
-    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
-    if (!dialog) throw new Error("api editor dialog not open");
-    return dialog;
-  };
+  const editorDialog = (): HTMLElement => container;
 
   it("只有主模型子 tab 吃宽栏，其余三个表单子 tab 保持 720", () => {
     // 外壳对 api tab 不封顶，宽度由 SettingsAPI 按子 tab 各自封：
@@ -174,8 +182,8 @@ describe("SettingsAPI catalog integration", () => {
       '[data-testid="configured-provider-oauth:openai-codex"]',
     );
     expect(row).not.toBeNull();
-    // 品牌图标用 fill-<品牌色> 上色；lucide 的 Server 兜底是 stroke + fill="none"
-    const icon = row?.querySelector("svg");
+    // 可点按钮铺满整行、本身没有子节点；图标是它的兄弟节点
+    const icon = row?.parentElement?.querySelector("svg");
     expect(icon?.getAttribute("class")).toContain("fill-[");
   });
 
@@ -187,6 +195,7 @@ describe("SettingsAPI catalog integration", () => {
     ).mockResolvedValue({ loggedIn: true, providerName: "OpenRouter" });
 
     await render();
+    await ensureCatalog();
     const tile = container.querySelector(
       '[data-testid="openrouter-oauth-connect"]',
     ) as HTMLButtonElement;
@@ -195,9 +204,9 @@ describe("SettingsAPI catalog integration", () => {
 
     await clickEntry("oauth:openrouter");
 
-    // 确认框出现，且带真正会登出的那个按钮
-    expect(container.textContent).toContain("Disconnect");
-    const confirm = Array.from(container.querySelectorAll("button"))
+    // 确认框经 portal 挂到 body，不在 container 内
+    expect(document.body.textContent).toContain("Disconnect");
+    const confirm = Array.from(document.body.querySelectorAll("button"))
       .filter((b) => b.textContent?.trim() === "Disconnect")
       .at(-1);
     expect(confirm).toBeTruthy();
@@ -228,6 +237,7 @@ describe("SettingsAPI catalog integration", () => {
 
   it("点已配置的供应商瓦片进编辑器，并带上已配置角标", async () => {
     await render();
+    await ensureCatalog();
     const tile = container.querySelector(
       '[data-catalog-entry="provider:openrouter"]',
     );
@@ -235,9 +245,9 @@ describe("SettingsAPI catalog integration", () => {
 
     await clickEntry("provider:openrouter");
 
-    // 编辑器弹窗打开：出现 API Key 输入框
+    // 详情页打开：凭证块里有 API Key 行（编辑态默认打码只读）
     expect(
-      editorDialog().querySelector('input[type="password"]'),
+      editorDialog().querySelector('[data-testid="credential-api-key"]'),
     ).not.toBeNull();
     expect(editorDialog().textContent).toContain("OpenRouter");
   });
@@ -246,7 +256,7 @@ describe("SettingsAPI catalog integration", () => {
     await render();
     await clickEntry("provider:deepseek");
     expect(
-      editorDialog().querySelector('input[type="password"]'),
+      editorDialog().querySelector('[data-testid="credential-api-key"]'),
     ).not.toBeNull();
   });
 
@@ -275,6 +285,7 @@ describe("SettingsAPI catalog integration", () => {
     ).mockResolvedValue(planConfig);
 
     await render();
+    await ensureCatalog();
     const tile = container.querySelector(
       '[data-catalog-entry="plan:custom:subscription-bailian-coding"]',
     );

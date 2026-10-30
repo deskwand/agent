@@ -25,11 +25,14 @@ describe("provider catalog", () => {
           expect(getLocalGatewayPreset(entry.id)?.id, `local ${entry.id}`).toBe(
             entry.id,
           );
-        } else {
+        } else if (entry.kind === "plan") {
           expect(
             CODING_SUBSCRIPTIONS.some((p) => p.profileKey === entry.id),
             `plan ${entry.id}`,
           ).toBe(true);
+        } else {
+          // cloud 指向应用自己的云服务，没有外部来源可校验。
+          expect(entry.id, `cloud ${entry.id}`).toBe("deskwand");
         }
       }
     }
@@ -55,5 +58,37 @@ describe("provider catalog", () => {
     const subscription = PROVIDER_CATALOG.find((c) => c.id === "subscription");
     const claude = subscription?.entries.find((e) => e.id === "anthropic");
     expect(claude?.labelKey).toBe("api.catalogClaude");
+  });
+});
+
+describe("目录条目扩展", () => {
+  function flatEntries() {
+    return PROVIDER_CATALOG.flatMap((category) => [...category.entries]);
+  }
+
+  it("订阅组首位是 DeskWand 云服务", () => {
+    const first = PROVIDER_CATALOG[0].entries[0];
+    expect(first.kind).toBe("cloud");
+    expect(first.id).toBe("deskwand");
+  });
+
+  it("厂商条目带取 key 页地址", () => {
+    const deepseek = flatEntries().find(
+      (entry) => entry.kind === "provider" && entry.id === "deepseek",
+    );
+    expect(deepseek?.keyUrl).toBe("https://platform.deepseek.com/api_keys");
+  });
+
+  it("引导页精简集是 compact 条目的子集", () => {
+    const compact = flatEntries().filter((entry) => entry.compact);
+    expect(compact.length).toBeGreaterThanOrEqual(6);
+    expect(compact.length).toBeLessThan(flatEntries().length);
+  });
+
+  it("搜索词覆盖厂商域名，供搜索框匹配", () => {
+    const anthropic = flatEntries().find(
+      (entry) => entry.kind === "provider" && entry.id === "anthropic",
+    );
+    expect(anthropic?.searchTerms).toContain("api.anthropic.com");
   });
 });

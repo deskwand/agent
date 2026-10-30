@@ -119,6 +119,14 @@ describe("SettingsAPI OAuth login flow", () => {
     });
     await flush();
 
+    // 目录页在「添加供应商」之后
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="provider-list-add"]')
+        ?.click();
+    });
+    await flush();
+
     const button = container.querySelector(
       '[data-testid="openai-codex-oauth-connect"]',
     );
@@ -190,6 +198,14 @@ describe("SettingsAPI OAuth login flow", () => {
     await flush();
     setActiveProvider.mockClear();
     get.mockClear();
+
+    // 目录页在「添加供应商」之后
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="provider-list-add"]')
+        ?.click();
+    });
+    await flush();
 
     const button = container.querySelector(
       '[data-testid="openai-codex-oauth-connect"]',

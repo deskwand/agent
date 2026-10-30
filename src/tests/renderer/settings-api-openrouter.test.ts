@@ -141,6 +141,14 @@ describe("SettingsAPI OpenRouter login flow", () => {
     });
     await flush();
 
+    // 目录页在「添加供应商」之后
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="provider-list-add"]')
+        ?.click();
+    });
+    await flush();
+
     const button = container.querySelector(
       '[data-testid="openrouter-oauth-connect"]',
     );
@@ -235,8 +243,16 @@ describe("SettingsAPI OpenRouter login flow", () => {
     });
     await flush();
 
+    // 断开入口收进了行尾 ⋯ 菜单
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[data-testid="provider-row-menu-openrouter"]',
+        )
+        ?.click();
+    });
     const disconnectButton = container.querySelector(
-      '[data-testid="openrouter-oauth-disconnect"]',
+      '[data-testid="provider-row-disconnect"]',
     );
     expect(disconnectButton).not.toBeNull();
 

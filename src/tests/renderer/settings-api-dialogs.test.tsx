@@ -126,210 +126,6 @@ async function expectFocusTrap(layer: HTMLElement): Promise<void> {
   ).toBe(first);
 }
 
-describe("SettingsAPI API 编辑弹窗外壳", () => {
-  let container: HTMLDivElement;
-  let root: Root;
-  // 显式标注签名：否则 vi.fn() 的通用 Mock 类型不能赋给 store 上带参数的动作签名
-  let acquireSpy: ReturnType<typeof vi.fn<(id: string) => void>>;
-  let releaseSpy: ReturnType<typeof vi.fn<(id: string) => void>>;
-
-  beforeEach(() => {
-    document.body.innerHTML = "";
-    container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-    const state = useAppStore.getState();
-    // 包一层 store action 记数：关闭恰一次 = release 恰一次（引用计数释放）。
-    acquireSpy = vi.fn(state.acquireBrowserOcclusion);
-    releaseSpy = vi.fn(state.releaseBrowserOcclusion);
-    useAppStore.setState({
-      appConfig: buildConfig(),
-      isConfigured: false,
-      browserOcclusionIds: new Set<string>(),
-      acquireBrowserOcclusion: acquireSpy,
-      releaseBrowserOcclusion: releaseSpy,
-    });
-    window.electronAPI = {
-      config: {
-        get: vi.fn(async () => buildConfig()),
-        getPresets: vi.fn(async () => API_PROVIDER_PRESETS),
-        saveProvider: vi.fn(async () => ({
-          success: true,
-          config: buildConfig(),
-        })),
-        fetchOpenRouterModels: vi.fn(async () => ({
-          usedFallback: false,
-          models: [],
-        })),
-      },
-      auth: {
-        status: vi.fn(async () => ({ loggedIn: false, providerName: "OAuth" })),
-      },
-      openrouterAuth: {
-        login: vi.fn(async () => ({
-          apiKey: "sk-or-v1-test",
-          providerName: "OpenRouter",
-        })),
-        logout: vi.fn(async () => undefined),
-        status: vi.fn(async () => ({
-          loggedIn: false,
-          providerName: "OpenRouter",
-        })),
-      },
-    } as unknown as typeof window.electronAPI;
-  });
-
-  afterEach(() => {
-    act(() => root.unmount());
-    container.remove();
-    document.body
-      .querySelectorAll('[role="dialog"], [role="alertdialog"]')
-      .forEach((el) => el.remove());
-    useAppStore.setState({ browserOcclusionIds: new Set<string>() });
-  });
-
-  const dialog = (): HTMLElement | null =>
-    document.body.querySelector<HTMLElement>('[role="dialog"]');
-
-  const closeButton = (): HTMLButtonElement | null =>
-    dialog()?.querySelector<HTMLButtonElement>(
-      `button[aria-label="${i18n.t("common.close")}"]`,
-    ) ?? null;
-
-  /**
-   * 渲染 → 聚焦未配置的供应商瓦片 → 点开编辑器，返回 opener。
-   * jsdom 的 click 不会自动聚焦，回焦用例必须显式 focus（与 skill-md-modal 测试一致）。
-   */
-  const openEditor = async (): Promise<HTMLButtonElement> => {
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await flush();
-    const opener = container.querySelector<HTMLButtonElement>(
-      '[data-catalog-entry="provider:deepseek"]',
-    );
-    expect(opener, "未配置供应商瓦片必须存在").not.toBeNull();
-    opener!.focus();
-    expect(document.activeElement).toBe(opener);
-    await click(opener!);
-    await flush();
-    return opener!;
-  };
-
-  it("打开后是唯一的 role=dialog，标题为 api.addApi，occlusion 恰好占 1", async () => {
-    await openEditor();
-
-    // 根因断言：内容经 portal 挂到 body，不在测试 container 内。
-    expect(document.body.querySelectorAll('[role="dialog"]').length).toBe(1);
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
-
-    expect(dialog()?.querySelector("h2")?.textContent).toBe(
-      i18n.t("api.addApi"),
-    );
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(1);
-
-    // vendored 内置角标由 CSS 屏蔽，可见关闭键只有一个（本地化 aria-label + X 图标）。
-    expect(dialog()?.className).toContain("[&>button]:hidden");
-    expect(closeButton()?.querySelector("svg")).not.toBeNull();
-  });
-
-  it("点遮罩不关，草稿不变", async () => {
-    await openEditor();
-
-    const input = dialog()?.querySelector<HTMLInputElement>(
-      'input[type="password"]',
-    );
-    expect(input, "API Key 输入框必须存在").not.toBeNull();
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(input, "sk-draft-keep");
-      input!.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await flush();
-
-    // 遮罩是 DialogContent 的上一个兄弟（DialogPortal 里 Overlay 在 Content 之前）。
-    // modal DialogContent 传了 deferPointerDownOutside，pointerdown 只登记、
-    // 真正的 outside 判定在紧随的 click 上，两步都要发在遮罩本身上。
-    const overlay = dialog()?.previousElementSibling ?? null;
-    expect(overlay, "遮罩层必须存在").not.toBeNull();
-    await act(async () => {
-      overlay!.dispatchEvent(
-        new MouseEvent("pointerdown", { bubbles: true, cancelable: true }),
-      );
-    });
-    await act(async () => {
-      overlay!.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, cancelable: true }),
-      );
-    });
-    await flush();
-
-    expect(dialog(), "点遮罩后弹窗必须仍在").not.toBeNull();
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(1);
-    expect(
-      dialog()?.querySelector<HTMLInputElement>('input[type="password"]')
-        ?.value,
-      "遮罩点击不得清掉草稿",
-    ).toBe("sk-draft-keep");
-  });
-
-  it("Escape 不关（原手写外壳没有 Escape 关闭路径）", async () => {
-    await openEditor();
-
-    await act(async () => {
-      // cancelable 必须为 true：外壳靠 onEscapeKeyDown 的 preventDefault 拦住 Radix。
-      document.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "Escape",
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
-    });
-    await flush();
-
-    expect(dialog(), "Escape 后弹窗必须仍在").not.toBeNull();
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(1);
-    expect(releaseSpy).not.toHaveBeenCalled();
-  });
-
-  it("X 关闭恰一次、释放 occlusion，关闭后焦点回到 opener", async () => {
-    const opener = await openEditor();
-    expect(acquireSpy).toHaveBeenCalledTimes(1);
-    const occlusionId = acquireSpy.mock.calls[0][0];
-
-    await click(closeButton()!);
-    await flush();
-
-    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(0);
-    expect(releaseSpy, "关闭恰一次 = release 恰一次").toHaveBeenCalledTimes(1);
-    expect(releaseSpy).toHaveBeenCalledWith(occlusionId);
-    expect(document.activeElement, "关闭后必须回到 opener").toBe(opener);
-
-    // 再开一次：关闭没有把父级状态关坏。
-    await click(opener);
-    await flush();
-    expect(document.body.querySelectorAll('[role="dialog"]').length).toBe(1);
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(1);
-    expect(acquireSpy).toHaveBeenCalledTimes(2);
-  });
-
-  it("开窗后焦点进入 dialog，Tab 从末 tabbable 回绕到首 tabbable", async () => {
-    await openEditor();
-    await expectFocusTrap(dialog()!);
-  });
-});
-
-//
-// Task 3 第 2 小步：剩余四个手写弹窗外壳（视觉编辑 / 订阅方案 / OAuth 断开 / API Key 删除）
-// 迁到 Occluding* 原语后逐项验红过的失败模式：
-//   role 唯一与标题、occlusion 引用计数、遮罩/Escape 不关、显式关闭恰一次并回焦、
-//   AlertDialog 确认路径的「pending 立即清空 / disabled / 不重复请求」语义。
-//
 describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -506,8 +302,19 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     return opener;
   };
 
+  /** 目录页在「添加供应商」之后 */
+  const openCatalog = async (): Promise<void> => {
+    const add = container.querySelector<HTMLButtonElement>(
+      '[data-testid="provider-list-add"]',
+    );
+    expect(add, "添加入口必须存在").not.toBeNull();
+    await click(add!);
+    await flush();
+  };
+
   const openPlanDialog = async (): Promise<HTMLButtonElement> => {
     await renderSettings();
+    await openCatalog();
     const opener = container.querySelector<HTMLButtonElement>(
       '[data-catalog-entry="plan:custom:subscription-bailian-coding"]',
     );
@@ -520,8 +327,15 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
 
   const openOauthDialog = async (): Promise<HTMLButtonElement> => {
     await renderSettings();
+    // 断开入口收进了行尾 ⋯ 菜单
+    await click(
+      container.querySelector<HTMLButtonElement>(
+        '[data-testid="provider-row-menu-oauth:openai-codex"]',
+      )!,
+    );
+    await flush();
     const opener = container.querySelector<HTMLButtonElement>(
-      '[data-testid="openai-codex-oauth-disconnect"]',
+      '[data-testid="provider-row-disconnect"]',
     );
     expect(opener, "OAuth 断开按钮必须存在（登录态）").not.toBeNull();
     opener!.focus();
@@ -532,8 +346,14 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
 
   const openDeleteDialog = async (): Promise<HTMLButtonElement> => {
     await renderSettings();
+    await click(
+      container.querySelector<HTMLButtonElement>(
+        '[data-testid="provider-row-menu-oauth:openai-codex"]',
+      )!,
+    );
+    await flush();
     const opener = container.querySelector<HTMLButtonElement>(
-      '[data-testid="oauth:openai-codex-delete"]',
+      '[data-testid="provider-row-delete-oauth:openai-codex"]',
     );
     expect(opener, "删除按钮必须存在").not.toBeNull();
     opener!.focus();
@@ -621,7 +441,7 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     const logout = deferred<void>();
     authLogout.mockReturnValue(logout.promise);
 
-    const opener = await openOauthDialog();
+    await openOauthDialog();
     expect(dialogs("alertdialog")).toHaveLength(1);
     expect(dialogs("alertdialog")[0].querySelector("h2")?.textContent).toBe(
       i18n.t("api.oauthDisconnect"),
@@ -648,7 +468,8 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     ).toHaveBeenCalledTimes(1);
     expect(useAppStore.getState().browserOcclusionIds.size).toBe(0);
     expect(releaseSpy).toHaveBeenCalledTimes(1);
-    expect(document.activeElement, "确认后焦点回到 opener").toBe(opener);
+    // 菜单项点完即卸载，关闭后焦点回到页面根节点（rootRef fallback）
+    expect(container.contains(document.activeElement)).toBe(true);
 
     await act(async () => {
       logout.resolve();
@@ -660,7 +481,7 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
   it("API Key 删除：pending 期间 disabled、遮罩/Escape 不关、不重复请求；resolve 关/reject 恢复", async () => {
     const first = deferred<{ config: AppConfig }>();
     deleteProvider.mockReturnValue(first.promise);
-    const opener = await openDeleteDialog();
+    await openDeleteDialog();
     await flush();
     expect(dialogs("alertdialog")).toHaveLength(1);
     expect(dialogs("alertdialog")[0].querySelector("h2")?.textContent).toBe(
@@ -704,7 +525,18 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     // reject：弹窗仍打开、按钮恢复可用、取消仍是关闭入口。
     const second = deferred<{ config: AppConfig }>();
     deleteProvider.mockReturnValue(second.promise);
-    await click(opener);
+    // 菜单项点一次就卸载，重开菜单再点
+    await click(
+      container.querySelector<HTMLButtonElement>(
+        '[data-testid="provider-row-menu-oauth:openai-codex"]',
+      )!,
+    );
+    await flush();
+    await click(
+      container.querySelector<HTMLButtonElement>(
+        '[data-testid="provider-row-delete-oauth:openai-codex"]',
+      )!,
+    );
     await flush();
     const confirmSecond = buttonIn(
       dialogs("alertdialog")[0],
@@ -766,14 +598,21 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
   });
 
   it("叠加：OAuth + Key 同时打开时 occlusion 2→1→0，逐层把焦点还回各层 opener", async () => {
-    const oauthOpener = await openOauthDialog();
+    await openOauthDialog();
     expect(dialogs("alertdialog")).toHaveLength(1);
 
     // 合成路径，不是真实鼠标路径：modal 期间 Radix 给 body 加 pointer-events:none，
     // 底层 OAuth 弹窗对外不可点，真实用户点不到它的「删除」。这里直接派发 click
     // 绕开指针模型，专门验证两层各自记住返回目标、关掉上层不覆写下层。
+    // 删除入口在行尾 ⋯ 菜单里：合成点击直接派发，绕开 modal 的指针模型。
+    await click(
+      container.querySelector<HTMLButtonElement>(
+        '[data-testid="provider-row-menu-oauth:openai-codex"]',
+      )!,
+    );
+    await flush();
     const deleteOpener = container.querySelector<HTMLButtonElement>(
-      '[data-testid="oauth:openai-codex-delete"]',
+      '[data-testid="provider-row-delete-oauth:openai-codex"]',
     );
     expect(deleteOpener, "删除按钮必须存在").not.toBeNull();
     await click(deleteOpener!);
@@ -813,9 +652,7 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     await flush();
     expect(dialogs("alertdialog")).toHaveLength(0);
     expect(useAppStore.getState().browserOcclusionIds.size).toBe(0);
-    expect(
-      document.activeElement,
-      "最终关闭后必须回到原 opener（共享 Ref 会在叠层时被覆写、丢给它）",
-    ).toBe(oauthOpener);
+    // 菜单项点完即卸载：最终焦点回到页面根节点，而不是已消失的 opener
+    expect(container.contains(document.activeElement)).toBe(true);
   });
 });

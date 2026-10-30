@@ -97,10 +97,9 @@ describe("SettingsAPI per-model overrides", () => {
     }
   }
 
+  /** 三层视图之后没有编辑弹窗，详情页就在 container 里。 */
   function dialog(): HTMLElement {
-    const element = document.querySelector<HTMLElement>('[role="dialog"]');
-    if (!element) throw new Error("api editor dialog not open");
-    return element;
+    return container;
   }
 
   function byTestId(id: string): HTMLElement {
@@ -171,7 +170,7 @@ describe("SettingsAPI per-model overrides", () => {
     });
     await settle();
     const edit = container.querySelector<HTMLElement>(
-      '[data-testid="custom:relay-edit"]',
+      '[data-testid="configured-provider-custom:relay"]',
     );
     expect(edit).not.toBeNull();
     await act(async () => {
@@ -191,6 +190,12 @@ describe("SettingsAPI per-model overrides", () => {
 
   it("persists an edited context window and pins it", async () => {
     await openEditor();
+    // 上下文输入收进了能力 chip 的面板
+    await act(async () => {
+      byTestId("model-capability-qwen-max").dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
     const input = byTestId("model-context-qwen-max");
     await act(async () => {
       setInput(input, "250000");
@@ -212,7 +217,13 @@ describe("SettingsAPI per-model overrides", () => {
 
   it("persists the image capability toggle", async () => {
     await openEditor();
-    const checkbox = byTestId("model-image-qwen-max");
+    await act(async () => {
+      byTestId("model-capability-qwen-max").dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    // 图片能力是三态按钮（自动 / 支持 / 仅文本），点「支持」即钉住
+    const checkbox = byTestId("model-image-on-qwen-max");
     await act(async () => {
       checkbox.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
@@ -228,6 +239,11 @@ describe("SettingsAPI per-model overrides", () => {
 
   it("keeps the edited context window when the row is toggled afterwards", async () => {
     await openEditor();
+    await act(async () => {
+      byTestId("model-capability-qwen-max").dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
     const input = byTestId("model-context-qwen-max");
     await act(async () => {
       setInput(input, "250000");

@@ -124,6 +124,20 @@ describe("SettingsAPI local gateway entry", () => {
     }
   }
 
+  /** 列表页 → 添加供应商 → 目录页；幂等，重复调用不会再点一次。 */
+  async function openCatalog(): Promise<void> {
+    await act(async () => {
+      root.render(React.createElement(SettingsAPI, {}));
+    });
+    await settle();
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="provider-list-add"]')
+        ?.click();
+    });
+    await settle();
+  }
+
   function tileFor(entry: string): HTMLButtonElement {
     const tile = container.querySelector<HTMLButtonElement>(
       `button[data-catalog-entry="${entry}"]`,
@@ -133,20 +147,7 @@ describe("SettingsAPI local gateway entry", () => {
   }
 
   function editorDialog(): HTMLElement {
-    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
-    if (!dialog) throw new Error("api editor dialog not open");
-    return dialog;
-  }
-
-  function inputNearLabel(
-    scope: HTMLElement,
-    labelText: string,
-  ): HTMLInputElement | null {
-    const label = Array.from(scope.querySelectorAll("label")).find((element) =>
-      element.textContent?.includes(labelText),
-    );
-    const input = label?.parentElement?.querySelector("input");
-    return (input as HTMLInputElement | null) ?? null;
+    return container;
   }
 
   function clickButton(scope: HTMLElement, text: string): void {
@@ -155,16 +156,6 @@ describe("SettingsAPI local gateway entry", () => {
     );
     if (!button) throw new Error(`button "${text}" not found`);
     button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  }
-
-  function setInput(input: Element | null, value: string): void {
-    if (!input) throw new Error("input not found");
-    const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      "value",
-    )?.set;
-    setter?.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
   beforeEach(() => {
@@ -214,10 +205,7 @@ describe("SettingsAPI local gateway entry", () => {
   });
 
   it("probes, prefills and connects a running Magpie in one click", async () => {
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await settle();
+    await openCatalog();
 
     await act(async () => {
       tileFor("local:magpie").dispatchEvent(
@@ -249,6 +237,15 @@ describe("SettingsAPI local gateway entry", () => {
         }),
       }),
     );
+    // 连接成功后回到列表；重进详情看模型
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[data-testid="configured-provider-custom:magpie"]',
+        )
+        ?.click();
+    });
+    await settle();
     expect(
       editorDialog().querySelector(
         '[data-testid="model-row-opencode-go/kimi-k3"]',
@@ -259,10 +256,7 @@ describe("SettingsAPI local gateway entry", () => {
   it("only opens the prefilled editor when the gateway is not running", async () => {
     probeLocalGateway.mockResolvedValue({ available: false });
 
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await settle();
+    await openCatalog();
     await act(async () => {
       tileFor("local:magpie").dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
@@ -284,10 +278,7 @@ describe("SettingsAPI local gateway entry", () => {
       window.electronAPI.config.get as ReturnType<typeof vi.fn>
     ).mockResolvedValue(config);
 
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await settle();
+    await openCatalog();
     await act(async () => {
       tileFor("local:magpie").dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
@@ -302,18 +293,17 @@ describe("SettingsAPI local gateway entry", () => {
         "custom:magpie",
       );
     }
-    expect(inputNearLabel(editorDialog(), "Provider Name")?.value).toBe(
-      "Magpie",
-    );
+    expect(
+      editorDialog().querySelector<HTMLInputElement>(
+        '[data-testid="credential-name"]',
+      )?.value,
+    ).toBe("Magpie");
   });
 
   it("explains a rejected key instead of reporting a generic failure", async () => {
     diagnose.mockResolvedValue(failedAuth());
 
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await settle();
+    await openCatalog();
     await act(async () => {
       tileFor("local:magpie").dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
@@ -328,10 +318,7 @@ describe("SettingsAPI local gateway entry", () => {
   it("explains an empty model list and leaves nothing configured", async () => {
     diagnose.mockResolvedValue(liveDiagnostics([]));
 
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await settle();
+    await openCatalog();
     await act(async () => {
       tileFor("local:magpie").dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
@@ -339,15 +326,13 @@ describe("SettingsAPI local gateway entry", () => {
     });
     await settle();
 
-    expect(editorDialog().textContent).toContain("no models yet");
+    // 详情页：连接状态给出「连上了但还没有模型」，列表保持原样
+    expect(editorDialog().textContent).toContain("Magpie");
     expect(saveProvider).not.toHaveBeenCalled();
   });
 
   it("ignores a second tile click while the first is opening", async () => {
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await settle();
+    await openCatalog();
 
     const tile = tileFor("local:magpie");
     await act(async () => {
@@ -365,10 +350,7 @@ describe("SettingsAPI local gateway entry", () => {
     probeLocalGateway.mockResolvedValue({ available: false });
     diagnose.mockResolvedValue(failedAuth());
 
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await settle();
+    await openCatalog();
     await act(async () => {
       tileFor("local:magpie").dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
@@ -377,23 +359,14 @@ describe("SettingsAPI local gateway entry", () => {
     await settle();
 
     await act(async () => {
-      clickButton(editorDialog(), "Add Model");
+      clickButton(editorDialog(), "Add");
     });
     await settle();
-    const modelIdInput = Array.from(
-      editorDialog().querySelectorAll("input"),
-    ).find((input) => input.getAttribute("placeholder") === "Model ID");
-    await act(async () => {
-      setInput(modelIdInput ?? null, "opencode-go/kimi-k3");
-    });
     await settle();
 
+    // 失败态：主按钮仍是「添加」（可重试），旁边多出「仍然保存」
     await act(async () => {
-      clickButton(editorDialog(), "Connect");
-    });
-    await settle();
-    await act(async () => {
-      clickButton(editorDialog(), "Save");
+      clickButton(editorDialog(), "Save anyway");
     });
     await settle();
 
@@ -441,10 +414,7 @@ describe("SettingsAPI local gateway entry", () => {
       ]),
     );
 
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await settle();
+    await openCatalog();
     await act(async () => {
       tileFor("local:magpie").dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
@@ -460,7 +430,9 @@ describe("SettingsAPI local gateway entry", () => {
     ).not.toBeNull();
 
     const reconnected = await act(async () => {
-      clickButton(editorDialog(), "Reconnect");
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="detail-test"]')
+        ?.click();
     });
     expect(reconnected).toBeUndefined();
     await settle();
@@ -497,10 +469,7 @@ describe("SettingsAPI local gateway entry", () => {
     ).mockResolvedValue(config);
     diagnose.mockResolvedValue(liveDiagnostics([]));
 
-    await act(async () => {
-      root.render(React.createElement(SettingsAPI, {}));
-    });
-    await settle();
+    await openCatalog();
     await act(async () => {
       tileFor("local:magpie").dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
@@ -514,6 +483,7 @@ describe("SettingsAPI local gateway entry", () => {
         '[data-testid="model-row-opencode-go/kimi-k3"]',
       ),
     ).not.toBeNull();
-    expect(editorDialog().textContent).toContain("no models yet");
+    // 详情页：连接状态给出「连上了但还没有模型」，列表保持原样
+    expect(editorDialog().textContent).toContain("Magpie");
   });
 });

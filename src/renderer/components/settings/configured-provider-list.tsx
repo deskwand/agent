@@ -1,30 +1,14 @@
-import { useTranslation } from "react-i18next";
-import type {
-  ApiProviderConfig,
-  ProviderPresets,
-  ProviderType,
-} from "../../types";
+import type { ApiProviderConfig, ProviderType } from "../../types";
 import {
   ProviderBrandIcon,
   resolveProviderBrand,
   type ProviderBrand,
 } from "./provider-icons";
 import { OAUTH_PROVIDERS } from "./provider-catalog";
-import { SettingsCard, SettingsRow } from "./shared";
-import { Button } from "../app-button";
 
 export interface ConfiguredProviderRow {
   profileKey: string;
   config: ApiProviderConfig;
-}
-
-export interface ConfiguredProviderListProps {
-  rows: ConfiguredProviderRow[];
-  presets: ProviderPresets;
-  oauthStatuses: Record<string, { loggedIn: boolean; providerName: string }>;
-  onEdit: (profileKey: string) => void;
-  onDelete: (profileKey: string) => void;
-  onDisconnect: (providerId: string) => void;
 }
 
 /**
@@ -47,16 +31,14 @@ export function oauthProviderIdForProfile(
  *
  * oauth profile 存的 `config.provider` 是合成值 `"oauth"`，它既不在预设表里、
  * 也不在 BRAND_SPECS 里，直接送进 resolveProviderBrand 只会拿到 undefined，
- * 整行就渲染成 Server 占位图。品牌只能从目录的 OAuth 条目取 —— 网格瓦片
- * 走的是同一条路（entryBrand），两处必须一致。
+ * 整行就渲染成 Server 占位图。品牌只能从目录的 OAuth 条目取。
  */
 export function rowBrand(
   profileKey: string,
   config: ApiProviderConfig,
 ): ProviderBrand | ProviderType {
   // 应用自己的云端 profile 不是品牌供应商；它的 customProtocol 是 openai，
-  // 不挡住的话会套上 OpenAI 的标。它今天被 configuredProviders 筛掉了，
-  // 这里显式挡住，免得哪天被放进来时静默画错。
+  // 不挡住的话会套上 OpenAI 的标。
   if (profileKey === "custom:deskwand") return "custom";
   if (config.localGateway === "magpie") return "magpie";
   const oauthId = oauthProviderIdForProfile(profileKey);
@@ -69,7 +51,7 @@ export function rowBrand(
   );
 }
 
-function hostOf(baseUrl?: string): string | undefined {
+export function hostOf(baseUrl?: string): string | undefined {
   if (!baseUrl) return undefined;
   try {
     return new URL(baseUrl).host;
@@ -78,92 +60,4 @@ function hostOf(baseUrl?: string): string | undefined {
   }
 }
 
-export function ConfiguredProviderList({
-  rows,
-  presets,
-  oauthStatuses,
-  onEdit,
-  onDelete,
-  onDisconnect,
-}: ConfiguredProviderListProps) {
-  const { t } = useTranslation();
-  if (rows.length === 0) return null;
-
-  return (
-    <SettingsCard>
-      {rows.map(({ profileKey, config }) => {
-        const oauthId = oauthProviderIdForProfile(profileKey);
-        const status = oauthId ? oauthStatuses[oauthId] : undefined;
-        const modelCount = config.models?.length ?? 0;
-        const oauthProvider = oauthId
-          ? OAUTH_PROVIDERS.find((p) => p.id === oauthId)
-          : undefined;
-        const displayName =
-          config.name ||
-          // oauth profile 的 provider 是 "oauth"，预设表里没有它，
-          // 名字只能从目录取；否则 config.name 为空时会显示成 "oauth"。
-          oauthProvider?.name ||
-          (config.provider === "custom"
-            ? t("api.otherProvider")
-            : (presets as unknown as Record<string, { name?: string }>)[
-                config.provider
-              ]?.name) ||
-          config.provider;
-        const source = hostOf(config.baseUrl) || displayName;
-        const subtitle = status?.loggedIn
-          ? t("api.rowSubtitleOauth", { models: modelCount })
-          : t("api.rowSubtitle", { source, models: modelCount });
-
-        return (
-          <SettingsRow
-            key={profileKey}
-            testId={`configured-provider-${profileKey}`}
-            icon={
-              <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-muted">
-                <ProviderBrandIcon
-                  brand={rowBrand(profileKey, config)}
-                  className="h-5 w-5"
-                />
-              </span>
-            }
-            title={displayName}
-            description={subtitle}
-            control={
-              <>
-                {status?.loggedIn && oauthId && (
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    data-testid={`${oauthId}-oauth-disconnect`}
-                    onClick={() => onDisconnect(oauthId)}
-                    className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground"
-                  >
-                    {t("api.oauthDisconnect")}
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  type="button"
-                  data-testid={`${profileKey}-edit`}
-                  onClick={() => onEdit(profileKey)}
-                  className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground"
-                >
-                  {t("api.editApi")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  data-testid={`${profileKey}-delete`}
-                  onClick={() => onDelete(profileKey)}
-                  className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                >
-                  {t("api.deleteApi")}
-                </Button>
-              </>
-            }
-          />
-        );
-      })}
-    </SettingsCard>
-  );
-}
+export { ProviderBrandIcon };
