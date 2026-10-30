@@ -357,28 +357,35 @@ function sanitizeDraft(
   for (const item of draft.models) {
     const id = item.id.trim();
     if (!id) continue;
+    const keepsContextWindow =
+      item.source === "custom" || item.contextWindowPinned === true;
+    const keepsInput = item.source === "custom" || item.inputPinned === true;
+    const contextWindow =
+      keepsContextWindow &&
+      typeof item.contextWindow === "number" &&
+      item.contextWindow > 0
+        ? Math.round(item.contextWindow)
+        : undefined;
+    const input =
+      keepsInput && Array.isArray(item.input) && item.input.length > 0
+        ? item.input
+        : undefined;
     deduped.set(id, {
       id,
       label: item.label.trim() || id,
       source: item.source,
-      contextWindow:
-        item.source === "custom" &&
-        typeof item.contextWindow === "number" &&
-        item.contextWindow > 0
-          ? Math.round(item.contextWindow)
-          : undefined,
+      contextWindow,
       maxTokens:
-        item.source === "custom" &&
+        keepsContextWindow &&
         typeof item.maxTokens === "number" &&
         item.maxTokens > 0
           ? Math.round(item.maxTokens)
           : undefined,
-      input:
-        item.source === "custom" &&
-        Array.isArray(item.input) &&
-        item.input.length > 0
-          ? item.input
-          : undefined,
+      input,
+      ...(contextWindow && item.contextWindowPinned
+        ? { contextWindowPinned: true }
+        : {}),
+      ...(input && item.inputPinned ? { inputPinned: true } : {}),
     });
   }
   const models = Array.from(deduped.values());
@@ -387,7 +394,11 @@ function sanitizeDraft(
     name: draft.name.trim(),
     apiKey: draft.apiKey.trim(),
     baseUrl: draft.baseUrl.trim(),
-    defaultModel: models[0]?.id || "",
+    // 保留用户选的默认模型；它已被删掉时才退回首行（以前无条件写成首行，
+    // 「保存」会静默把默认模型改掉）。
+    defaultModel: models.some((model) => model.id === draft.defaultModel)
+      ? draft.defaultModel
+      : models[0]?.id || "",
     models,
   };
 }
@@ -536,6 +547,13 @@ export function SettingsAPI({
    * 模型列表写进刚切到的计划（或被关掉的弹窗）。
    */
   const connectRequestRef = useRef(0);
+  /**
+   * 本弹窗内已经成功落过盘的 profileKey。
+   * 行编辑只在「已落盘」后才即时写回：新开的自定义供应商还没填 Key/Base URL，
+   * 不能让手填一个模型 ID 就凭空多出一个供应商条目。不查 appConfig 是因为
+   * 「连接」刚写回时 config 可能还没同步到 store（保存返回的配置以它为准）。
+   */
+  const persistedProfilesRef = useRef<Set<string>>(new Set());
   const startConnectRequest = () => {
     connectRequestRef.current += 1;
     return connectRequestRef.current;
@@ -747,6 +765,16 @@ export function SettingsAPI({
 
   const isCreating = originalProfileKey === null;
   const isCustomDraft = draft?.provider === "custom";
+  const modelFilterNeedle = modelFilter.trim().toLowerCase();
+  // 保留原始下标：行编辑按 index 定位（手工行的 id 可以是空串，不能用 id 做 key）
+  const visibleModelRows = modelRows
+    .map((row, index) => ({ row, index }))
+    .filter(
+      ({ row }) =>
+        !modelFilterNeedle ||
+        row.id.toLowerCase().includes(modelFilterNeedle) ||
+        row.label.toLowerCase().includes(modelFilterNeedle),
+    );
   const localGatewayPreset = draft?.localGateway
     ? getLocalGatewayPreset(draft.localGateway)
     : undefined;
@@ -782,6 +810,8 @@ export function SettingsAPI({
         contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
         input: model.input,
+        contextWindowPinned: model.contextWindowPinned,
+        inputPinned: model.inputPinned,
         enabled: !(provider.disabledModels ?? []).includes(model.id),
         isDefault: model.id === provider.defaultModel,
       })),
@@ -849,6 +879,7 @@ export function SettingsAPI({
         nextConfig = deleted.config;
       }
       applyConfig(nextConfig);
+      persistedProfilesRef.current.add(sanitized.profileKey);
       setSuccessMessage(t("common.saved"));
       setEditorOpen(false);
       onSaved?.();
@@ -909,6 +940,7 @@ export function SettingsAPI({
         buildProviderPayload(sanitized, models, defaultModel, disabledModels),
       );
       applyConfig(saved.config);
+      persistedProfilesRef.current.add(sanitized.profileKey);
       return true;
     } catch (saveError) {
       setConnectMessage(
@@ -918,25 +950,32 @@ export function SettingsAPI({
     }
   };
 
-  /** 勾选行 → 持久化模型（保留端点提供的元数据） */
+  /** 勾选行 → 持久化模型（保留端点提供的元数据与用户的钉住标记） */
   const rowsToModels = (
     rows: ProviderModelRow[],
     source: ApiProviderModel["source"],
   ): ApiProviderModel[] =>
-    rows.map((row) => ({
-      id: row.id,
-      label: row.label,
-      source,
-      ...(typeof row.contextWindow === "number" && row.contextWindow > 0
-        ? { contextWindow: Math.round(row.contextWindow) }
-        : {}),
-      ...(typeof row.maxTokens === "number" && row.maxTokens > 0
-        ? { maxTokens: Math.round(row.maxTokens) }
-        : {}),
-      ...(Array.isArray(row.input) && row.input.length > 0
-        ? { input: row.input }
-        : {}),
-    }));
+    rows.map((row) => {
+      const hasContextWindow =
+        typeof row.contextWindow === "number" && row.contextWindow > 0;
+      const hasInput = Array.isArray(row.input) && row.input.length > 0;
+      return {
+        id: row.id,
+        label: row.label,
+        source,
+        ...(hasContextWindow
+          ? { contextWindow: Math.round(row.contextWindow as number) }
+          : {}),
+        ...(hasContextWindow && row.contextWindowPinned
+          ? { contextWindowPinned: true }
+          : {}),
+        ...(typeof row.maxTokens === "number" && row.maxTokens > 0
+          ? { maxTokens: Math.round(row.maxTokens) }
+          : {}),
+        ...(hasInput ? { input: row.input } : {}),
+        ...(hasInput && row.inputPinned ? { inputPinned: true } : {}),
+      };
+    });
 
   const applyMergeToDraft = (merge: MergeProviderModelsResult) => {
     setDraft((prev) =>
@@ -1169,12 +1208,15 @@ export function SettingsAPI({
     disabled: string[],
   ): Promise<boolean> => {
     if (!draft) return false;
+    const enabled = rows.filter((row) => row.enabled && row.id.trim());
+    if (enabled.length === 0) return false;
     const sanitized = sanitizeDraft(draft, presets);
-    const enabled = rowsToModels(
-      rows.filter((row) => row.enabled),
-      isCustomDraft ? "custom" : "preset",
+    const ok = await persistModels(
+      sanitized,
+      rowsToModels(enabled, isCustomDraft ? "custom" : "preset"),
+      defaultModel,
+      disabled,
     );
-    const ok = await persistModels(sanitized, enabled, defaultModel, disabled);
     if (!ok) {
       setConnectMessage(t("api.modelsSyncFailed"));
     }
@@ -1190,72 +1232,127 @@ export function SettingsAPI({
     if (snapshot.draft) setDraft(snapshot.draft);
   };
 
-  const toggleModel = (id: string) => {
-    const target = modelRows.find((row) => row.id === id);
-    if (!target) return;
-    const enabledNow = modelRows.filter((row) => row.enabled).length;
-    if (target.enabled && enabledNow <= 1) {
-      setConnectMessage(t("api.atLeastOneModel"));
-      return;
-    }
-
-    const nextRows = modelRows.map((row) =>
-      row.id === id ? { ...row, enabled: !row.enabled } : row,
-    );
-    const nextEnabled = nextRows.filter((row) => row.enabled);
-    const nextDefault = nextEnabled.some(
-      (row) => row.id === draft?.defaultModel,
-    )
-      ? (draft?.defaultModel ?? "")
-      : (nextEnabled[0]?.id ?? "");
-    const nextRowsWithDefault = nextRows.map((row) => ({
+  /**
+   * 行的唯一写入口：同时更新 modelRows / draft.models / disabledModels，再按需落盘。
+   *
+   * 以前带选框的列表和手工编辑器各存一份模型（modelRows 与 draft.models），
+   * 在手工栏里改了上下文、随后再点一次勾选，`persistCurrentModels` 会用
+   * modelRows 的旧值把改动写回去 —— 用户填的数值就这样静默丢了。
+   */
+  const commitRows = (
+    nextRows: ProviderModelRow[],
+    options: { persist?: boolean } = {},
+  ): void => {
+    const enabledRows = nextRows.filter((row) => row.enabled && row.id.trim());
+    const defaultModel =
+      enabledRows.find((row) => row.isDefault)?.id ?? enabledRows[0]?.id ?? "";
+    const normalized = nextRows.map((row) => ({
       ...row,
-      isDefault: row.id === nextDefault,
+      isDefault: row.id === defaultModel && Boolean(row.id),
     }));
-    const nextDisabled = nextRowsWithDefault
-      .filter((row) => !row.enabled)
+    const disabled = normalized
+      .filter((row) => !row.enabled && row.id.trim())
       .map((row) => row.id);
-
     const snapshot = { rows: modelRows, draft };
-    setModelRows(nextRowsWithDefault);
-    setConnectMessage("");
+    setModelRows(normalized);
     setDraft((prev) =>
       prev
         ? {
             ...prev,
-            defaultModel: nextDefault,
-            disabledModels: nextDisabled,
+            defaultModel,
+            disabledModels: disabled,
             models: rowsToModels(
-              nextEnabled,
+              enabledRows,
               prev.provider === "custom" ? "custom" : "preset",
             ),
           }
         : prev,
     );
-    void persistCurrentModels(
-      nextRowsWithDefault,
-      nextDefault,
-      nextDisabled,
-    ).then((ok) => {
+    if (options.persist === false || enabledRows.length === 0) return;
+    // 还没落过盘的新配置不在这里写：manual 行属于草稿，等「连接」或「保存」再去落盘，
+    // 否则刚填一个模型 ID 就会凭空多出一个供应商条目。
+    const savedOnce =
+      Boolean(draft) &&
+      (persistedProfilesRef.current.has(draft!.profileKey) ||
+        Boolean(appConfig?.providers?.[draft!.profileKey]));
+    if (!savedOnce) return;
+    void persistCurrentModels(normalized, defaultModel, disabled).then((ok) => {
       if (!ok) restoreSnapshot(snapshot);
     });
   };
 
+  /** 只改本地行（输入过程中的每个字符），落盘交给 commitRow */
+  const patchRow = (index: number, patch: Partial<ProviderModelRow>) => {
+    setModelRows((prev) =>
+      prev.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, ...patch } : row,
+      ),
+    );
+  };
+
+  const commitRow = (index: number) => {
+    const row = modelRows[index];
+    if (!row) return;
+    commitRows(modelRows);
+  };
+
+  const addModelRow = () => {
+    setModelRows((prev) => [
+      ...prev,
+      {
+        id: "",
+        label: "",
+        isNew: true,
+        enabled: true,
+        isDefault: false,
+        manual: true,
+      },
+    ]);
+  };
+
+  const removeModelRow = (index: number) => {
+    commitRows(modelRows.filter((_, rowIndex) => rowIndex !== index));
+  };
+
+  const toggleModel = (index: number) => {
+    const target = modelRows[index];
+    if (!target) return;
+    const enabledNow = modelRows.filter(
+      (row) => row.enabled && row.id.trim(),
+    ).length;
+    if (target.enabled && enabledNow <= 1) {
+      setConnectMessage(t("api.atLeastOneModel"));
+      return;
+    }
+    setConnectMessage("");
+    commitRows(
+      modelRows.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, enabled: !row.enabled } : row,
+      ),
+    );
+  };
+
   const setDefaultModelRow = (id: string) => {
     if (!modelRows.some((row) => row.id === id && row.enabled)) return;
-    const nextRows = modelRows.map((row) => ({
-      ...row,
-      isDefault: row.id === id,
-    }));
-    const nextDisabled = nextRows
-      .filter((row) => !row.enabled)
-      .map((r) => r.id);
-    const snapshot = { rows: modelRows, draft };
-    setModelRows(nextRows);
-    setDraft((prev) => (prev ? { ...prev, defaultModel: id } : prev));
-    void persistCurrentModels(nextRows, id, nextDisabled).then((ok) => {
-      if (!ok) restoreSnapshot(snapshot);
-    });
+    commitRows(modelRows.map((row) => ({ ...row, isDefault: row.id === id })));
+  };
+
+  /** 图片能力：改完立即落盘（与勾选一致），并钉住，避免端点元数据把它改回去 */
+  const toggleRowImage = (index: number) => {
+    const row = modelRows[index];
+    if (!row) return;
+    const supportsImage = row.input?.includes("image") ?? false;
+    commitRows(
+      modelRows.map((current, rowIndex) =>
+        rowIndex === index
+          ? {
+              ...current,
+              input: supportsImage ? ["text"] : ["text", "image"],
+              inputPinned: true,
+            }
+          : current,
+      ),
+    );
   };
 
   // ── Vision model save (from modal) ──
@@ -1551,44 +1648,6 @@ export function SettingsAPI({
         );
       }
       return next;
-    });
-  };
-
-  const addModel = () => {
-    setDraft((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        models: [
-          ...current.models,
-          { id: "", label: "", source: "custom" as const },
-        ],
-      };
-    });
-  };
-
-  const updateModel = (index: number, patch: Partial<ApiProviderModel>) => {
-    setDraft((current) => {
-      if (!current) return current;
-      const models = current.models.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, ...patch } : item,
-      );
-      return { ...current, models };
-    });
-  };
-
-  const removeModel = (index: number) => {
-    setDraft((current) => {
-      if (!current) return current;
-      const removing = current.models[index];
-      const models = current.models.filter(
-        (_, itemIndex) => itemIndex !== index,
-      );
-      const defaultModel =
-        removing?.id === current.defaultModel
-          ? models[0]?.id || ""
-          : current.defaultModel;
-      return { ...current, models, defaultModel };
     });
   };
 
@@ -2993,115 +3052,27 @@ export function SettingsAPI({
                 </div>
 
                 {isCustomDraft && (
-                  <>
-                    <div className="space-y-3 border-b border-border/60 py-5">
-                      <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <Server className="h-4 w-4" />
-                        {t("api.baseUrl")}
-                      </label>
-                      <Input
-                        type="text"
-                        value={draft.baseUrl}
-                        onChange={(event) =>
-                          updateDraft({ baseUrl: event.target.value })
-                        }
-                        placeholder={
-                          modelsPresetForDraft(
-                            draft.provider,
-                            draft.customProtocol,
-                            presets,
-                          ).baseUrl
-                        }
-                        className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
-                      />
-                    </div>
-
-                    <div className="space-y-4 border-b border-border/60 py-5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-foreground">
-                          {modelRows.length > 0
-                            ? t("api.customModelsManual")
-                            : t("api.models")}
-                        </label>
-                        <Button
-                          variant="ghost"
-                          type="button"
-                          onClick={addModel}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
-                        >
-                          <Plus className="h-3 w-3" />
-                          {t("api.addCustomModel")}
-                        </Button>
-                      </div>
-
-                      {draft.models.length === 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {t("api.selectPresetModelsHint")}
-                        </p>
-                      )}
-
-                      <div className="space-y-2">
-                        {draft.models.map((item, index) => (
-                          <div
-                            key={`model-${index}`}
-                            className="flex items-center gap-2"
-                          >
-                            <Input
-                              type="text"
-                              value={item.id}
-                              onChange={(event) =>
-                                updateModel(index, {
-                                  id: event.target.value,
-                                  label: event.target.value,
-                                })
-                              }
-                              placeholder={t("api.modelId")}
-                              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
-                            />
-                            <Input
-                              type="number"
-                              value={item.contextWindow ?? ""}
-                              onChange={(event) =>
-                                updateModel(index, {
-                                  contextWindow:
-                                    event.target.value &&
-                                    Number(event.target.value) > 0
-                                      ? Math.round(Number(event.target.value))
-                                      : undefined,
-                                })
-                              }
-                              placeholder={t("api.contextWindowPlaceholder")}
-                              title={t("api.contextWindowHint")}
-                              className="w-36 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
-                            <label className="flex items-center gap-1.5 text-sm text-muted-foreground flex-shrink-0">
-                              <input
-                                type="checkbox"
-                                checked={item.input?.includes("image") ?? false}
-                                onChange={(e) =>
-                                  updateModel(index, {
-                                    input: e.target.checked
-                                      ? ["text", "image"]
-                                      : ["text"],
-                                  })
-                                }
-                                className="rounded"
-                              />
-                              {t("api.supportsImage")}
-                            </label>
-                            <Button
-                              variant="ghost"
-                              type="button"
-                              onClick={() => removeModel(index)}
-                              className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-auto"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
+                  <div className="space-y-3 border-b border-border/60 py-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Server className="h-4 w-4" />
+                      {t("api.baseUrl")}
+                    </label>
+                    <Input
+                      type="text"
+                      value={draft.baseUrl}
+                      onChange={(event) =>
+                        updateDraft({ baseUrl: event.target.value })
+                      }
+                      placeholder={
+                        modelsPresetForDraft(
+                          draft.provider,
+                          draft.customProtocol,
+                          presets,
+                        ).baseUrl
+                      }
+                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
+                    />
+                  </div>
                 )}
 
                 {connectState === "failed" && diagResult && (
@@ -3115,7 +3086,7 @@ export function SettingsAPI({
                   </div>
                 )}
 
-                {modelRows.length > 0 && (
+                {(modelRows.length > 0 || isCustomDraft) && (
                   <div className="space-y-3 border-b border-border/60 py-5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <label className="text-sm font-medium text-foreground">
@@ -3123,9 +3094,11 @@ export function SettingsAPI({
                       </label>
                       <span className="text-xs text-muted-foreground">
                         {t("api.modelsEnabledCount", {
-                          enabled: modelRows.filter((row) => row.enabled)
+                          enabled: modelRows.filter(
+                            (row) => row.enabled && row.id.trim(),
+                          ).length,
+                          total: modelRows.filter((row) => row.id.trim())
                             .length,
-                          total: modelRows.length,
                         })}
                       </span>
                     </div>
@@ -3138,62 +3111,145 @@ export function SettingsAPI({
                       className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
 
-                    <div className="max-h-72 space-y-1 overflow-y-auto">
-                      {modelRows
-                        .filter((row) => {
-                          const needle = modelFilter.trim().toLowerCase();
-                          if (!needle) return true;
-                          return (
-                            row.id.toLowerCase().includes(needle) ||
-                            row.label.toLowerCase().includes(needle)
-                          );
-                        })
-                        .map((row) => (
+                    {modelRows.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {t("api.selectPresetModelsHint")}
+                      </p>
+                    )}
+
+                    <div
+                      data-testid="model-rows"
+                      className="max-h-80 space-y-1 overflow-y-auto"
+                    >
+                      {visibleModelRows.map(({ row, index }) => {
+                        const rowKey = row.id || `manual-${index}`;
+                        const supportsImage =
+                          row.input?.includes("image") ?? false;
+                        return (
                           <div
-                            key={row.id}
-                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-hover-surface"
+                            key={`${rowKey}-${index}`}
+                            className="rounded-lg px-2 py-1.5 hover:bg-hover-surface"
                           >
-                            <input
-                              type="checkbox"
-                              data-testid={`model-row-${row.id}`}
-                              checked={row.enabled}
-                              onChange={() => toggleModel(row.id)}
-                              className="rounded"
-                            />
-                            <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                              {row.label}
-                              {row.label !== row.id && (
-                                <span className="ml-2 text-xs text-muted-foreground">
-                                  {row.id}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                data-testid={`model-row-${row.id}`}
+                                checked={row.enabled}
+                                onChange={() => toggleModel(index)}
+                                className="rounded"
+                              />
+                              {row.manual || !row.id ? (
+                                <Input
+                                  type="text"
+                                  value={row.id}
+                                  placeholder={t("api.modelId")}
+                                  data-testid={`model-id-${index}`}
+                                  onChange={(event) =>
+                                    patchRow(index, {
+                                      id: event.target.value,
+                                      label: event.target.value,
+                                    })
+                                  }
+                                  onBlur={() => commitRow(index)}
+                                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
+                                />
+                              ) : (
+                                <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                                  {row.label}
+                                  {row.label !== row.id && (
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      {row.id}
+                                    </span>
+                                  )}
                                 </span>
                               )}
-                            </span>
-                            {row.isNew && (
-                              <span className="rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary-text">
-                                {t("api.modelsNew")}
-                              </span>
-                            )}
-                            {isFreeModel({ id: row.id, label: row.label }) && (
-                              <span className="shrink-0 rounded-md border border-success/40 bg-success/10 px-1.5 py-0.5 text-[10px] text-success">
-                                {t("common.free")}
-                              </span>
-                            )}
-                            <Button
-                              variant="ghost"
-                              type="button"
-                              onClick={() => setDefaultModelRow(row.id)}
-                              disabled={!row.enabled}
-                              className={`rounded-md border px-1.5 py-0.5 text-[10px] transition-colors ${
-                                row.isDefault
-                                  ? "border-primary bg-primary/10 text-primary-text"
-                                  : "border-border/60 text-muted-foreground hover:border-border hover:text-muted-foreground"
-                              } disabled:opacity-40`}
-                            >
-                              {t("api.modelsDefault")}
-                            </Button>
+                              {row.isNew && (
+                                <span className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary-text">
+                                  {t("api.modelsNew")}
+                                </span>
+                              )}
+                              {isFreeModel({
+                                id: row.id,
+                                label: row.label,
+                              }) && (
+                                <span className="shrink-0 rounded-md border border-success/40 bg-success/10 px-1.5 py-0.5 text-[10px] text-success">
+                                  {t("common.free")}
+                                </span>
+                              )}
+                              <Button
+                                variant="ghost"
+                                type="button"
+                                onClick={() => setDefaultModelRow(row.id)}
+                                disabled={!row.enabled || !row.id.trim()}
+                                className={`rounded-md border px-1.5 py-0.5 text-[10px] transition-colors ${
+                                  row.isDefault
+                                    ? "border-primary bg-primary/10 text-primary-text"
+                                    : "border-border/60 text-muted-foreground hover:border-border hover:text-muted-foreground"
+                                } disabled:opacity-40`}
+                              >
+                                {t("api.modelsDefault")}
+                              </Button>
+                              {isCustomDraft && (
+                                <Button
+                                  variant="ghost"
+                                  type="button"
+                                  onClick={() => removeModelRow(index)}
+                                  aria-label={t("common.delete")}
+                                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-auto"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                            <div className="mt-1 flex items-center gap-2 pl-6">
+                              <Input
+                                type="number"
+                                value={row.contextWindow ?? ""}
+                                data-testid={`model-context-${row.id}`}
+                                placeholder={t("api.contextWindowPlaceholder")}
+                                title={t("api.contextWindowHint")}
+                                onChange={(event) => {
+                                  const parsed = Number(event.target.value);
+                                  patchRow(index, {
+                                    contextWindow:
+                                      event.target.value && parsed > 0
+                                        ? Math.round(parsed)
+                                        : undefined,
+                                    contextWindowPinned: Boolean(
+                                      event.target.value && parsed > 0,
+                                    ),
+                                  });
+                                }}
+                                onBlur={() => commitRow(index)}
+                                className="w-36 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 h-auto shadow-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              />
+                              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <input
+                                  type="checkbox"
+                                  data-testid={`model-image-${row.id}`}
+                                  checked={supportsImage}
+                                  onChange={() => toggleRowImage(index)}
+                                  className="rounded"
+                                />
+                                {t("api.supportsImage")}
+                              </label>
+                            </div>
                           </div>
-                        ))}
+                        );
+                      })}
                     </div>
+
+                    {isCustomDraft && (
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={addModelRow}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
+                      >
+                        <Plus className="h-3 w-3" />
+                        {t("api.addCustomModel")}
+                      </Button>
+                    )}
                   </div>
                 )}
 

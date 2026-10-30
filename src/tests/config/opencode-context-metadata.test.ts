@@ -120,3 +120,29 @@ describe("opencode context metadata end to end", () => {
     ).toBe(1000000);
   });
 });
+
+describe("user overrides survive the opencode registry rebuild", () => {
+  it("keeps a pinned context window that the registry would otherwise overwrite", async () => {
+    const { enrichProviderModelsFromRegistry } =
+      await import("../../main/config/config-store");
+    const enriched = await enrichProviderModelsFromRegistry({
+      profileKey: "opencode-go",
+      config: {
+        ...GO_PROVIDER,
+        defaultModel: "minimax-m3",
+        models: [
+          {
+            id: "minimax-m3",
+            label: "MiniMax-M3",
+            source: "preset",
+            contextWindow: 777777,
+            contextWindowPinned: true,
+          },
+        ],
+      },
+    });
+    const row = enriched.config.models.find((m) => m.id === "minimax-m3");
+    expect(row?.contextWindow).toBe(777777);
+    expect(row?.contextWindowPinned).toBe(true);
+  });
+});

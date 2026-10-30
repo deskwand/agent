@@ -92,6 +92,17 @@ export interface ApiProviderModel {
   contextWindow?: number;
   maxTokens?: number;
   input?: ("text" | "image")[];
+  /**
+   * 用户在设置里手填过该模型的上下文窗口。
+   *
+   * 没有它时，预设供应商的 contextWindow 每次加载都按注册表 / models.dev 重算
+   * （`normalizeProviderModel` 的自动解析，见 opencode-context-metadata 的
+   * 「heals a stale persisted value」——历史脏值必须能自愈）。一旦用户手动盯住
+   * 某个值，就必须压过自动探测，否则设置里改了也不生效。
+   */
+  contextWindowPinned?: boolean;
+  /** 用户手动改过该模型的图片能力；语义与 contextWindowPinned 相同。 */
+  inputPinned?: boolean;
 }
 
 export interface ApiProviderConfig {
@@ -585,17 +596,30 @@ function normalizeProviderModel(
   const label = toNonEmptyString(raw?.label) || id;
   const source = raw?.source === "custom" ? "custom" : "preset";
   const model: ApiProviderModel = { id, label, source };
-  if (source === "custom") {
-    if (typeof raw?.contextWindow === "number" && raw.contextWindow > 0) {
-      model.contextWindow = Math.round(raw.contextWindow);
-    }
-    if (typeof raw?.maxTokens === "number" && raw.maxTokens > 0) {
-      model.maxTokens = Math.round(raw.maxTokens);
-    }
-    if (Array.isArray(raw?.input) && raw.input.length > 0) {
-      model.input = raw.input;
-    }
+  // 自定义模型的元数据没有「自动探测」这一层，原样保留；预设模型只在用户钉过
+  // 对应字段时才保留，否则交给下面的自动解析重算（避免把旧目录值冻进配置）。
+  const keepsMetadata = source === "custom";
+  const keepsContextWindow = keepsMetadata || raw?.contextWindowPinned === true;
+  const keepsInput = keepsMetadata || raw?.inputPinned === true;
+  if (
+    keepsContextWindow &&
+    typeof raw?.contextWindow === "number" &&
+    raw.contextWindow > 0
+  ) {
+    model.contextWindow = Math.round(raw.contextWindow);
   }
+  if (
+    keepsContextWindow &&
+    typeof raw?.maxTokens === "number" &&
+    raw.maxTokens > 0
+  ) {
+    model.maxTokens = Math.round(raw.maxTokens);
+  }
+  if (keepsInput && Array.isArray(raw?.input) && raw.input.length > 0) {
+    model.input = raw.input;
+  }
+  if (raw?.contextWindowPinned === true) model.contextWindowPinned = true;
+  if (raw?.inputPinned === true) model.inputPinned = true;
   // Auto-resolve contextWindow for all models (preset + custom without manual override)
   if (!model.contextWindow || model.contextWindow <= 0) {
     try {
@@ -793,6 +817,37 @@ export async function enrichProviderModelsFromRegistry(
     maxTokens: m.maxTokens,
     input: m.input,
   }));
+  // 注册表重建会把用户手填的上下文/图片能力冲掉（同一个 id 走的是注册表那份）。
+  // 钉过的字段原样贴回去：否则 opencode-go 这类会在保存时被注册表自愈的供应商
+  // 上，用户在设置里改的值得不到保存。
+  const pinnedById = new Map(
+    (payload.config.models ?? [])
+      .filter(
+        (model) =>
+          model?.contextWindowPinned === true || model?.inputPinned === true,
+      )
+      .map((model) => [model.id, model]),
+  );
+  if (pinnedById.size > 0) {
+    models = models.map((model) => {
+      const pinned = pinnedById.get(model.id);
+      if (!pinned) return model;
+      const merged: ApiProviderModel = { ...model };
+      if (
+        pinned.contextWindowPinned === true &&
+        typeof pinned.contextWindow === "number" &&
+        pinned.contextWindow > 0
+      ) {
+        merged.contextWindow = Math.round(pinned.contextWindow);
+        merged.contextWindowPinned = true;
+      }
+      if (pinned.inputPinned === true && Array.isArray(pinned.input)) {
+        merged.input = pinned.input;
+        merged.inputPinned = true;
+      }
+      return merged;
+    });
+  }
   // opencode 的注册表比端点滞后：端点独有的模型（如 beam-free /
   // minimax-m3.1-flash-free）会被注册表整体替换顺手丢掉。保留它们并追加在
   // 注册表之后（注册表在前，同 id 以注册表元数据为准）。oauth 没有端点列表，

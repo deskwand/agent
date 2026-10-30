@@ -124,3 +124,67 @@ describe("mergeProviderModels", () => {
     });
   });
 });
+
+describe("mergeProviderModels keeps user overrides", () => {
+  it("prefers a saved context window over the value the endpoint reports", () => {
+    const result = mergeProviderModels({
+      catalog: [],
+      live: [{ id: "qwen-max", name: "Qwen Max", contextWindow: 131072 }],
+      saved: [
+        {
+          id: "qwen-max",
+          label: "Qwen Max",
+          source: "custom",
+          contextWindow: 200000,
+          contextWindowPinned: true,
+        },
+      ],
+      disabled: [],
+      defaultModel: "qwen-max",
+      modelSource: "custom",
+    });
+    expect(result.rows[0]?.contextWindow).toBe(200000);
+    expect(result.rows[0]?.contextWindowPinned).toBe(true);
+    expect(result.enabled[0]?.contextWindow).toBe(200000);
+    expect(result.enabled[0]?.contextWindowPinned).toBe(true);
+  });
+
+  it("prefers a saved image capability over the endpoint metadata", () => {
+    const result = mergeProviderModels({
+      catalog: [],
+      live: [{ id: "qwen-max", name: "Qwen Max", input: ["text"] }],
+      saved: [
+        {
+          id: "qwen-max",
+          label: "Qwen Max",
+          source: "custom",
+          input: ["text", "image"],
+          inputPinned: true,
+        },
+      ],
+      disabled: [],
+      defaultModel: "qwen-max",
+      modelSource: "custom",
+    });
+    expect(result.rows[0]?.input).toEqual(["text", "image"]);
+    expect(result.enabled[0]?.inputPinned).toBe(true);
+  });
+
+  it("still refreshes an unpinned preset row from the catalogue", () => {
+    const result = mergeProviderModels({
+      ...base,
+      saved: [
+        {
+          id: "claude-sonnet-4-6",
+          label: "claude-sonnet-4-6",
+          source: "preset",
+          contextWindow: 512000,
+        },
+      ],
+    });
+    // 目录行沿用已保存值（历史行为），但钉住标记不会被凭空补上
+    const row = result.rows.find((r) => r.id === "claude-sonnet-4-6");
+    expect(row?.contextWindow).toBe(512000);
+    expect(row?.contextWindowPinned).toBeUndefined();
+  });
+});

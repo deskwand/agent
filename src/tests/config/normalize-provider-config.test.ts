@@ -400,3 +400,58 @@ describe("normalizeProviderConfig — localGateway marker", () => {
     );
   });
 });
+
+// --------------- 用户手动覆盖的模型元数据 ---------------
+// 预设供应商的 contextWindow 平时由注册表 / models.dev 自动解析（见
+// opencode-context-metadata.test.ts 的「heals a stale persisted value」）。
+// 但用户在设置里手填的值必须压过自动探测，否则「配了也不生效」。
+
+describe("normalizeProviderConfig — pinned model metadata", () => {
+  const model = (extra: Record<string, unknown>) => ({
+    provider: "anthropic" as const,
+    customProtocol: "anthropic" as const,
+    apiKey: "sk-ant-test",
+    baseUrl: "https://api.anthropic.com",
+    defaultModel: "claude-sonnet-4-6",
+    models: [
+      {
+        id: "claude-sonnet-4-6",
+        label: "claude-sonnet-4-6",
+        source: "preset" as const,
+        ...extra,
+      },
+    ],
+    updatedAt: "2024-01-01T00:00:00.000Z",
+  });
+
+  it("keeps a pinned context window instead of re-resolving it", () => {
+    const result = normalizeProviderConfig(
+      "anthropic",
+      model({ contextWindow: 777777, contextWindowPinned: true }),
+    );
+    const row = result.models.find((m) => m.id === "claude-sonnet-4-6");
+    expect(row?.contextWindow).toBe(777777);
+    expect(row?.contextWindowPinned).toBe(true);
+  });
+
+  it("keeps a pinned image capability", () => {
+    const result = normalizeProviderConfig(
+      "anthropic",
+      model({ input: ["text"], inputPinned: true }),
+    );
+    const row = result.models.find((m) => m.id === "claude-sonnet-4-6");
+    expect(row?.input).toEqual(["text"]);
+    expect(row?.inputPinned).toBe(true);
+  });
+
+  it("still re-resolves an unpinned value", () => {
+    const result = normalizeProviderConfig(
+      "anthropic",
+      model({ contextWindow: 777777 }),
+    );
+    const row = result.models.find((m) => m.id === "claude-sonnet-4-6");
+    expect(row?.contextWindow).not.toBe(777777);
+    expect(row?.contextWindow).toBeGreaterThan(0);
+    expect(row?.contextWindowPinned).toBeUndefined();
+  });
+});

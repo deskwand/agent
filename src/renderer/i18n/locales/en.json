@@ -786,8 +786,7 @@
     "oauthOpenRouterDesc": "Connect via your OpenRouter account",
     "oauthOpenRouterFallbackNotice": "Connected to OpenRouter. Model sync failed, so the built-in fallback list is being used.",
     "oauthOpenRouterModelLoadError": "OpenRouter did not return any usable models.",
-    "modelsConnectHint": "Connect to fetch the model list from the endpoint",
-    "customModelsManual": "Add models manually"
+    "modelsConnectHint": "Connect to fetch the model list from the endpoint"
   },
   "window": {
     "minimize": "Minimize",

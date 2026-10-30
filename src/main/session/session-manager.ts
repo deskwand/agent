@@ -862,10 +862,28 @@ export class SessionManager {
 
     // Resolve contextWindows from model configs for each session
     const contextWindows: Record<string, number> = {};
+    // 用户在设置里钉过的值优先：会话列表 / 上下文占比条在首次发言前只有这份数据，
+    // 走自动解析会显示成注册表的旧值（看上去就是「配了不生效」）。
+    let savedProviders: AppConfig["providers"] | undefined;
+    try {
+      savedProviders = configStore.getAll().providers;
+    } catch {
+      savedProviders = undefined;
+    }
     for (const s of sessions) {
       const modelName = s.model?.trim();
       if (!modelName) continue;
       try {
+        const savedModel = s.providerProfileKey
+          ? savedProviders?.[s.providerProfileKey]?.models.find(
+              (model) => model.id === modelName,
+            )
+          : undefined;
+        const savedContextWindow = savedModel?.contextWindow;
+        if (typeof savedContextWindow === "number" && savedContextWindow > 0) {
+          contextWindows[s.id] = savedContextWindow;
+          continue;
+        }
         const providerId = s.providerProfileKey
           ? registryProviderIdForProfileKey(s.providerProfileKey)
           : undefined;

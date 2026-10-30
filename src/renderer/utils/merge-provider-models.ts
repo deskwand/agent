@@ -10,6 +10,12 @@ export interface ProviderModelRow {
   input?: ("text" | "image")[];
   enabled: boolean;
   isDefault: boolean;
+  /** 用户手填过上下文窗口（压过自动探测），见 ApiProviderModel.contextWindowPinned */
+  contextWindowPinned?: boolean;
+  /** 用户手动改过图片能力 */
+  inputPinned?: boolean;
+  /** 手工新增、尚未保存的空行（id 可编辑） */
+  manual?: boolean;
 }
 
 export interface MergeProviderModelsInput {
@@ -39,12 +45,14 @@ function withMetadata(
   const model: ApiProviderModel = { ...base };
   if (typeof row.contextWindow === "number" && row.contextWindow > 0) {
     model.contextWindow = Math.round(row.contextWindow);
+    if (row.contextWindowPinned) model.contextWindowPinned = true;
   }
   if (typeof row.maxTokens === "number" && row.maxTokens > 0) {
     model.maxTokens = Math.round(row.maxTokens);
   }
   if (Array.isArray(row.input) && row.input.length > 0) {
     model.input = row.input;
+    if (row.inputPinned) model.inputPinned = true;
   }
   return model;
 }
@@ -86,23 +94,29 @@ export function mergeProviderModels(
         contextWindow: saved?.contextWindow,
         maxTokens: saved?.maxTokens,
         input: saved?.input,
+        contextWindowPinned: saved?.contextWindowPinned,
+        inputPinned: saved?.inputPinned,
       }),
     );
   }
 
   // 2) 端点独有的追加在末尾，按 id 排序，标「新增」
+  // 已保存的元数据优先于端点上报的：用户手填的上下文不能每次刷新被端点值顶掉。
   const liveOnly = Array.from(liveById.values())
     .filter((model) => !known.has(model.id))
     .sort((left, right) => left.id.localeCompare(right.id));
   for (const model of liveOnly) {
     known.add(model.id);
+    const saved = savedById.get(model.id);
     rows.push(
       blankRow(model.id, model.name, {
         isNew: true,
         enabled: !disabled.has(model.id),
-        contextWindow: model.contextWindow,
-        maxTokens: model.maxTokens,
-        input: model.input,
+        contextWindow: saved?.contextWindow ?? model.contextWindow,
+        maxTokens: saved?.maxTokens ?? model.maxTokens,
+        input: saved?.input ?? model.input,
+        contextWindowPinned: saved?.contextWindowPinned,
+        inputPinned: saved?.inputPinned,
       }),
     );
   }
@@ -119,6 +133,8 @@ export function mergeProviderModels(
         contextWindow: model.contextWindow,
         maxTokens: model.maxTokens,
         input: model.input,
+        contextWindowPinned: model.contextWindowPinned,
+        inputPinned: model.inputPinned,
       }),
     );
   }

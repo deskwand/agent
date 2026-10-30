@@ -786,8 +786,7 @@
     "oauthOpenRouterDesc": "通过 OpenRouter 账号接入",
     "oauthOpenRouterFallbackNotice": "OpenRouter 已连接，但模型同步失败，当前已回退到内置模型列表。",
     "oauthOpenRouterModelLoadError": "OpenRouter 没有返回可用模型。",
-    "modelsConnectHint": "点击「连接」后自动获取模型列表",
-    "customModelsManual": "手动添加模型"
+    "modelsConnectHint": "点击「连接」后自动获取模型列表"
   },
   "window": {
     "minimize": "最小化",

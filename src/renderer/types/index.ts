@@ -974,6 +974,10 @@ export interface ApiProviderModel {
   contextWindow?: number;
   maxTokens?: number;
   input?: ("text" | "image")[];
+  /** 用户在设置里手填过上下文窗口：压过注册表 / models.dev 的自动探测 */
+  contextWindowPinned?: boolean;
+  /** 用户手动改过图片能力 */
+  inputPinned?: boolean;
 }
 
 export interface ApiProviderConfig {
