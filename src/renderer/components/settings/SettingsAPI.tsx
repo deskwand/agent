@@ -60,7 +60,6 @@ import {
   SettingsContentSection,
   SettingsFormSelect,
   SettingsSection,
-  SettingsSwitch,
 } from "./shared";
 import { OAUTH_PROVIDERS, type ProviderCatalogEntry } from "./provider-catalog";
 import ApiDiagnosticsPanel from "../ApiDiagnosticsPanel";
@@ -233,6 +232,19 @@ function createDraftFromProvider(
     models: config.models.map((item) => ({ ...item })),
     disabledModels: config.disabledModels ? [...config.disabledModels] : [],
     localGateway: config.localGateway,
+  };
+}
+
+/** 下拉值 → { profileKey, model }；"follow-main" 表示跟随主模型。 */
+function parseUtilitySelection(
+  value: string,
+): { profileKey: ProviderProfileKey; model: string } | null {
+  if (!value || value === "follow-main") return null;
+  const separator = value.indexOf("|");
+  if (separator <= 0) return null;
+  return {
+    profileKey: value.slice(0, separator) as ProviderProfileKey,
+    model: value.slice(separator + 1),
   };
 }
 
@@ -533,6 +545,8 @@ export function SettingsAPI({
   const [utilityMessage, setUtilityMessage] = useState<
     "saved" | "error" | null
   >(null);
+  /** 轻量任务下拉的选中值；"follow-main" = 跟随主模型 */
+  const [utilitySelection, setUtilitySelection] = useState("follow-main");
 
   // ── OAuth state ──
   const [oauthStatuses, setOAuthStatuses] = useState<
@@ -619,6 +633,12 @@ export function SettingsAPI({
       }
       if (nextConfig.utilityRuntime) {
         setUtilityDraft(nextConfig.utilityRuntime);
+        setUtilitySelection(
+          nextConfig.utilityRuntime.inheritFromActive ||
+            !nextConfig.utilityRuntime.providerProfileKey
+            ? "follow-main"
+            : `${nextConfig.utilityRuntime.providerProfileKey}|${nextConfig.utilityRuntime.model}`,
+        );
       }
       // Initialize search / webAccess state from config
       setSearchDraft(searchAddInheritedDefaults(nextConfig));
@@ -713,6 +733,34 @@ export function SettingsAPI({
       .filter((model) => !(profile.disabledModels ?? []).includes(model.id))
       .map((model) => ({ value: model.id, label: model.label }));
   }, [appConfig, visionSource]);
+
+  /**
+   * 轻量任务的选项只能是「已配置供应商的已启用模型」。
+   * OAuth 的 key 是空串（resolveUtilityModelConfig 会直接拿它发请求），零模型供应商没得选，
+   * 两者都排除。
+   */
+  const utilityModelOptions = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [
+      { value: "follow-main", label: t("api.utilityModelFollowMain") },
+    ];
+    for (const row of configuredProviders) {
+      if (row.config.provider === "oauth") continue;
+      const disabled = row.config.disabledModels ?? [];
+      const models = row.config.models.filter(
+        (model) => !disabled.includes(model.id),
+      );
+      if (models.length === 0) continue;
+      const providerName =
+        row.config.name || providerLabel(row.profileKey, presets, t);
+      for (const model of models) {
+        options.push({
+          value: `${row.profileKey}|${model.id}`,
+          label: `${providerName} / ${model.label || model.id}`,
+        });
+      }
+    }
+    return options;
+  }, [configuredProviders, presets, t]);
 
   const visionSourceCandidates = useMemo(
     () =>
@@ -2171,125 +2219,48 @@ export function SettingsAPI({
             面板壳保留，只为 a11y（role=tabpanel + aria 关联）；非当前值面板不保留状态。 */}
         <TabsContent value="utility" className="max-w-[720px] space-y-5">
           {activeTab === "utility" && !embedded && (
-            <>
-              <SettingsContentSection
-                title={t("api.utilityModelTitle")}
-                description={t("api.utilityModelDesc")}
+            <SettingsContentSection
+              title={t("api.utilityModelTitle")}
+              description={t("api.utilityModelDesc")}
+            >
+              <fieldset
+                disabled={isUtilitySaving}
+                className="m-0 min-w-0 space-y-4 border-0 p-0"
               >
-                <fieldset
-                  disabled={isUtilitySaving}
-                  className="m-0 min-w-0 space-y-4 border-0 p-0"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {t("api.utilityInheritActive")}
-                    </span>
-                    <SettingsSwitch
-                      checked={utilityDraft.inheritFromActive}
-                      onChange={(next) => {
-                        setUtilityDraft((prev) => ({
-                          ...prev,
-                          inheritFromActive: next,
-                        }));
-                        setUtilityMessage(null);
-                      }}
-                      label={t("api.utilityInheritActive")}
-                      testId="utility-inherit-active"
-                    />
-                  </div>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t("api.utilityModel")}
+                  </span>
+                  <SettingsFormSelect
+                    value={utilitySelection}
+                    onChange={(next) => {
+                      setUtilitySelection(next);
+                      setUtilityMessage(null);
+                    }}
+                    label={t("api.utilityModel")}
+                    testId="utility-model"
+                    options={utilityModelOptions}
+                  />
+                </label>
 
-                  {!utilityDraft.inheritFromActive && (
-                    <>
-                      <label className="block space-y-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {t("api.utilityProvider")}
-                        </span>
-                        <SettingsFormSelect
-                          value={utilityDraft.providerProfileKey || ""}
-                          onChange={(key) => {
-                            const profileKey = key || undefined;
-                            const profile = profileKey
-                              ? appConfig?.providers?.[profileKey]
-                              : undefined;
-                            setUtilityDraft((prev) => ({
-                              ...prev,
-                              providerProfileKey: profileKey,
-                              model: profile?.defaultModel || "",
-                            }));
-                            setUtilityMessage(null);
-                          }}
-                          label={t("api.utilityProvider")}
-                          testId="utility-provider"
-                          options={[
-                            {
-                              value: "",
-                              label: t("api.utilityProviderPlaceholder"),
-                            },
-                            ...Object.entries(
-                              appConfig?.providers || {},
-                            ).flatMap(([key, cfg]) =>
-                              cfg
-                                ? [
-                                    {
-                                      value: key,
-                                      label:
-                                        resolveProviderDisplayName(
-                                          key,
-                                          cfg.name,
-                                          t,
-                                        ) || key,
-                                    },
-                                  ]
-                                : [],
-                            ),
-                          ]}
-                        />
-                      </label>
-
-                      <label className="block space-y-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {t("api.utilityModel")}
-                        </span>
-                        <SettingsFormSelect
-                          value={utilityDraft.model || ""}
-                          onChange={(next) => {
-                            setUtilityDraft((prev) => ({
-                              ...prev,
-                              model: next,
-                            }));
-                            setUtilityMessage(null);
-                          }}
-                          label={t("api.utilityModel")}
-                          testId="utility-model"
-                          options={[
-                            {
-                              value: "",
-                              label: t("api.utilityModelPlaceholder"),
-                            },
-                            ...(
-                              appConfig?.providers?.[
-                                utilityDraft.providerProfileKey || ""
-                              ]?.models || []
-                            ).map((m) => ({
-                              value: m.id,
-                              label: m.label || m.id,
-                            })),
-                          ]}
-                        />
-                      </label>
-                    </>
-                  )}
-
+                <div className="flex items-center gap-3">
                   <Button
                     variant="ghost"
                     type="button"
+                    data-testid="utility-save"
                     onClick={async () => {
                       if (!window.electronAPI) return;
                       setIsUtilitySaving(true);
                       setUtilityMessage(null);
                       try {
+                        const picked = parseUtilitySelection(utilitySelection);
                         const saved = await window.electronAPI.config.save({
-                          utilityRuntime: utilityDraft,
+                          utilityRuntime: {
+                            inheritFromActive: !picked,
+                            providerProfileKey: picked?.profileKey,
+                            model: picked?.model ?? "",
+                            timeoutMs: utilityDraft.timeoutMs || 180000,
+                          },
                         });
                         applyConfig(saved.config);
                         setUtilityMessage("saved");
@@ -2299,7 +2270,7 @@ export function SettingsAPI({
                         setIsUtilitySaving(false);
                       }
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
+                    className="inline-flex h-auto items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                   >
                     {t("api.saveUtilityModel")}
                   </Button>
@@ -2311,9 +2282,9 @@ export function SettingsAPI({
                       {t("api.saveFailed")}
                     </p>
                   )}
-                </fieldset>
-              </SettingsContentSection>
-            </>
+                </div>
+              </fieldset>
+            </SettingsContentSection>
           )}
         </TabsContent>
       </Tabs>
