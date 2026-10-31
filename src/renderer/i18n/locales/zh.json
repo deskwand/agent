@@ -842,7 +842,8 @@
     "providerAddedNoModels": "已保存，但没拿到模型列表",
     "oauthConnected": "已登录",
     "addTitle": "添加 {{name}}",
-    "connectFailed": "连接失败"
+    "connectFailed": "连接失败",
+    "collapse": "收起"
   },
   "window": {
     "minimize": "最小化",

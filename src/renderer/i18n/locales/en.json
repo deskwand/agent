@@ -842,7 +842,8 @@
     "providerAddedNoModels": "Saved, but no model list was returned",
     "oauthConnected": "Signed in",
     "addTitle": "Add {{name}}",
-    "connectFailed": "Connection failed"
+    "connectFailed": "Connection failed",
+    "collapse": "Collapse"
   },
   "window": {
     "minimize": "Minimize",

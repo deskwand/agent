@@ -168,30 +168,36 @@ describe("视觉模型来源", () => {
     });
   });
 
-  it("来源选「单独配置」后字段就在页内，不再弹旧编辑器", async () => {
+  it("单独配置默认收起：先给摘要，点「编辑」才铺开字段", async () => {
     await openVisionTab();
     await pickOption(container, "vision-source", "manual");
     await flush();
 
-    // 老弹窗必须消失：视觉配置只在页内出现一次
+    // 没有弹窗，也不该一进来就是整张供应商配置表单
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
     expect(
-      container.querySelector('[data-testid="vision-manual-edit"]'),
+      container.querySelector('[data-testid="vision-provider-anthropic"]'),
     ).toBeNull();
+    expect(container.querySelector('input[type="password"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="vision-manual-summary"]'),
+    ).not.toBeNull();
 
-    // 供应商墙、API Key、模型都在页内
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          '[data-testid="vision-manual-toggle"]',
+        )
+        ?.click();
+    });
+    await flush();
+
+    // 展开后字段才出现，且仍在页内
     expect(
       container.querySelector('[data-testid="vision-provider-anthropic"]'),
     ).not.toBeNull();
     expect(container.querySelector('input[type="password"]')).not.toBeNull();
-
-    // 启用开关只有页内那一个（弹窗里那个已删）
-    expect(
-      container.querySelector('[data-testid="vision-model-enabled"]'),
-    ).not.toBeNull();
-    expect(
-      container.querySelector('[data-testid="vision-model-enabled-in-modal"]'),
-    ).toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it("来源关闭时保存 enabled:false，且不带 providerProfileKey", async () => {

@@ -123,8 +123,14 @@ describe("SettingsAPI Zhipu vision model", () => {
     });
     await flush();
 
-    // 来源选「单独配置」→ 字段直接出现在页内（不再有弹窗）
+    // 来源选「单独配置」→ 字段在页内；默认收起，先展开
     await pickOption(container, "vision-source", "manual");
+    await flush();
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="vision-manual-toggle"]')
+        ?.click();
+    });
     await flush();
 
     // 选择「智谱」provider（预设 name 为硬编码中文）
