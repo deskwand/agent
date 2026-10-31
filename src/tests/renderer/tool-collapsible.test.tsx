@@ -740,8 +740,10 @@ describe("ToolResultBlock 折叠壳（task-9a 专项）", () => {
     const pre = node.querySelector("pre.text-destructive");
     expect(pre).not.toBeNull();
     expect(pre!.textContent).toContain("res-error-line-39");
-    expect(pre!.className).toContain("overflow-y-auto");
-    expect(pre!.className).toContain("max-h-[300px]");
+    const clamp = node.querySelector<HTMLElement>("[data-output-clamp]")!;
+    expect(clamp.dataset.outputClamp).toBe("clamped");
+    expect(clamp.style.maxHeight).toBe("300px");
+    expect(pre!.className).not.toContain("max-h-[300px]");
   });
 
   it("附件图片仍在展开内容里渲染，非白名单 MIME 仍被过滤", async () => {
@@ -911,8 +913,10 @@ describe("ToolUseBlock 折叠壳（task-9a 专项）", () => {
       "-diff-removed-marker",
     );
     const pre = diffPanel.querySelector("pre")!;
-    expect(pre.className).toContain("overflow-y-auto");
-    expect(pre.className).toContain("max-h-[300px]");
+    const clamp = diffPanel.querySelector<HTMLElement>("[data-output-clamp]")!;
+    expect(clamp.dataset.outputClamp).toBe("clamped");
+    expect(clamp.style.maxHeight).toBe("300px");
+    expect(pre.className).not.toContain("max-h-[300px]");
     expect(diffPanel.querySelectorAll("img")).toHaveLength(1);
   });
 });
@@ -1112,9 +1116,11 @@ describe("任务 9a · BashToolBlock 折叠原语契约", () => {
 
     const node = await expand(h.container);
     expect(h.container.querySelector(".bg-destructive\\/5")).not.toBeNull();
-    // 长输出：终端正文自己带 300px 上限与滚动条
-    expect(node.innerHTML).toContain("max-h-[300px]");
-    expect(node.innerHTML).toContain("overflow-y-auto");
+    // 长输出：限高交给 OutputClamp，终端正文自己不再写 max-h
+    const clamp = node.querySelector<HTMLElement>("[data-output-clamp]")!;
+    expect(clamp.dataset.outputClamp).toBe("clamped");
+    expect(clamp.style.maxHeight).toBe("300px");
+    expect(node.innerHTML).not.toContain("max-h-[300px]");
     // 输出里的尖括号必须是被转义的文本，不能变成真元素
     expect(node.querySelector("b")).toBeNull();
     expect(node.textContent).toContain("<b>k9-raw-tag</b>");
@@ -1125,6 +1131,37 @@ describe("任务 9a · BashToolBlock 折叠原语契约", () => {
       body.click();
     });
     expect(trigger(h.container).getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("点「显示全部输出」铺开全文，点「收起输出」回到限高态", async () => {
+    const h = harness();
+    await h.render(
+      k9BashEl(K9_BASH("k9-long-output-line\n".repeat(200), false)),
+    );
+
+    const node = await expand(h.container);
+    const clamp = () => node.querySelector<HTMLElement>("[data-output-clamp]")!;
+    const button = () =>
+      Array.from(node.querySelectorAll<HTMLButtonElement>("button")).find(
+        (el) =>
+          el.textContent === "Show full output" ||
+          el.textContent === "Collapse output",
+      )!;
+
+    expect(clamp().dataset.outputClamp).toBe("clamped");
+    expect(button().textContent).toBe("Show full output");
+
+    await activate(button());
+    expect(clamp().dataset.outputClamp).toBe("full");
+    expect(clamp().style.maxHeight).toBe("");
+    expect(node.textContent).toContain("k9-long-output-line");
+    expect(button().textContent).toBe("Collapse output");
+    // 铺开不能把整块折叠掉：标题行仍是展开态
+    expect(trigger(h.container).getAttribute("aria-expanded")).toBe("true");
+
+    await activate(button());
+    expect(clamp().dataset.outputClamp).toBe("clamped");
+    expect(clamp().style.maxHeight).toBe("300px");
   });
 });
 
@@ -1199,8 +1236,10 @@ describe("任务 9a · FileToolBlock 折叠原语契约", () => {
 
     const pre = node.querySelector<HTMLElement>("pre.text-destructive")!;
     expect(pre.textContent).toContain("k9-file-error-marker");
-    expect(pre.className).toContain("max-h-[300px]");
-    expect(pre.className).toContain("overflow-y-auto");
+    const clamp = node.querySelector<HTMLElement>("[data-output-clamp]")!;
+    expect(clamp.dataset.outputClamp).toBe("clamped");
+    expect(clamp.style.maxHeight).toBe("300px");
+    expect(pre.className).not.toContain("max-h-[300px]");
     expect(node.querySelector(".animate-fade-in")).not.toBeNull();
   });
 

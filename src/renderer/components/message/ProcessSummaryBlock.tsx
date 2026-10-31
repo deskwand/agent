@@ -30,6 +30,7 @@ import {
   CollapsibleTrigger,
 } from "../ui/collapsible";
 import { NestedToolDetails } from "./NestedToolDetails";
+import { OutputClamp } from "./OutputClamp";
 import { useAppStore } from "../../store";
 import { Button } from "../app-button";
 
@@ -191,59 +192,63 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
       </div>
 
       {expanded && (
-        <CollapsibleContent className="mt-1 max-h-[400px] overflow-y-auto [scrollbar-gutter:stable] pl-5 space-y-1">
-          {block.scripts?.map((script) => (
-            <div
-              key={script.id}
-              ref={failedToolCallId === script.id ? failedItemRef : null}
-            >
-              <Collapsible>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    className="text-xs text-muted-foreground h-auto px-0 hover:bg-transparent hover:text-current"
-                  >
-                    {t("tool.grouped.scriptDetails")}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <ToolUseBlock
-                    block={{
-                      type: "tool_use",
-                      id: script.id,
-                      name: "codemode",
-                      input: script.input,
-                    }}
-                    allBlocks={allBlocks}
-                    message={message}
-                    showIcon={false}
-                  />
-                </CollapsibleContent>
-              </Collapsible>
+        <CollapsibleContent className="mt-1 [scrollbar-gutter:stable] pl-5">
+          <OutputClamp maxHeight={400}>
+            <div className="space-y-1">
+              {block.scripts?.map((script) => (
+                <div
+                  key={script.id}
+                  ref={failedToolCallId === script.id ? failedItemRef : null}
+                >
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        className="text-xs text-muted-foreground h-auto px-0 hover:bg-transparent hover:text-current"
+                      >
+                        {t("tool.grouped.scriptDetails")}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <ToolUseBlock
+                        block={{
+                          type: "tool_use",
+                          id: script.id,
+                          name: "codemode",
+                          input: script.input,
+                        }}
+                        allBlocks={allBlocks}
+                        message={message}
+                        showIcon={false}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+              ))}
+              {visibleItems.map((item) => (
+                <div
+                  key={item.id}
+                  ref={failedToolCallId === item.id ? failedItemRef : null}
+                >
+                  {item.trace ? (
+                    <NestedToolDetails
+                      item={item}
+                      allBlocks={allBlocks}
+                      message={message}
+                    />
+                  ) : (
+                    <ToolUseBlock
+                      block={item}
+                      allBlocks={allBlocks}
+                      message={message}
+                      showIcon={false}
+                    />
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-          {visibleItems.map((item) => (
-            <div
-              key={item.id}
-              ref={failedToolCallId === item.id ? failedItemRef : null}
-            >
-              {item.trace ? (
-                <NestedToolDetails
-                  item={item}
-                  allBlocks={allBlocks}
-                  message={message}
-                />
-              ) : (
-                <ToolUseBlock
-                  block={item}
-                  allBlocks={allBlocks}
-                  message={message}
-                  showIcon={false}
-                />
-              )}
-            </div>
-          ))}
+          </OutputClamp>
         </CollapsibleContent>
       )}
     </Collapsible>

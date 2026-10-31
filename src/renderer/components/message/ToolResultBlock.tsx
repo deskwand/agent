@@ -22,6 +22,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "../ui/collapsible";
+import { OutputClamp } from "./OutputClamp";
 
 // Only allow safe image MIME types for data: URI rendering
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -218,33 +219,37 @@ export const ToolResultBlock = memo(function ToolResultBlock({
               </div>
             )}
             {block.diff ? (
-              <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted leading-snug">
-                {block.diff.split("\n").map((line, i) => {
-                  const prefix = line[0];
-                  const bgClass =
-                    prefix === "+"
-                      ? "diff-add"
-                      : prefix === "-"
-                        ? "diff-del"
-                        : "text-muted-foreground";
-                  return (
-                    <div key={i} className={bgClass}>
-                      {line}
-                    </div>
-                  );
-                })}
-              </pre>
+              <OutputClamp maxHeight={300}>
+                <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 bg-muted leading-snug">
+                  {block.diff.split("\n").map((line, i) => {
+                    const prefix = line[0];
+                    const bgClass =
+                      prefix === "+"
+                        ? "diff-add"
+                        : prefix === "-"
+                          ? "diff-del"
+                          : "text-muted-foreground";
+                    return (
+                      <div key={i} className={bgClass}>
+                        {line}
+                      </div>
+                    );
+                  })}
+                </pre>
+              </OutputClamp>
             ) : (
               shouldShowOutputText && (
-                <pre
-                  className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
-                    block.isError
-                      ? "text-destructive bg-destructive/5"
-                      : "text-muted-foreground bg-muted"
-                  } ${preferImageOutput ? "mt-2" : ""}`}
-                >
-                  {block.content}
-                </pre>
+                <OutputClamp maxHeight={300}>
+                  <pre
+                    className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 ${
+                      block.isError
+                        ? "text-destructive bg-destructive/5"
+                        : "text-muted-foreground bg-muted"
+                    } ${preferImageOutput ? "mt-2" : ""}`}
+                  >
+                    {block.content}
+                  </pre>
+                </OutputClamp>
               )
             )}
             {!preferImageOutput && hasImages && (

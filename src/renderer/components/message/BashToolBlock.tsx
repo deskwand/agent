@@ -23,6 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "../ui/collapsible";
+import { OutputClamp } from "./OutputClamp";
 
 interface BashToolBlockProps {
   block: ToolUseContent;
@@ -217,9 +218,11 @@ export const BashToolBlock = memo(function BashToolBlock({
                 <Loader2 className="w-3 h-3 animate-spin text-primary-text" />
                 {t("tool.sectionStreaming")}
               </div>
-              <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted">
-                {partialToolResult.content}
-              </pre>
+              <OutputClamp maxHeight={300}>
+                <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 bg-muted">
+                  {partialToolResult.content}
+                </pre>
+              </OutputClamp>
             </div>
           )}
 
@@ -258,10 +261,12 @@ export const BashToolBlock = memo(function BashToolBlock({
 
                 {/* Output with ANSI coloring (fg applied by ansi-to-html converter) */}
                 {outputHtml ? (
-                  <div
-                    className="whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto"
-                    dangerouslySetInnerHTML={{ __html: outputHtml }}
-                  />
+                  <OutputClamp maxHeight={300}>
+                    <div
+                      className="whitespace-pre-wrap break-all"
+                      dangerouslySetInnerHTML={{ __html: outputHtml }}
+                    />
+                  </OutputClamp>
                 ) : (
                   <div
                     className="italic"

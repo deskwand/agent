@@ -23,6 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "../ui/collapsible";
+import { OutputClamp } from "./OutputClamp";
 
 interface FileToolBlockProps {
   block: ToolUseContent;
@@ -280,11 +281,13 @@ export const FileToolBlock = memo(function FileToolBlock({
             {/* Content area */}
             <div className="px-3 pb-3">
               {isError ? (
-                <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto text-destructive bg-destructive/5">
-                  {typeof toolResult?.content === "string"
-                    ? toolResult.content
-                    : ""}
-                </pre>
+                <OutputClamp maxHeight={300}>
+                  <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 text-destructive bg-destructive/5">
+                    {typeof toolResult?.content === "string"
+                      ? toolResult.content
+                      : ""}
+                  </pre>
+                </OutputClamp>
               ) : displayContent ? (
                 <CodeBlock language={lang}>{displayContent}</CodeBlock>
               ) : (

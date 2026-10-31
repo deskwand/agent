@@ -1817,6 +1817,8 @@
     "bashExitCode": "exit {{code}}",
     "bashRunning": "Running...",
     "bashNoOutput": "(no output)",
+    "showFullOutput": "Show full output",
+    "collapseOutput": "Collapse output",
     "readReading": "Reading...",
     "readEmptyFile": "(empty file)",
     "actionTextToSpeech": "text to speech",

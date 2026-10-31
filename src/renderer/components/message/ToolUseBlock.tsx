@@ -40,6 +40,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "../ui/collapsible";
+import { OutputClamp } from "./OutputClamp";
 
 /**
  * 输出要按「元信息头 + Markdown 正文」拆开渲染的子代理工具。
@@ -526,9 +527,11 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     </div>
                     {typeof toolInput.message === "string" &&
                       toolInput.message.length > 0 && (
-                        <div className="mt-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-2.5 text-muted-foreground">
-                          {toolInput.message}
-                        </div>
+                        <OutputClamp maxHeight={200}>
+                          <div className="mt-1 whitespace-pre-wrap rounded-lg bg-muted p-2.5 text-muted-foreground">
+                            {toolInput.message}
+                          </div>
+                        </OutputClamp>
                       )}
                   </div>
                 ) : (
@@ -552,9 +555,11 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     <Loader2 className="w-3 h-3 animate-spin text-primary-text" />
                     {t("tool.sectionStreaming")}
                   </div>
-                  <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted">
-                    {partialToolResult.content}
-                  </pre>
+                  <OutputClamp maxHeight={300}>
+                    <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 bg-muted">
+                      {partialToolResult.content}
+                    </pre>
+                  </OutputClamp>
                 </div>
               )}
 
@@ -581,53 +586,61 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     </div>
                   ))}
                 {toolResult.diff ? (
-                  <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted leading-snug">
-                    {toolResult.diff.split("\n").map((line, i) => {
-                      const prefix = line[0];
-                      const bgClass =
-                        prefix === "+"
-                          ? "diff-add"
-                          : prefix === "-"
-                            ? "diff-del"
-                            : "text-muted-foreground";
-                      return (
-                        <div key={i} className={bgClass}>
-                          {line}
-                        </div>
-                      );
-                    })}
-                  </pre>
+                  <OutputClamp maxHeight={300}>
+                    <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 bg-muted leading-snug">
+                      {toolResult.diff.split("\n").map((line, i) => {
+                        const prefix = line[0];
+                        const bgClass =
+                          prefix === "+"
+                            ? "diff-add"
+                            : prefix === "-"
+                              ? "diff-del"
+                              : "text-muted-foreground";
+                        return (
+                          <div key={i} className={bgClass}>
+                            {line}
+                          </div>
+                        );
+                      })}
+                    </pre>
+                  </OutputClamp>
                 ) : (isWebSearchTool || isAgentTool || isSubagentOutputTool) &&
                   typeof toolResult.content === "string" ? (
-                  <div className="text-xs text-muted-foreground max-h-[400px] overflow-y-auto">
-                    {subagentOutput?.header && (
-                      <div className="mb-2 whitespace-pre-wrap rounded-lg bg-muted p-2.5">
-                        {subagentOutput.header}
-                      </div>
-                    )}
-                    {subagentOutput ? (
-                      subagentOutput.body && (
-                        <MessageMarkdown normalizedText={subagentOutput.body} />
-                      )
-                    ) : (
-                      <MessageMarkdown
-                        normalizedText={agentResultText ?? toolResult.content}
-                      />
-                    )}
-                  </div>
+                  <OutputClamp maxHeight={400}>
+                    <div className="text-xs text-muted-foreground">
+                      {subagentOutput?.header && (
+                        <div className="mb-2 whitespace-pre-wrap rounded-lg bg-muted p-2.5">
+                          {subagentOutput.header}
+                        </div>
+                      )}
+                      {subagentOutput ? (
+                        subagentOutput.body && (
+                          <MessageMarkdown
+                            normalizedText={subagentOutput.body}
+                          />
+                        )
+                      ) : (
+                        <MessageMarkdown
+                          normalizedText={agentResultText ?? toolResult.content}
+                        />
+                      )}
+                    </div>
+                  </OutputClamp>
                 ) : (
                   shouldShowOutputText && (
-                    <pre
-                      className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
-                        isError
-                          ? "text-destructive bg-destructive/5"
-                          : "text-muted-foreground bg-muted"
-                      } ${preferImageOutput ? "mt-2" : ""}`}
-                    >
-                      {isVisionDescribe && visionDescriptionText !== null
-                        ? visionDescriptionText
-                        : toolResult.content}
-                    </pre>
+                    <OutputClamp maxHeight={300}>
+                      <pre
+                        className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 ${
+                          isError
+                            ? "text-destructive bg-destructive/5"
+                            : "text-muted-foreground bg-muted"
+                        } ${preferImageOutput ? "mt-2" : ""}`}
+                      >
+                        {isVisionDescribe && visionDescriptionText !== null
+                          ? visionDescriptionText
+                          : toolResult.content}
+                      </pre>
+                    </OutputClamp>
                   )
                 )}
                 {!preferImageOutput &&
