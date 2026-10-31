@@ -820,7 +820,6 @@
     "visionModelLabel": "模型",
     "sourceOff": "关闭",
     "sourceConfigured": "已配置供应商",
-    "sourceCustom": "单独配置…",
     "catalogTitle": "添加供应商",
     "saveAnyway": "仍然保存",
     "testConnectionOnly": "只验证，不改配置",
@@ -843,7 +842,9 @@
     "oauthConnected": "已登录",
     "addTitle": "添加 {{name}}",
     "connectFailed": "连接失败",
-    "collapse": "收起"
+    "collapse": "收起",
+    "sourceLegacy": "手工配置（旧）",
+    "visionLegacyNotice": "当前是手工配置的 {{provider}} / {{model}}。它只能沿用或替换：选一个已配置供应商即可换掉。"
   },
   "window": {
     "minimize": "最小化",

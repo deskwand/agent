@@ -820,7 +820,6 @@
     "visionModelLabel": "Model",
     "sourceOff": "Off",
     "sourceConfigured": "Configured provider",
-    "sourceCustom": "Configure manually…",
     "catalogTitle": "Add provider",
     "saveAnyway": "Save anyway",
     "testConnectionOnly": "Checks only, changes nothing",
@@ -843,7 +842,9 @@
     "oauthConnected": "Signed in",
     "addTitle": "Add {{name}}",
     "connectFailed": "Connection failed",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "sourceLegacy": "Manual (legacy)",
+    "visionLegacyNotice": "The current vision model is a manual {{provider}} / {{model}} setup. It can only be kept or replaced: pick a configured provider to replace it."
   },
   "window": {
     "minimize": "Minimize",

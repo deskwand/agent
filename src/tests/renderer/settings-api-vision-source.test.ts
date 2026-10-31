@@ -168,36 +168,70 @@ describe("视觉模型来源", () => {
     });
   });
 
-  it("单独配置默认收起：先给摘要，点「编辑」才铺开字段", async () => {
+  it("页面里没有手填表单：来源只有关闭与已配置供应商", async () => {
     await openVisionTab();
-    await pickOption(container, "vision-source", "manual");
-    await flush();
 
-    // 没有弹窗，也不该一进来就是整张供应商配置表单
-    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    const { openMenu } = await import("./settings-menu-helper");
+    await openMenu(container, "vision-source");
+    const optionIds = Array.from(
+      document.querySelectorAll('[data-testid^="vision-source-option-"]'),
+    ).map((node) => node.getAttribute("data-testid"));
+    expect(optionIds).not.toContain("vision-source-option-manual");
+    expect(optionIds).toContain("vision-source-option-off");
+    expect(optionIds).toContain("vision-source-option-profile:deepseek");
+
+    // 任何状态下都不渲染供应商墙 / API Key 输入
     expect(
       container.querySelector('[data-testid="vision-provider-anthropic"]'),
     ).toBeNull();
     expect(container.querySelector('input[type="password"]')).toBeNull();
-    expect(
-      container.querySelector('[data-testid="vision-manual-summary"]'),
-    ).not.toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("旧的手工配置不丢失：给一条只读来源，保存时原样写回", async () => {
+    const legacy = buildConfig({
+      isConfigured: true,
+      visionModel: {
+        enabled: true,
+        provider: "deepseek",
+        apiKey: "sk-legacy",
+        baseUrl: "https://api.deepseek.com/v1",
+        model: "deepseek-flash",
+      },
+    });
+    (
+      window.electronAPI.config.get as unknown as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(legacy);
+    useAppStore.setState({ appConfig: legacy, isConfigured: true });
+
+    await openVisionTab();
+
+    // 只读提示：说清当前是旧手工配置、怎么替换
+    expect(container.textContent).toContain(
+      i18n.t("api.visionLegacyNotice", {
+        provider: "DeepSeek",
+        model: "deepseek-flash",
+      }),
+    );
+    expect(container.querySelector('input[type="password"]')).toBeNull();
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>(
-          '[data-testid="vision-manual-toggle"]',
-        )
+        .querySelector<HTMLButtonElement>('[data-testid="vision-save"]')
         ?.click();
     });
     await flush();
 
-    // 展开后字段才出现，且仍在页内
-    expect(
-      container.querySelector('[data-testid="vision-provider-anthropic"]'),
-    ).not.toBeNull();
-    expect(container.querySelector('input[type="password"]')).not.toBeNull();
-    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    const payload = save.mock.calls[0][0] as {
+      visionModel: {
+        enabled: boolean;
+        providerProfileKey?: string;
+        apiKey: string;
+      };
+    };
+    expect(payload.visionModel.enabled).toBe(true);
+    expect(payload.visionModel.providerProfileKey).toBeUndefined();
+    expect(payload.visionModel.apiKey).toBe("sk-legacy");
   });
 
   it("来源关闭时保存 enabled:false，且不带 providerProfileKey", async () => {

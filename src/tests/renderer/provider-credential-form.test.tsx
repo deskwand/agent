@@ -129,6 +129,19 @@ describe("凭证表单", () => {
     expect(container.textContent).toContain(i18n.t("api.enterApiKey"));
   });
 
+  it("智谱条目可选站点，切换后 Base URL 跟着变", () => {
+    const zhipu: ProviderCatalogEntry = { kind: "provider", id: "zhipu" };
+    render({ entry: zhipu });
+    const baseUrl = byTestId<HTMLInputElement>("credential-base-url")!;
+    expect(baseUrl.value).toContain("open.bigmodel.cn");
+
+    act(() => byTestId<HTMLButtonElement>("credential-region-global")!.click());
+    expect(byTestId<HTMLInputElement>("credential-base-url")!.value).toContain(
+      "z.ai",
+    );
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+  });
+
   it("secondaryAction 渲染成次要按钮并回调", () => {
     const onClick = vi.fn();
     render({
