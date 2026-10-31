@@ -1,8 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-index 11ab140..9c80a99 100644
+index 8728a3e..376b386 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -802,7 +802,10 @@ export class AgentSession {
+@@ -800,7 +800,10 @@ export class AgentSession {
          if (this._agentRunAbortRequested)
              return false;
          const settings = this.settingsManager.getRetrySettings();
@@ -14,7 +14,7 @@ index 11ab140..9c80a99 100644
              return false;
          }
          for (let i = event.messages.length - 1; i >= 0; i--) {
-@@ -3064,7 +3067,7 @@ export class AgentSession {
+@@ -3093,7 +3096,7 @@ export class AgentSession {
              return false;
          }
          this._retryAttempt++;
@@ -24,7 +24,7 @@ index 11ab140..9c80a99 100644
              this._retryAttempt--;
              return false;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-index f9292e8..7947b31 100644
+index eb2bd28..3f9728c 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 @@ -39,16 +39,186 @@ function getAliases() {
@@ -221,7 +221,7 @@ index f9292e8..7947b31 100644
      };
      const piCodingAgentEntry = packageIndex;
      const piAgentCoreEntry = resolveWorkspaceOrImport("agent/dist/index.js", "@earendil-works/pi-agent-core");
-@@ -81,6 +251,7 @@ function getAliases() {
+@@ -84,6 +254,7 @@ function getAliases() {
          "@sinclair/typebox/compile": typeboxCompileEntry,
          "@sinclair/typebox/value": typeboxValueEntry,
      };

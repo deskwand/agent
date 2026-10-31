@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as PiCompat from "@earendil-works/pi-ai/compat";
 import type { SaveProviderPayload } from "../../main/config/config-store";
 
 const mocks = vi.hoisted(() => ({
@@ -184,6 +185,54 @@ describe("OAuth provider SDK model catalogs", () => {
       config.providers["oauth:openai-codex"]?.models.map((model) => model.id),
     ).toEqual(["gpt-6-astra", "gpt-5.6-sol"]);
   });
+
+  it.each(["gpt-5.5", "gpt-5.3-codex-spark"])(
+    "replaces the retired Codex default %s using the installed SDK catalog",
+    async (retiredModel) => {
+      const { getModels } = await vi.importActual<typeof PiCompat>(
+        "@earendil-works/pi-ai/compat",
+      );
+      const catalog = getModels("openai-codex");
+      expect(catalog.length).toBeGreaterThan(0);
+      expect(catalog.map((model) => model.id)).not.toContain(retiredModel);
+      mocks.getModels.mockReturnValue(catalog);
+      const original = oauthPayload("openai-codex", retiredModel).config;
+      const apiKeyProfile = {
+        provider: "openai",
+        apiKey: "profile-key",
+        baseUrl: "https://api.openai.com/v1",
+        defaultModel: "gpt-5.4",
+        models: [{ id: "gpt-5.4", label: "GPT-5.4", source: "preset" }],
+        updatedAt: "2026-09-12T00:00:00.000Z",
+      };
+      mocks.seed = {
+        activeProviderKey: "oauth:openai-codex",
+        providers: {
+          "oauth:openai-codex": {
+            ...original,
+            models: [
+              { id: retiredModel, label: retiredModel, source: "preset" },
+            ],
+          },
+          openai: apiKeyProfile,
+        },
+      };
+      const store = new ConfigStore();
+      const before = store.getAll().providers.openai;
+
+      await store.syncOAuthProviderModelsFromRegistry();
+
+      const config = store.getAll();
+      expect(config.activeProviderKey).toBe("oauth:openai-codex");
+      expect(config.providers["oauth:openai-codex"]?.defaultModel).toBe(
+        catalog[0].id,
+      );
+      expect(
+        config.providers["oauth:openai-codex"]?.models.map((model) => model.id),
+      ).toEqual(catalog.map((model) => model.id));
+      expect(config.providers.openai).toEqual(before);
+    },
+  );
 
   it("retains a failed catalog while synchronizing later OAuth profiles", async () => {
     const originalCopilotModels = [

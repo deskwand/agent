@@ -41,18 +41,23 @@ describe("resolveModelContextWindow — provider aware", () => {
   it("falls back to models.dev when the registry is stale", () => {
     getModelsDevContextWindowMock.mockReturnValue(1000000);
     expect(
-      resolveModelContextWindow("minimax-m3.1-flash-free", "opencode-go"),
+      resolveModelContextWindow(
+        "deskwand-endpoint-only-test-model",
+        "opencode-go",
+      ),
     ).toBe(1000000);
     expect(getModelsDevContextWindowMock).toHaveBeenCalledWith(
       "opencode-go",
-      "minimax-m3.1-flash-free",
+      "deskwand-endpoint-only-test-model",
     );
   });
 
   it("does not consult the catalog without a provider", () => {
     getModelsDevContextWindowMock.mockReturnValue(1000000);
     // custom / 未知 profile 没有注册表 provider，目录里也无从命中
-    expect(resolveModelContextWindow("minimax-m3.1-flash-free")).toBe(0);
+    expect(resolveModelContextWindow("deskwand-endpoint-only-test-model")).toBe(
+      0,
+    );
     expect(getModelsDevContextWindowMock).not.toHaveBeenCalled();
   });
 

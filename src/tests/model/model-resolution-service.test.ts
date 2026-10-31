@@ -362,15 +362,17 @@ describe("ModelResolutionService", () => {
     expect(result.piModel.input).toEqual(["text"]);
   });
 
-  it("resolves the cloud vision model from the registry", async () => {
+  it("preserves the cloud vision model when it is absent from the registry", async () => {
     const result = await service.resolve({
       sessionProviderProfileKey: "custom:deskwand",
       sessionModel: "deepseek-v4-flash-vision-exp",
       appConfig: withDeskWandCloudProfile(buildAppConfig()),
     });
 
-    // 能力位（["text","image"]）由 dialect 文件那条用例钉住，这里只验证走的是注册表分支
-    expect(result.trace.piModelSource).toBe("registry");
+    // Pi 1.4.0 no longer catalogs this endpoint-specific model.
+    expect(result.trace.piModelSource).toBe("synthetic");
+    expect(result.piModel.id).toBe("deepseek-v4-flash-vision-exp");
+    expect(result.piModel.baseUrl).toBe("https://api.deskwand.com/api/models");
   });
 
   it("lets an explicitly declared image capability win over the text-only table", async () => {
@@ -404,11 +406,11 @@ describe("ModelResolutionService — models.dev fallback for endpoint-only model
           customProtocol: "openai",
           apiKey: "sk-test",
           baseUrl: "https://opencode.ai/inference/go/v1",
-          defaultModel: "minimax-m3.1-flash-free",
+          defaultModel: "deskwand-endpoint-only-test-model",
           models: [
             {
-              id: "minimax-m3.1-flash-free",
-              label: "minimax-m3.1-flash-free",
+              id: "deskwand-endpoint-only-test-model",
+              label: "deskwand-endpoint-only-test-model",
               source: "preset",
             },
           ],
@@ -450,7 +452,7 @@ describe("ModelResolutionService — models.dev fallback for endpoint-only model
 
     const resolved = await service.resolve({
       sessionProviderProfileKey: "opencode-go",
-      sessionModel: "minimax-m3.1-flash-free",
+      sessionModel: "deskwand-endpoint-only-test-model",
       appConfig: appConfigWithOpencodeGo(),
     });
 
@@ -466,7 +468,7 @@ describe("ModelResolutionService — models.dev fallback for endpoint-only model
 
     const resolved = await service.resolve({
       sessionProviderProfileKey: "opencode-go",
-      sessionModel: "minimax-m3.1-flash-free",
+      sessionModel: "deskwand-endpoint-only-test-model",
       appConfig: appConfigWithOpencodeGo(),
     });
 
