@@ -1384,6 +1384,17 @@
   animation: menu-in-down var(--motion-fast) var(--ease-ui-out);
 }
 
+/* 右栏面板入场。宽度过渡由 panelWidthTransitionClass 负责，这一层只补「内容自己
+   淡进来」——四块面板共用同一个类。
+
+   刻意复用 `fade-in` 而不另写一条关键帧：两者行为完全一样，多一套名字就是动效策略
+   要防的漂移。也刻意只动 opacity（`fade-in` 本身就只有 opacity）：ReviewPanel 的
+   全屏态是 `fixed inset-0`，而 isFullscreen 是保活组件里的 state ⇒ 重开一个曾经全屏
+   过的 review 会在入场动画期间带着 transform 的祖先下重排全屏层。 */
+.animate-panel-in {
+  animation: fade-in var(--motion-standard) var(--ease-ui-out);
+}
+
 /* ================================================================
    Magic Effects — opt-in utility classes (compositor-only, 60fps)
    ================================================================ */
@@ -1526,7 +1537,8 @@
   .animate-toast-in-top,
   .animate-toast-in-bottom,
   .animate-menu-in-up,
-  .animate-menu-in-down {
+  .animate-menu-in-down,
+  .animate-panel-in {
     animation-name: fade-in !important;
     animation-duration: var(--motion-fast) !important;
     transform: none !important;

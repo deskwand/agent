@@ -27,6 +27,7 @@ import type { EmotionSignal } from "../shared/voice-emotion";
 
 import { useWindowSize } from "./hooks/useWindowSize";
 import { Sidebar } from "./components/Sidebar";
+import { RightPanelSlot } from "./components/right-panel-slot";
 import { AppRail } from "./components/AppRail";
 import { isSidebarAllowed } from "./utils/nav-rail";
 import { ResizeHandle } from "./components/ResizeHandle";
@@ -503,18 +504,6 @@ function App() {
   const overviewPanelActive =
     rightPanelVisible && rightPanelMode === "overview";
 
-  // 访问过的面板：首次打开后一直挂载，之后只切可见性（React 18 没有 <Activity>，
-  // 用 hidden 实现「隐藏但保活」；每块面板的状态因此不会在切换时丢失）
-  const [visitedPanels, setVisitedPanels] = useState<Set<string>>(
-    () => new Set(),
-  );
-  useEffect(() => {
-    if (!rightPanelMode || rightPanelMode === "browser") return;
-    setVisitedPanels((prev) =>
-      prev.has(rightPanelMode) ? prev : new Set(prev).add(rightPanelMode),
-    );
-  }, [rightPanelMode]);
-
   // 拖动分隔条期间必须去掉面板的宽度过渡：过渡会把每一帧的宽度变化再延迟 300ms，
   // 面板永远追不上光标，松手后还要自己滑一段。折叠/展开仍然需要这条过渡，
   // 所以只由拖动状态开关，不删除过渡本身。
@@ -783,80 +772,58 @@ function App() {
               </PanelErrorBoundary>
             )}
 
-            {visitedPanels.has("preview") && (
-              <div
-                className={
-                  rightPanelMode === "preview"
-                    ? "flex flex-1 min-w-0"
-                    : "hidden"
-                }
+            <RightPanelSlot active={previewPanelActive}>
+              {/* 预览的显示条件由 mode 改成了 previewPanelActive（多了 rightPanelVisible）：
+                  整页视图/配置弹窗下容器本来就是 w-0 + overflow-hidden，没有视觉差别。 */}
+              <PanelErrorBoundary
+                name="FilePreviewPanel"
+                resetKey={activePreviewTab ?? undefined}
+                fallback={<div className="flex-1 bg-muted" />}
               >
-                <PanelErrorBoundary
-                  name="FilePreviewPanel"
-                  resetKey={activePreviewTab ?? undefined}
-                  fallback={<div className="flex-1 bg-muted" />}
-                >
-                  <Suspense fallback={<div className="flex-1 bg-muted" />}>
-                    <FilePreviewPanel visible={previewPanelActive} />
-                  </Suspense>
-                </PanelErrorBoundary>
-              </div>
-            )}
+                <Suspense fallback={<div className="flex-1 bg-muted" />}>
+                  <FilePreviewPanel visible={previewPanelActive} />
+                </Suspense>
+              </PanelErrorBoundary>
+            </RightPanelSlot>
 
-            {visitedPanels.has("review") && (
-              <div
-                className={reviewPanelActive ? "flex flex-1 min-w-0" : "hidden"}
+            <RightPanelSlot active={reviewPanelActive}>
+              <PanelErrorBoundary
+                name="ReviewPanel"
+                resetKey={activeSessionId ?? undefined}
+                fallback={<div className="flex-1 bg-muted" />}
               >
-                <PanelErrorBoundary
-                  name="ReviewPanel"
-                  resetKey={activeSessionId ?? undefined}
-                  fallback={<div className="flex-1 bg-muted" />}
-                >
-                  <Suspense fallback={<div className="flex-1 bg-muted" />}>
-                    <ReviewPanel
-                      key={activeSessionId ?? "none"}
-                      visible={reviewPanelActive}
-                    />
-                  </Suspense>
-                </PanelErrorBoundary>
-              </div>
-            )}
+                <Suspense fallback={<div className="flex-1 bg-muted" />}>
+                  <ReviewPanel
+                    key={activeSessionId ?? "none"}
+                    visible={reviewPanelActive}
+                  />
+                </Suspense>
+              </PanelErrorBoundary>
+            </RightPanelSlot>
 
-            {visitedPanels.has("overview") && (
-              <div
-                className={
-                  overviewPanelActive ? "flex flex-1 min-w-0" : "hidden"
-                }
+            <RightPanelSlot active={overviewPanelActive}>
+              <PanelErrorBoundary
+                name="SessionOverviewPanel"
+                fallback={<div className="flex-1 bg-background" />}
               >
-                <PanelErrorBoundary
-                  name="SessionOverviewPanel"
-                  fallback={<div className="flex-1 bg-background" />}
-                >
-                  <Suspense fallback={<div className="flex-1 bg-background" />}>
-                    <SessionOverviewPanel visible={overviewPanelActive} />
-                  </Suspense>
-                </PanelErrorBoundary>
-              </div>
-            )}
+                <Suspense fallback={<div className="flex-1 bg-background" />}>
+                  <SessionOverviewPanel visible={overviewPanelActive} />
+                </Suspense>
+              </PanelErrorBoundary>
+            </RightPanelSlot>
 
-            {visitedPanels.has("files") && (
-              <div
-                className={
-                  rightPanelVisible && rightPanelMode === "files"
-                    ? "flex flex-1 min-w-0"
-                    : "hidden"
-                }
+            <RightPanelSlot
+              active={rightPanelVisible && rightPanelMode === "files"}
+            >
+              <PanelErrorBoundary
+                name="FileBrowser"
+                fallback={<div className="flex-1 bg-muted" />}
               >
-                <PanelErrorBoundary
-                  name="FileBrowser"
-                  fallback={<div className="flex-1 bg-muted" />}
-                >
-                  <Suspense fallback={<div className="flex-1 bg-muted" />}>
-                    <FileBrowser width={panelWidth} />
-                  </Suspense>
-                </PanelErrorBoundary>
-              </div>
-            )}
+                <Suspense fallback={<div className="flex-1 bg-muted" />}>
+                  <FileBrowser width={panelWidth} />
+                </Suspense>
+              </PanelErrorBoundary>
+            </RightPanelSlot>
           </div>
         </div>
       )}
