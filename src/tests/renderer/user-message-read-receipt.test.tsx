@@ -2,6 +2,8 @@
 import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "../../renderer/i18n/config";
 import { MessageCard } from "../../renderer/components/MessageCard";
@@ -87,5 +89,20 @@ describe("user message read receipt", () => {
     expect(
       container.querySelector('[aria-label="Copy message"]'),
     ).not.toBeNull();
+  });
+
+  it("colors the ring with theme tokens, not the fixed success green", () => {
+    // `--success` 是「固定语义层」，8 套主题共用一个绿，在单色聊天区里会跳
+    // 出画面。这条锁住：已读/未读都用随主题变的 foreground / muted-foreground。
+    const src = readFileSync(
+      path.join(
+        __dirname,
+        "../../renderer/components/message/ReadReceiptRing.tsx",
+      ),
+      "utf-8",
+    );
+    expect(src).not.toContain("text-success");
+    expect(src).toContain("text-foreground/70");
+    expect(src).toContain("text-muted-foreground/75");
   });
 });
