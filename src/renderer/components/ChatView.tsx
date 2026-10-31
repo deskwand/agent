@@ -13,6 +13,7 @@ import {
   useSessionExecutionClock,
   useSessionMessages,
   useSessionPartialMessage,
+  useSessionPartialThinking,
   useSessionPendingTurns,
 } from "../store/selectors";
 import {
@@ -98,6 +99,7 @@ import {
   type ChatInputSubmitData,
 } from "./ChatInput";
 import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
+import { findLatestUserMessage, resolveReadState } from "../utils/message-read";
 import {
   sendQueuedInput,
   suppressNextInputQueueDrain,
@@ -887,6 +889,43 @@ export function ChatView() {
     }
     return turns;
   }, [displayedMessages]);
+
+  // 已读回执（A 方案：环只跟最新一轮）。判据全在 utils/message-read.ts，
+  // 这里只负责取数：这一轮的整体助手块（含重启后从持久化推出的）+ 正在流式的正文/思考。
+  // 每次渲染只算一次 —— 环形至多只可能出现在最新那条用户消息上，没必要为窗口里
+  // 几百条消息各调一次（流式时每帧都会重渲染）。
+  const latestUserMessage = useMemo(
+    () => findLatestUserMessage(displayedMessages),
+    [displayedMessages],
+  );
+  const partialThinking = useSessionPartialThinking(activeSessionId);
+  const latestTurnReadState = useMemo(
+    () =>
+      resolveReadState({
+        turnId: latestUserMessage?.turnId,
+        localStatus: latestUserMessage?.localStatus,
+        blocks: latestUserMessage?.turnId
+          ? turnBlocksById.get(latestUserMessage.turnId)
+          : null,
+        // `partialByTurn` 会留着别的轮次的残段 —— 交给纯函数比对，不在这里预判。
+        partialTurnId: activeTurn?.turnId ?? null,
+        partialMessage,
+        partialThinking,
+        // 发送后到 `session.status` 回来之间有一个 IPC 往返的空档：那段时间
+        // `isSessionRunning` 还是 false，但 `activateNextTurn` 已经把 activeTurn
+        // 设上了 —— 两个都不看的话，刚发出的气泡会先空一帧再冒灰环。
+        isAwaiting: isSessionRunning || hasActiveTurn,
+      }),
+    [
+      latestUserMessage,
+      turnBlocksById,
+      activeTurn?.turnId,
+      partialMessage,
+      partialThinking,
+      isSessionRunning,
+      hasActiveTurn,
+    ],
+  );
 
   // Keep the window pinned to the tail while the user is at the bottom,
   // so streamed messages stay visible as the list grows.
@@ -2099,6 +2138,12 @@ export function ChatView() {
                           videoReferences={videoReferences}
                           suppressProcessSummaries={suppressProcessSummaries}
                           onForkMessage={handleForkMessage}
+                          // 历史不出环靠这一句：只有最新那条用户消息拿得到结果。
+                          readState={
+                            message.id === latestUserMessage?.id
+                              ? latestTurnReadState
+                              : null
+                          }
                         />
                       </div>
                     );

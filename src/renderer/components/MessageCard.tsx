@@ -47,6 +47,8 @@ import {
   projectNestedToolMessages,
 } from "../utils/nested-tool-display";
 import { Button } from "./app-button";
+import { ReadReceiptRing } from "./message/ReadReceiptRing";
+import type { ReadReceiptState } from "../utils/message-read";
 
 const EMPTY_NESTED_CALLS = {};
 const EMPTY_MESSAGES: Message[] = [];
@@ -68,6 +70,11 @@ interface MessageCardProps {
   suppressProcessSummaries?: boolean;
   /** 分叉入口：仅助手消息显示（tool_result 行/流式中/排队中/已取消除外） */
   onForkMessage?: (message: Message) => void;
+  /**
+   * 用户消息的已读回执（只在最新一轮出现）。由 ChatView 用
+   * `utils/message-read.ts` 算出；null / 缺省 = 不显示。
+   */
+  readState?: ReadReceiptState | null;
 }
 
 /**
@@ -116,6 +123,7 @@ export const MessageCard = memo(function MessageCard({
   toolBlocksProjected = false,
   toolLookupBlocks,
   onForkMessage,
+  readState,
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
 
@@ -589,52 +597,55 @@ export const MessageCard = memo(function MessageCard({
         // User message — compact bubble with action bar below
         <div className="flex justify-end group">
           <div className="max-w-[80%] min-w-0 flex flex-col items-end">
-            <div
-              className={`message-user px-4 py-3 rounded-xl min-w-0 break-words ${
-                isQueued ? "opacity-70 border-dashed" : ""
-              } ${isCancelled ? "opacity-60" : ""}`}
-            >
-              {isQueued && (
-                <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  <span>{t("messageCard.queued")}</span>
-                </div>
-              )}
-              {isCancelled && (
-                <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <XCircle className="w-3 h-3" />
-                  <span>{t("messageCard.cancelled")}</span>
-                </div>
-              )}
-              {isUser && message.elSelections?.length ? (
-                <ElementRefChips selections={message.elSelections} />
-              ) : null}
-              {visibleBlocks.length === 0 &&
-              !(isUser && message.elSelections?.length) ? (
-                <span className="text-muted-foreground italic">
-                  {t("messageCard.emptyMessage")}
-                </span>
-              ) : (
-                visibleBlocks.map((block, index) => (
-                  <ContentBlockView
-                    key={
-                      "id" in block
-                        ? (block as { id: string }).id
-                        : `block-${block.type}-${index}`
-                    }
-                    block={block}
-                    artifactExpansion={artifactExpansion}
-                    isUser={isUser}
-                    isStreaming={
-                      isStreaming &&
-                      (block.type !== "text" || index === lastTextBlockIndex)
-                    }
-                    allBlocks={allDisplayBlocks}
-                  />
-                ))
-              )}
+            <div className="flex min-w-0 max-w-full items-end justify-end gap-1.5">
+              <div
+                className={`message-user px-4 py-3 rounded-xl min-w-0 break-words ${
+                  isQueued ? "opacity-70 border-dashed" : ""
+                } ${isCancelled ? "opacity-60" : ""}`}
+              >
+                {isQueued && (
+                  <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="w-3 h-3" />
+                    <span>{t("messageCard.queued")}</span>
+                  </div>
+                )}
+                {isCancelled && (
+                  <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                    <XCircle className="w-3 h-3" />
+                    <span>{t("messageCard.cancelled")}</span>
+                  </div>
+                )}
+                {isUser && message.elSelections?.length ? (
+                  <ElementRefChips selections={message.elSelections} />
+                ) : null}
+                {visibleBlocks.length === 0 &&
+                !(isUser && message.elSelections?.length) ? (
+                  <span className="text-muted-foreground italic">
+                    {t("messageCard.emptyMessage")}
+                  </span>
+                ) : (
+                  visibleBlocks.map((block, index) => (
+                    <ContentBlockView
+                      key={
+                        "id" in block
+                          ? (block as { id: string }).id
+                          : `block-${block.type}-${index}`
+                      }
+                      block={block}
+                      artifactExpansion={artifactExpansion}
+                      isUser={isUser}
+                      isStreaming={
+                        isStreaming &&
+                        (block.type !== "text" || index === lastTextBlockIndex)
+                      }
+                      allBlocks={allDisplayBlocks}
+                    />
+                  ))
+                )}
+              </div>
+              {readState ? <ReadReceiptRing state={readState} /> : null}
             </div>
-            {renderActionBar("mt-0.5")}
+            {renderActionBar(readState ? "mt-0.5 pr-[22px]" : "mt-0.5")}
           </div>
         </div>
       ) : (

@@ -449,6 +449,13 @@ export function useSessionPartialMessage(sessionId: string | null): string {
   );
 }
 
+/** 指定会话（分屏区域）正在流式输出的思考文本。不要去用全局版：分屏时会串会话。 */
+export function useSessionPartialThinking(sessionId: string | null): string {
+  return useAppStore((s) =>
+    sessionId ? (s.sessionStates[sessionId]?.partialThinking ?? "") : "",
+  );
+}
+
 /** 指定会话的活动轮次（无则 null）。 */
 export function useSessionActiveTurn(
   sessionId: string | null,

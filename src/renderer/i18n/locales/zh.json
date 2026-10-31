@@ -1425,6 +1425,8 @@
     "retryAttempt": "第 {{count}} 次",
     "queued": "排队中",
     "cancelled": "已取消",
+    "read": "已读",
+    "unread": "未读",
     "emptyMessage": "空消息",
     "emptyText": "（空文本）",
     "copyMessage": "复制消息",

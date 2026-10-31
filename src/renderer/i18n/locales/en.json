@@ -1426,6 +1426,8 @@
     "retryAttempt": "attempt {{count}}",
     "queued": "Queued",
     "cancelled": "Cancelled",
+    "read": "Read",
+    "unread": "Unread",
     "emptyMessage": "Empty message",
     "emptyText": "(empty text)",
     "copyMessage": "Copy message",
