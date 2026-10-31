@@ -36,19 +36,19 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
 
 type BarProps = React.ComponentProps<typeof ChatInputBottomBar>;
 
-/** 右簇（展开 + 发送）除「随内容变化的两个 prop」之外的必填/可选 prop。 */
+/** 右簇（展开 + 麦克风 + 发送）除「随内容变化的两个 prop」之外的必填/可选 prop。 */
 const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
   canStop: false,
   onStop: () => {},
   isSubmitting: false,
+  voice: { status: "idle", onToggle: () => {} },
 };
 
-/** 左簇（附件 + 麦克风）不变的那几项；单测右簇时只用来占位。 */
+/** 左簇（仅附件）不变的那几项；单测右簇时只用来占位。 */
 const leadBarProps: React.ComponentProps<typeof ChatInputActionBar> = {
   onAttach: () => {},
   onAddFiles: () => {},
   attachedKeys: new Set<string>(),
-  voice: { status: "idle", onToggle: () => {} },
 };
 
 /**
@@ -249,8 +249,8 @@ describe("展开按钮（右簇）", () => {
     // 关键：元素在，只是看不见 —— 条件渲染的版本一出现就会推动编辑器与发送键
     expect(button).not.toBeNull();
     expect(button!.className).toContain("invisible");
-    // 右簇永远只有「展开 + 发送」两颗按钮，空态也一样
-    expect(container.querySelectorAll("button")).toHaveLength(2);
+    // 右簇永远是「展开 + 麦克风 + 发送」三颗按钮，空态也一样
+    expect(container.querySelectorAll("button")).toHaveLength(3);
   });
 
   it("有内容后是同一颗按钮原地变可见", async () => {
@@ -264,14 +264,26 @@ describe("展开按钮（右簇）", () => {
     expect(after.className).not.toContain("invisible");
   });
 
-  it("与发送键同处右簇，且排在发送键前面", async () => {
+  it("与麦克风、发送键同处右簇，顺序是 展开 → 麦克风 → 发送", async () => {
     await renderBar({ hasInputContent: true });
 
     const button = expandButton()!;
     const send = container.querySelector('button[type="submit"]')!;
-    // 同一个父节点 = 同一个右簇容器；展开在前，所以它不会把发送键推走
-    expect(button.parentElement).toBe(send.parentElement);
-    expect(button.nextElementSibling).toBe(send);
+    const mic = container.querySelector<HTMLElement>(
+      '[aria-label="chat.voiceStart"]',
+    )!;
+    const trail = button.parentElement!;
+    // 同一个父节点 = 同一个右簇容器
+    expect(trail).toBe(send.parentElement);
+    expect(trail.contains(mic)).toBe(true);
+    // 展开在最前：它显隐只改自己那格，不推走麦克风与发送键
+    expect(trail.firstElementChild).toBe(button);
+    // DOM 顺序 = 视觉顺序（麦克风外面包了一层容器，所以比 aria-label 而不是 nextElementSibling）
+    expect(
+      [...trail.querySelectorAll("button")].map((b) =>
+        b.getAttribute("aria-label"),
+      ),
+    ).toEqual(["chat.expandInput", "chat.voiceStart", "chat.sendMessage"]);
   });
 
   it("keeps the button while expanded without content", async () => {

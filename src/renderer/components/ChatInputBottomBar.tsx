@@ -3,6 +3,7 @@ import type { ProviderProfileKey } from "../types";
 import { ArrowUp, Maximize2, Minimize2, Square } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { Button } from "./app-button";
+import { VoiceMicButton, type VoiceMicButtonProps } from "./VoiceMicButton";
 
 export interface ModelOptionGroup {
   profileKey: ProviderProfileKey;
@@ -23,13 +24,16 @@ export interface ContextStatusDetails {
 }
 
 /**
- * 输入卡内的右簇：展开 + 发送。
+ * 输入卡内的右簇：展开 + 麦克风 + 发送。
  *
- * 左簇（附件 / 麦克风）在 `ChatInputActionBar`：两者分别落在编辑器左右两侧，
+ * 左簇（仅附件）在 `ChatInputActionBar`：两者分别落在编辑器左右两侧，
  * 由 `ChatInput` 的同一条 flex 行排布。
  *
+ * 麦克风恒定 36×36（`MIC_SLOT_CLASS`，六态都不改宽），放进右簇不会推挤编辑器；
+ * 它从前在左簇，等于让每行草稿先缩进 38px 才写到字。
+ *
  * 展开按钮为什么在这里、且为什么常驻一个隐形槽位：它是按「有没有内容」出现的。
- * 夹在左簇里会把麦克风与编辑器左边缘一起右推 38px，而那正是用户敲下第一个字的时刻；
+ * 夹在左簇里会把编辑器左边缘右推 38px，而那正是用户敲下第一个字的时刻；
  * 放到发送键左边之后它只影响编辑器右边界，再把槽位改成常驻（`invisible`），连那点
  * 都不变 —— 打字时画面完全静止。
  */
@@ -45,6 +49,13 @@ export interface ChatInputBottomBarProps {
    * 必填：漏接线要变成编译错误，而不是静默不显示按钮。
    */
   hasInputContent: boolean;
+  /**
+   * 语音输入的全部状态与动作，原样透传给 `VoiceMicButton`。
+   *
+   * 必填：漏接线要变成编译错误，而不是静默不显示麦克风
+   * （与 `hasInputContent` 同一套约定）。
+   */
+  voice: VoiceMicButtonProps;
 }
 
 export function ChatInputBottomBar({
@@ -55,6 +66,7 @@ export function ChatInputBottomBar({
   isExpanded = false,
   onToggleExpand,
   hasInputContent,
+  voice,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
 
@@ -91,6 +103,8 @@ export function ChatInputBottomBar({
           <TooltipContent side="bottom">{expandLabel}</TooltipContent>
         </Tooltip>
       )}
+
+      <VoiceMicButton {...voice} />
 
       <Tooltip>
         <TooltipTrigger asChild>
@@ -129,7 +143,7 @@ export function ChatInputBottomBar({
  *
  * 判的只是**可见性**，不是渲染：按钮始终在 DOM 里（`invisible` 占位），所以它出现
  * 时不会推动编辑器或发送键。这是这一格唯一安稳的做法 —— 条件渲染的版本在左簇里会
- * 把麦克风与文字右推 38px，在右簇里会缩窄编辑区。
+ * 把编辑器左边缘右推 38px，在右簇里会缩窄编辑区。
  */
 export function shouldShowExpandButton(
   isExpanded: boolean,

@@ -28,10 +28,6 @@ const baseProps: ChatInputActionBarProps = {
   onAttach: () => {},
   onAddFiles: () => {},
   attachedKeys: new Set<string>(),
-  voice: {
-    status: "idle",
-    onToggle: () => {},
-  },
 };
 
 describe("底栏到命令入口的接线", () => {

@@ -1,16 +1,19 @@
 import { AttachMenu } from "./attach/AttachMenu";
-import { VoiceMicButton, type VoiceMicButtonProps } from "./VoiceMicButton";
 import type { ChatInputAttachedFile } from "./ChatInput";
 
 /**
- * 输入卡内的左簇：附件 / 麦克风。
+ * 输入卡内的左簇：仅附件（`+`）。
  *
  * 与 `ChatInputBottomBar` 的分工：这一簇是「写之前能做的事」，在编辑器**左边**；
- * 展开与发送在编辑器右边。两者都在卡内同一行。拆成两个组件不是因为想分层 —— 它们
- * 落在 flex 行的两端、中间夹着编辑器，一个组件没法把编辑区包在自己中间。
+ * 展开 / 麦克风 / 发送在编辑器右边。两者都在卡内同一行，由 `ChatInput` 的那条
+ * flex 行排布 —— 拆成两个组件不是因为想分层，而是它们落在 flex 行的两端、
+ * 中间夹着编辑器，一个组件没法把编辑区包在自己中间。
  *
- * 展开按钮不在这里：它按「有没有内容」出现，留在左簇会把麦克风与文字右推；它需要一个
- * 常驻的隐形槽位，所以归右簇（`ChatInputBottomBar`）。
+ * 麦克风曾经在这里，已移到右簇：它是「用另一种方式产出内容」，与提交同属动作，
+ * 而不是写之前的前置动作；且它占 36px，留在最左等于让每一行草稿都先缩进 38px。
+ *
+ * 展开按钮也不在这里：它按「有没有内容」出现，需要一个常驻的隐形槽位，
+ * 所以归右簇（`ChatInputBottomBar`）。
  */
 export interface ChatInputActionBarProps {
   onAttach: () => void;
@@ -30,11 +33,6 @@ export interface ChatInputActionBarProps {
   onInsertPromptCommand?: (name: string) => void;
   /** 技能入口：宿主把 /skill:<name> 插进输入框。缺省 = 本宿主不支持技能引用 */
   onInsertSkill?: (name: string) => void;
-  /**
-   * 语音输入的全部状态与动作。必填：漏接线要变成编译错误，
-   * 而不是静默不显示麦克风（与 hasInputContent 同一套约定）。
-   */
-  voice: VoiceMicButtonProps;
 }
 
 export function ChatInputActionBar({
@@ -47,7 +45,6 @@ export function ChatInputActionBar({
   onCommandEntry,
   onInsertPromptCommand,
   onInsertSkill,
-  voice,
 }: ChatInputActionBarProps) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
@@ -62,8 +59,6 @@ export function ChatInputActionBar({
         onInsertPromptCommand={onInsertPromptCommand}
         onInsertSkill={onInsertSkill}
       />
-
-      <VoiceMicButton {...voice} />
     </div>
   );
 }

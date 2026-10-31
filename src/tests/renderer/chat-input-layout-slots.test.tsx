@@ -2,7 +2,8 @@
 //
 // 录音条（topSlot）与卡内单行的结构约定：
 //   - 录音条必须在**卡片内**、编辑器**上方**（在卡外等于把它丢进消息区）；
-//   - 左簇 / 编辑器 / 发送键必须是**同一行**的三个兄弟，且编辑器能伸缩。
+//   - 左簇（附件）/ 编辑器 / 右簇（展开、麦克风、发送）必须是**同一行**的兄弟，
+//     且编辑器能伸缩。
 //
 // jsdom 没有布局引擎，钉不了像素；能钉的是结构与 class token。像素结论见
 // design-docs/2026-10-29-composer-mockup/mockup.html 的 Chromium 实测。
@@ -13,6 +14,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatInput } from "../../renderer/components/ChatInput";
+import { ChatInputBottomBar } from "../../renderer/components/ChatInputBottomBar";
 
 vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
@@ -140,4 +142,36 @@ describe("两个聊天宿主都接上了新槽位", () => {
       expect(source).toContain("polishing={voice.polishing}");
     },
   );
+});
+
+describe("麦克风在右簇", () => {
+  it("顺序是 展开 → 麦克风 → 发送，且展开键在无内容时仍占位", async () => {
+    await act(async () => {
+      root.render(
+        React.createElement(ChatInputBottomBar, {
+          canStop: false,
+          onStop: () => {},
+          isSubmitting: false,
+          isExpanded: false,
+          onToggleExpand: () => {},
+          hasInputContent: false,
+          voice: { status: "idle", onToggle: () => {} },
+        }),
+      );
+    });
+
+    const labels = [...container.querySelectorAll("button")].map((b) =>
+      b.getAttribute("aria-label"),
+    );
+    expect(labels).toEqual([
+      "chat.expandInput",
+      "chat.voiceStart",
+      "chat.sendMessage",
+    ]);
+    // 无内容时展开键是 invisible 占位，不是被条件渲染掉
+    const expand = container.querySelector<HTMLElement>(
+      '[aria-label="chat.expandInput"]',
+    )!;
+    expect(expand.className).toContain("invisible");
+  });
 });

@@ -2555,6 +2555,17 @@ export function ChatView() {
                   onInsertSkill={(name) =>
                     chatInputRef.current?.insertSkillChip(name)
                   }
+                />
+              }
+              bottomSlot={
+                <ChatInputBottomBar
+                  canStop={canStop}
+                  onStop={handleStop}
+                  isSubmitting={isSubmitting}
+                  submitDisabled={submitBlocked}
+                  isExpanded={isInputExpanded}
+                  onToggleExpand={() => setIsInputExpanded((v) => !v)}
+                  hasInputContent={hasInputContent}
                   voice={toMicButtonProps(
                     voice,
                     voiceEngine.install,
@@ -2568,17 +2579,6 @@ export function ChatView() {
                       CHAT_INPUT_VOICE_OWNER,
                     ),
                   )}
-                />
-              }
-              bottomSlot={
-                <ChatInputBottomBar
-                  canStop={canStop}
-                  onStop={handleStop}
-                  isSubmitting={isSubmitting}
-                  submitDisabled={submitBlocked}
-                  isExpanded={isInputExpanded}
-                  onToggleExpand={() => setIsInputExpanded((v) => !v)}
-                  hasInputContent={hasInputContent}
                 />
               }
             />

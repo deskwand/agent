@@ -839,18 +839,6 @@ export function WelcomeView() {
                   chatInputRef.current?.insertSkillChip(name)
                 }
                 attachMenuDirection="down"
-                voice={toMicButtonProps(
-                  voice,
-                  voiceEngine.install,
-                  {
-                    config: voiceEngineConfig,
-                    platform: window.electronAPI?.platform,
-                    t,
-                  },
-                  // 欢迎页没有会话，卡片不可能挂起 —— 这一格永远轮不到被别人占。
-                  // 仍显式传：漏传要是编译错误。
-                  false,
-                )}
               />
             )
           }
@@ -864,6 +852,18 @@ export function WelcomeView() {
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}
+                voice={toMicButtonProps(
+                  voice,
+                  voiceEngine.install,
+                  {
+                    config: voiceEngineConfig,
+                    platform: window.electronAPI?.platform,
+                    t,
+                  },
+                  // 欢迎页没有会话，卡片不可能挂起 —— 这一格永远轮不到被别人占。
+                  // 仍显式传：漏传要是编译错误。
+                  false,
+                )}
               />
             )
           }
