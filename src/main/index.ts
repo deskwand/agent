@@ -5037,6 +5037,14 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.anchorAt,
       );
 
+    case "session.rewind":
+      return sm.rewindSession(
+        event.payload.sessionId,
+        event.payload.messageId,
+        event.payload.anchor,
+        event.payload.anchorAt,
+      );
+
     case "session.command":
       return sm.handleGoalCommand(
         event.payload.sessionId,

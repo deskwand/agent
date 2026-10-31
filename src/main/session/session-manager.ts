@@ -30,6 +30,7 @@ import * as path from "path";
 import type {
   Session,
   Message,
+  RewindResult,
   ServerEvent,
   PermissionResult,
   ContentBlock,
@@ -134,6 +135,12 @@ interface IAgentRunner {
     cwd: string | undefined,
     forkEntryId: string,
   ): Promise<string | null>;
+  isCompacting?(sessionId: string): boolean;
+  rewindSessionFile?(
+    sessionId: string,
+    file: string,
+    keepEntryId: string,
+  ): Promise<{ backupPath: string; keptEntries: number }>;
   compact(
     sessionId: string,
     instructions?: string,
@@ -220,6 +227,8 @@ export class SessionManager {
   private sessionTitleAttempts: Set<string> = new Set();
   private titleGenerationTokens: Map<string, symbol> = new Map();
   private messageCache: Map<string, Message[]> = new Map();
+  /** 正在回滚的会话：连点两次只允许跑一次手术。 */
+  private rewinding: Set<string> = new Set();
   /**
    * Sessions whose cache holds the COMPLETE history. saveMessage seeds a
    * partial [message] cache on miss; only a full getMessages() (or a page
@@ -671,6 +680,100 @@ export class SessionManager {
         // 忽略清理失败
       }
       throw error;
+    }
+  }
+
+  /**
+   * 原地回滚：保留到 messageId 这条消息（含），删除它之后的全部内容。
+   *
+   * 与 forkSession 的差别只有一点：保留目标本身 vs 复制到目标为止。
+   * 目标必须能在权威 entries 里定位（`entryId` 非空）——回退到实时缓存意味着
+   * 缓存里可能夹着没落盘的消息，拿它的下标去 entries 里找会错位，
+   * 轻则截在别的条目上，重则截成空会话。
+   */
+  async rewindSession(
+    sessionId: string,
+    messageId: string,
+    anchor?: string | null,
+    anchorAt?: number | null,
+  ): Promise<RewindResult> {
+    if (this.rewinding.has(sessionId)) {
+      throw new Error(t("errors.rewindRunning"));
+    }
+    this.rewinding.add(sessionId);
+    try {
+      const session = this.loadSession(sessionId);
+      if (!session) throw new Error(t("errors.rewindSessionNotFound"));
+      const busy =
+        this.isSessionRunning(sessionId) ||
+        (this.promptQueues.get(sessionId)?.length ?? 0) > 0 ||
+        this.agentRunner.isCompacting?.(sessionId) === true;
+      if (busy) throw new Error(t("errors.rewindRunning"));
+
+      const resolved = this.resolveForkPoint(
+        sessionId,
+        messageId,
+        anchor ?? null,
+        anchorAt ?? null,
+      );
+      if (resolved.forkIdx < 0) {
+        throw new Error(t("errors.rewindPointNotFound"));
+      }
+      const target = resolved.messages[resolved.forkIdx];
+      if (isToolResultMessage(target)) {
+        throw new Error(t("errors.rewindPointNotAllowed"));
+      }
+
+      // 保留区**最后一条**不能挂无 result 的 tool_use：下一轮会直接报工具调用不匹配。
+      // 只查末尾一条 —— 更早的悬空 tool_use 来自被中止的回合，是既有状态，
+      // 回滚不该因此永久失效（否则一个坏回合就让整个会话再也回滚不了）。
+      const kept = resolved.messages.slice(0, resolved.forkIdx + 1);
+      const withResult = new Set<string>();
+      for (const message of kept) {
+        for (const block of message.content) {
+          if (block.type === "tool_result") withResult.add(block.toolUseId);
+        }
+      }
+      const last = kept[kept.length - 1];
+      const dangling =
+        last?.content.some(
+          (block) => block.type === "tool_use" && !withResult.has(block.id),
+        ) ?? false;
+      if (dangling) throw new Error(t("errors.rewindPointNotAllowed"));
+
+      const rewrite = this.agentRunner.rewindSessionFile;
+      if (!rewrite) throw new Error(t("errors.rewindFailed"));
+      if (!session.piSessionFile) throw new Error(t("errors.rewindNoJsonl"));
+      if (!resolved.entryId) throw new Error(t("errors.rewindPointNotFound"));
+
+      await rewrite.call(
+        this.agentRunner,
+        sessionId,
+        session.piSessionFile,
+        resolved.entryId,
+      );
+
+      // pi 会话已在上一步释放；消息缓存必须清掉才能从截断后的文件重读
+      this.messageCache.delete(sessionId);
+      this.fullyLoadedSessions.delete(sessionId);
+      const page = this.getMessagesPage(sessionId, null, 1000);
+      const droppedCount = resolved.messages.length - (resolved.forkIdx + 1);
+      log(
+        "[SessionManager] Session rewound:",
+        sessionId,
+        "keep entry:",
+        resolved.entryId,
+        "dropped:",
+        droppedCount,
+      );
+      return {
+        sessionId,
+        messages: page.messages,
+        hasMore: page.hasMore,
+        droppedCount,
+      };
+    } finally {
+      this.rewinding.delete(sessionId);
     }
   }
 
@@ -1999,6 +2102,12 @@ export class SessionManager {
     turnProfile?: TurnProfileName,
     emotion?: EmotionSignal,
   ): void {
+    // 回滚窗口（dispose 等待 + 文件重写，1–3s）内不接受新回合：此时常驻 pi 会话
+    // 已被摘掉，冷启动会重新打开**即将被截断的旧文件**，迟到的 append 要么被
+    // rename 覆盖，要么带着已删的 parentId 落进新文件成为孤儿 leaf。
+    if (this.rewinding.has(session.id)) {
+      throw new Error(t("errors.rewindRunning"));
+    }
     const queue = this.promptQueues.get(session.id) || [];
     queue.push({
       prompt,

@@ -16,6 +16,7 @@ const ALL_CLIENT_EVENT_TYPES = [
   "session.start",
   "session.continue",
   "session.fork",
+  "session.rewind",
   "session.setThinkingLevel",
   "session.setProviderModel",
   "session.stop",

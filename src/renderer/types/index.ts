@@ -457,6 +457,14 @@ export interface PermissionRule {
   action: "allow" | "deny" | "ask";
 }
 
+/** 回滚结果：截断后的尾页 + 删掉的条数（用于 toast）。 */
+export interface RewindResult {
+  sessionId: string;
+  messages: Message[];
+  hasMore: boolean;
+  droppedCount: number;
+}
+
 // IPC Event types
 export type ClientEvent =
   | { type: "session.createVoiceRecord"; payload: Record<string, never> }
@@ -556,6 +564,16 @@ export type ClientEvent =
       payload: { sessionId: string; beforeId: string | null; limit: number };
     }
   | { type: "session.getTraceSteps"; payload: { sessionId: string } }
+  | {
+      type: "session.rewind";
+      payload: {
+        sessionId: string;
+        messageId: string;
+        /** 回滚点锚点：实时 id 与 JSONL entry id 不同名时用它定位（见 shared/fork-anchor） */
+        anchor?: string | null;
+        anchorAt?: number | null;
+      };
+    }
   | { type: "usage.query"; payload: { range: UsageRange } }
   | { type: "usage.exchange-rate"; payload: Record<string, never> }
   | {

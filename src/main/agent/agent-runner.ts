@@ -196,6 +196,7 @@ import {
   sanitizeSudoOutput,
   SUDO_AUTH_FAILURE_TEXT,
 } from "./sudo-command";
+import { t } from "../i18n";
 
 export { piSessionFileContainsLegacyMemoryContext };
 
@@ -769,6 +770,70 @@ export class AgentRunner {
       }
     }
     return target.getSessionFile() ?? null;
+  }
+
+  /** 该会话是否正在压缩（回滚期间必须没人在写文件）。 */
+  isCompacting(sessionId: string): boolean {
+    return this.compactInFlight.has(sessionId);
+  }
+
+  /**
+   * 原地截断本会话的 JSONL 到 keepEntryId：先释放并**等待** dispose 常驻 pi 会话，
+   * 再重写文件。
+   *
+   * 顺序不能反：`_persist` 是 `appendFileSync(path)` 按路径追加，释放没结束就重写，
+   * 迟到的追加（_flushPendingCustomMessages、dispose() 里的 agent.abort()）会带着
+   * 已删条目的 parentId 落进新文件、成为新 leaf —— 下一次 getBranch() 会把整段
+   * 保留历史静默丢掉。
+   */
+  async rewindSessionFile(
+    sessionId: string,
+    file: string,
+    keepEntryId: string,
+  ): Promise<{ backupPath: string; keptEntries: number }> {
+    await this.disposeCachedPiSessionForRewind(sessionId);
+    return rewriteSessionFileTo(file, keepEntryId);
+  }
+
+  /** clearSdkSession 的 await 版本：同一套清理，但等 dispose 真正结束。 */
+  private async disposeCachedPiSessionForRewind(
+    sessionId: string,
+  ): Promise<void> {
+    const cached = this.piSessions.get(sessionId);
+    const modelRuntime = this.sessionModelRuntimes.get(sessionId);
+    if (modelRuntime) {
+      unregisterSessionModelRuntime(modelRuntime);
+      this.sessionModelRuntimes.delete(sessionId);
+    }
+    if (!cached) return;
+    this.piSessions.delete(sessionId);
+    resetUiState();
+    this.pendingSteerDeliveries.delete(sessionId);
+    this.lastSteeringLengths.delete(sessionId);
+    this.releaseSubagentSession(sessionId);
+
+    const dispose = cached.runtime
+      ? cached.runtime.dispose()
+      : Promise.resolve(cached.session.dispose());
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        dispose,
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(t("errors.rewindFailed"))),
+            REWIND_DISPOSE_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } catch (error) {
+      // 超时/失败也不把它丢在无人回收的状态：让它自己跑完（MCP 子进程要靠它退场），
+      // 只吞掉失败，不阻塞回滚的报错
+      void dispose.catch(() => {});
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /** Call after the user installs / removes a skill / plugin so the next query re-links everything. */
@@ -5520,4 +5585,100 @@ export function applySessionTurnPolicyToSdk(
     current.every((name, i) => name === next[i]);
   if (!unchanged) piSession.setActiveToolsByName(next);
   if (sessionRecord) sessionRecord.turnProfile = profile;
+}
+
+/** 释放常驻 pi 会话的等待上限：超过就拒绝回滚（此时文件还没被碰过）。 */
+export const REWIND_DISPOSE_TIMEOUT_MS = 10_000;
+
+/** 只保留本会话文件最新的那一份回滚快照。 */
+function pruneRewindBackups(file: string, keepPath: string): void {
+  const dir = path.dirname(file);
+  const prefix = `${path.basename(file)}.rewind-`;
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.startsWith(prefix) || !name.endsWith(".bak")) continue;
+    const full = path.join(dir, name);
+    if (full === keepPath) continue;
+    fs.rmSync(full, { force: true });
+  }
+}
+
+/** rename 覆盖：Windows 上被 Defender/索引器短暂占用会 EPERM，重试 3 次。 */
+async function renameSessionFile(tmp: string, file: string): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.renameSync(tmp, file);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (attempt >= 2 || (code !== "EPERM" && code !== "EBUSY")) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+}
+
+/**
+ * 把 JSONL 重写成 root→keepEntryId 这条路径（原地、原子）。
+ *
+ * 保留区含**全部** entry 类型：compaction 摘要、model/thinking 变更、
+ * branch_summary、custom_message 都在上下文里，只留 message 会让上下文变形。
+ */
+export async function rewriteSessionFileTo(
+  file: string,
+  keepEntryId: string,
+): Promise<{ backupPath: string; keptEntries: number }> {
+  // 备份必须发生在 open 之前：pi 打开缺 version 的旧文件时会迁移并重写它，
+  // 之后再复制就只剩迁移后的内容，原始字节就没了
+  const backupPath = `${file}.rewind-${Date.now()}.bak`;
+  fs.copyFileSync(file, backupPath);
+  pruneRewindBackups(file, backupPath);
+
+  const source = PiSessionManager.open(file);
+  const header = source.getHeader();
+  if (!header) throw new Error(t("errors.rewindFailed"));
+  const branch = source.getBranch(keepEntryId);
+  if (branch.length === 0 || branch[branch.length - 1].id !== keepEntryId) {
+    throw new Error(t("errors.rewindPointNotAllowed"));
+  }
+  const keptIds = new Set(branch.map((entry) => entry.id));
+  for (const entry of branch) {
+    if (entry.type === "compaction" && !keptIds.has(entry.firstKeptEntryId)) {
+      // 摘要指向保留区之外的条目：树不线性或文件损坏，不写任何东西
+      throw new Error(t("errors.rewindPointNotAllowed"));
+    }
+  }
+
+  const tmp = `${file}.rewind-tmp-${process.pid}`;
+  try {
+    const fd = fs.openSync(tmp, "w");
+    try {
+      fs.writeFileSync(fd, `${JSON.stringify(header)}\n`);
+      for (const entry of branch) {
+        // 每行必须以 \n 结尾：loadEntriesFromFile 会在缺终止符时补一个换行
+        fs.writeFileSync(fd, `${JSON.stringify(entry)}\n`);
+      }
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    await renameSessionFile(tmp, file);
+  } catch (error) {
+    fs.rmSync(tmp, { force: true });
+    throw error;
+  }
+
+  // 复核：重开必须正好停在这个点，否则说明写入/树结构有问题
+  let verified = false;
+  try {
+    const reopened = PiSessionManager.open(file);
+    verified =
+      reopened.getLeafId() === keepEntryId &&
+      reopened.getEntryCount() === branch.length;
+  } catch {
+    verified = false;
+  }
+  if (!verified) {
+    fs.copyFileSync(backupPath, file);
+    throw new Error(t("errors.rewindFailed"));
+  }
+  return { backupPath, keptEntries: branch.length };
 }

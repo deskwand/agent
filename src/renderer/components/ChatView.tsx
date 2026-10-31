@@ -112,6 +112,7 @@ import {
   shouldShowRecordingStrip,
   VoiceRecordingStrip,
 } from "./VoiceRecordingStrip";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
 import { getCapabilityGate } from "../capabilities/capability-gate";
 import { ensureVoiceModeStart } from "../utils/voice/voice-mode-gate";
@@ -355,6 +356,7 @@ export function ChatView() {
     continueSession,
     stopSession,
     forkSession,
+    rewindSession,
     setSessionThinkingLevel,
     setSessionProviderModel,
     getSessionMessagesPage,
@@ -1230,6 +1232,52 @@ export function ChatView() {
     },
     [activeSession, forkSession, messages, t],
   );
+
+  // 目标连会话一起记：对话框开着时会话可能被程序化切走（删除/新建/分屏重定向），
+  // 点击那一刻的 activeSession 已经不是用户确认的那个会话了。
+  const [rewindTarget, setRewindTarget] = useState<{
+    sessionId: string;
+    message: Message;
+  } | null>(null);
+  const rewindInFlightRef = useRef(false);
+
+  const handleRewindMessage = useCallback(
+    (message: Message) => {
+      if (!activeSession) return;
+      if (rewindInFlightRef.current) return;
+      setRewindTarget({ sessionId: activeSession.id, message });
+    },
+    [activeSession],
+  );
+
+  const rewindDropCount = useMemo(() => {
+    if (!rewindTarget) return 0;
+    const index = messages.findIndex((m) => m.id === rewindTarget.message.id);
+    return index < 0 ? 0 : messages.length - 1 - index;
+  }, [messages, rewindTarget]);
+
+  const confirmRewind = useCallback(async () => {
+    const target = rewindTarget;
+    if (!target) return;
+    setRewindTarget(null);
+    // 对话框打开期间会话被切走了：确认的是旧会话，绝不能落到新会话上
+    if (activeSession?.id !== target.sessionId) return;
+    rewindInFlightRef.current = true;
+    try {
+      // 卡片可能是合并后的（纯工具消息并进了前一条助手消息），
+      // 锚点取消息自己的原始内容，两边才算得出同一个值
+      const raw =
+        messages.find((m) => m.id === target.message.id) ?? target.message;
+      await rewindSession(
+        target.sessionId,
+        target.message.id,
+        buildForkAnchor(raw),
+        raw.timestamp,
+      );
+    } finally {
+      rewindInFlightRef.current = false;
+    }
+  }, [activeSession, messages, rewindSession, rewindTarget]);
 
   const handleDockTickSelect = useCallback(
     (messageId: string) => {
@@ -2138,6 +2186,7 @@ export function ChatView() {
                           videoReferences={videoReferences}
                           suppressProcessSummaries={suppressProcessSummaries}
                           onForkMessage={handleForkMessage}
+                          onRewindMessage={handleRewindMessage}
                           // 历史不出环靠这一句：只有最新那条用户消息拿得到结果。
                           readState={
                             message.id === latestUserMessage?.id
@@ -2464,6 +2513,16 @@ export function ChatView() {
         onTickSelect={handleDockTickSelect}
       />
       <VoiceDownloadConfirm engine={voiceEngine} />
+      <ConfirmDialog
+        isOpen={rewindTarget !== null}
+        title={t("chat.rewindConfirmTitle")}
+        description={t("chat.rewindConfirmDescription", {
+          count: rewindDropCount,
+        })}
+        confirmLabel={t("chat.rewindConfirmAction")}
+        onConfirm={() => void confirmRewind()}
+        onCancel={() => setRewindTarget(null)}
+      />
     </div>
   );
 }

@@ -112,6 +112,7 @@ const ALLOWED_CLIENT_EVENTS = new Set([
   "session.start",
   "session.continue",
   "session.fork",
+  "session.rewind",
   "session.setThinkingLevel",
   "session.setProviderModel",
   "session.stop",

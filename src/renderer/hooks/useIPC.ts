@@ -9,6 +9,7 @@ import type {
   PermissionResult,
   Session,
   Message,
+  RewindResult,
   TraceStep,
   ContentBlock,
   ThinkingLevel,
@@ -970,6 +971,44 @@ export function useIPC() {
     ],
   );
 
+  const rewindSession = useCallback(
+    async (
+      sessionId: string,
+      messageId: string,
+      anchor?: string | null,
+      anchorAt?: number | null,
+    ) => {
+      let result: RewindResult | undefined;
+      try {
+        result = await invoke<RewindResult>({
+          type: "session.rewind",
+          payload: { sessionId, messageId, anchor, anchorAt },
+        });
+      } catch (e) {
+        useAppStore.getState().setGlobalNotice({
+          id: `notice-session-rewind-${Date.now()}`,
+          type: "error",
+          message: e instanceof Error ? e.message : i18n.t("chat.rewindFailed"),
+          messageKey: e instanceof Error ? undefined : "chat.rewindFailed",
+        });
+        return undefined;
+      }
+      if (!result) return result;
+      useAppStore
+        .getState()
+        .applyRewind(result.sessionId, result.messages, result.hasMore);
+      useAppStore.getState().setGlobalNotice({
+        id: `notice-session-rewind-done-${Date.now()}`,
+        type: "success",
+        message: "",
+        messageKey: "chat.rewindDone",
+        messageValues: { count: result.droppedCount },
+      });
+      return result;
+    },
+    [invoke],
+  );
+
   const setSessionThinkingLevel = useCallback(
     (sessionId: string, thinkingLevel: ThinkingLevel) => {
       updateSession(sessionId, { thinkingLevel });
@@ -1495,6 +1534,7 @@ export function useIPC() {
     createVoiceSession,
     continueSession,
     forkSession,
+    rewindSession,
     setSessionThinkingLevel,
     renameSession,
     setSessionProviderModel,

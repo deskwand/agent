@@ -89,6 +89,12 @@ const MSG: Record<Locale, MessageTable> = {
     "errors.forkNoJsonl": "源会话无 JSONL 文件，无法分叉（需先回填存量数据）",
     "errors.forkPointUnresolved": "分叉失败：无法在会话历史中定位分叉点",
     "errors.forkHistoryExtractFailed": "分叉失败：无法从源会话文件提取历史",
+    "errors.rewindSessionNotFound": "会话不存在",
+    "errors.rewindRunning": "会话正在运行，请先停止或等这一轮结束",
+    "errors.rewindNoJsonl": "这个会话还没有可回滚的历史文件",
+    "errors.rewindPointNotFound": "无法在会话历史中定位回滚点",
+    "errors.rewindPointNotAllowed": "这条消息不能作为回滚点",
+    "errors.rewindFailed": "回滚失败，请稍后重试",
 
     // ── OAuth ──
     "oauth.openBrowser": "打开浏览器",
@@ -218,6 +224,14 @@ const MSG: Record<Locale, MessageTable> = {
       "Fork failed: could not locate the fork point in session history",
     "errors.forkHistoryExtractFailed":
       "Fork failed: could not extract history from the source session file",
+    "errors.rewindSessionNotFound": "Session not found",
+    "errors.rewindRunning":
+      "The session is busy. Stop it or wait for this turn to finish.",
+    "errors.rewindNoJsonl": "This session has no history file to rewind",
+    "errors.rewindPointNotFound":
+      "Could not locate the rewind point in session history",
+    "errors.rewindPointNotAllowed": "This message cannot be a rewind point",
+    "errors.rewindFailed": "Rewind failed. Please try again.",
 
     // ── OAuth ──
     "oauth.openBrowser": "Open Browser",

@@ -472,6 +472,12 @@ interface AppState {
     messages: Message[],
     hasMore: boolean,
   ) => void;
+  /** 回滚后整窗替换：清掉所有随被删消息作废的运行时态。 */
+  applyRewind: (
+    sessionId: string,
+    messages: Message[],
+    hasMore: boolean,
+  ) => void;
   prependOlderMessages: (
     sessionId: string,
     older: Message[],
@@ -1302,6 +1308,33 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
       };
     }),
+
+  applyRewind: (sessionId, messages, hasMore) => {
+    const restored = messages.map(restoreUserMessage);
+    // collectCurrentPlan 返回 CurrentPlan | null（null = 保留区里没有生效的清单）
+    const plan = collectCurrentPlan(restored);
+    // 被删消息可能正在朗读：音频在 hook 的闭包里，只改 store 会留下无人可停的音频
+    stopReadAloud();
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        messages: restored,
+        hasMoreOlder: hasMore,
+        oldestMessageId: restored[0]?.id ?? null,
+        historyHydrated: true,
+        nestedToolCalls: {},
+        partialByTurn: {},
+        partialToolResults: {},
+        backgroundAgents: [],
+        steerRecords: [],
+        currentTodos: plan ? plan.todos : null,
+        currentPlanDone: plan ? plan.done : false,
+        ...(plan && plan.todos.length > 0
+          ? { lastNonEmptyTodos: plan.todos, lastPlanDone: plan.done }
+          : {}),
+      }),
+    }));
+    get().clearQueuedMessages(sessionId);
+  },
 
   prependOlderMessages: (sessionId, older, hasMore) => {
     let trimmedCount = 0;

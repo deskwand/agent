@@ -8,6 +8,7 @@ import {
   Clock,
   XCircle,
   GitBranch,
+  History,
   Volume2,
   Play,
   Loader2,
@@ -70,6 +71,8 @@ interface MessageCardProps {
   suppressProcessSummaries?: boolean;
   /** 分叉入口：仅助手消息显示（tool_result 行/流式中/排队中/已取消除外） */
   onForkMessage?: (message: Message) => void;
+  /** 回滚入口：user 消息与回合末尾的助手消息，流式中/排队中/已取消除外 */
+  onRewindMessage?: (message: Message) => void;
   /**
    * 用户消息的已读回执（只在最新一轮出现）。由 ChatView 用
    * `utils/message-read.ts` 算出；null / 缺省 = 不显示。
@@ -123,6 +126,7 @@ export const MessageCard = memo(function MessageCard({
   toolBlocksProjected = false,
   toolLookupBlocks,
   onForkMessage,
+  onRewindMessage,
   readState,
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
@@ -383,6 +387,14 @@ export const MessageCard = memo(function MessageCard({
     !isStreaming &&
     groupedDisplayBlocks.length > 0;
 
+  const canRewind =
+    (isUser || isTurnEnd) &&
+    !isToolResultRow &&
+    !isQueued &&
+    !isCancelled &&
+    !isStreaming &&
+    groupedDisplayBlocks.length > 0;
+
   const showActions =
     (message.role !== "assistant" || isTurnEnd) &&
     !isStreaming &&
@@ -407,7 +419,8 @@ export const MessageCard = memo(function MessageCard({
 
   const renderActionBar = (extraClass?: string) => {
     const showFork = canFork && onForkMessage;
-    if (!showActions && !showFork) return null;
+    const showRewind = canRewind && onRewindMessage;
+    if (!showActions && !showFork && !showRewind) return null;
     // ⚠️ 图标按钮一律走 `iconSm`（28×28，与 `BrowserPanel` / `TitlebarButton` 的图标键同尺寸 ✓
     // —— 那两处现在也传 `size="iconSm"` 了；**手写 `w-7 h-7` 只有 32×28**，不是 28×28 ✗，
     // 2026-10-10 实测见 `app-button.tsx` 紧凑档说明 ✓）
@@ -580,6 +593,25 @@ export const MessageCard = memo(function MessageCard({
             </TooltipTrigger>
             <TooltipContent side="bottom">
               {t("messageCard.forkMessage")}
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+        {showRewind ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                type="button"
+                size="iconSm"
+                onClick={() => onRewindMessage(message)}
+                aria-label={t("messageCard.rewindHere")}
+                className="flex items-center justify-center hover:bg-transparent text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <History className="w-3 h-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {t("messageCard.rewindHere")}
             </TooltipContent>
           </Tooltip>
         ) : null}

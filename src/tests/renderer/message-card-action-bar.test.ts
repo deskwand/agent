@@ -231,3 +231,45 @@ describe("MessageCard action bar", () => {
     }
   });
 });
+
+describe("MessageCard rewind entry", () => {
+  function renderRewindCard(
+    message: Message,
+    extra: Partial<{ isTurnEnd: boolean; isStreaming: boolean }> = {},
+  ) {
+    act(() => {
+      root.render(
+        React.createElement(MessageCard, {
+          message,
+          isLatestRound: true,
+          onRewindMessage: vi.fn(),
+          ...extra,
+        }),
+      );
+    });
+  }
+
+  it("shows the rewind entry on a user message", () => {
+    renderRewindCard(makeMessage({ id: "u1", role: "user" }));
+    expect(
+      container.querySelector('[aria-label="Rewind to here"]'),
+    ).not.toBeNull();
+  });
+
+  it("shows the rewind entry on a turn-ending assistant message", () => {
+    renderRewindCard(makeMessage());
+    expect(
+      container.querySelector('[aria-label="Rewind to here"]'),
+    ).not.toBeNull();
+  });
+
+  it("hides the rewind entry while streaming", () => {
+    renderRewindCard(makeMessage(), { isStreaming: true });
+    expect(container.querySelector('[aria-label="Rewind to here"]')).toBeNull();
+  });
+
+  it("hides the rewind entry on a mid-turn assistant message", () => {
+    renderRewindCard(makeMessage(), { isTurnEnd: false });
+    expect(container.querySelector('[aria-label="Rewind to here"]')).toBeNull();
+  });
+});
