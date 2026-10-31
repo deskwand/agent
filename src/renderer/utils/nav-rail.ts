@@ -14,6 +14,10 @@ export interface RailItem {
 /**
  * `settings` 不在其中：它不在图标栏上，而是从头像弹层进入（HelpMenu 占栏底第一格）。
  * 所以 resolveRailActiveKey("settings") 返回 null，图标栏没有对应的高亮项。
+ *
+ * `feedback` 同样不在其中（2026-10-22 用户决定）：它只从栏底「?」帮助菜单进入，
+ * 不再占用「更多」卡片的一行、也不可固定。用户原话是「rail 那边多了一个反馈问题的入口」
+ * —— 三个入口（更多卡片 / 帮助菜单 / 设置-关于）只留后两个。
  */
 export const RAIL_ITEMS: readonly RailItem[] = [
   { key: "chat", view: "chat", labelKey: "navRail.chat", placement: "rail" },
@@ -38,15 +42,9 @@ export const RAIL_ITEMS: readonly RailItem[] = [
     labelKey: "accountMenu.usage",
     placement: "more",
   },
-  {
-    key: "feedback",
-    view: "feedback",
-    labelKey: "help.feedback",
-    placement: "more",
-  },
 ];
 
-/** 当前视图对应的图标栏项 key；settings 不在栏上，返回 null。 */
+/** 当前视图对应的图标栏项 key；settings 与 feedback 不在栏上，返回 null。 */
 export function resolveRailActiveKey(activeView: ActiveView): string | null {
   return RAIL_ITEMS.find((item) => item.view === activeView)?.key ?? null;
 }

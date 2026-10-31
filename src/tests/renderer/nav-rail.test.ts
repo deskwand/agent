@@ -32,7 +32,6 @@ describe("RAIL_ITEMS", () => {
       "apps",
       "vault",
       "usage",
-      "feedback",
     ]);
   });
 
@@ -52,16 +51,17 @@ describe("resolveRailActiveKey", () => {
     expect(resolveRailActiveKey("apps")).toBe("apps");
     expect(resolveRailActiveKey("vault")).toBe("vault");
     expect(resolveRailActiveKey("usage")).toBe("usage");
-    expect(resolveRailActiveKey("feedback")).toBe("feedback");
   });
 
-  it("returns null for settings because it lives in the bottom cluster", () => {
+  it("returns null for settings and feedback because neither is on the rail", () => {
     expect(resolveRailActiveKey("settings")).toBeNull();
+    // 反馈只从「?」帮助菜单进（见 nav-rail.ts 的 RAIL_ITEMS 注释）
+    expect(resolveRailActiveKey("feedback")).toBeNull();
   });
 
-  it("covers every view except settings", () => {
+  it("covers every view except settings and feedback", () => {
     for (const view of ALL_VIEWS) {
-      if (view === "settings") continue;
+      if (view === "settings" || view === "feedback") continue;
       expect(resolveRailActiveKey(view), view).not.toBeNull();
     }
   });
@@ -95,7 +95,6 @@ describe("RAIL_ITEMS 的 placement 分组", () => {
       "apps",
       "vault",
       "usage",
-      "feedback",
     ]);
   });
 
