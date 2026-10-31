@@ -295,6 +295,8 @@ interface AppState {
   /** 当前货币对 USD 的汇率；null = 未取到，界面静默回退美元显示。 */
   currencyRate: number | null;
   settingsTab: string | null;
+  /** 打开设置面板时要落到哪一页（目前只有 api 目录页） */
+  apiConfigIntent: "catalog" | null;
 
   rightPanelMode:
     | "files"
@@ -526,6 +528,7 @@ interface AppState {
   setShowSchedule: (show: boolean) => void;
   setShowApps: (show: boolean) => void;
   setSettingsTab: (tab: string | null) => void;
+  setApiConfigIntent: (intent: "catalog" | null) => void;
 
   officePreviewBusyPath: string | null;
   setOfficePreviewBusyPath: (path: string | null) => void;
@@ -787,6 +790,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currency: readStoredCurrency(),
   currencyRate: null,
   settingsTab: null,
+  apiConfigIntent: null,
   rightPanelMode: null as
     | "files"
     | "browser"
@@ -1695,6 +1699,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setShowSchedule: (show) => set({ activeView: show ? "automation" : "chat" }),
   setShowApps: (show) => set({ activeView: show ? "apps" : "chat" }),
   setSettingsTab: (tab) => set({ settingsTab: tab }),
+  setApiConfigIntent: (intent) => set({ apiConfigIntent: intent }),
   setReviewTargetFile: (path) => set({ reviewTargetFile: path }),
   toggleFileBrowser: () =>
     set((state) => {

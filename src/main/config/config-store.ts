@@ -14,6 +14,7 @@ import type {
   VisionModelConfig,
 } from "../../shared/api-model-presets";
 import { getCodingSubscription } from "../../shared/coding-subscriptions";
+import { normalizeVisionModelConfig } from "./vision-model";
 import {
   isLocalGatewayId,
   type LocalGatewayId,
@@ -1103,7 +1104,10 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     autoSkillLearning: stored.autoSkillLearning,
     telemetryEnabled: stored.telemetryEnabled,
     isConfigured: stored.isConfigured,
-    visionModel: stored.visionModel,
+    // 读路径只做归一化，不写回磁盘：get() 不能有副作用。
+    visionModel: stored.visionModel
+      ? normalizeVisionModelConfig(stored.visionModel, stored.providers ?? {})
+      : undefined,
     voiceEngine: normalizeVoiceEngineConfig(stored.voiceEngine),
     voiceEmotion: normalizeVoiceEmotionConfig(stored.voiceEmotion),
     ocr: normalizeOcrConfig(stored.ocr),
@@ -1275,7 +1279,10 @@ export class ConfigStore {
     if (updates.petCustomImage !== undefined)
       stored.petCustomImage = normalizePetCustomImage(updates.petCustomImage);
     if (updates.visionModel !== undefined)
-      stored.visionModel = updates.visionModel;
+      stored.visionModel = normalizeVisionModelConfig(
+        updates.visionModel,
+        stored.providers ?? {},
+      );
     if (updates.voiceEngine !== undefined)
       stored.voiceEngine = updates.voiceEngine;
     if (updates.voiceEmotion !== undefined)

@@ -178,14 +178,17 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogCategory[] = [
         id: "opencode-go",
         searchTerms: ["opencode.ai", "go"],
       },
+      // 订阅套餐也是「粘一把 key 就能成」，进引导页精简集
       {
         kind: "plan",
         id: "custom:subscription-bailian-coding",
+        compact: true,
         searchTerms: ["bailian", "百炼", "阿里"],
       },
       {
         kind: "plan",
         id: "custom:subscription-ark-coding",
+        compact: true,
         searchTerms: ["ark", "火山", "volcengine"],
       },
     ],

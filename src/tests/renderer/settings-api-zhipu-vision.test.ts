@@ -9,6 +9,7 @@ import { useAppStore } from "../../renderer/store";
 import type { AppConfig } from "../../renderer/types";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import { normalizeCodemodeConfig } from "../../shared/codemode-config";
+import { pickOption } from "./settings-menu-helper";
 import { normalizeWebAccessConfig } from "../../shared/web-access";
 
 function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
@@ -122,9 +123,13 @@ describe("SettingsAPI Zhipu vision model", () => {
     });
     await flush();
 
-    // 打开配置编辑器（空状态按钮）
+    // 来源选「单独配置」后才出现手动编辑器入口
+    await pickOption(container, "vision-source", "manual");
+    await flush();
     await act(async () => {
-      clickButton(container, "Configure Vision Model");
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="vision-manual-edit"]')
+        ?.click();
     });
     await flush();
 
@@ -135,6 +140,8 @@ describe("SettingsAPI Zhipu vision model", () => {
     });
     await flush();
 
+    // 视觉编辑弹窗已改用 shadcn Dialog：内容经 portal 挂到 body。
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
     // 区域切换按钮出现（模型自动为 glm-4.6v-flash）
     const regionButtons = Array.from(document.body.querySelectorAll("button"));
     expect(

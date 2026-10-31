@@ -14,6 +14,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../renderer/i18n/config";
 import i18n from "../../renderer/i18n/config";
+import { pickOption } from "./settings-menu-helper";
 import { SettingsAPI } from "../../renderer/components/settings/SettingsAPI";
 import { useAppStore } from "../../renderer/store";
 import type { AppConfig } from "../../renderer/types";
@@ -294,7 +295,13 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     await renderSettings();
     await click(findButton(i18n.t("api.visionModelTab")));
     await flush();
-    const opener = findButton(i18n.t("api.visionModelConfigureButton"));
+    // 视觉 tab 现在先选来源；「单独配置」才打开手动编辑器
+    await pickOption(container, "vision-source", "manual");
+    await flush();
+    const opener = container.querySelector<HTMLButtonElement>(
+      '[data-testid="vision-manual-edit"]',
+    )!;
+    expect(opener, "手动编辑入口必须存在").not.toBeNull();
     opener.focus();
     expect(document.activeElement).toBe(opener);
     await click(opener);

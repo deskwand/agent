@@ -50,7 +50,16 @@ import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { usePushToTalk } from "../hooks/usePushToTalk";
-import { ConnectCards } from "./welcome/connect-cards";
+import { ConnectPanel } from "./welcome/connect-panel";
+import type { ProviderCatalogEntry } from "./settings/provider-catalog";
+import { entryProfileKey } from "./settings/api/provider-entry";
+import type { ProviderCredentialValues } from "./settings/api/provider-credential-form";
+import {
+  connectAndPersistProvider,
+  persistProviderModels,
+} from "../services/provider-connect";
+import type { LocalGatewayId } from "../../shared/local-gateways";
+import type { AppConfig, ProviderDraft, ProviderType } from "../types";
 import { CapabilityIntro } from "./welcome/CapabilityIntro";
 import { ProjectMenuChip } from "./welcome/ProjectMenuChip";
 import { listWorkspaceProjects } from "../utils/sidebar-session-groups";
@@ -91,6 +100,8 @@ export function WelcomeView() {
   const sessions = useAppStore((state) => state.sessions);
   const setWorkingDir = useAppStore((state) => state.setWorkingDir);
   const setShowSettings = useAppStore((state) => state.setShowSettings);
+  const setAppConfig = useAppStore((state) => state.setAppConfig);
+  const setApiConfigIntent = useAppStore((state) => state.setApiConfigIntent);
   const setSettingsTab = useAppStore((state) => state.setSettingsTab);
   const setShowLoginModal = useAppStore((state) => state.setShowLoginModal);
   const setGlobalNotice = useAppStore((state) => state.setGlobalNotice);
@@ -271,10 +282,32 @@ export function WelcomeView() {
     [],
   );
 
+  // 引导页连接区需要的两份只读派生数据
+  const oauthStatusesForPanel = useMemo(() => {
+    const providers = appConfig?.providers ?? {};
+    const statuses: Record<string, { loggedIn: boolean }> = {};
+    for (const key of Object.keys(providers)) {
+      if (key.startsWith("oauth:")) {
+        statuses[key.slice("oauth:".length)] = { loggedIn: true };
+      }
+    }
+    return statuses;
+  }, [appConfig]);
+
+  const localGatewaysForPanel = useMemo(() => {
+    const ids = new Set<LocalGatewayId>();
+    for (const config of Object.values(appConfig?.providers ?? {})) {
+      if (config?.localGateway) ids.add(config.localGateway);
+    }
+    return ids;
+  }, [appConfig]);
+
   const handleOpenApiKey = useCallback(() => {
+    // 引导页的「更多供应商」直接落到目录页，不再让人先看一遍空列表
+    setApiConfigIntent("catalog");
     setSettingsTab("api");
     setShowSettings(true);
-  }, [setSettingsTab, setShowSettings]);
+  }, [setApiConfigIntent, setSettingsTab, setShowSettings]);
 
   const handleConnectOAuth = useCallback(
     async (providerId: string, name: string) => {
@@ -285,11 +318,61 @@ export function WelcomeView() {
     [t],
   );
 
-  const handleConnectSubscription = useCallback(
-    async (profileKey: string, apiKey: string) => {
-      await connectCodingSubscription(profileKey, apiKey, t);
+  const handleSubmitCredentials = useCallback(
+    async (entry: ProviderCatalogEntry, values: ProviderCredentialValues) => {
+      // 订阅套餐走既有服务（它已经处理 key 前缀校验与首选模型）
+      if (entry.kind === "plan") {
+        await connectCodingSubscription(entry.id, values.apiKey, t);
+        return;
+      }
+      const profileKey =
+        entryProfileKey(entry) ?? (`custom:${crypto.randomUUID()}` as const);
+      const draft: ProviderDraft = {
+        profileKey: profileKey as ProviderProfileKey,
+        provider: entry.id as ProviderType,
+        customProtocol: values.customProtocol,
+        name: values.name,
+        apiKey: values.apiKey,
+        baseUrl: values.baseUrl,
+        defaultModel: "",
+        models: [],
+      };
+      let config: AppConfig | null = null;
+      const ok = await connectAndPersistProvider(
+        { draft, presets: API_PROVIDER_PRESETS, catalog: [] },
+        {
+          t,
+          isSaved: () => false,
+          persist: async (draftToSave, models, defaultModel, disabled) => {
+            try {
+              config = await persistProviderModels(
+                draftToSave,
+                models,
+                defaultModel,
+                disabled,
+              );
+              return true;
+            } catch {
+              return false;
+            }
+          },
+          onMerge: () => undefined,
+        },
+      );
+      if (!ok) throw new Error(t("api.connectFailed"));
+      if (config) setAppConfig(config);
+      // saveProvider 不动 activeProviderKey：不激活的话 fresh install 会停在
+      // 默认的 openrouter 上，成功提示也不会出现。
+      try {
+        const activated = await window.electronAPI.config.setActiveProvider({
+          profileKey,
+        });
+        setAppConfig(activated.config);
+      } catch {
+        // 激活失败不影响「已经配好」，设置页里还能再点「设为当前」
+      }
     },
-    [t],
+    [setAppConfig, t],
   );
 
   // 连接成功的提示必须挂在这一层：卡片区随 isConfigured 变 true 立刻卸载，
@@ -573,11 +656,16 @@ export function WelcomeView() {
         </div>
 
         {showConnectCards && (
-          <ConnectCards
+          <ConnectPanel
+            configuredProfileKeys={
+              new Set(Object.keys(appConfig?.providers ?? {}))
+            }
+            oauthStatuses={oauthStatusesForPanel}
+            configuredLocalGateways={localGatewaysForPanel}
             onOpenCloud={() => setShowLoginModal(true)}
-            onOpenApiKey={handleOpenApiKey}
-            onConnectOAuth={handleConnectOAuth}
-            onConnectSubscription={handleConnectSubscription}
+            onOpenApiSettings={handleOpenApiKey}
+            onOAuthLogin={handleConnectOAuth}
+            onSubmitCredentials={handleSubmitCredentials}
           />
         )}
 

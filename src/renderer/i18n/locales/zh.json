@@ -2425,7 +2425,8 @@
     "connected": "已连接 {{provider}} · {{model}}",
     "rowDeskwand": "DeskWand 登录即用",
     "connectAction": "连接",
-    "moreProviders": "更多供应商…"
+    "moreProviders": "更多供应商…",
+    "moreHint": "找不到想要的？"
   },
   "feed": {
     "filterEmpty": "没有未读的了",

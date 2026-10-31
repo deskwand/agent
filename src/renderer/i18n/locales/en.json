@@ -2428,7 +2428,8 @@
     "connected": "Connected to {{provider}} · {{model}}",
     "rowDeskwand": "Sign in to DeskWand",
     "connectAction": "Connect",
-    "moreProviders": "More providers…"
+    "moreProviders": "More providers…",
+    "moreHint": "Not what you need?"
   },
   "feed": {
     "filterEmpty": "Nothing unread",

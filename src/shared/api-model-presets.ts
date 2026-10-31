@@ -19,6 +19,8 @@ export interface VisionModelConfig {
   apiKey: string;
   baseUrl?: string;
   model: string;
+  /** 引用一条已配置供应商；存在时凭证以那条为准 */
+  providerProfileKey?: string;
 }
 
 export interface SharedProviderPreset {

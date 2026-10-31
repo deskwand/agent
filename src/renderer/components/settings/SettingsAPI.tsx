@@ -11,22 +11,17 @@ import {
   Key,
   Loader2,
   Pencil,
-  Plus,
   Search,
   Server,
   Trash2,
   X,
   Zap,
 } from "lucide-react";
-import { mergeProviderModels } from "../../utils/merge-provider-models";
+import { connectAndPersistProvider } from "../../services/provider-connect";
 import type {
   MergeProviderModelsResult,
   ProviderModelRow,
 } from "../../utils/merge-provider-models";
-import {
-  ConnectTimeoutError,
-  diagnoseProviderModels,
-} from "../../services/connect-models";
 import { useAppStore } from "../../store";
 import {
   FALLBACK_PROVIDER_PRESETS,
@@ -53,6 +48,7 @@ import type {
   DiagnosticResult,
   ProviderPreset,
   ProviderPresets,
+  ProviderDraft,
   ProviderProfileKey,
   ProviderType,
   UtilityModelRuntimeConfig,
@@ -64,7 +60,7 @@ import {
   type WebAccessAuthProvider,
   type WebAccessConfig,
 } from "../../../shared/web-access";
-import { ProviderBrandIcon, resolveProviderBrand } from "./provider-icons";
+import { ProviderBrandIcon } from "./provider-icons";
 import { resolveProviderDisplayName } from "../../utils/model-label";
 import {
   SettingsContentSection,
@@ -107,21 +103,6 @@ type ProviderChoice = ProviderType;
 interface SettingsAPIProps {
   embedded?: boolean;
   onSaved?: () => void;
-}
-
-interface ProviderDraft {
-  profileKey: ProviderProfileKey;
-  provider: ProviderType;
-  customProtocol: CustomProtocolType;
-  name: string;
-  apiKey: string;
-  baseUrl: string;
-  defaultModel: string;
-  models: ApiProviderModel[];
-  /** 用户取消勾选过的模型 id，写回 config.disabledModels */
-  disabledModels?: string[];
-  /** 本机网关预设；目前只有 magpie */
-  localGateway?: LocalGatewayId;
 }
 
 const PROVIDER_ORDER: ProviderChoice[] = [
@@ -574,6 +555,14 @@ export function SettingsAPI({
 
   // ── 视图状态机：列表 → 目录 → 添加 / 详情 ──
   const [view, setView] = useState<ApiView>(API_VIEW_LIST);
+  // 引导页「更多供应商…」带着意图进来，直接落到目录页
+  const apiConfigIntent = useAppStore((state) => state.apiConfigIntent);
+  const setApiConfigIntent = useAppStore((state) => state.setApiConfigIntent);
+  useEffect(() => {
+    if (!apiConfigIntent) return;
+    if (apiConfigIntent === "catalog") setView(openCatalog("main"));
+    setApiConfigIntent(null);
+  }, [apiConfigIntent, setApiConfigIntent]);
 
   // ── Search / webAccess state ──
   const [searchDraft, setSearchDraft] = useState<WebAccessConfig | null>(null);
@@ -593,6 +582,8 @@ export function SettingsAPI({
     model: "",
   });
   const [visionEditorOpen, setVisionEditorOpen] = useState(false);
+  /** 视觉模型来源：off / profile:<profileKey> / manual */
+  const [visionSource, setVisionSource] = useState<string>("off");
   const [isVisionSaving, setIsVisionSaving] = useState(false);
   const [visionError, setVisionError] = useState("");
   const [visionSuccess, setVisionSuccess] = useState("");
@@ -657,8 +648,6 @@ export function SettingsAPI({
     [],
   );
 
-  const isVisionConfigured = !!appConfig?.visionModel?.model?.trim();
-
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -688,6 +677,13 @@ export function SettingsAPI({
       // Initialize vision model state from config
       if (nextConfig.visionModel) {
         setVisionDraft(nextConfig.visionModel);
+        setVisionSource(
+          nextConfig.visionModel.providerProfileKey
+            ? `profile:${nextConfig.visionModel.providerProfileKey}`
+            : nextConfig.visionModel.enabled
+              ? "manual"
+              : "off",
+        );
       }
       if (nextConfig.utilityRuntime) {
         setUtilityDraft(nextConfig.utilityRuntime);
@@ -758,6 +754,22 @@ export function SettingsAPI({
     }
     return ids;
   }, [appConfig]);
+
+  /**
+   * 能当视觉来源的供应商：OAuth 的 provider 是合成值、没有 baseUrl/key，
+   * 引用了只会写出坏配置；零模型的供应商则在来源里选了也没模型可选。
+   */
+  const visionSourceCandidates = useMemo(
+    () =>
+      configuredProviders.filter(
+        (row) =>
+          row.config.provider !== "oauth" &&
+          row.config.models.some(
+            (model) => !(row.config.disabledModels ?? []).includes(model.id),
+          ),
+      ),
+    [configuredProviders],
+  );
 
   const isCustomDraft = draft?.provider === "custom";
   // 保留原始下标：行编辑按 index 定位（手工行的 id 可以是空串，不能用 id 做 key）
@@ -978,156 +990,40 @@ export function SettingsAPI({
    * `silent` = 打开编辑弹窗时的后台刷新（设计 §4.5）：失败只在顶部留一行
    * 提示并保留本地列表，不弹出诊断面板、不打断用户。
    */
+  /**
+   * 连接 = 服务层同一条判断链（services/provider-connect.ts），这里只接状态。
+   * 欢迎屏的「粘贴 API Key」走的是同一个函数，所以两处口径不会漂。
+   */
   const runConnect = async (
     draftValue: ProviderDraft,
     silent = false,
   ): Promise<boolean> => {
-    if (!window.electronAPI) return false;
     const requestId = startConnectRequest();
-    const isStale = () => connectRequestRef.current !== requestId;
     const sanitized = sanitizeDraft(draftValue, presets);
-    const isCustom = sanitized.provider === "custom";
-    // 从配置里判定是否已落过盘（不能读 originalProfileKey：openEdit 会
-    // 同步调它，那时 state 还是上一轮的值）
-    const alreadySaved = Boolean(appConfig?.providers?.[sanitized.profileKey]);
-
-    const fail = (message?: string) => {
-      if (isStale()) return false;
-      if (silent) {
-        setConnectMessage(message ?? t("api.modelsRefreshFailed"));
-        setConnectState("idle");
-        return false;
-      }
-      if (message) setConnectMessage(message);
-      setConnectState("failed");
-    };
-
-    if (requiresApiKey(sanitized.provider) && !sanitized.apiKey) {
-      setError(t("api.enterApiKey"));
-      return false;
-    }
-    if (isCustom && !sanitized.baseUrl) {
-      setError(t("api.enterBaseUrl"));
-      return false;
-    }
-
-    setError("");
-    setSuccessMessage("");
-    setConnectMessage("");
-    setDiagResult(null);
-    setConnectState("connecting");
-
-    // 预设供应商先落盘（目录兜底，断网也可用）；自定义供应商等拉取成功再落盘。
-    // 编辑已有供应商时不预写 —— 它已经落过盘，预写会把现有模型列表洗回目录。
-    if (!isCustom && !alreadySaved) {
-      const savedFirst = await persistModels(
-        sanitized,
-        [],
-        sanitized.defaultModel,
-        sanitized.disabledModels ?? [],
-      );
-      if (isStale()) return false;
-      if (!savedFirst) {
-        setConnectState("idle");
-        return false;
-      }
-    }
-
-    let result: DiagnosticResult;
-    try {
-      result = await diagnoseProviderModels({
-        provider: sanitized.provider,
-        apiKey: sanitized.apiKey,
-        baseUrl: isCustom ? sanitized.baseUrl : undefined,
-        customProtocol: sanitized.customProtocol,
-        captureModels: true,
-      });
-    } catch (connectError) {
-      fail(
-        connectError instanceof ConnectTimeoutError
-          ? t("api.connectTimeout")
-          : connectError instanceof Error
-            ? connectError.message
-            : String(connectError),
-      );
-      return false;
-    }
-
-    if (isStale()) return false;
-    setDiagResult(result);
-
-    if (result.skippedReason) {
-      fail(t("api.modelsBusy"));
-      return false;
-    }
-    if (!result.overallOk) {
-      fail(
-        Boolean(draftValue.localGateway) && result.failedAt === "auth"
-          ? t("api.localGatewayAuthFailed")
-          : undefined,
-      );
-      return false;
-    }
-
-    const live = result.modelsSource === "live" ? (result.models ?? []) : null;
-    // 空列表等同于「没拿到」：既不能报连接成功，也不能拿它去合并清空草稿。
-    if (isCustom && live !== null && live.length === 0) {
-      fail(
-        draftValue.localGateway
-          ? t("api.localGatewayNoModels")
-          : t("api.modelsManualHint"),
-      );
-      return false;
-    }
-    const merge = mergeProviderModels({
-      catalog: catalogForDraft(draftValue),
-      live,
-      saved: draftValue.models,
-      disabled: draftValue.disabledModels ?? [],
-      defaultModel: draftValue.defaultModel,
-      modelSource: isCustom ? "custom" : "preset",
-      // 打开弹窗的静默刷新只刷元数据；只有显式「重新连接」才把端点没返回的
-      // 模型当作下线删掉，否则手填的别名会在用户没操作时被删。
-      dropMissingModels: !silent,
-    });
-    applyMergeToDraft(merge);
-
-    // 自定义供应商拿不到可用列表：不落盘，退回手填编辑器 + 「保存」
-    if (isCustom && (!live || merge.enabled.length === 0)) {
-      fail(
-        draftValue.localGateway && live
-          ? t("api.localGatewayNoModels")
-          : t("api.modelsManualHint"),
-      );
-      return false;
-    }
-
-    // 有可用的启用集才写回：预设供应商已在前面用内置目录兜底落过盘。
-    if (merge.enabled.length > 0) {
-      const persisted = await persistModels(
-        sanitized,
-        merge.enabled,
-        merge.defaultModel,
-        merge.disabled,
-      );
-      if (!persisted) {
-        fail();
-        return false;
-      }
-    }
-
-    setConnectState("connected");
-    if (result.modelsSource === "unsupported") {
-      setConnectMessage(t("api.modelsUnsupported"));
-    } else if (result.modelsFiltered) {
-      setConnectMessage(
-        t("api.modelsFiltered", { count: result.modelsFiltered }),
-      );
-    } else {
-      setConnectMessage(t("api.connected"));
-    }
-
-    return true;
+    const ok = await connectAndPersistProvider(
+      {
+        draft: sanitized,
+        presets,
+        catalog: catalogForDraft(draftValue),
+      },
+      {
+        t,
+        silent,
+        isSaved: (profileKey) =>
+          Boolean(appConfig?.providers?.[profileKey as ProviderProfileKey]),
+        isStale: () => connectRequestRef.current !== requestId,
+        persist: async (draftToSave, models, defaultModel, disabled) =>
+          persistModels(draftToSave, models, defaultModel, disabled),
+        onMerge: (merge) => applyMergeToDraft(merge),
+        onDiagnostic: (result) => {
+          if (result) setDiagResult(result);
+        },
+        onState: (state) => setConnectState(state),
+        onMessage: (message) => setConnectMessage(message),
+        onError: (message) => setError(message),
+      },
+    );
+    return ok;
   };
   const handleConnect = () => {
     if (draft) void runConnect(draft);
@@ -1305,12 +1201,15 @@ export function SettingsAPI({
   // ── Vision model save (from modal) ──
   const handleVisionSave = async () => {
     if (!window.electronAPI) return;
-    if (visionDraft.enabled && !visionDraft.model.trim()) {
+    // 开关在界面上由「来源」表达，校验也必须按来源判，不看草稿里的 enabled
+    const willEnable = visionSource !== "off";
+    if (willEnable && !visionDraft.model.trim()) {
       setVisionError(t("api.modelRequired"));
       return;
     }
     if (
-      visionDraft.enabled &&
+      willEnable &&
+      visionSource === "manual" &&
       !visionDraft.apiKey.trim() &&
       visionDraft.provider !== "ollama"
     ) {
@@ -1321,17 +1220,35 @@ export function SettingsAPI({
     setVisionError("");
     setVisionSuccess("");
     try {
-      const config: VisionModelConfig = {
-        enabled: visionDraft.enabled,
-        provider: visionDraft.provider,
-        customProtocol:
-          visionDraft.provider === "custom"
-            ? visionDraft.customProtocol
-            : undefined,
-        apiKey: visionDraft.apiKey,
-        baseUrl: visionDraft.baseUrl || undefined,
-        model: visionDraft.model,
-      };
+      const config: VisionModelConfig =
+        visionSource === "off"
+          ? {
+              enabled: false,
+              provider: visionDraft.provider,
+              apiKey: visionDraft.apiKey,
+              baseUrl: visionDraft.baseUrl || undefined,
+              model: visionDraft.model,
+            }
+          : visionSource.startsWith("profile:")
+            ? {
+                enabled: true,
+                provider: visionDraft.provider,
+                apiKey: visionDraft.apiKey,
+                baseUrl: visionDraft.baseUrl || undefined,
+                model: visionDraft.model,
+                providerProfileKey: visionSource.slice("profile:".length),
+              }
+            : {
+                enabled: true,
+                provider: visionDraft.provider,
+                customProtocol:
+                  visionDraft.provider === "custom"
+                    ? visionDraft.customProtocol
+                    : undefined,
+                apiKey: visionDraft.apiKey,
+                baseUrl: visionDraft.baseUrl || undefined,
+                model: visionDraft.model,
+              };
       const saved = await window.electronAPI.config.save({
         visionModel: config,
       });
@@ -1350,34 +1267,6 @@ export function SettingsAPI({
   // ── Vision model toggle (instant save from card) ──
   // IMPORTANT: toggle must use the SAVED config (appConfig.visionModel),
   // NOT the draft (visionDraft) which may contain unsaved editor changes.
-  const handleVisionToggle = async (newEnabled: boolean) => {
-    if (!window.electronAPI) return;
-    const saved = appConfig?.visionModel;
-    if (!saved) return;
-    const config: VisionModelConfig = {
-      enabled: newEnabled,
-      provider: saved.provider,
-      customProtocol:
-        saved.provider === "custom" ? saved.customProtocol : undefined,
-      apiKey: saved.apiKey,
-      baseUrl: saved.baseUrl || undefined,
-      model: saved.model,
-    };
-    setIsVisionSaving(true);
-    try {
-      const savedConfig = await window.electronAPI.config.save({
-        visionModel: config,
-      });
-      applyConfig(savedConfig.config);
-      setVisionDraft((prev) => ({ ...prev, enabled: newEnabled }));
-    } catch (saveError) {
-      setVisionError(
-        saveError instanceof Error ? saveError.message : String(saveError),
-      );
-    } finally {
-      setIsVisionSaving(false);
-    }
-  };
 
   // ── Close vision editor, resetting draft to saved state ──
   const closeVisionEditor = () => {
@@ -1396,12 +1285,6 @@ export function SettingsAPI({
     setVisionError("");
     setVisionSuccess("");
     setVisionEditorOpen(true);
-  };
-
-  // ── Mask API key for display ──
-  const maskApiKey = (key: string): string => {
-    if (!key || key.length <= 8) return key || "—";
-    return `${key.slice(0, 4)}...${key.slice(-4)}`;
   };
 
   // ── Vision model helper: reuse active provider's API key ──
@@ -1913,89 +1796,172 @@ export function SettingsAPI({
             面板壳保留，只为 a11y（role=tabpanel + aria 关联）；非当前值面板不保留状态。 */}
         <TabsContent value="vision" className="max-w-[720px] space-y-5">
           {activeTab === "vision" && !embedded && (
-            <>
-              {!isVisionConfigured ? (
-                /* ── Empty state ── */
-                <div className="rounded-2xl border border-dashed border-border/60 px-6 py-10 text-center">
-                  <div className="text-3xl mb-3">🔮</div>
-                  <h3 className="text-sm font-medium text-foreground">
-                    {t("api.visionModelNotConfigured")}
-                  </h3>
-                  <p className="mt-1 text-xs text-muted-foreground max-w-xs mx-auto">
-                    {t("api.visionModelNotConfiguredDesc")}
+            <SettingsContentSection
+              title={t("api.visionModelTitle")}
+              description={t("api.visionModelDesc")}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">
+                  {t("api.visionModelEnable")}
+                </span>
+                <SettingsSwitch
+                  checked={visionSource !== "off"}
+                  onChange={(next) => {
+                    const source = next
+                      ? visionSourceCandidates.length > 0
+                        ? `profile:${visionSourceCandidates[0].profileKey}`
+                        : "manual"
+                      : "off";
+                    setVisionSource(source);
+                    if (source !== "off" && !visionDraft.model.trim()) {
+                      const profile = source.startsWith("profile:")
+                        ? appConfig?.providers?.[
+                            source.slice(
+                              "profile:".length,
+                            ) as ProviderProfileKey
+                          ]
+                        : undefined;
+                      const firstModel = profile?.models?.find(
+                        (model) =>
+                          !(profile.disabledModels ?? []).includes(model.id),
+                      );
+                      if (firstModel) {
+                        setVisionDraft((prev) => ({
+                          ...prev,
+                          provider: profile!.provider,
+                          model: firstModel.id,
+                        }));
+                      }
+                    }
+                  }}
+                  label={t("api.visionModelEnable")}
+                  testId="vision-model-enabled"
+                />
+              </div>
+
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium text-foreground">
+                  {t("api.visionSource")}
+                </span>
+                <SettingsFormSelect
+                  value={visionSource}
+                  testId="vision-source"
+                  label={t("api.visionSource")}
+                  onChange={(next) => {
+                    setVisionSource(next);
+                    if (!next.startsWith("profile:")) return;
+                    const profile =
+                      appConfig?.providers?.[
+                        next.slice("profile:".length) as ProviderProfileKey
+                      ];
+                    if (!profile) return;
+                    const firstModel = profile.models?.find(
+                      (model) =>
+                        !(profile.disabledModels ?? []).includes(model.id),
+                    );
+                    setVisionDraft((prev) => ({
+                      ...prev,
+                      provider: profile.provider,
+                      customProtocol: profile.customProtocol,
+                      baseUrl: profile.baseUrl ?? "",
+                      model: firstModel?.id ?? prev.model,
+                    }));
+                  }}
+                  options={[
+                    { value: "off", label: t("api.sourceOff") },
+                    ...visionSourceCandidates.map((row) => ({
+                      value: `profile:${row.profileKey}`,
+                      label:
+                        row.config.name ||
+                        providerLabel(row.profileKey, presets, t),
+                    })),
+                    { value: "manual", label: t("api.sourceCustom") },
+                  ]}
+                />
+              </label>
+
+              {visionSource.startsWith("profile:") && (
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-foreground">
+                    {t("api.visionModelLabel")}
+                  </span>
+                  <SettingsFormSelect
+                    value={visionDraft.model}
+                    testId="vision-model"
+                    label={t("api.visionModelLabel")}
+                    onChange={(next) =>
+                      setVisionDraft((prev) => ({ ...prev, model: next }))
+                    }
+                    options={(
+                      appConfig?.providers?.[
+                        visionSource.slice(
+                          "profile:".length,
+                        ) as ProviderProfileKey
+                      ]?.models ?? []
+                    )
+                      .filter(
+                        (model) =>
+                          !(
+                            appConfig?.providers?.[
+                              visionSource.slice(
+                                "profile:".length,
+                              ) as ProviderProfileKey
+                            ]?.disabledModels ?? []
+                          ).includes(model.id),
+                      )
+                      .map((model) => ({
+                        value: model.id,
+                        label: model.label,
+                      }))}
+                  />
+                </label>
+              )}
+
+              {visionSource === "manual" && (
+                <div className="space-y-2 rounded-lg border border-border/60 px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">
+                    {visionProviderName(
+                      visionDraft.provider,
+                      visionDraft.customProtocol,
+                      presets,
+                      t,
+                    )}{" "}
+                    / {visionDraft.model || "—"}
                   </p>
                   <Button
                     variant="ghost"
                     type="button"
+                    data-testid="vision-manual-edit"
                     onClick={openVisionEditor}
-                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 h-auto"
+                    className="inline-flex h-auto items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground"
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    {t("api.visionModelConfigureButton")}
+                    <Pencil className="h-3 w-3" />
+                    {t("api.editApi")}
                   </Button>
                 </div>
-              ) : (
-                /* ── Configured card ── */
-                <div
-                  className={`rounded-2xl border border-border/60 bg-background px-4 py-3 shadow-card ${
-                    !visionDraft.enabled ? "opacity-60" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
-                        <ProviderBrandIcon
-                          brand={
-                            resolveProviderBrand(
-                              visionDraft.provider,
-                              visionDraft.customProtocol,
-                            ) ?? "custom"
-                          }
-                          className="h-4 w-4 flex-shrink-0"
-                        />
-                        <span className="truncate">
-                          {visionProviderName(
-                            visionDraft.provider,
-                            visionDraft.customProtocol,
-                            presets,
-                            t,
-                          )}
-                          {" / "}
-                          {visionDraft.model}
-                        </span>
-                      </p>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        API Key: {maskApiKey(visionDraft.apiKey)}
-                        {!visionDraft.enabled && (
-                          <span className="ml-1">
-                            — {t("api.visionModelDisabledHint")}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <SettingsSwitch
-                        checked={visionDraft.enabled}
-                        onChange={(next) => {
-                          void handleVisionToggle(next);
-                        }}
-                        label={t("api.visionModelEnable")}
-                        testId="vision-model-enabled"
-                      />
-                      <Button
-                        variant="ghost"
-                        type="button"
-                        onClick={openVisionEditor}
-                        className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
-                      >
-                        <Pencil className="h-3 w-3" />
-                        {t("api.editApi")}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
               )}
-            </>
+
+              <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+                <Button
+                  variant="ghost"
+                  type="button"
+                  data-testid="vision-save"
+                  disabled={isVisionSaving}
+                  onClick={() => void handleVisionSave()}
+                  className="h-auto rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isVisionSaving ? t("common.saving") : t("common.save")}
+                </Button>
+              </div>
+              {visionError && (
+                <p role="alert" className="text-xs text-destructive">
+                  {visionError}
+                </p>
+              )}
+              {visionSuccess && (
+                <p className="text-xs text-success">{visionSuccess}</p>
+              )}
+            </SettingsContentSection>
           )}
         </TabsContent>
 

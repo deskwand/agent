@@ -938,6 +938,8 @@ export interface VisionModelConfig {
   apiKey: string;
   baseUrl?: string;
   model: string;
+  /** 引用一条已配置供应商；存在时凭证以那条为准（见 main/config/vision-model.ts） */
+  providerProfileKey?: ProviderProfileKey;
 }
 export interface VoiceEngineConfig {
   enabled: boolean;
@@ -1000,6 +1002,22 @@ export interface ApiProviderConfig {
   /** 本机网关预设；目前只有 magpie。仅对 provider === "custom" 生效。 */
   localGateway?: LocalGatewayId;
   updatedAt: string;
+}
+
+/** 供应商「添加/编辑」过程中的草稿。服务层与设置页共用。 */
+export interface ProviderDraft {
+  profileKey: ProviderProfileKey;
+  provider: ProviderType;
+  customProtocol: CustomProtocolType;
+  name: string;
+  apiKey: string;
+  baseUrl: string;
+  defaultModel: string;
+  models: ApiProviderModel[];
+  /** 用户取消勾选过的模型 id，写回 config.disabledModels */
+  disabledModels?: string[];
+  /** 本机网关预设；目前只有 magpie */
+  localGateway?: LocalGatewayId;
 }
 
 export interface SaveProviderPayload {

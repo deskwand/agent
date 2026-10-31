@@ -142,7 +142,7 @@ describe("SettingsAPI 顶部页签（ui/tabs 语义）", () => {
   /** 每个页签内容区的「指纹文案」：切换后用它确认对应面板真的在 DOM 里。 */
   const MARKERS = [
     i18n.t("api.configuredListTitle"),
-    i18n.t("api.visionModelConfigureButton"),
+    i18n.t("api.visionModelTitle"),
     i18n.t("webAccess.groupTitle"),
     i18n.t("api.utilityModelTitle"),
   ];
