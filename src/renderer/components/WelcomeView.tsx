@@ -25,11 +25,11 @@ import type {
   ApiProviderConfig,
 } from "../types";
 import { getInitialSessionTitle } from "../../shared/session-title";
-import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 import {
   Bug,
   Eye,
   FileText,
+  GitBranch,
   Globe,
   Sparkles,
   type LucideIcon,
@@ -166,12 +166,9 @@ export function WelcomeView() {
   });
   const repoFacts = formatRepoFacts(repoSummary, t);
   const repoSuggestions = welcomeRepoSuggestions(repoSummary);
-  const projectName = (() => {
-    if (!workingDir) return "";
-    return workingDir.split(/[\\/]/).filter(Boolean).pop() || "";
-  })();
-  const showProjectTitle =
-    !!projectName && projectName !== DEFAULT_WORKDIR_DIRNAME;
+  // 仓库事实和起手建议都缺（非 git 目录 / 快照还没回来）时，这一段整体不占位。
+  // 以前它外面套着 `h-28` 的固定盒子，非 git 目录下会渲染出 112px 纯空白。
+  const hasRepoContext = Boolean(repoFacts) || repoSuggestions.length > 0;
 
   // 项目列表与会话记录同源（灵感页「交给 AI」用的是同一个函数）。
   // sessions 还没加载完时它是空数组 —— 所以 chip 的显示名绝不能取自它，只能取自 workingDir。
@@ -618,47 +615,11 @@ export function WelcomeView() {
       className={`flex-1 min-h-0 flex flex-col items-center overflow-y-auto ${PAGE_INSET_X} py-10 md:py-14`}
     >
       <div className="my-auto max-w-[52.5rem] w-full shrink-0 space-y-7">
-        <div className="space-y-4 text-center">
-          <p className="text-base font-medium tracking-[-0.02em] text-muted-foreground text-center">
-            {showProjectTitle
-              ? t("welcome.titleWithProject", { projectName })
-              : t("welcome.title")}
-          </p>
-          {!showConnectCards && workingDir ? (
-            <div
-              data-testid="welcome-repo-context"
-              className="flex h-28 min-w-0 flex-col items-center justify-center gap-2"
-            >
-              {repoFacts ? (
-                <p
-                  className="max-w-full truncate text-center text-xs text-muted-foreground"
-                  title={repoFacts}
-                >
-                  {repoFacts}
-                </p>
-              ) : null}
-              {repoSuggestions.length > 0 ? (
-                <div className="flex w-full flex-wrap justify-center gap-2">
-                  {repoSuggestions.map((suggestion) => (
-                    <Button
-                      variant="ghost"
-                      key={suggestion.id}
-                      type="button"
-                      onClick={() =>
-                        chatInputRef.current?.appendPromptExample(
-                          t(suggestion.promptKey),
-                        )
-                      }
-                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground h-auto"
-                    >
-                      {t(`welcome.repo.suggestion.${suggestion.id}`)}
-                    </Button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+        {/* 标题只说「做什么」；「落在哪个项目」由底栏的项目 chip 交代一次。
+            从前标题也重复了项目名，同一个词在一屏里出现两次。 */}
+        <p className="text-base font-medium tracking-[-0.02em] text-muted-foreground text-center">
+          {t("welcome.title")}
+        </p>
 
         {showConnectCards && (
           <ConnectPanel
@@ -674,10 +635,62 @@ export function WelcomeView() {
           />
         )}
 
-        {/* 快捷入口 —— 能力发现，不分组；只在已配置时出现：未配置时它们邀请的动作
-            注定会被主进程的会话闸门拒掉 */}
-        {visibleEntries.length > 0 && !showConnectCards && (
-          <div className="flex flex-wrap justify-center gap-2">
+        {/* 起手动作带 —— 「这仓库现在能做什么」在前，「这个产品能做什么」在后，中间
+            一道竖线分组；只在已配置时出现（未配置时它们邀请的动作注定被主进程的
+            会话闸门拒掉）。
+
+            为什么不是两排：这两段从前是两排 className 几乎逐字相同的 chip，中间
+            夹着 `h-28` 留出来的 58px 硬空白，读起来像一排被挤断了，而不是两个组。
+            现在一条带内间距一律 gap-2。也没有固定高度了 —— chip 行本来就在，仓库
+            事实只是行内加料，数据到达时高度通常不变，不需要为防抖买断 112px。 */}
+        {!showConnectCards && (hasRepoContext || visibleEntries.length > 0) ? (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {workingDir ? (
+              <div
+                data-testid="welcome-repo-context"
+                // 无内容时 `hidden` 而不是不渲染：外层靠 testid 判断「有没有这个区域」，
+                // 而空的 flex 子元素会多占两个 gap，把居中的 chip 行推歪。
+                className={
+                  hasRepoContext
+                    ? "flex min-w-0 flex-wrap items-center justify-center gap-2"
+                    : "hidden"
+                }
+              >
+                {repoFacts ? (
+                  <span
+                    className="inline-flex max-w-full items-center gap-1 text-xs text-muted-foreground"
+                    title={repoFacts}
+                  >
+                    <GitBranch
+                      className="h-3.5 w-3.5 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 truncate">{repoFacts}</span>
+                  </span>
+                ) : null}
+                {repoSuggestions.map((suggestion) => (
+                  <Button
+                    variant="ghost"
+                    key={suggestion.id}
+                    type="button"
+                    onClick={() =>
+                      chatInputRef.current?.appendPromptExample(
+                        t(suggestion.promptKey),
+                      )
+                    }
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground h-auto"
+                  >
+                    {t(`welcome.repo.suggestion.${suggestion.id}`)}
+                  </Button>
+                ))}
+                {hasRepoContext ? (
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-px flex-shrink-0 bg-border/60"
+                  />
+                ) : null}
+              </div>
+            ) : null}
             {visibleEntries.map((entry) => (
               <Button
                 variant="ghost"
@@ -691,7 +704,7 @@ export function WelcomeView() {
               </Button>
             ))}
           </div>
-        )}
+        ) : null}
 
         {showConnectCards && (
           <p className="text-center text-xs text-muted-foreground">

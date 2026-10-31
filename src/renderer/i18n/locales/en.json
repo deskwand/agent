@@ -42,7 +42,6 @@
       }
     },
     "title": "How can I help you today?",
-    "titleWithProject": "How can I help you today in project \"{{projectName}}\"?",
     "projectMenu": {
       "title": "Switch project",
       "triggerLabel": "Switch project, current: {{name}}",

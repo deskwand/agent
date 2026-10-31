@@ -42,9 +42,9 @@ export function ProjectMenuChip({
 }: ProjectMenuChipProps) {
   const { t } = useTranslation();
   const defaultLabel = t("welcome.projectMenu.defaultWorkspace");
-  // 「默认工作区」两种情形合一：没有 workingDir，或路径正好是默认工作目录 ——
-  // 与 WelcomeView 的 `showProjectTitle` 同源（都看 DEFAULT_WORKDIR_DIRNAME），
-  // 免得标题说「在项目「default_working_dir」中」而 chip 说「默认工作区」。
+  // 「默认工作区」两种情形合一：没有 workingDir，或路径正好是默认工作目录。
+  // 这枚 chip 现在是项目名的**唯一出口**（标题不再重复它）——所以这个归一必须
+  // 对，否则界面上唯一的落点信息会显示成 `default_working_dir`。
   const name = workingDir ? projectNameOf(workingDir) : "";
   // 与 projects 里的 cwd 直接比字符串：两边同源 —— 列表那条是 `listWorkspaceProjects()`
   // 规范化过的，当前这条是它经 `workdir.set` **原样回传**的值（`src/main/index.ts:1020`），

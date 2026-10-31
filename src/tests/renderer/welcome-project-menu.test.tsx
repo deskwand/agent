@@ -225,9 +225,11 @@ describe("欢迎页项目 chip", () => {
     });
     // 回传值原样落 store（不自己拼路径）
     expect(useAppStore.getState().workingDir).toBe("/work/beta");
-    // 切完 chip 跟标题都要跟上
+    // 切完 chip 要跟上；标题不再重复项目名（同一屏幕里不出现两次），
+    // 所以「落在哪个项目」只剩 chip 这一个出口
     expect(chip().textContent).toContain("beta");
-    expect(container.textContent).toContain("welcome.titleWithProject");
+    expect(container.textContent).toContain("welcome.title");
+    expect(container.textContent).not.toContain("welcome.titleWithProject");
     // 当前项的勾要跟着走（不然切完菜单里一个勾都没有）
     await pointerDown(chip());
     expect(menuItemByText("beta").getAttribute("aria-current")).toBe("true");
@@ -278,14 +280,17 @@ describe("欢迎页项目 chip", () => {
     expect(useAppStore.getState().workingDir).toBe("/work/beta");
   });
 
-  it("回到默认工作区：不发 IPC，workingDir 清成 null，标题回到不带项目名那一支", async () => {
+  it("回到默认工作区：不发 IPC，workingDir 清成 null，chip 回到默认工作区", async () => {
     await render();
     await pick("welcome.projectMenu.defaultWorkspace");
 
     expect(ui.invoke).not.toHaveBeenCalled();
     expect(useAppStore.getState().workingDir).toBeNull();
+    expect(chip().textContent).toContain(
+      "welcome.projectMenu.defaultWorkspace",
+    );
+    // 标题不再带项目名，所以它不该变——这一条只留 chip 那一侧。
     expect(container.textContent).toContain("welcome.title");
-    // welcome.title 是 welcome.titleWithProject 的子串，所以只查子串是查不出来的
     expect(container.textContent).not.toContain("welcome.titleWithProject");
   });
 

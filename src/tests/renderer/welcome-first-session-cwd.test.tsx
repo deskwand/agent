@@ -78,11 +78,15 @@ describe("欢迎页把 workingDir 当作新会话的 cwd", () => {
     expect(startSession.mock.calls[0][2]).toBeUndefined();
   });
 
-  it("标题走带项目名那一支（用户看得见落地在哪）", async () => {
+  it("项目名不再进标题；落点由底栏 chip 交代（只交代一次）", async () => {
     await submitFirstMessage("把这个做成一个能跑的东西");
 
-    // i18n 在测试里被 mock 成返回 key：这里断言的是「走的是带 projectName 那条分支」。
-    // 不能用 not.toContain("welcome.title")—— 它是 "welcome.titleWithProject" 的子串。
-    expect(container.textContent).toContain("welcome.titleWithProject");
+    // 标题回到不带项目名那一支（i18n 在测试里被 mock 成返回 key）
+    expect(container.textContent).toContain("welcome.title");
+    // 「用户看得见落地在哪」这个诉求没丢：它现在只由底栏的项目 chip 承担
+    const chip = container.querySelector<HTMLElement>(
+      'button[aria-label="welcome.projectMenu.triggerLabel"]',
+    );
+    expect(chip?.textContent).toContain("alpha");
   });
 });

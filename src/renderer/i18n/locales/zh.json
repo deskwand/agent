@@ -42,7 +42,6 @@
       }
     },
     "title": "今天我能为您做些什么？",
-    "titleWithProject": "在项目「{{projectName}}」中，今天我能为您做些什么？",
     "projectMenu": {
       "title": "切换项目",
       "triggerLabel": "切换项目，当前：{{name}}",
