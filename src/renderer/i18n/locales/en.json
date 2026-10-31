@@ -709,8 +709,6 @@
     "modelRequired": "Configure at least one model",
     "duplicateModel": "Model IDs must be unique",
     "models": "Models",
-    "selectProviderStepTitle": "Select API Provider",
-    "selectProviderStepDesc": "Choose a provider first, then fill in the required API details.",
     "newSetUnsavedHint": "Closing this dialog will discard the newly created set.",
     "createSetTitle": "Create Config Set",
     "saveAsTitle": "Save As Config Set",

@@ -709,8 +709,6 @@
     "modelRequired": "请至少配置一个模型",
     "duplicateModel": "模型 ID 不能重复",
     "models": "模型列表",
-    "selectProviderStepTitle": "选择 API 提供商",
-    "selectProviderStepDesc": "先选择供应商，再填写对应的 API 信息。",
     "newSetUnsavedHint": "关闭弹窗会放弃当前新建方案。",
     "createSetTitle": "新建配置方案",
     "saveAsTitle": "另存为配置方案",
