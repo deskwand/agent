@@ -308,6 +308,9 @@ function sanitizeDraft(
         ? { contextWindowPinned: true }
         : {}),
       ...(input && item.inputPinned ? { inputPinned: true } : {}),
+      ...(typeof item.reasoning === "boolean"
+        ? { reasoning: item.reasoning }
+        : {}),
     });
   }
   const models = Array.from(deduped.values());
@@ -833,6 +836,7 @@ export function SettingsAPI({
         input: model.input,
         contextWindowPinned: model.contextWindowPinned,
         inputPinned: model.inputPinned,
+        reasoning: model.reasoning,
         enabled: !(provider.disabledModels ?? []).includes(model.id),
         isDefault: model.id === provider.defaultModel,
       })),
@@ -995,6 +999,9 @@ export function SettingsAPI({
           : {}),
         ...(hasInput ? { input: row.input } : {}),
         ...(hasInput && row.inputPinned ? { inputPinned: true } : {}),
+        ...(typeof row.reasoning === "boolean"
+          ? { reasoning: row.reasoning }
+          : {}),
       };
     });
 

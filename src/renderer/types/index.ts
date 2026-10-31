@@ -1002,6 +1002,8 @@ export interface ApiProviderModel {
   contextWindowPinned?: boolean;
   /** 用户手动改过图片能力 */
   inputPinned?: boolean;
+  /** 用户声明该模型支持扩展思考；缺省表示自动判定 */
+  reasoning?: boolean;
 }
 
 export interface ApiProviderConfig {

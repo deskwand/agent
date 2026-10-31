@@ -180,3 +180,67 @@ describe("模型列表", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+describe("模型列表 — 思考能力", () => {
+  function openPanel(rowOverrides: Partial<ProviderModelRow> = {}) {
+    render([row({ reasoning: undefined, ...rowOverrides })]);
+    act(() => {
+      byTestId<HTMLButtonElement>("model-capability-qwen-max")?.click();
+    });
+  }
+
+  it("默认停在自动，关掉时写入 false 并提交", () => {
+    openPanel();
+
+    const auto = byTestId<HTMLButtonElement>("model-reasoning-auto-qwen-max");
+    const off = byTestId<HTMLButtonElement>("model-reasoning-off-qwen-max");
+    expect(auto?.className).toContain("border-primary");
+    expect(off).not.toBeNull();
+
+    act(() => {
+      off?.click();
+    });
+
+    const committed = onCommit.mock.calls.at(-1)?.[0] ?? [];
+    expect(committed[0].reasoning).toBe(false);
+  });
+
+  it("选自动时清掉声明", () => {
+    openPanel({ reasoning: false });
+
+    act(() => {
+      byTestId<HTMLButtonElement>("model-reasoning-auto-qwen-max")?.click();
+    });
+
+    const committed = onCommit.mock.calls.at(-1)?.[0] ?? [];
+    expect(committed[0].reasoning).toBeUndefined();
+  });
+
+  it("打开时写入 true", () => {
+    openPanel();
+
+    act(() => {
+      byTestId<HTMLButtonElement>("model-reasoning-on-qwen-max")?.click();
+    });
+
+    const committed = onCommit.mock.calls.at(-1)?.[0] ?? [];
+    expect(committed[0].reasoning).toBe(true);
+  });
+});
+
+describe("模型列表 — 思考能力的收起态标记", () => {
+  it("声明过时在能力 chip 里标出来", () => {
+    render([row({ reasoning: true })]);
+    // jsdom 里语言探测落到 en，按 en 文案断言（与文件里其余用例一致）
+    expect(byTestId("model-capability-qwen-max")?.textContent).toContain(
+      "Thinking",
+    );
+  });
+
+  it("选自动时 chip 不出现思考标记", () => {
+    render([row({ reasoning: undefined })]);
+    expect(byTestId("model-capability-qwen-max")?.textContent).not.toContain(
+      "Thinking",
+    );
+  });
+});

@@ -7,6 +7,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { DESKWAND_PROVIDER_PREFIX } from "../../../shared/deskwand-provider";
 import { modelResolutionService } from "../../model/model-resolution-service";
+import { resolveModelReasoning } from "../pi-model-resolution";
 import { resolveModelInput } from "../pi-model-resolution";
 import { configStore, type AppConfig } from "../../config/config-store";
 import { log, logWarn } from "../../utils/logger";
@@ -108,7 +109,9 @@ async function resolveProfileEntry(
       name: m.label || m.id,
       api: resolved.piModel.api,
       baseUrl: effectiveBaseUrl,
-      reasoning: false,
+      // 与主会话同源：显式声明 > 注册表 → id/label 关键词。以前写死 false，
+      // 中转别名（如 qoder/dfmodel）在子代理里同样丢掉思考能力。
+      reasoning: m.reasoning ?? resolveModelReasoning(m.id, m.label),
       // 逐个判能力：显式声明 > 注册表 / 已验证端点上的纯文本表 > 乐观默认（与
       // applyPiModelRuntimeOverrides 同源，此前是默认模型的能力套全表）
       input: m.input?.length

@@ -318,3 +318,30 @@ describe("mergeProviderModels only drops missing rows on an explicit reconnect",
     expect(result.rows[0]?.contextWindow).toBe(1000000);
   });
 });
+
+describe("mergeProviderModels — reasoning declaration", () => {
+  it("carries a saved reasoning declaration onto the catalogue row", () => {
+    const result = mergeProviderModels({
+      ...base,
+      saved: [
+        {
+          id: "claude-opus-4-6",
+          label: "claude-opus-4-6",
+          source: "preset",
+          reasoning: false,
+        },
+      ],
+    });
+
+    const row = result.rows.find((item) => item.id === "claude-opus-4-6");
+    expect(row?.reasoning).toBe(false);
+    expect(
+      result.enabled.find((item) => item.id === "claude-opus-4-6")?.reasoning,
+    ).toBe(false);
+  });
+
+  it("leaves reasoning undefined for rows the user never declared", () => {
+    const result = mergeProviderModels(base);
+    expect(result.rows.every((row) => row.reasoning === undefined)).toBe(true);
+  });
+});

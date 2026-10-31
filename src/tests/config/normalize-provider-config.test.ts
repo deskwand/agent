@@ -455,3 +455,36 @@ describe("normalizeProviderConfig — pinned model metadata", () => {
     expect(row?.contextWindowPinned).toBeUndefined();
   });
 });
+
+describe("normalizeProviderConfig — model reasoning declaration", () => {
+  it("keeps an explicit reasoning flag on custom models", () => {
+    const result = normalizeProviderConfig(
+      "custom:relay" as ProviderProfileKey,
+      {
+        models: [
+          {
+            id: "relay-alias",
+            label: "DeepSeek-Flash",
+            source: "custom",
+            reasoning: false,
+          },
+        ],
+      },
+    );
+
+    expect(result.models[0].reasoning).toBe(false);
+  });
+
+  it("leaves reasoning undefined when the user never declared it", () => {
+    const result = normalizeProviderConfig(
+      "custom:relay" as ProviderProfileKey,
+      {
+        models: [
+          { id: "relay-alias", label: "DeepSeek-Flash", source: "custom" },
+        ],
+      },
+    );
+
+    expect(result.models[0].reasoning).toBeUndefined();
+  });
+});

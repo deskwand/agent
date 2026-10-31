@@ -14,6 +14,8 @@ export interface ProviderModelRow {
   contextWindowPinned?: boolean;
   /** 用户手动改过图片能力 */
   inputPinned?: boolean;
+  /** 用户声明该模型支持扩展思考；缺省表示自动判定 */
+  reasoning?: boolean;
   /** 手工新增、尚未保存的空行（id 可编辑） */
   manual?: boolean;
 }
@@ -59,6 +61,7 @@ function withMetadata(
     model.input = row.input;
     if (row.inputPinned) model.inputPinned = true;
   }
+  if (typeof row.reasoning === "boolean") model.reasoning = row.reasoning;
   return model;
 }
 
@@ -101,6 +104,7 @@ export function mergeProviderModels(
         input: saved?.input,
         contextWindowPinned: saved?.contextWindowPinned,
         inputPinned: saved?.inputPinned,
+        reasoning: saved?.reasoning,
       }),
     );
   }
@@ -125,6 +129,7 @@ export function mergeProviderModels(
         input: saved?.inputPinned ? saved.input : (model.input ?? saved?.input),
         contextWindowPinned: saved?.contextWindowPinned,
         inputPinned: saved?.inputPinned,
+        reasoning: saved?.reasoning,
       }),
     );
   }
@@ -151,6 +156,7 @@ export function mergeProviderModels(
         input: model.input,
         contextWindowPinned: model.contextWindowPinned,
         inputPinned: model.inputPinned,
+        reasoning: model.reasoning,
       }),
     );
   }

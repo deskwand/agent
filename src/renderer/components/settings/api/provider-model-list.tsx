@@ -144,13 +144,23 @@ export function ProviderModelList({
 
       <div data-testid="model-rows" className="space-y-0.5">
         {visible.map(({ row, index }) => {
+          // 声明过思考能力时在收起状态也标出来：中转端点开始 400 时，用户不该
+          // 为了确认「我改过这个开关」再展开面板。
+          const capabilities = [
+            imageOn(row)
+              ? t("api.modelCapabilityChipImage")
+              : t("api.modelCapabilityChipText"),
+          ];
+          if (typeof row.reasoning === "boolean") {
+            capabilities.push(
+              row.reasoning
+                ? t("api.modelCapabilityChipReasoningOn")
+                : t("api.modelCapabilityChipReasoningOff"),
+            );
+          }
           const chip = [formatContextWindow(row.contextWindow)]
             .filter(Boolean)
-            .concat(
-              imageOn(row)
-                ? t("api.modelCapabilityChipImage")
-                : t("api.modelCapabilityChipText"),
-            )
+            .concat(capabilities)
             .join(" · ");
           const panelOpen = openCapability === (row.id || `manual-${index}`);
           const panelKey = row.id || `manual-${index}`;
@@ -321,6 +331,51 @@ export function ProviderModelList({
                         );
                       })}
                     </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[11px] text-muted-foreground">
+                      {t("api.supportsReasoning")}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {(["auto", "on", "off"] as const).map((mode) => {
+                        const active =
+                          mode === "on"
+                            ? row.reasoning === true
+                            : mode === "off"
+                              ? row.reasoning === false
+                              : typeof row.reasoning !== "boolean";
+                        return (
+                          <Button
+                            variant="ghost"
+                            key={mode}
+                            type="button"
+                            data-testid={`model-reasoning-${mode}-${row.id}`}
+                            onClick={() => {
+                              const next: Partial<ProviderModelRow> =
+                                mode === "auto"
+                                  ? { reasoning: undefined }
+                                  : { reasoning: mode === "on" };
+                              onCommit(patch(index, next));
+                            }}
+                            className={`h-auto rounded-md border px-2 py-0.5 text-[11px] ${
+                              active
+                                ? "border-primary bg-primary/10 font-medium text-primary-text"
+                                : "border-border/60 text-muted-foreground hover:border-border"
+                            }`}
+                          >
+                            {mode === "auto"
+                              ? t("api.modelCapabilityAutomatic")
+                              : mode === "on"
+                                ? t("api.modelCapabilityReasoningOn")
+                                : t("api.modelCapabilityReasoningOff")}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10.5px] text-muted-foreground">
+                      {t("api.modelCapabilityReasoningAutoHint")}
+                    </p>
                   </div>
                 </div>
               )}

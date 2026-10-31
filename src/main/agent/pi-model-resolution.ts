@@ -672,3 +672,41 @@ export function resolveModelInput(
   if (registryInput) return registryInput;
   return ["text", "image"];
 }
+
+/** label 里的空格与下划线当作连字符，让 "DeepSeek Flash" 命中 deepseek-flash。 */
+function normalizeReasoningKeywordSource(value: string): string {
+  return value.trim().replace(/[\s_]+/g, "-");
+}
+
+/**
+ * 单个模型有没有扩展思考（reasoning）能力。
+ *
+ * 顺序：注册表同 id 条目 > id 关键词 > label 关键词 > false。
+ * 用户的显式声明不在这里裁决 —— 调用方先看配置里的 reasoning 字段。
+ *
+ * 注册表查找直接复用 resolvePiRegistryModel：它已经处理了「id 自带 provider
+ * 前缀」与「同 id 在多家目录里」的优先级，不要在这里重写一遍。
+ *
+ * label 必须参与：`qoder/dfmodel` 这类中转 id 不含任何关键词，用户看到的
+ * 名字是 "DeepSeek-Flash"。此前只测 id，这类模型被静默判成不支持思考，
+ * pi 拿到 reasoning:false 后把思考档位夹成 off（实测 PI_REASONING_LEVEL=off）。
+ *
+ * label 层放宽了误判面：像 "Qwen3-Coder" 这样的中转别名也会命中 qwen3 关键词，
+ * 于是 pi 会向并不支持思考的后端发 reasoning_effort。这是有意的取舍 —— 目录命中
+ * 与设置页的「不支持」开关是退路，标错一次比把真推理模型判成 off 便宜。
+ */
+export function resolveModelReasoning(
+  modelId: string,
+  label?: string,
+): boolean {
+  const trimmed = modelId.trim();
+  if (trimmed) {
+    const registryModel = resolvePiRegistryModel(trimmed);
+    if (registryModel) return registryModel.reasoning === true;
+  }
+  if (REASONING_MODEL_PATTERN.test(trimmed)) return true;
+  const normalizedLabel = normalizeReasoningKeywordSource(label ?? "");
+  return (
+    normalizedLabel !== "" && REASONING_MODEL_PATTERN.test(normalizedLabel)
+  );
+}

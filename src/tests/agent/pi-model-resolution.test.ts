@@ -7,6 +7,7 @@ vi.mock("../../main/config/models-dev-catalog", () => ({
 
 import {
   resolveModelContextWindow,
+  resolveModelReasoning,
   resolvePiRouteProtocol,
 } from "../../main/agent/pi-model-resolution";
 
@@ -91,5 +92,34 @@ describe("resolveModelContextWindow — provider aware", () => {
 
   it("returns 0 for unknown models instead of inventing a number", () => {
     expect(resolveModelContextWindow("totally-unknown-model")).toBe(0);
+  });
+});
+
+describe("resolveModelReasoning", () => {
+  it("reads reasoning from a registry entry with the same id", () => {
+    // deepseek-flash 在 pi-ai 1.4.0 目录里是 reasoning:true；gpt-4o 是 false
+    expect(resolveModelReasoning("deepseek-flash")).toBe(true);
+    expect(resolveModelReasoning("gpt-4o")).toBe(false);
+  });
+
+  it("strips a provider prefix before the registry lookup", () => {
+    expect(resolveModelReasoning("deepseek/deepseek-flash")).toBe(true);
+  });
+
+  it("matches the label when the id is a relay alias", () => {
+    // 真机案例：qoder 中转把 DeepSeek-Flash 暴露成 qoder/dfmodel
+    expect(resolveModelReasoning("qoder/dfmodel", "DeepSeek-Flash")).toBe(true);
+    expect(resolveModelReasoning("relay-alias", "DeepSeek Flash")).toBe(true);
+  });
+
+  it("returns false when neither id nor label names a reasoning model", () => {
+    expect(resolveModelReasoning("qoder/dfmodel", "DF Model")).toBe(false);
+    expect(resolveModelReasoning("my-relay-model")).toBe(false);
+    expect(resolveModelReasoning("")).toBe(false);
+  });
+
+  it("still recognises the id keywords used before this change", () => {
+    expect(resolveModelReasoning("some-reasoner-v2")).toBe(true);
+    expect(resolveModelReasoning("kimi-k2-thinking")).toBe(true);
   });
 });

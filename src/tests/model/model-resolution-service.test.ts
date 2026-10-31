@@ -20,6 +20,7 @@ vi.mock("../../main/config/ollama-api", () => ({
   })),
 }));
 
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { ModelResolutionService } from "../../main/model/model-resolution-service";
 import { normalizeProviderConfig } from "../../main/config/config-store";
 import type {
@@ -527,5 +528,84 @@ describe("ModelResolutionService — models.dev fallback for endpoint-only model
 
     expect(result.piModel.id).toBe("opencode-go/kimi-k3");
     expect(result.piModel.provider).toBe("deskwand:custom:magpie");
+  });
+});
+
+describe("ModelResolutionService — synthetic reasoning", () => {
+  const service = new ModelResolutionService();
+
+  function appConfigWithRelay(): AppConfig {
+    const config = buildAppConfig();
+    config.providers["custom:qoder"] = {
+      provider: "custom",
+      customProtocol: "openai",
+      apiKey: "qoder-key",
+      baseUrl: "https://qoder.example.com/v1",
+      defaultModel: "qoder/dfmodel",
+      models: [
+        { id: "qoder/dfmodel", label: "DeepSeek-Flash", source: "custom" },
+      ],
+      updatedAt: "2026-10-31T00:00:00.000Z",
+    };
+    return config;
+  }
+
+  it("turns reasoning on for a relay alias whose label names a reasoning model", async () => {
+    const result = await service.resolve({
+      sessionProviderProfileKey: "custom:qoder" as ProviderProfileKey,
+      sessionModel: "qoder/dfmodel",
+      appConfig: appConfigWithRelay(),
+    });
+
+    expect(result.trace.piModelSource).toBe("synthetic");
+    expect(result.piModel.reasoning).toBe(true);
+    // 判定的目的是让「中」不再被夹成 off：支持档位必须包含 medium。
+    expect(getSupportedThinkingLevels(result.piModel)).toContain("medium");
+  });
+
+  it("lets an explicit reasoning:false win over the label", async () => {
+    const appConfig = appConfigWithRelay();
+    appConfig.providers["custom:qoder"]!.models[0].reasoning = false;
+
+    const result = await service.resolve({
+      sessionProviderProfileKey: "custom:qoder" as ProviderProfileKey,
+      sessionModel: "qoder/dfmodel",
+      appConfig,
+    });
+
+    expect(result.piModel.reasoning).toBe(false);
+    // 声明关掉之后只剩 off —— pi 会据此把档位夹回来。
+    expect(getSupportedThinkingLevels(result.piModel)).toEqual(["off"]);
+  });
+
+  it("lets a declaration override a registry-resolved model", async () => {
+    // deepseek-flash 在目录里是 reasoning:true。用户手关后必须尊重声明，
+    // 否则在设置里改「不支持」对这种目录内模型完全不生效。
+    const appConfig = buildAppConfig();
+    appConfig.providers["custom:relay"] = {
+      provider: "custom",
+      customProtocol: "openai",
+      apiKey: "relay-key",
+      baseUrl: "https://relay.example.com/v1",
+      defaultModel: "deepseek-flash",
+      models: [
+        {
+          id: "deepseek-flash",
+          label: "deepseek-flash",
+          source: "custom",
+          reasoning: false,
+        },
+      ],
+      updatedAt: "2026-10-31T00:00:00.000Z",
+    };
+
+    const result = await service.resolve({
+      sessionProviderProfileKey: "custom:relay" as ProviderProfileKey,
+      sessionModel: "deepseek-flash",
+      appConfig,
+    });
+
+    expect(result.trace.piModelSource).toBe("registry");
+    expect(result.piModel.reasoning).toBe(false);
   });
 });

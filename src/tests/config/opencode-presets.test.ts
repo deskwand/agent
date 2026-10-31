@@ -187,3 +187,32 @@ describe("OpenCode config integration", () => {
     expect(enriched.config.disabledModels).toEqual(["glm-5.2"]);
   });
 });
+
+describe("enrichProviderModelsFromRegistry — reasoning declaration", () => {
+  it("keeps a user-declared reasoning flag when the registry rebuilds models", async () => {
+    const enriched = await enrichProviderModelsFromRegistry({
+      profileKey: "opencode",
+      config: {
+        provider: "opencode",
+        customProtocol: "openai",
+        apiKey: "sk-test",
+        baseUrl: "https://opencode.ai/zen/v1",
+        defaultModel: "",
+        models: [
+          {
+            id: "claude-sonnet-4-6",
+            label: "claude-sonnet-4-6",
+            source: "preset",
+            reasoning: false,
+          },
+        ],
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      },
+    });
+
+    const rebuilt = enriched.config.models.find(
+      (entry) => entry.id === "claude-sonnet-4-6",
+    );
+    expect(rebuilt?.reasoning).toBe(false);
+  });
+});

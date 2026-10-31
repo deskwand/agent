@@ -104,6 +104,14 @@ export interface ApiProviderModel {
   contextWindowPinned?: boolean;
   /** 用户手动改过该模型的图片能力；语义与 contextWindowPinned 相同。 */
   inputPinned?: boolean;
+  /**
+   * 用户声明该模型是否支持扩展思考（reasoning）。
+   *
+   * 存在即声明，`undefined` 表示交给自动判定（注册表 → id/label 关键词）。
+   * 这里没有 pinned 标记：reasoning 从来没有被自动写入过配置，存量值只可能
+   * 来自用户，所以不需要像 contextWindowPinned 那样区分「自动值」与「手填值」。
+   */
+  reasoning?: boolean;
 }
 
 export interface ApiProviderConfig {
@@ -621,6 +629,7 @@ function normalizeProviderModel(
   }
   if (raw?.contextWindowPinned === true) model.contextWindowPinned = true;
   if (raw?.inputPinned === true) model.inputPinned = true;
+  if (typeof raw?.reasoning === "boolean") model.reasoning = raw.reasoning;
   // Auto-resolve contextWindow for all models (preset + custom without manual override)
   if (!model.contextWindow || model.contextWindow <= 0) {
     try {
@@ -825,7 +834,9 @@ export async function enrichProviderModelsFromRegistry(
     (payload.config.models ?? [])
       .filter(
         (model) =>
-          model?.contextWindowPinned === true || model?.inputPinned === true,
+          model?.contextWindowPinned === true ||
+          model?.inputPinned === true ||
+          typeof model?.reasoning === "boolean",
       )
       .map((model) => [model.id, model]),
   );
@@ -845,6 +856,9 @@ export async function enrichProviderModelsFromRegistry(
       if (pinned.inputPinned === true && Array.isArray(pinned.input)) {
         merged.input = pinned.input;
         merged.inputPinned = true;
+      }
+      if (typeof pinned.reasoning === "boolean") {
+        merged.reasoning = pinned.reasoning;
       }
       return merged;
     });

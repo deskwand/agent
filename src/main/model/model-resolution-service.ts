@@ -23,6 +23,7 @@ import { shouldPreserveModelId } from "../../shared/local-gateways";
 import {
   applyPiModelRuntimeOverrides,
   buildSyntheticPiModel,
+  resolveModelReasoning,
   resolvePiModelString,
   resolvePiRegistryModel,
   resolvePiRouteProtocol,
@@ -193,6 +194,7 @@ export class ModelResolutionService {
     });
 
     let piModelSource: ModelResolutionTrace["piModelSource"] = "registry";
+
     let piModel = resolvePiRegistryModel(modelString, {
       configProvider: protocol,
       customBaseUrl: baseUrl,
@@ -200,6 +202,21 @@ export class ModelResolutionService {
       customProtocol: providerConfig.customProtocol,
       preserveModelId: shouldPreserveModelId(providerConfig),
     });
+
+    // 显式声明 > 本次已解析出的目录条目 > 自动判定（id/label 关键词）。
+    //
+    // 第二层直接用 piModel.reasoning，而不是再调一次 resolveModelReasoning：这里的
+    // 目录查询带着 configProvider / customBaseUrl / preserveModelId，是权威的一份；
+    // 让 `resolveModelReasoning` 用空的 options 再查一遍，等于把「哪份目录条目算数」
+    // 判断两次，两份答案不一致时就会把已经解析对的 reasoning 翻回去。
+    // 合成分支 piModel 为空，那时才轮到 resolveModelReasoning（目录必然查不到）。
+    const resolvedReasoning =
+      modelSelection.matchedModel.reasoning ??
+      piModel?.reasoning ??
+      resolveModelReasoning(
+        modelSelection.modelId,
+        modelSelection.matchedModel.label,
+      );
 
     if (!piModel) {
       piModelSource = "synthetic";
@@ -230,7 +247,7 @@ export class ModelResolutionService {
         protocol,
         baseUrl,
         undefined,
-        undefined,
+        resolvedReasoning,
         modelSelection.matchedModel.contextWindow ?? catalogContextWindow,
         modelSelection.matchedModel.maxTokens,
       );
@@ -240,6 +257,13 @@ export class ModelResolutionService {
         rawProvider: providerConfig.provider,
         customProtocol: providerConfig.customProtocol,
       });
+    }
+
+    // 目录分支不读我们的配置，声明与 label 判定要在这里补一刀。合成分支已经带着
+    // 同一个值进来，这个判断在那里是空操作；`applyPiModelRuntimeOverrides` 在合成
+    // 分支内部跑的时候看的也是 resolvedReasoning，不会被这次赋值绕过。
+    if (piModel.reasoning !== resolvedReasoning) {
+      piModel = { ...piModel, reasoning: resolvedReasoning } as Model<Api>;
     }
 
     if (

@@ -277,3 +277,66 @@ describe("registerDeskWandProviders", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+describe("registerDeskWandProviders — reasoning capability", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    runtimeMock.getRegisteredProviderIds.mockReturnValue([]);
+    runtimeMock.removeRuntimeApiKey.mockResolvedValue(undefined);
+    runtimeMock.setRuntimeApiKey.mockResolvedValue(undefined);
+    resolveMock.mockResolvedValue({
+      providerProfileKey: "current",
+      providerType: "custom",
+      customProtocol: "openai",
+      protocol: "openai",
+      modelId: "relay-alias",
+      apiKey: "relay-key",
+      baseUrl: "https://relay.test/v1",
+      contextWindow: 1000000,
+      maxTokens: 384000,
+      piModel: model,
+      trace: {
+        providerSource: "session",
+        modelSource: "provider.defaultModel",
+        piModelSource: "synthetic",
+        notes: [],
+      },
+    });
+  });
+
+  it("derives reasoning from the label and honours an explicit override", async () => {
+    const relayConfig = {
+      providers: {
+        current: {
+          provider: "custom",
+          customProtocol: "openai",
+          apiKey: "relay-key",
+          baseUrl: "https://relay.test/v1",
+          defaultModel: "relay-alias",
+          models: [
+            { id: "relay-alias", label: "DeepSeek-Flash", source: "custom" },
+            {
+              id: "relay-plain",
+              label: "Plain Model",
+              source: "custom",
+              reasoning: false,
+            },
+          ],
+          updatedAt: "2026-10-31T00:00:00.000Z",
+        },
+      },
+    } as unknown as AppConfig;
+
+    await registerDeskWandProviders(runtime, relayConfig);
+
+    const registered = runtimeMock.registerProvider.mock.calls.at(-1)?.[1] as {
+      models: Array<{ id: string; reasoning?: boolean }>;
+    };
+    const reasoningById = Object.fromEntries(
+      registered.models.map((entry) => [entry.id, entry.reasoning]),
+    );
+
+    expect(reasoningById["relay-alias"]).toBe(true);
+    expect(reasoningById["relay-plain"]).toBe(false);
+  });
+});
