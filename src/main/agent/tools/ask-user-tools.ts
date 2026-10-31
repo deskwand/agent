@@ -172,6 +172,16 @@ export function createAskUserTools(
       const result = await requestAskUser(sessionId, toolCallId, questions);
 
       if (result.status === "cancelled") {
+        // 用户改在对话里发消息（主进程 steerSession 解的提问）：那条消息已经
+        // 作为引导进了本回合，模型不该重新提问，也不该按默认值继续瞎猜。
+        if (result.reason === "userReplied") {
+          return text(
+            "The user did not answer the card; they replied in chat " +
+              "instead — their message is part of this turn. Act on it " +
+              "and do not repeat these questions.",
+            { askUserStatus: "userReplied" },
+          );
+        }
         return text(
           "The user cancelled this question (the session was stopped). " +
             "Continue with reasonable defaults, or explain in plain text " +

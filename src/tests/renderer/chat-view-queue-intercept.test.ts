@@ -10,9 +10,15 @@ import { selectedButton } from "../fixtures/element-selection";
 
 let capturedOnSubmit: ((data: ChatInputSubmitData) => void) | null = null;
 let capturedQueueSteer: ((id: string) => void) | null = null;
+const capturedSetPrompt: string[] = [];
 
+const ipcMocks = vi.hoisted(() => ({ submitAskUser: vi.fn() }));
+
+// 真 i18n 配置会在模块加载时 i18n.use(initReactI18next)，缺这个导出会让整份
+// 测试文件在收集阶段就挂掉（本文件在 main 上已因此红了，这里顺手补齐）。
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
+  initReactI18next: { type: "3rdParty", init: () => undefined },
 }));
 
 vi.mock("../../renderer/hooks/useIPC", () => ({
@@ -22,17 +28,23 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
     setSessionThinkingLevel: vi.fn(),
     setSessionProviderModel: vi.fn(),
     isElectron: false,
+    submitAskUser: ipcMocks.submitAskUser,
   }),
 }));
 
 vi.mock("../../renderer/components/ChatInput", async () => {
   const ReactModule = await import("react");
   return {
-    ChatInput: ReactModule.forwardRef(function MockChatInput(props: { onSubmit: (d: unknown) => void }, ref) {
+    ChatInput: ReactModule.forwardRef(function MockChatInput(
+      props: { onSubmit: (d: unknown) => void },
+      ref,
+    ) {
       ReactModule.useImperativeHandle(ref, () => ({
         clear: () => {},
         focus: () => {},
-        setPrompt: () => {},
+        setPrompt: (text: string) => {
+          capturedSetPrompt.push(text);
+        },
         submit: () => {},
         isEmpty: () => true,
         selectFiles: () => {},
@@ -67,15 +79,27 @@ vi.mock("../../renderer/components/ChatInputQueueBar", async () => {
 
 function makeSession(status: Session["status"]): Session {
   return {
-    id: "s1", title: "t", status,
-    createdAt: Date.now(), updatedAt: Date.now(), cwd: "/tmp",
-    mountedPaths: [] as MountedPath[], allowedTools: [],
-    memoryEnabled: false, isProjectMode: false,
+    id: "s1",
+    title: "t",
+    status,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    cwd: "/tmp",
+    mountedPaths: [] as MountedPath[],
+    allowedTools: [],
+    memoryEnabled: false,
+    isProjectMode: false,
   };
 }
 
 function makeMessage(id: string): Message {
-  return { id, sessionId: "s1", role: "user", timestamp: Date.now(), content: [{ type: "text", text: id }] };
+  return {
+    id,
+    sessionId: "s1",
+    role: "user",
+    timestamp: Date.now(),
+    content: [{ type: "text", text: id }],
+  };
 }
 
 function setInitialState(status: Session["status"]): void {
@@ -84,16 +108,23 @@ function setInitialState(status: Session["status"]): void {
     activeSessionId: "s1",
     sessionStates: {
       s1: {
-        historyHydrated: true, hasMoreOlder: false, oldestMessageId: null,
+        historyHydrated: true,
+        hasMoreOlder: false,
+        oldestMessageId: null,
         messages: [makeMessage("u1")],
-        partialByTurn: {}, partialMessage: "", partialThinking: "",
-        pendingTurns: [], activeTurn: null,
+        partialByTurn: {},
+        partialMessage: "",
+        partialThinking: "",
+        pendingTurns: [],
+        activeTurn: null,
         executionClock: { startAt: null, endAt: null },
-        traceSteps: [], contextWindow: 0,
+        traceSteps: [],
+        contextWindow: 0,
         compaction: { status: "idle" },
         inputQueue: [],
         steerRecords: [],
-        partialToolResults: {}, backgroundAgents: [],
+        partialToolResults: {},
+        backgroundAgents: [],
       } as never,
     },
   });
@@ -105,7 +136,9 @@ describe("ChatView non-idle send interception", () => {
   let scrollToDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(() => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    (
+      globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
     useAppStore.setState(useAppStore.getInitialState());
     class ResizeObserverMock {
       observe() {}
@@ -145,6 +178,8 @@ describe("ChatView non-idle send interception", () => {
     await act(async () => root.unmount());
     container.remove();
     capturedOnSubmit = null;
+    capturedSetPrompt.length = 0;
+    ipcMocks.submitAskUser.mockClear();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     if (scrollToDescriptor) {
@@ -164,7 +199,9 @@ describe("ChatView non-idle send interception", () => {
 
   it("routes plain-text submit to inputQueue when running", async () => {
     setInitialState("running");
-    await act(async () => { root.render(React.createElement(ChatView)); });
+    await act(async () => {
+      root.render(React.createElement(ChatView));
+    });
     await act(async () => {
       capturedOnSubmit!({ text: "keep going", images: [], files: [] });
     });
@@ -175,12 +212,18 @@ describe("ChatView non-idle send interception", () => {
 
   it("routes image attachment submits to inputQueue when running", async () => {
     setInitialState("running");
-    await act(async () => { root.render(React.createElement(ChatView)); });
+    await act(async () => {
+      root.render(React.createElement(ChatView));
+    });
     await act(async () => {
       capturedOnSubmit!({
         text: "look at this",
         images: [
-          { url: "data:image/png;base64,AAA", base64: "AAA", mediaType: "image/png" },
+          {
+            url: "data:image/png;base64,AAA",
+            base64: "AAA",
+            mediaType: "image/png",
+          },
         ],
         files: [],
       });
@@ -195,7 +238,9 @@ describe("ChatView non-idle send interception", () => {
 
   it("routes file attachment submits to inputQueue when running", async () => {
     setInitialState("running");
-    await act(async () => { root.render(React.createElement(ChatView)); });
+    await act(async () => {
+      root.render(React.createElement(ChatView));
+    });
     await act(async () => {
       capturedOnSubmit!({
         text: "check this file",
@@ -220,7 +265,9 @@ describe("ChatView non-idle send interception", () => {
 
   it("does not intercept when idle", async () => {
     setInitialState("idle");
-    await act(async () => { root.render(React.createElement(ChatView)); });
+    await act(async () => {
+      root.render(React.createElement(ChatView));
+    });
     await act(async () => {
       capturedOnSubmit!({ text: "normal send", images: [], files: [] });
     });
@@ -235,29 +282,40 @@ describe("ChatView non-idle send interception", () => {
       activeSessionId: "s1",
       sessionStates: {
         s1: {
-          historyHydrated: true, hasMoreOlder: false, oldestMessageId: null,
+          historyHydrated: true,
+          hasMoreOlder: false,
+          oldestMessageId: null,
           messages: [
             makeMessage("u1"),
             { ...makeMessage("a1"), role: "assistant" },
             { ...makeMessage("g1"), role: "user", autoGenerated: true },
           ],
-          partialByTurn: {}, partialMessage: "", partialThinking: "",
-          pendingTurns: [], activeTurn: null,
+          partialByTurn: {},
+          partialMessage: "",
+          partialThinking: "",
+          pendingTurns: [],
+          activeTurn: null,
           executionClock: { startAt: null, endAt: null },
-          traceSteps: [], contextWindow: 0,
+          traceSteps: [],
+          contextWindow: 0,
           compaction: { status: "idle" },
           inputQueue: [],
           steerRecords: [],
-          partialToolResults: {}, backgroundAgents: [],
+          partialToolResults: {},
+          backgroundAgents: [],
         } as never,
       },
     });
-    await act(async () => { root.render(React.createElement(ChatView)); });
+    await act(async () => {
+      root.render(React.createElement(ChatView));
+    });
     await act(async () => {
       capturedOnSubmit!({ text: "深圳", images: [], files: [] });
     });
     const queuedId = useAppStore.getState().sessionStates.s1!.inputQueue[0].id;
-    await act(async () => { capturedQueueSteer!(queuedId); });
+    await act(async () => {
+      capturedQueueSteer!(queuedId);
+    });
     const record = useAppStore.getState().sessionStates.s1!.steerRecords[0];
     expect(record.anchorMessageId).toBe("a1"); // 最后一条可见消息，而非 autoGenerated 的 g1
   });
@@ -284,5 +342,84 @@ describe("ChatView non-idle send interception", () => {
     expect(useAppStore.getState().sessionStates.s1!.inputQueue[0].id).toBe(
       queued.id,
     );
+  });
+
+  function seedPendingAskUser(): void {
+    useAppStore.setState({
+      pendingAskUsers: {
+        "t-1": {
+          sessionId: "s1",
+          toolCallId: "t-1",
+          questions: [
+            {
+              question: "数据库用哪个？",
+              header: "技术栈",
+              type: "choice",
+              options: [{ label: "PostgreSQL" }, { label: "SQLite" }],
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  it("卡片挂起时提交：走 steer 而不是排队区", async () => {
+    setInitialState("running");
+    seedPendingAskUser();
+    await act(async () => {
+      root.render(React.createElement(ChatView));
+    });
+    await act(async () => {
+      capturedOnSubmit!({ text: "直接用 SQLite", images: [], files: [] });
+    });
+    const state = useAppStore.getState().sessionStates.s1!;
+    expect(state.inputQueue).toEqual([]);
+    expect(state.steerRecords).toHaveLength(1);
+    expect(state.steerRecords[0]!.text).toBe("直接用 SQLite");
+    expect(ipcMocks.submitAskUser).not.toHaveBeenCalled();
+  });
+
+  it("卡片挂起 + 元素附件：程序化跳过卡片，仍走排队区", async () => {
+    setInitialState("running");
+    seedPendingAskUser();
+    await act(async () => {
+      root.render(React.createElement(ChatView));
+    });
+    await act(async () => {
+      capturedOnSubmit!({
+        text: "",
+        images: [],
+        files: [],
+        elSelections: [selectedButton],
+      });
+    });
+    const state = useAppStore.getState().sessionStates.s1!;
+    expect(state.inputQueue).toHaveLength(1);
+    expect(state.inputQueue[0]!.elSelections).toEqual([selectedButton]);
+    expect(state.steerRecords).toEqual([]);
+    expect(ipcMocks.submitAskUser).toHaveBeenCalledWith("s1", "t-1", {
+      "0": "__SKIPPED__",
+    });
+  });
+
+  it("卡片挂起时 steer 失败：把文本回填输入框（会话等不到 idle）", async () => {
+    setInitialState("running");
+    seedPendingAskUser();
+    await act(async () => {
+      root.render(React.createElement(ChatView));
+    });
+    await act(async () => {
+      capturedOnSubmit!({ text: "直接用 SQLite", images: [], files: [] });
+    });
+    const record = useAppStore.getState().sessionStates.s1!.steerRecords[0]!;
+    // 主进程回报 steer 失败（no-active-session / sdk-error）
+    await act(async () => {
+      useAppStore.getState().updateSteerRecord("s1", record.id, {
+        status: "failed",
+        reason: "sdk-error",
+      });
+    });
+    // 卡片还挂着 → 等不到 idle，必须就地回填，否则用户打的字凭空消失
+    expect(capturedSetPrompt).toContain("直接用 SQLite");
   });
 });

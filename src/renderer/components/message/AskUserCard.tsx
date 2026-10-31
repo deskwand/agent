@@ -1,6 +1,6 @@
 // ask_user 内联卡片：pending 可交互 / answered、cancelled、interrupted 只读。
 // 状态判定：findToolResult 找到 result → 解析 answers（answered）或
-// askUserStatus（cancelled）；无 result 且 pendingAskUsers 有本块 → pending；
+// askUserStatus（cancelled / userReplied）；无 result 且 pendingAskUsers 有本块 → pending；
 // 无 result 且非 pending → interrupted（会话重启/历史重放）。
 // 视觉遵循已确认 mockup：左侧状态色竖条（pending 靛蓝语义 Token bg-primary、
 // answered/cancelled 灰）、header 彩色胶囊、题间虚线分隔、底部按钮区。
@@ -68,8 +68,7 @@ export function AskUserCard({
 
   // 已提交答案（从 tool_result 文本 JSON 解析）
   const answers: AskUserAnswers | undefined = useMemo(() => {
-    if (!resultBlock || resultBlock.askUserStatus === "cancelled")
-      return undefined;
+    if (!resultBlock || resultBlock.askUserStatus) return undefined;
     const text =
       typeof resultBlock.content === "string" ? resultBlock.content : "";
     try {
@@ -107,7 +106,7 @@ export function AskUserCard({
 
   if (questions.length === 0) return null;
 
-  const cancelled = resultBlock?.askUserStatus === "cancelled";
+  const terminalStatus = resultBlock?.askUserStatus;
   const isPending = !resultBlock && Boolean(pendingRequest);
   const interactive = isPending && !locked;
   const allSkipped =
@@ -115,8 +114,12 @@ export function AskUserCard({
     questions.length > 0 &&
     questions.every((_, i) => displayAnswers[String(i)] === ASK_USER_SKIPPED);
 
-  const statusText = cancelled
-    ? t("tool.askUser.cancelled")
+  const statusText = terminalStatus
+    ? t(
+        terminalStatus === "userReplied"
+          ? "tool.askUser.userReplied"
+          : "tool.askUser.cancelled",
+      )
     : resultBlock || submittedAnswers
       ? allSkipped
         ? t("tool.askUser.skippedItem")

@@ -349,6 +349,25 @@ describe("AskUserCard", () => {
     expect(container.textContent).toContain("tool.askUser.cancelled");
   });
 
+  it("askUserStatus=userReplied 显示已跳过 · 你在对话里直接回复", () => {
+    const { container } = renderCard(
+      CARD({
+        allBlocks: [
+          {
+            type: "tool_result",
+            toolUseId: "t-1",
+            content: "replied in chat",
+            askUserStatus: "userReplied",
+          },
+        ],
+      }),
+    );
+    expect(container.textContent).toContain("tool.askUser.userReplied");
+    // 不能落进"会话已中断"，也绝不能把这段文案当答案回显
+    expect(container.textContent).not.toContain("tool.askUser.interrupted");
+    expect(container.textContent).not.toContain("replied in chat");
+  });
+
   it("无结果且非 pending 显示会话已中断", () => {
     const { container } = renderCard(CARD());
     expect(container.textContent).toContain("tool.askUser.interrupted");

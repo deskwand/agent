@@ -4,6 +4,10 @@
  * `ask_user` 工具的共享类型与常量：主进程（工具/会话管理）、渲染层（卡片）
  * 与测试共用。运行时校验在 ask-user-tools.ts 的 execute 内（defineTool 不做
  * schema 校验，参照 shared/todos.ts 的先例）。
+ *
+ * 阻塞语义（新增「问用户」类工具前先选一个类别）：
+ * - 内联卡片（本工具）：不阻塞。用户不答就当他跳过，随时可以被一条聊天气泡顶掉；
+ * - 遮挡模态（permission / sudo）：硬闸门，必须应答，且必须有超时兜底。
  */
 
 /** 单题类型：单选 / 多选 / 自由输入 / 是否 */
@@ -36,7 +40,10 @@ export const ASK_USER_SKIPPED = "__SKIPPED__";
 
 export type AskUserResult =
   | { status: "answered"; answers: AskUserAnswers }
-  | { status: "cancelled" };
+  | { status: "cancelled"; reason?: AskUserCancelReason };
+
+/** 挂起被解掉的原因：停止会话，还是用户改在对话里回复。 */
+export type AskUserCancelReason = "stopped" | "userReplied";
 
 /** 题目列表别名：供不便引用题目类型全名的模块（agent-runner 有字面量守卫测试）使用 */
 export type AskUserPromptList = AskUserQuestion[];

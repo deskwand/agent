@@ -85,7 +85,27 @@ describe("session-manager ask_user", () => {
     const send = spySend(sm);
     const promise = sm.requestAskUser("s-1", "t-1", questions);
     sm.cancelPendingAskUsers("s-1");
-    await expect(promise).resolves.toEqual({ status: "cancelled" });
+    await expect(promise).resolves.toEqual({
+      status: "cancelled",
+      reason: "stopped",
+    });
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "askUser.dismiss",
+        payload: { toolCallId: "t-1" },
+      }),
+    );
+  });
+
+  it("可按 userReplied 解提问：用户在对话里回复了", async () => {
+    const sm = makeSessionManager();
+    const send = spySend(sm);
+    const promise = sm.requestAskUser("s-1", "t-1", questions);
+    sm.cancelPendingAskUsers("s-1", "userReplied");
+    await expect(promise).resolves.toEqual({
+      status: "cancelled",
+      reason: "userReplied",
+    });
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "askUser.dismiss",
@@ -99,12 +119,96 @@ describe("session-manager ask_user", () => {
     const send = spySend(sm);
     const promise = sm.requestAskUser("s-1", "t-1", questions);
     sm.stopSession("s-1");
-    await expect(promise).resolves.toEqual({ status: "cancelled" });
+    await expect(promise).resolves.toEqual({
+      status: "cancelled",
+      reason: "stopped",
+    });
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "askUser.dismiss",
         payload: { toolCallId: "t-1" },
       }),
     );
+  });
+});
+
+describe("session-manager steerSession 与挂起提问", () => {
+  type SteerInternals = {
+    loadSession: (sessionId: string) => unknown;
+    agentRunner: { steer: (...args: unknown[]) => Promise<boolean> };
+  };
+
+  it("先确认 steer 入队，再把提问解成 userReplied", async () => {
+    const sm = makeSessionManager();
+    const promise = sm.requestAskUser("s-1", "t-1", questions);
+    let resolvedAlready = false;
+    void promise.then(() => {
+      resolvedAlready = true;
+    });
+
+    let resolvedWhenQueued: boolean | null = null;
+    const internals = sm as unknown as SteerInternals;
+    internals.loadSession = () => ({ id: "s-1" });
+    internals.agentRunner = {
+      steer: vi.fn(async () => {
+        await Promise.resolve();
+        resolvedWhenQueued = resolvedAlready;
+        return true;
+      }),
+    };
+
+    await sm.steerSession("s-1", "就用 SQLite 吧", "r-1");
+    await expect(promise).resolves.toEqual({
+      status: "cancelled",
+      reason: "userReplied",
+    });
+    // 入队那一刻提问还没被解掉 —— 顺序反了会丢消息
+    expect(resolvedWhenQueued).toBe(false);
+  });
+
+  it("steer 没入队时不解提问（消息不能两头空）", async () => {
+    const sm = makeSessionManager();
+    const promise = sm.requestAskUser("s-1", "t-1", questions);
+
+    const internals = sm as unknown as SteerInternals;
+    internals.loadSession = () => ({ id: "s-1" });
+    internals.agentRunner = { steer: vi.fn(async () => false) };
+
+    await sm.steerSession("s-1", "就用 SQLite 吧", "r-1");
+    // 仍挂起：只有显式作答才 resolve
+    sm.handleAskUserResponse("s-1", "t-1", { "0": "SQLite" });
+    await expect(promise).resolves.toEqual({
+      status: "answered",
+      answers: { "0": "SQLite" },
+    });
+  });
+
+  it("只解本会话的提问：别的会话挂着的卡片不动", async () => {
+    const sm = makeSessionManager();
+    const first = sm.requestAskUser("s-1", "t-1", questions);
+    const second = sm.requestAskUser("s-2", "t-2", questions);
+
+    const internals = sm as unknown as SteerInternals;
+    internals.loadSession = () => ({ id: "s-1" });
+    internals.agentRunner = { steer: vi.fn(async () => true) };
+
+    await sm.steerSession("s-1", "就用 SQLite 吧", "r-1");
+    await expect(first).resolves.toEqual({
+      status: "cancelled",
+      reason: "userReplied",
+    });
+
+    // s-2 仍挂起：只有它自己的回答能 resolve 它
+    let secondResolved = false;
+    void second.then(() => {
+      secondResolved = true;
+    });
+    await Promise.resolve();
+    expect(secondResolved).toBe(false);
+    sm.handleAskUserResponse("s-2", "t-2", { "0": "PostgreSQL" });
+    await expect(second).resolves.toEqual({
+      status: "answered",
+      answers: { "0": "PostgreSQL" },
+    });
   });
 });

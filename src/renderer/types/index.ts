@@ -162,8 +162,8 @@ export interface ToolResultContent {
     data: string; // base64 encoded image data
     mimeType: string; // e.g., 'image/png'
   }>;
-  /** ask_user 卡片终态标记：会话被取消时由工具写入 details 并投影到这里 */
-  askUserStatus?: "cancelled";
+  /** ask_user 卡片终态：会话被停止（stopSession）/ 用户改在对话里回复（steerSession） */
+  askUserStatus?: "cancelled" | "userReplied";
   /**
    * codemode 外层结果携带的内部调用标准化快照。仅 codemode 结果有值；
    * 旧消息类型无此字段，读取方需按可选处理。

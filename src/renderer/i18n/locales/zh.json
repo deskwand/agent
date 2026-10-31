@@ -1911,6 +1911,7 @@
       "answered": "已提交",
       "skippedItem": "已跳过",
       "cancelled": "已取消",
+      "userReplied": "已跳过 · 你在对话里直接回复",
       "interrupted": "会话已中断"
     }
   },

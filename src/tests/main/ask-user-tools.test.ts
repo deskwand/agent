@@ -150,6 +150,16 @@ describe("ask_user tool", () => {
     expect(result.details).toEqual({ askUserStatus: "cancelled" });
   });
 
+  it("用户在对话里回复：返回 userReplied 文案与 details", async () => {
+    const { tool, resolveFn } = setup();
+    const pending = run(tool, { questions: validQuestions });
+    resolveFn()({ status: "cancelled", reason: "userReplied" });
+    const result = (await pending) as ExecResult;
+    expect(textOf(result)).toMatch(/replied in chat/i);
+    expect(textOf(result)).not.toMatch(/session was stopped/i);
+    expect(result.details).toEqual({ askUserStatus: "userReplied" });
+  });
+
   it("整卡跳过：全题哨兵值（含 multiSelect）原样返回", async () => {
     const { tool, resolveFn } = setup();
     const pending = run(tool, { questions: validQuestions });

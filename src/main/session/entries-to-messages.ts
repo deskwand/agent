@@ -242,8 +242,9 @@ export function entriesToMessages(
       if (typeof t.details?.errorCode === "string") {
         block.errorCode = t.details.errorCode as ToolResultContent["errorCode"];
       }
-      if (t.details?.askUserStatus === "cancelled") {
-        block.askUserStatus = "cancelled";
+      const askUserStatus = t.details?.askUserStatus;
+      if (askUserStatus === "cancelled" || askUserStatus === "userReplied") {
+        block.askUserStatus = askUserStatus;
       }
       const toolName =
         typeof t.toolName === "string"

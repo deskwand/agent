@@ -5079,7 +5079,8 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       return { success: true };
 
     case "session.steer":
-      sm.steerSession(
+      // 解掉挂起的 ask_user 发生在 steerSession 内部，必须等它走完
+      await sm.steerSession(
         event.payload.sessionId,
         event.payload.prompt,
         event.payload.requestId,

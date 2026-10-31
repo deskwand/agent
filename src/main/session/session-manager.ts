@@ -110,6 +110,7 @@ import type {
   AskUserAnswers,
   AskUserQuestion,
   AskUserResult,
+  AskUserCancelReason,
 } from "../../shared/ask-user";
 
 interface IAgentRunner {
@@ -152,7 +153,7 @@ interface IAgentRunner {
     text: string,
     requestId: string,
     images?: ImageContent[],
-  ): void;
+  ): Promise<boolean>;
 }
 
 const WORKSPACE_MOUNT_VIRTUAL_PATH = "/mnt/workspace";
@@ -2272,17 +2273,32 @@ export class SessionManager {
     this.agentRunner.abortCompaction(sessionId);
   }
 
-  /** Inject a steering message during agent execution. */
-  steerSession(
+  /**
+   * 运行中注入一条引导。
+   *
+   * Steering is a turn-level ephemeral event, not a chat message — do not
+   * persist to DB; it lives in the live turn context only.
+   *
+   * 顺带解掉本会话挂起的 ask_user：用户改在对话里发消息，就等于跳过卡片
+   * （reason "userReplied"）。必须先确认消息已进 SDK 引导队列再 resolve 工具 ——
+   * 反过来的话工具批会立刻收尾，引导可能赶不上下一次模型调用而丢消息。
+   *
+   * 边界：agentRunner.steer 返回 true 只说明“进了 SDK 引导队列”，不等于
+   * “进了模型上下文”。若之后 delivered 对账失败（回合早退、模式切换），卡片
+   * 已是终态而模型可能没看到这条消息 —— 该失败可在渲染层看到红色 failed 记录。
+   */
+  async steerSession(
     sessionId: string,
     text: string,
     requestId: string,
     images?: ImageContent[],
-  ): void {
+  ): Promise<void> {
     if (!this.loadSession(sessionId)) throw new Error("Session not found");
-    // Steering is a turn-level ephemeral event, not a chat message —
-    // do not persist to DB. It lives in the live turn context only.
-    this.agentRunner.steer?.(sessionId, text, requestId, images);
+    // 显式先入队；runner 没有 steer 能力时什么都不做（别假装送达）
+    const queued = this.agentRunner.steer
+      ? await this.agentRunner.steer(sessionId, text, requestId, images)
+      : false;
+    if (queued) this.cancelPendingAskUsers(sessionId, "userReplied");
   }
 
   // Delete a session
@@ -2812,11 +2828,20 @@ export class SessionManager {
     });
   }
 
-  cancelPendingAskUsers(sessionId: string): void {
+  /**
+   * 解掉本会话挂起的提问。
+   * reason 决定工具返回文案与卡片终态文案：
+   * - "stopped"：会话停止（stopSession）；
+   * - "userReplied"：用户没答题、直接在对话里发了消息（见 steerSession）。
+   */
+  cancelPendingAskUsers(
+    sessionId: string,
+    reason: AskUserCancelReason = "stopped",
+  ): void {
     for (const [toolCallId, entry] of this.pendingAskUsers) {
       if (entry.sessionId !== sessionId) continue;
       this.pendingAskUsers.delete(toolCallId);
-      entry.resolve({ status: "cancelled" });
+      entry.resolve({ status: "cancelled", reason });
       this.sendToRenderer({
         type: "askUser.dismiss",
         payload: { toolCallId },

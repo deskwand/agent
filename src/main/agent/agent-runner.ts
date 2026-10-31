@@ -4989,13 +4989,18 @@ Tool routing:\n
     }
   }
 
-  /** Inject a steering message during agent execution (SDK native steer). */
-  steer(
+  /**
+   * Inject a steering message during agent execution (SDK native steer).
+   *
+   * @returns true = 已确认进 SDK 引导队列；false = 没能入队（调用方不该
+   *   再假装送达，例如解掉挂起的 ask_user）。
+   */
+  async steer(
     sessionId: string,
     text: string,
     requestId: string,
     images?: ImageContent[],
-  ): void {
+  ): Promise<boolean> {
     const cached = this.piSessions.get(sessionId);
     if (!cached) {
       logWarn("[AgentRunner] steer: no active piSession for", sessionId);
@@ -5009,7 +5014,7 @@ Tool routing:\n
           reason: "no-active-session",
         },
       });
-      return;
+      return false;
     }
     // 转换 renderer ImageContent（source 嵌套）→ pi-ai ImageContent（data/mimeType 平铺）
     const piImages = (images ?? []).map((img) => ({
@@ -5017,46 +5022,46 @@ Tool routing:\n
       data: img.source.data,
       mimeType: img.source.media_type,
     }));
-    cached.session
-      .steer(text, piImages)
-      .then(() => {
-        log("[AgentRunner] steer queued:", text.substring(0, 80));
-        // 建立送达基线：resolve 后消息已在队列，读取当前长度。
-        // 若读数为 0（极快消费场景，消息入队即被注入）→ 直接 delivered，
-        // 避免基线缺失导致记录永久卡在 injecting。
-        const queueLen =
-          typeof cached.session.getSteeringMessages === "function"
-            ? cached.session.getSteeringMessages().length
-            : 0;
-        if (queueLen === 0) {
-          this.sendToRenderer({
-            type: "session.steer.delivered",
-            payload: { sessionId, text, requestId },
-          });
-        } else {
-          const pending = this.pendingSteerDeliveries.get(sessionId) ?? [];
-          pending.push({ requestId, text });
-          this.pendingSteerDeliveries.set(sessionId, pending);
-        }
-        this.lastSteeringLengths.set(sessionId, queueLen);
+    try {
+      await cached.session.steer(text, piImages);
+      log("[AgentRunner] steer queued:", text.substring(0, 80));
+      // 建立送达基线：resolve 后消息已在队列，读取当前长度。
+      // 若读数为 0（极快消费场景，消息入队即被注入）→ 直接 delivered，
+      // 避免基线缺失导致记录永久卡在 injecting。
+      const queueLen =
+        typeof cached.session.getSteeringMessages === "function"
+          ? cached.session.getSteeringMessages().length
+          : 0;
+      if (queueLen === 0) {
         this.sendToRenderer({
-          type: "session.steer.result",
-          payload: { sessionId, status: "accepted", text, requestId },
+          type: "session.steer.delivered",
+          payload: { sessionId, text, requestId },
         });
-      })
-      .catch((e) => {
-        logError("[AgentRunner] steer failed:", e);
-        this.sendToRenderer({
-          type: "session.steer.result",
-          payload: {
-            sessionId,
-            status: "failed",
-            text,
-            requestId,
-            reason: "sdk-error",
-          },
-        });
+      } else {
+        const pending = this.pendingSteerDeliveries.get(sessionId) ?? [];
+        pending.push({ requestId, text });
+        this.pendingSteerDeliveries.set(sessionId, pending);
+      }
+      this.lastSteeringLengths.set(sessionId, queueLen);
+      this.sendToRenderer({
+        type: "session.steer.result",
+        payload: { sessionId, status: "accepted", text, requestId },
       });
+      return true;
+    } catch (e) {
+      logError("[AgentRunner] steer failed:", e);
+      this.sendToRenderer({
+        type: "session.steer.result",
+        payload: {
+          sessionId,
+          status: "failed",
+          text,
+          requestId,
+          reason: "sdk-error",
+        },
+      });
+      return false;
+    }
   }
 
   /** queue_update 送达判定：队列长度较上次快照减少 n → 按 FIFO 把最早的
