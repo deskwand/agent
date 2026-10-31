@@ -168,6 +168,32 @@ describe("视觉模型来源", () => {
     });
   });
 
+  it("来源选「单独配置」后字段就在页内，不再弹旧编辑器", async () => {
+    await openVisionTab();
+    await pickOption(container, "vision-source", "manual");
+    await flush();
+
+    // 老弹窗必须消失：视觉配置只在页内出现一次
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="vision-manual-edit"]'),
+    ).toBeNull();
+
+    // 供应商墙、API Key、模型都在页内
+    expect(
+      container.querySelector('[data-testid="vision-provider-anthropic"]'),
+    ).not.toBeNull();
+    expect(container.querySelector('input[type="password"]')).not.toBeNull();
+
+    // 启用开关只有页内那一个（弹窗里那个已删）
+    expect(
+      container.querySelector('[data-testid="vision-model-enabled"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="vision-model-enabled-in-modal"]'),
+    ).toBeNull();
+  });
+
   it("来源关闭时保存 enabled:false，且不带 providerProfileKey", async () => {
     await openVisionTab();
     await act(async () => {

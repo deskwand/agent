@@ -1,20 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  AlertCircle,
   Bot,
-  CheckCircle,
   ChevronDown,
   ChevronRight,
   Eye,
   Globe2,
   Key,
   Loader2,
-  Pencil,
   Search,
   Server,
   Trash2,
-  X,
   Zap,
 } from "lucide-react";
 import { connectAndPersistProvider } from "../../services/provider-connect";
@@ -84,7 +80,6 @@ import {
 import { ProviderListPage } from "./api/provider-list-page";
 import { Input } from "../ui/input";
 import { Button } from "../app-button";
-import { DialogClose, DialogContent, DialogTitle } from "../ui/dialog";
 import {
   AlertDialogAction,
   AlertDialogCancel,
@@ -94,7 +89,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
-import { OccludingAlertDialog, OccludingDialog } from "../ui/occluding-dialog";
+import { OccludingAlertDialog } from "../ui/occluding-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 type ProviderChoice = ProviderType;
@@ -173,22 +168,6 @@ function providerOptionLabel(
 }
 
 /** 视觉模型卡片名称：custom 按协议显示品牌名（OpenAI/Anthropic/Gemini） */
-const VISION_PROTOCOL_NAMES: Record<CustomProtocolType, string> = {
-  anthropic: "Anthropic",
-  openai: "OpenAI",
-  gemini: "Gemini",
-};
-
-function visionProviderName(
-  provider: ProviderType,
-  customProtocol: CustomProtocolType | undefined,
-  presets: ProviderPresets,
-  t: (key: string) => string,
-): string {
-  return provider === "custom"
-    ? VISION_PROTOCOL_NAMES[customProtocol ?? "anthropic"]
-    : providerOptionLabel(provider, presets, t);
-}
 
 function modelsPresetForDraft(
   provider: ProviderType,
@@ -481,7 +460,6 @@ export function SettingsAPI({
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement | null>(null);
   // 五个弹窗各自一份回焦状态：共用一份会在叠层时覆写 opener（Task 3 review）。
-  const visionDialogReturnFocus = useReturnFocus(rootRef);
   const oauthDisconnectReturnFocus = useReturnFocus(rootRef);
   const deleteDialogReturnFocus = useReturnFocus(rootRef);
   const setAppConfig = useAppStore((state) => state.setAppConfig);
@@ -579,7 +557,6 @@ export function SettingsAPI({
     baseUrl: "",
     model: "",
   });
-  const [visionEditorOpen, setVisionEditorOpen] = useState(false);
   /** 视觉模型来源：off / profile:<profileKey> / manual */
   const [visionSource, setVisionSource] = useState<string>("off");
   const [isVisionSaving, setIsVisionSaving] = useState(false);
@@ -1264,7 +1241,6 @@ export function SettingsAPI({
         visionModel: config,
       });
       applyConfig(saved.config);
-      setVisionEditorOpen(false);
       setVisionSuccess(t("common.saved"));
     } catch (saveError) {
       setVisionError(
@@ -1280,23 +1256,6 @@ export function SettingsAPI({
   // NOT the draft (visionDraft) which may contain unsaved editor changes.
 
   // ── Close vision editor, resetting draft to saved state ──
-  const closeVisionEditor = () => {
-    setVisionEditorOpen(false);
-    if (appConfig?.visionModel) {
-      setVisionDraft(appConfig.visionModel);
-    }
-  };
-
-  // ── Open vision model editor ──
-  const openVisionEditor = () => {
-    // Pre-fill draft from saved config, or use defaults
-    if (appConfig?.visionModel) {
-      setVisionDraft(appConfig.visionModel);
-    }
-    setVisionError("");
-    setVisionSuccess("");
-    setVisionEditorOpen(true);
-  };
 
   // ── Vision model helper: reuse active provider's API key ──
   const reuseActiveProviderApiKey = () => {
@@ -1934,26 +1893,233 @@ export function SettingsAPI({
               )}
 
               {visionSource === "manual" && (
-                <div className="space-y-2 rounded-lg border border-border/60 px-3 py-2.5">
-                  <p className="text-xs text-muted-foreground">
-                    {visionProviderName(
-                      visionDraft.provider,
-                      visionDraft.customProtocol,
-                      presets,
-                      t,
-                    )}{" "}
-                    / {visionDraft.model || "—"}
-                  </p>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    data-testid="vision-manual-edit"
-                    onClick={openVisionEditor}
-                    className="inline-flex h-auto items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-hover-surface hover:text-foreground"
-                  >
-                    <Pencil className="h-3 w-3" />
-                    {t("api.editApi")}
-                  </Button>
+                <div className="space-y-4 rounded-xl border border-border/60 px-3 py-3">
+                  <div className="space-y-2">
+                    <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+                      <Server className="h-3.5 w-3.5" />
+                      {t("api.provider")}
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {VISION_PROVIDER_ORDER.map((provider) => (
+                        <Button
+                          variant="ghost"
+                          key={provider}
+                          type="button"
+                          data-testid={`vision-provider-${provider}`}
+                          onClick={() => {
+                            const preset = (
+                              presets as unknown as Record<
+                                string,
+                                ProviderPreset
+                              >
+                            )[provider];
+                            setVisionDraft((prev) => ({
+                              ...prev,
+                              provider,
+                              baseUrl:
+                                provider !== "custom"
+                                  ? preset?.baseUrl || ""
+                                  : prev.baseUrl,
+                              model:
+                                provider === "zhipu"
+                                  ? "glm-4.6v-flash"
+                                  : prev.model,
+                            }));
+                          }}
+                          className={`inline-flex h-auto items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+                            visionDraft.provider === provider
+                              ? "border-primary bg-primary/10 font-medium text-primary-text"
+                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                          }`}
+                        >
+                          <ProviderBrandIcon
+                            brand={provider}
+                            className="h-3.5 w-3.5 flex-shrink-0"
+                          />
+                          {providerOptionLabel(provider, presets, t)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {visionDraft.provider === "custom" && (
+                    <div className="space-y-2">
+                      <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+                        <Server className="h-3.5 w-3.5" />
+                        {t("api.protocol")}
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(["anthropic", "openai", "gemini"] as const).map(
+                          (protocol) => (
+                            <Button
+                              variant="ghost"
+                              key={protocol}
+                              type="button"
+                              onClick={() => {
+                                const preset =
+                                  protocol === "anthropic"
+                                    ? presets.custom
+                                    : protocol === "openai"
+                                      ? presets.openai
+                                      : presets.gemini;
+                                setVisionDraft((prev) => ({
+                                  ...prev,
+                                  customProtocol: protocol,
+                                  baseUrl: preset.baseUrl,
+                                }));
+                              }}
+                              className={`h-auto rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                                visionDraft.customProtocol === protocol
+                                  ? "border-primary bg-primary/10 font-medium text-primary-text"
+                                  : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                              }`}
+                            >
+                              {protocol}
+                            </Button>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {visionDraft.provider === "zhipu" && (
+                    <div className="space-y-2">
+                      <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+                        <Globe2 className="h-3.5 w-3.5" />
+                        {t("api.region")}
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        {ZHIPU_REGIONS.map((region) => (
+                          <Button
+                            variant="ghost"
+                            key={region.id}
+                            type="button"
+                            onClick={() =>
+                              setVisionDraft((prev) => ({
+                                ...prev,
+                                baseUrl: region.baseUrl,
+                              }))
+                            }
+                            className={`h-auto rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                              visionDraft.baseUrl === region.baseUrl
+                                ? "border-primary bg-primary/10 font-medium text-primary-text"
+                                : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                            }`}
+                          >
+                            {t(region.labelKey)}
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        {t("api.zhipuRegionHint")}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+                        <Key className="h-3.5 w-3.5" />
+                        {t("api.apiKey")}
+                      </span>
+                      {appConfig?.activeProviderKey &&
+                        appConfig?.providers?.[appConfig.activeProviderKey]
+                          ?.apiKey && (
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            size="xs"
+                            onClick={reuseActiveProviderApiKey}
+                            className="h-auto text-[11px] text-primary-text hover:underline"
+                          >
+                            {t("api.reuseMainModelKey")}
+                          </Button>
+                        )}
+                    </div>
+                    <Input
+                      type="password"
+                      value={visionDraft.apiKey}
+                      onChange={(event) =>
+                        setVisionDraft((prev) => ({
+                          ...prev,
+                          apiKey: event.target.value,
+                        }))
+                      }
+                      placeholder={t("api.enterApiKey")}
+                      className="h-auto w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30"
+                    />
+                  </div>
+
+                  {(visionDraft.provider === "custom" ||
+                    visionDraft.provider === "ollama") && (
+                    <div className="space-y-1.5">
+                      <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+                        <Server className="h-3.5 w-3.5" />
+                        {t("api.baseUrl")}
+                      </span>
+                      <Input
+                        type="text"
+                        value={visionDraft.baseUrl || ""}
+                        onChange={(event) =>
+                          setVisionDraft((prev) => ({
+                            ...prev,
+                            baseUrl: event.target.value,
+                          }))
+                        }
+                        placeholder={t("api.enterBaseUrl")}
+                        className="h-auto w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+                      <Eye className="h-3.5 w-3.5" />
+                      {t("api.model")}
+                    </span>
+                    <Input
+                      type="text"
+                      value={visionDraft.model}
+                      onChange={(event) =>
+                        setVisionDraft((prev) => ({
+                          ...prev,
+                          model: event.target.value,
+                        }))
+                      }
+                      placeholder={t("api.visionModelPlaceholder")}
+                      className="h-auto w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/30"
+                    />
+                    {visionDraft.provider !== "custom" && (
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {(() => {
+                          const preset = (
+                            presets as unknown as Record<string, ProviderPreset>
+                          )[visionDraft.provider];
+                          if (!preset?.models) return null;
+                          return preset.models.slice(0, 5).map((m) => (
+                            <Button
+                              variant="ghost"
+                              key={m.id}
+                              type="button"
+                              onClick={() =>
+                                setVisionDraft((prev) => ({
+                                  ...prev,
+                                  model: m.id,
+                                }))
+                              }
+                              className={`h-auto rounded-md border px-2 py-0.5 text-[11px] transition-colors ${
+                                visionDraft.model === m.id
+                                  ? "border-primary bg-primary/10 text-primary-text"
+                                  : "border-border/60 text-muted-foreground hover:border-border"
+                              }`}
+                            >
+                              {m.name || m.id}
+                            </Button>
+                          ));
+                        })()}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -2460,333 +2626,6 @@ export function SettingsAPI({
       </Tabs>
 
       {/* ── Vision model editor modal ── */}
-      {visionEditorOpen && (
-        <OccludingDialog
-          open={visionEditorOpen}
-          onOpenChange={(open) => {
-            if (!open) closeVisionEditor();
-          }}
-        >
-          <DialogContent
-            className="mx-4 max-h-[88vh] w-full max-w-[560px] gap-0 overflow-hidden rounded-2xl border border-border/60 bg-background p-0 [&>button]:hidden"
-            aria-describedby={undefined}
-            onInteractOutside={(event) => event.preventDefault()}
-            onEscapeKeyDown={(event) => event.preventDefault()}
-            {...visionDialogReturnFocus.focusHandlers}
-          >
-            <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-              <DialogTitle className="text-sm font-medium text-foreground">
-                {t("api.visionModelEditTitle")}
-              </DialogTitle>
-              <DialogClose asChild>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  aria-label={t("common.close")}
-                  className="rounded-lg p-2 hover:bg-hover-surface h-auto"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </DialogClose>
-            </div>
-            <div className="max-h-[calc(88vh-64px)] overflow-y-auto p-5">
-              <div className="space-y-5">
-                {/* Enable toggle */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">
-                    {t("api.visionModelEnable")}
-                  </span>
-                  <SettingsSwitch
-                    checked={visionDraft.enabled}
-                    onChange={(next) => {
-                      setVisionDraft((prev) => ({ ...prev, enabled: next }));
-                    }}
-                    label={t("api.visionModelEnable")}
-                    testId="vision-model-enabled-in-modal"
-                  />
-                </div>
-
-                {/* Provider selection */}
-                <div className="space-y-3 border-b border-border/60 pb-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <Server className="h-4 w-4" />
-                    {t("api.provider")}
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                    {VISION_PROVIDER_ORDER.map((provider) => (
-                      <Button
-                        variant="ghost"
-                        key={provider}
-                        type="button"
-                        onClick={() => {
-                          const preset = (
-                            presets as unknown as Record<string, ProviderPreset>
-                          )[provider];
-                          setVisionDraft((prev) => ({
-                            ...prev,
-                            provider,
-                            baseUrl:
-                              provider !== "custom"
-                                ? preset?.baseUrl || ""
-                                : prev.baseUrl,
-                            model:
-                              provider === "zhipu"
-                                ? "glm-4.6v-flash"
-                                : prev.model,
-                          }));
-                        }}
-                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                          visionDraft.provider === provider
-                            ? "border-primary bg-primary/10 font-medium text-primary-text"
-                            : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                        }`}
-                      >
-                        <ProviderBrandIcon
-                          brand={provider}
-                          className="h-4 w-4 flex-shrink-0"
-                        />
-                        {providerOptionLabel(provider, presets, t)}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Custom protocol selector */}
-                {visionDraft.provider === "custom" && (
-                  <div className="space-y-3 border-b border-border/60 pb-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Server className="h-4 w-4" />
-                      {t("api.protocol")}
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(["anthropic", "openai", "gemini"] as const).map(
-                        (protocol) => (
-                          <Button
-                            variant="ghost"
-                            key={protocol}
-                            type="button"
-                            onClick={() => {
-                              const preset =
-                                protocol === "anthropic"
-                                  ? presets.custom
-                                  : protocol === "openai"
-                                    ? presets.openai
-                                    : presets.gemini;
-                              setVisionDraft((prev) => ({
-                                ...prev,
-                                customProtocol: protocol,
-                                baseUrl: preset.baseUrl,
-                              }));
-                            }}
-                            className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                              visionDraft.customProtocol === protocol
-                                ? "border-primary bg-primary/10 font-medium text-primary-text"
-                                : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                            }`}
-                          >
-                            {protocol}
-                          </Button>
-                        ),
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Zhipu region selector */}
-                {visionDraft.provider === "zhipu" && (
-                  <div className="space-y-3 border-b border-border/60 pb-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Globe2 className="h-4 w-4" />
-                      {t("api.region")}
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {ZHIPU_REGIONS.map((region) => (
-                        <Button
-                          variant="ghost"
-                          key={region.id}
-                          type="button"
-                          onClick={() =>
-                            setVisionDraft((prev) => ({
-                              ...prev,
-                              baseUrl: region.baseUrl,
-                            }))
-                          }
-                          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                            visionDraft.baseUrl === region.baseUrl
-                              ? "border-primary bg-primary/10 font-medium text-primary-text"
-                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                          }`}
-                        >
-                          {t(region.labelKey)}
-                        </Button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {t("api.zhipuRegionHint")}
-                    </p>
-                  </div>
-                )}
-
-                {/* API Key */}
-                <div className="space-y-3 border-b border-border/60 pb-5">
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Key className="h-4 w-4" />
-                      {t("api.apiKey")}
-                    </label>
-                    {appConfig?.activeProviderKey &&
-                      appConfig?.providers?.[appConfig.activeProviderKey]
-                        ?.apiKey && (
-                        <Button
-                          variant="ghost"
-                          type="button"
-                          size="xs"
-                          onClick={reuseActiveProviderApiKey}
-                          className="text-xs text-primary-text hover:underline"
-                        >
-                          {t("api.reuseMainModelKey")}
-                        </Button>
-                      )}
-                  </div>
-                  <Input
-                    type="password"
-                    value={visionDraft.apiKey}
-                    onChange={(event) =>
-                      setVisionDraft((prev) => ({
-                        ...prev,
-                        apiKey: event.target.value,
-                      }))
-                    }
-                    placeholder={t("api.enterApiKey")}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
-                  />
-                </div>
-
-                {/* Base URL (custom provider or Ollama only) */}
-                {(visionDraft.provider === "custom" ||
-                  visionDraft.provider === "ollama") && (
-                  <div className="space-y-3 border-b border-border/60 pb-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Server className="h-4 w-4" />
-                      {t("api.baseUrl")}
-                    </label>
-                    <Input
-                      type="text"
-                      value={visionDraft.baseUrl || ""}
-                      onChange={(event) =>
-                        setVisionDraft((prev) => ({
-                          ...prev,
-                          baseUrl: event.target.value,
-                        }))
-                      }
-                      placeholder={t("api.enterBaseUrl")}
-                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
-                    />
-                  </div>
-                )}
-
-                {/* Model */}
-                <div className="space-y-3 border-b border-border/60 pb-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <Eye className="h-4 w-4" />
-                    {t("api.model")}
-                  </label>
-                  <Input
-                    type="text"
-                    value={visionDraft.model}
-                    onChange={(event) =>
-                      setVisionDraft((prev) => ({
-                        ...prev,
-                        model: event.target.value,
-                      }))
-                    }
-                    placeholder={t("api.visionModelPlaceholder")}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
-                  />
-                  {/* Model suggestions based on provider */}
-                  {visionDraft.provider !== "custom" && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {(() => {
-                        const preset = (
-                          presets as unknown as Record<string, ProviderPreset>
-                        )[visionDraft.provider];
-                        if (!preset?.models) return null;
-                        return preset.models.slice(0, 5).map((m) => (
-                          <Button
-                            variant="ghost"
-                            key={m.id}
-                            type="button"
-                            onClick={() =>
-                              setVisionDraft((prev) => ({
-                                ...prev,
-                                model: m.id,
-                              }))
-                            }
-                            className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-                              visionDraft.model === m.id
-                                ? "border-primary bg-primary/10 text-primary-text"
-                                : "border-border/60 text-muted-foreground hover:border-border hover:text-muted-foreground"
-                            }`}
-                          >
-                            {m.name || m.id}
-                          </Button>
-                        ));
-                      })()}
-                    </div>
-                  )}
-                </div>
-
-                {/* Error / Success */}
-                {visionError && (
-                  <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                    {visionError}
-                  </div>
-                )}
-                {visionSuccess && (
-                  <div className="flex items-center gap-2 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
-                    <CheckCircle className="h-4 w-4 flex-shrink-0" />
-                    {visionSuccess}
-                  </div>
-                )}
-
-                {/* Buttons */}
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    onClick={closeVisionEditor}
-                    className="rounded-lg border border-border/60 px-4 py-2.5 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    onClick={() => {
-                      void handleVisionSave();
-                    }}
-                    disabled={isVisionSaving}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
-                  >
-                    {isVisionSaving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t("common.saving")}
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4" />
-                        {t("api.saveSettings")}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </OccludingDialog>
-      )}
 
       {pendingOAuthLogoutProviderId &&
         (() => {

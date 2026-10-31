@@ -14,7 +14,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../renderer/i18n/config";
 import i18n from "../../renderer/i18n/config";
-import { pickOption } from "./settings-menu-helper";
 import { SettingsAPI } from "../../renderer/components/settings/SettingsAPI";
 import { useAppStore } from "../../renderer/store";
 import type { AppConfig } from "../../renderer/types";
@@ -235,13 +234,6 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
   const dialogs = (role: "dialog" | "alertdialog" = "dialog"): HTMLElement[] =>
     Array.from(document.body.querySelectorAll<HTMLElement>(`[role="${role}"]`));
 
-  const findButton = (text: string): HTMLButtonElement => {
-    const button = Array.from(
-      document.body.querySelectorAll<HTMLButtonElement>("button"),
-    ).find((item) => (item.textContent ?? "").trim() === text);
-    expect(button, `按钮「${text}」必须存在`).toBeTruthy();
-    return button!;
-  };
 
   // 弹窗动作必须按层查找：列表行里的 opener 与弹窗动作常常同一文案。
   const buttonIn = (layer: HTMLElement, text: string): HTMLButtonElement => {
@@ -291,24 +283,6 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     await flush();
   };
 
-  const openVisionDialog = async (): Promise<HTMLButtonElement> => {
-    await renderSettings();
-    await click(findButton(i18n.t("api.visionModelTab")));
-    await flush();
-    // 视觉 tab 现在先选来源；「单独配置」才打开手动编辑器
-    await pickOption(container, "vision-source", "manual");
-    await flush();
-    const opener = container.querySelector<HTMLButtonElement>(
-      '[data-testid="vision-manual-edit"]',
-    )!;
-    expect(opener, "手动编辑入口必须存在").not.toBeNull();
-    opener.focus();
-    expect(document.activeElement).toBe(opener);
-    await click(opener);
-    await flush();
-    return opener;
-  };
-
   const openOauthDialog = async (): Promise<HTMLButtonElement> => {
     await renderSettings();
     // 断开入口收进了行尾 ⋯ 菜单
@@ -345,53 +319,6 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     await flush();
     return opener!;
   };
-
-  it("视觉编辑：唯一 dialog + 标题 + occlusion 1 + 遮罩/Escape 不关且草稿保留 + 关闭回焦", async () => {
-    const opener = await openVisionDialog();
-    expect(dialogs()).toHaveLength(1);
-    expect(dialogs()[0].querySelector("h2")?.textContent).toBe(
-      i18n.t("api.visionModelEditTitle"),
-    );
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(1);
-    expect(acquireSpy).toHaveBeenCalledTimes(1);
-    expect(dialogs()[0].className).toContain("[&>button]:hidden");
-
-    const draftInput =
-      dialogs()[0].querySelector<HTMLInputElement>('input[type="password"]') ??
-      dialogs()[0].querySelector<HTMLInputElement>("input");
-    expect(draftInput, "视觉弹窗内必须有输入框用于草稿断言").not.toBeNull();
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(draftInput, "vision-draft-keep");
-      draftInput!.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await flush();
-
-    await outsideClick(dialogs()[0]);
-    await pressEscape();
-
-    expect(dialogs(), "遮罩/Escape 后必须仍在").toHaveLength(1);
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(1);
-    expect(
-      dialogs()[0].querySelector<HTMLInputElement>('input[type="password"]') ??
-        dialogs()[0].querySelector<HTMLInputElement>("input"),
-    ).toHaveProperty("value", "vision-draft-keep");
-
-    const closeButton = dialogs()[0].querySelector<HTMLButtonElement>(
-      `button[aria-label="${i18n.t("common.close")}"]`,
-    );
-    expect(closeButton, "本地化 X 关闭键必须存在").not.toBeNull();
-    await click(closeButton!);
-    await flush();
-
-    expect(dialogs()).toHaveLength(0);
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(0);
-    expect(releaseSpy, "关闭恰一次 = release 恰一次").toHaveBeenCalledTimes(1);
-    expect(document.activeElement, "关闭后必须回到 opener").toBe(opener);
-  });
 
   it("OAuth 断开：确认恰一次、pending 立即清空而请求仍挂起、无额外取消调用", async () => {
     const logout = deferred<void>();
@@ -531,11 +458,6 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
       document.activeElement,
       "返回目标已卸载 → rootRef fallback 必须拿到焦点",
     ).toBe(container.firstElementChild);
-  });
-
-  it("视觉编辑：开窗后焦点进入 dialog，Tab 从末 tabbable 回绕到首 tabbable", async () => {
-    await openVisionDialog();
-    await expectFocusTrap(dialogs()[0]);
   });
 
   it("OAuth 断开：开窗后焦点进入 dialog，Tab 从末 tabbable 回绕到首 tabbable", async () => {

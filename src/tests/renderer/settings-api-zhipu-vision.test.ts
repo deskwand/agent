@@ -123,27 +123,22 @@ describe("SettingsAPI Zhipu vision model", () => {
     });
     await flush();
 
-    // 来源选「单独配置」后才出现手动编辑器入口
+    // 来源选「单独配置」→ 字段直接出现在页内（不再有弹窗）
     await pickOption(container, "vision-source", "manual");
     await flush();
+
+    // 选择「智谱」provider（预设 name 为硬编码中文）
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('[data-testid="vision-manual-edit"]')
+        .querySelector<HTMLButtonElement>(
+          '[data-testid="vision-provider-zhipu"]',
+        )
         ?.click();
     });
     await flush();
 
-    // 视觉编辑弹窗已改用 shadcn Dialog：内容经 portal 挂到 body。
-    // 选择「智谱」provider（预设 name 为硬编码中文）
-    await act(async () => {
-      clickButton(document.body, "智谱");
-    });
-    await flush();
-
-    // 视觉编辑弹窗已改用 shadcn Dialog：内容经 portal 挂到 body。
-    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
     // 区域切换按钮出现（模型自动为 glm-4.6v-flash）
-    const regionButtons = Array.from(document.body.querySelectorAll("button"));
+    const regionButtons = Array.from(container.querySelectorAll("button"));
     expect(
       regionButtons.some((b) => b.textContent?.includes("open.bigmodel.cn")),
     ).toBe(true);
@@ -154,7 +149,7 @@ describe("SettingsAPI Zhipu vision model", () => {
     // 切换到国际站
     await act(async () => {
       const globalBtn =
-        Array.from(document.body.querySelectorAll("button")).find((b) =>
+        Array.from(container.querySelectorAll("button")).find((b) =>
           b.textContent?.includes("api.z.ai"),
         ) || null;
       globalBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -162,7 +157,7 @@ describe("SettingsAPI Zhipu vision model", () => {
     await flush();
 
     // 填写 API Key（受控输入需 native setter + input 事件）
-    const keyInput = document.body.querySelector('input[type="password"]');
+    const keyInput = container.querySelector('input[type="password"]');
     expect(keyInput).not.toBeNull();
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
@@ -176,7 +171,9 @@ describe("SettingsAPI Zhipu vision model", () => {
 
     // 保存
     await act(async () => {
-      clickButton(document.body, "Save Settings");
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="vision-save"]')
+        ?.click();
     });
     await flush();
 
