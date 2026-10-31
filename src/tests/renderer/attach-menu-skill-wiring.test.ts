@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// 这个文件守的是**底栏这一层**：技能入口从 ChatInputBottomBar 透传到 AttachMenu。
+// 这个文件守的是**左簇这一层**：技能入口从 ChatInputActionBar 透传到 AttachMenu。
 //
 // 为什么需要它：attach-menu-skills.test.ts 直接渲染 AttachMenu，绕过底栏 —— 若有人
 // 在底栏漏传 onInsertSkill（或给 AttachMenu 加上条件渲染），技能组会在真实输入框里
@@ -11,9 +11,9 @@ import { toggleAttachMenu } from "./attach-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  ChatInputBottomBar,
-  type ChatInputBottomBarProps,
-} from "../../renderer/components/ChatInputBottomBar";
+  ChatInputActionBar,
+  type ChatInputActionBarProps,
+} from "../../renderer/components/ChatInputActionBar";
 
 vi.mock("react-i18next", () => ({
   // 占位不可省：底栏会走到 StatusPopover → utils/i18n-format → i18n/config，
@@ -22,18 +22,13 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-const baseProps: ChatInputBottomBarProps = {
+const baseProps: ChatInputActionBarProps = {
   onAttach: () => {},
   onAddFiles: () => {},
   attachedKeys: new Set<string>(),
-  canStop: false,
-  onStop: () => {},
-  isSubmitting: false,
   hasInputContent: false,
   voice: {
     status: "idle",
-    level: 0,
-    seconds: 0,
     onToggle: () => {},
   },
 };
@@ -73,10 +68,10 @@ describe("底栏到技能入口的接线", () => {
     container.remove();
   });
 
-  function render(props: Partial<ChatInputBottomBarProps> = {}) {
+  function render(props: Partial<ChatInputActionBarProps> = {}) {
     act(() => {
       root.render(
-        React.createElement(ChatInputBottomBar, { ...baseProps, ...props }),
+        React.createElement(ChatInputActionBar, { ...baseProps, ...props }),
       );
     });
   }

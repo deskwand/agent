@@ -102,9 +102,14 @@ import {
   sendQueuedInput,
   suppressNextInputQueueDrain,
 } from "../utils/input-queue-drain";
+import { ChatInputActionBar } from "./ChatInputActionBar";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { ChatInputFooterBar, WorkspaceChip } from "./ChatInputFooterBar";
 import { toMicButtonProps } from "./VoiceMicButton";
+import {
+  shouldShowRecordingStrip,
+  VoiceRecordingStrip,
+} from "./VoiceRecordingStrip";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
 import { getCapabilityGate } from "../capabilities/capability-gate";
 import { ensureVoiceModeStart } from "../utils/voice/voice-mode-gate";
@@ -2277,8 +2282,8 @@ export function ChatView() {
               onAttachmentsChange={handleAttachmentsChange}
               voiceRecording={voice.status === "recording"}
               placeholder={t("chat.typeMessage")}
-              cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
-              textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed py-2 overflow-hidden"
+              cardClassName="px-1.5 py-1.5 rounded-6xl bg-background/50 shadow-elevated"
+              textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed py-1.5 overflow-hidden"
               footerSlot={
                 <ChatInputFooterBar
                   leftSlot={<WorkspaceChip cwd={activeSessionCwd ?? null} />}
@@ -2348,8 +2353,17 @@ export function ChatView() {
                   contextStatusDetails={contextStatusDetails}
                 />
               }
-              bottomSlot={
-                <ChatInputBottomBar
+              topSlot={
+                shouldShowRecordingStrip(voice.status) ? (
+                  <VoiceRecordingStrip
+                    status={voice.status}
+                    level={voice.level}
+                    seconds={voice.seconds}
+                  />
+                ) : undefined
+              }
+              leadingSlot={
+                <ChatInputActionBar
                   onAttach={() => chatInputRef.current?.selectFiles()}
                   cwd={activeSessionCwd}
                   onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
@@ -2369,10 +2383,6 @@ export function ChatView() {
                   onInsertSkill={(name) =>
                     chatInputRef.current?.insertSkillChip(name)
                   }
-                  canStop={canStop}
-                  onStop={handleStop}
-                  isSubmitting={isSubmitting}
-                  submitDisabled={submitBlocked}
                   isExpanded={isInputExpanded}
                   onToggleExpand={() => setIsInputExpanded((v) => !v)}
                   hasInputContent={hasInputContent}
@@ -2389,6 +2399,14 @@ export function ChatView() {
                       CHAT_INPUT_VOICE_OWNER,
                     ),
                   )}
+                />
+              }
+              bottomSlot={
+                <ChatInputBottomBar
+                  canStop={canStop}
+                  onStop={handleStop}
+                  isSubmitting={isSubmitting}
+                  submitDisabled={submitBlocked}
                 />
               }
             />

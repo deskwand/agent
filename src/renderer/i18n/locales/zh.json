@@ -50,7 +50,7 @@
       "empty": "还没有项目，可在侧边栏「新建项目」或「打开已有项目」",
       "switchFailed": "切换项目失败，请稍后重试"
     },
-    "placeholder": "描述你想做的事情，按 / 使用快捷命令...",
+    "placeholder": "描述你想做的事情，Enter 发送，/ 使用快捷命令...",
     "quick": {
       "brainstorm": "加个功能",
       "debug": "修个 bug",
@@ -1205,7 +1205,7 @@
     "processing": "思考中…",
     "sending": "发送中…",
     "stop": "停止",
-    "typeMessage": "输入消息，按 / 使用快捷命令...",
+    "typeMessage": "输入消息，Enter 发送，/ 使用快捷命令...",
     "loadingConversation": "加载聊天中...",
     "startConversation": "开始聊天",
     "startFailed": "启动会话失败，请稍后重试。",
@@ -1306,6 +1306,7 @@
     "voiceHoldKeyMetaShiftSpaceWin": "Win Shift 空格",
     "voiceStop": "停止录音",
     "voiceStopWithEsc": "停止录音 · Esc 取消",
+    "voiceRecordingHint": "正在听，说完按 Esc 取消",
     "voicePolishing": "正在整理文字…",
     "voiceEngineOff": "语音输入还没启用",
     "voiceNotInstalled": "语音引擎还没装好，再点一次麦克风可以重新下载",
@@ -1314,6 +1315,7 @@
     "voiceMicUnavailable": "找不到可用的麦克风",
     "voiceCaptureFailed": "麦克风已就绪，但音频处理没能启动，可以重试一下",
     "voiceInstallFailed": "语音引擎安装失败",
+    "voiceInstallFailedRetry": "语音引擎安装失败 · 点击重试",
     "voiceDownloadConfirm": "开启语音输入需先下载语音模型，约 140MB。现在下载吗？",
     "voiceDownloadConfirmOk": "下载并开启",
     "voiceReady": "语音输入已就绪，点麦克风开始说话",

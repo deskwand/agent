@@ -43,9 +43,14 @@ import {
   type ChatInputSubmitData,
 } from "./ChatInput";
 import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
+import { ChatInputActionBar } from "./ChatInputActionBar";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { ChatInputFooterBar } from "./ChatInputFooterBar";
 import { toMicButtonProps } from "./VoiceMicButton";
+import {
+  shouldShowRecordingStrip,
+  VoiceRecordingStrip,
+} from "./VoiceRecordingStrip";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
@@ -716,8 +721,8 @@ export function WelcomeView() {
               ? t("connect.startPlaceholder")
               : t("welcome.placeholder")
           }
-          cardClassName={`rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4${showConnectCards ? " cursor-not-allowed" : ""}`}
-          textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed overflow-hidden"
+          cardClassName={`rounded-6xl bg-background/60 shadow-elevated px-1.5 py-1.5${showConnectCards ? " cursor-not-allowed" : ""}`}
+          textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed py-1.5 overflow-hidden"
           footerSlot={
             showConnectCards ? undefined : (
               <ChatInputFooterBar
@@ -792,9 +797,18 @@ export function WelcomeView() {
               />
             )
           }
-          bottomSlot={
+          topSlot={
+            shouldShowRecordingStrip(voice.status) ? (
+              <VoiceRecordingStrip
+                status={voice.status}
+                level={voice.level}
+                seconds={voice.seconds}
+              />
+            ) : undefined
+          }
+          leadingSlot={
             showConnectCards ? undefined : (
-              <ChatInputBottomBar
+              <ChatInputActionBar
                 onAttach={() => chatInputRef.current?.selectFiles()}
                 // 把工作目录一并交给附件菜单：不然选了项目后它的「工作区」入口还是
                 // 置灰的（`attachMenu.disabled.noWorkspace` 只看 cwd），项目级 slash
@@ -811,10 +825,6 @@ export function WelcomeView() {
                   chatInputRef.current?.insertSkillChip(name)
                 }
                 attachMenuDirection="down"
-                canStop={false}
-                onStop={() => {}}
-                isSubmitting={isSubmitting}
-                submitDisabled={voice.status === "recording"}
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}
@@ -830,6 +840,16 @@ export function WelcomeView() {
                   // 仍显式传：漏传要是编译错误。
                   false,
                 )}
+              />
+            )
+          }
+          bottomSlot={
+            showConnectCards ? undefined : (
+              <ChatInputBottomBar
+                canStop={false}
+                onStop={() => {}}
+                isSubmitting={isSubmitting}
+                submitDisabled={voice.status === "recording"}
               />
             )
           }

@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { Loader2, Mic } from "lucide-react";
+import { Loader2, Mic, Square, TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { VoiceInstallState } from "../../shared/ipc-types";
@@ -9,11 +8,13 @@ import type { VoiceEngineConfig } from "../types";
 import { holdKeyNameKey, shortcutPlatform } from "../voice-shortcut-labels";
 import { Button } from "./app-button";
 
+/**
+ * 那一格的全部输入。**没有 level / seconds**：电平与计时由卡片内的
+ * `VoiceRecordingStrip` 显示 —— 36px 的一格装不下波形，撑开就会把编辑区
+ * 和相邻控件挤走。
+ */
 export interface VoiceMicButtonProps {
   status: VoiceStatus;
-  /** 0..1，录音时的实时响度。 */
-  level: number;
-  seconds: number;
   /**
    * 安装态。null / 缺省 = 没在装（或还没读到）。
    *
@@ -44,53 +45,55 @@ export interface VoiceMicButtonProps {
   onToggle: () => void;
 }
 
-function formatSeconds(total: number): string {
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
-
-/** 波形槽位。固定 5 根，槽位号本身是常量，所以 key 不用数组序号。 */
-const LEVEL_SLOTS = [0, 1, 2, 3, 4] as const;
-
-/** 静音与空槽的保底高度（百分比）。不保底的话胶囊会半截空着。 */
-const LEVEL_FLOOR = 12;
-
 /**
- * 把最近 5 个电平采样摊成波形，最左最旧、最右最新，返回值是百分比高度。
- *
- * 电平每 100ms 才跳一次（采集 worklet 每 100ms 交一片音频），要读出「波形」只能靠
- * 时间差：5 根条各代表一个 100ms 采样。用同一个值乘 5 个系数只会让整块一起缩放 ——
- * 那是柱状图在抖，不是波形。
+ * 那一格的几何。**任何状态都不许改它** —— 它左锚定在输入框底栏里，一变宽就从编辑区
+ * 抢宽度；右锚定时（AskUserVoiceField）甚至会盖住正在输入的文字。
+ * 六种状态的差异只允许体现在图标与颜色上。
  */
-function useLevelBars(level: number, active: boolean): number[] {
-  const [samples, setSamples] = useState<number[]>([]);
+const MIC_SLOT_CLASS =
+  "relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50";
 
-  useEffect(() => {
-    if (!active) {
-      // 采样是这一次录音的产物，回 idle 就清空，下一轮从平地起步。
-      setSamples((prev) => (prev.length === 0 ? prev : []));
-      return;
-    }
-    setSamples((prev) =>
-      // 与上一个相同就不推：StrictMode 下 effect 会双跑，静止时也不该刷帧。
-      // 代价是完全恒定的电平不会填满 5 根条 —— 真实 RMS 不会逐帧一模一样，够不着。
-      prev[prev.length - 1] === level
-        ? prev
-        : [...prev, level].slice(-LEVEL_SLOTS.length),
-    );
-  }, [level, active]);
-
-  const missing = Math.max(0, LEVEL_SLOTS.length - samples.length);
-  const padded: number[] = [
-    ...Array.from({ length: missing }, () => 0),
-    ...samples,
-  ];
-  return padded.map((value) => Math.max(LEVEL_FLOOR, Math.round(value * 100)));
+/** 安装进度环。轨道用 `text-muted-foreground` 的 20% 透明度，弧用 `text-primary-text`。 */
+function InstallProgressRing({ percent }: { percent: number }) {
+  const radius = 12;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, percent));
+  return (
+    <svg
+      // 尺寸由按钮上的 `[&_svg]:size-7` 给：`.w-7` 是单类名（0,1,0），
+      // 赢不过 Button base 的 `[&_svg]:size-4`（`.cls svg` = 0,1,1）。
+      className="-rotate-90"
+      viewBox="0 0 28 28"
+      aria-hidden="true"
+    >
+      <circle
+        cx="14"
+        cy="14"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        className="opacity-20"
+      />
+      <circle
+        data-testid="voice-install-arc"
+        cx="14"
+        cy="14"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={circumference * (1 - clamped / 100)}
+        className="text-primary-text"
+      />
+    </svg>
+  );
 }
 
 export function VoiceMicButton({
   status,
-  level,
-  seconds,
   install,
   polishing,
   blocked,
@@ -107,102 +110,71 @@ export function VoiceMicButton({
   // 不锁的话用户会点一个没反应的按钮。下载中同理：这一次点击不该被解释成录音。
   const micDisabled = busy || installing || blocked === true;
   const recording = status === "recording";
-  /** 胶囊占那一格的两种状态：录音与收尾。收尾期间条冻住、整粒不可点。 */
-  const pillVisible = recording || status === "finishing";
-  const bars = useLevelBars(level, pillVisible);
-  // 环只在那一格空着的时候画：胶囊（录音/收尾）、请求权限、安装中、安装失败都各自占着那一格。
+  /** 这一格现在报的是「停止」：录音中与收尾中。收尾期间按钮锁住但仍是同一颗。 */
+  const stopping = recording || status === "finishing";
+  // 环只在那一格空着的时候画：停止键（录音/收尾）、请求权限、安装中、安装失败都各自占着那一格。
   const showPolishRing =
-    polishing === true &&
-    !pillVisible &&
-    !busy &&
-    !installing &&
-    !installFailed;
-  // 下载中 / 被别人占着 / 整理中，麦克风在忙别的事，气泡与可访问名都报那个状态。
-  // 「被别人占着」排在整理环前面：它才是这一格现在为什么点不动。
-  const activeLabel = installing
-    ? t("chat.voiceInstalling", { percent })
-    : blocked === true
+    polishing === true && !stopping && !busy && !installing && !installFailed;
+  // 下载中 / 装失败了 / 被别人占着 / 整理中，麦克风在忙别的事，气泡与可访问名都报那个状态。
+  // 失败排最前：它才是「为什么这一格是红的」。点下去是重试（`micDisabled` 不含它）。
+  // 「被别人占着」排在失败前面：按钮此刻是禁用的，先说清为什么点不动；
+  // 失败本身还有红色图标在，不会丢。
+  const activeLabel =
+    blocked === true
       ? t("chat.voiceBusyElsewhere")
-      : showPolishRing
-        ? t("chat.voicePolishing")
-        : null;
+      : installFailed
+        ? t("chat.voiceInstallFailedRetry")
+        : installing
+          ? t("chat.voiceInstalling", { percent })
+          : showPolishRing
+            ? t("chat.voicePolishing")
+            : null;
   // 气泡在空闲且麦克风可用时才多报一句快捷键。收尾 / 下载时那颗键按下去
   // 没反应（usePushToTalk 的 onStart 只认 idle），写了就是假的。
   const idleTooltip =
     micDisabled || !shortcutKeys
       ? t("chat.voiceStart")
       : t("chat.voiceStartWithShortcut", { keys: shortcutKeys });
-  // 这一格只有一个按钮，它按时序变形：录音时是一粒胶囊（停止键），其余时候是麦克风。
+  // 这一格只有一个按钮，它按时序变形：录音时是一个停止方块，其余时候是麦克风。
   // 三样东西（可访问名 / 气泡 / 禁用）都按“它现在是什么”报，而不是各报各的。
-  const ariaLabel = pillVisible
+  const ariaLabel = stopping
     ? t("chat.voiceStop")
     : (activeLabel ?? t("chat.voiceStart"));
-  const tooltipLabel = pillVisible
+  const tooltipLabel = stopping
     ? status === "finishing"
       ? // 收尾期间 Esc 不再取消（hook 的监听只认 recording / requesting），
         // 气泡不能许诺一个按下去没反应的键。
         t("chat.voiceStop")
       : t("chat.voiceStopWithEsc")
     : (activeLabel ?? idleTooltip);
-  const buttonDisabled = pillVisible ? status === "finishing" : micDisabled;
   // 焦点不能丢：键盘用户用空格开始录音后，按钮一旦换成另一个元素，焦点就掉到 body，
-  // 故事就停了（既没被告知录上了，也无法再按空格停下）。所以只换类名与内容。
-  const buttonClassName = pillVisible
-    ? "flex h-8 shrink-0 items-center gap-2 rounded-full bg-accent px-2.5 transition-colors hover:bg-selected-surface disabled:cursor-not-allowed"
-    : "relative inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50";
+  // 故事就停了（既没被告知录上了，也无法再按空格停下）。所以只换图标与颜色。
+  // 计时与波形在卡片内的 VoiceRecordingStrip：36px 装不下它们，撑宽会抢编辑区。
+  const buttonClassName = `${MIC_SLOT_CLASS} ${
+    stopping || installFailed ? "text-destructive hover:text-destructive" : ""
+  } ${installing ? "[&_svg]:size-7" : ""}`;
 
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {!pillVisible && installing && (
-        <>
-          {/* 下载进度占的正是录音胶囊那一格（原地，不加浮层） */}
-          <div
-            className="h-1 w-10 overflow-hidden rounded-full bg-border/60"
-            aria-hidden
-          >
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {percent}%
-          </span>
-        </>
-      )}
-
-      {!pillVisible && installFailed && (
-        <span className="px-1 text-xs text-destructive">
-          {t("chat.voiceInstallFailed")}
-        </span>
-      )}
-
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
             aria-label={ariaLabel}
-            disabled={buttonDisabled}
+            disabled={micDisabled}
             onClick={onToggle}
             className={buttonClassName}
           >
-            {pillVisible ? (
+            {stopping ? (
               <>
-                {/* 波形条 `aria-hidden`：它的含义已经在按钮的可访问名（「停止录音」）里。
-                    高度走 inline style —— 电平是运行时数据，Tailwind 不能穷举。 */}
-                <span className="flex h-4 items-end gap-[2px]" aria-hidden>
-                  {LEVEL_SLOTS.map((slot) => (
-                    <span
-                      key={slot}
-                      data-testid="voice-level-bar"
-                      className="w-[3px] rounded-full bg-muted-foreground transition-[height] duration-150 ease-out"
-                      style={{ height: `${bars[slot]}%` }}
-                    />
-                  ))}
-                </span>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {formatSeconds(seconds)}
-                </span>
+                {/* 整理环与录音环共用这一档呼吸动画：两者都是「这一刻这一格在忙」。 */}
+                <span
+                  aria-hidden
+                  data-testid="voice-recording-ring"
+                  className="pointer-events-none absolute -inset-[3px] rounded-full border-2 border-destructive opacity-[0.55] animate-voice-polish-ring"
+                />
+                <Square className="h-4 w-4" />
               </>
             ) : (
               <>
@@ -213,7 +185,11 @@ export function VoiceMicButton({
                     className="pointer-events-none absolute -inset-[3px] rounded-[11px] border-2 border-primary opacity-[0.55] animate-voice-polish-ring"
                   />
                 )}
-                {busy || installing ? (
+                {installing ? (
+                  <InstallProgressRing percent={percent} />
+                ) : installFailed ? (
+                  <TriangleAlert className="h-4 w-4" />
+                ) : busy ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Mic className="h-4 w-4" />
@@ -262,8 +238,6 @@ export function toMicButtonProps(
 
   return {
     status: voice.status,
-    level: voice.level,
-    seconds: voice.seconds,
     polishing: voice.polishing,
     install,
     blocked,

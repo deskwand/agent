@@ -131,11 +131,9 @@ export function AskUserVoiceField({
   }, [interactive]);
 
   const blocked = isVoiceHeldElsewhere(voiceOwner, ownerId) || voiceModeOpen;
-  const pillVisible =
-    voice.status === "recording" || voice.status === "finishing";
-  // 让位宽度跟着那一格现在是什么走：胶囊约 74px 宽，空闲的麦克风只占 36px ——
-  // 一律按 80px 留，空闲时就是一条白给的右空档。
-  const inputClassName = `${INPUT_BASE} ${pillVisible ? "pr-20" : "pr-11"}`;
+  // 麦克风恒占 36px（录音中也是同一个按钮，只换图标），所以右让位宽度不再随状态变：
+  // 以前胶囊宽 80px 要写 pr-20，现在恒定 pr-11。
+  const inputClassName = `${INPUT_BASE} pr-11`;
 
   return (
     <div className="relative">
@@ -152,8 +150,6 @@ export function AskUserVoiceField({
         <div className="absolute right-1 top-1/2 -translate-y-1/2">
           <VoiceMicButton
             status={voice.status}
-            level={voice.level}
-            seconds={voice.seconds}
             polishing={voice.polishing}
             install={voiceEngine.install}
             blocked={blocked}

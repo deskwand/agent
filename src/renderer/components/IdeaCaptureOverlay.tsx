@@ -12,6 +12,7 @@ import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
 import { toMicButtonProps, VoiceMicButton } from "./VoiceMicButton";
+import { VoiceRecordingStrip } from "./VoiceRecordingStrip";
 import { Button } from "./app-button";
 import { OccludingDialog } from "./ui/occluding-dialog";
 import {
@@ -239,6 +240,14 @@ export function IdeaCaptureOverlay(): JSX.Element {
             void save();
           }}
           className="min-h-[96px] w-full resize-none rounded-md border border-border bg-muted p-3 text-sm outline-none"
+        />
+
+        {/* 录音条放在麦克风上方：这一格的计时/电平原本在按钮里，现在按钮恒 36px。
+            这个浮层有空间，不像追问卡片那样只有一个内联文字框。 */}
+        <VoiceRecordingStrip
+          status={voice.status}
+          level={voice.level}
+          seconds={voice.seconds}
         />
 
         <div className="flex items-center gap-3">

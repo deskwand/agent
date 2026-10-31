@@ -50,7 +50,7 @@
       "empty": "No projects yet — create or open one in the sidebar",
       "switchFailed": "Could not switch project. Please try again."
     },
-    "placeholder": "Describe what you'd like to do, press / for shortcuts...",
+    "placeholder": "Describe what you'd like to do, Enter to send, / for shortcuts...",
     "quick": {
       "brainstorm": "Add a feature",
       "debug": "Fix a bug",
@@ -1205,7 +1205,7 @@
     "processing": "Thinking…",
     "sending": "Sending…",
     "stop": "Stop",
-    "typeMessage": "Type a message, press / for shortcuts...",
+    "typeMessage": "Type a message, Enter to send, / for shortcuts...",
     "loadingConversation": "Loading chat...",
     "startConversation": "Start chat",
     "startFailed": "Failed to start session. Please try again.",
@@ -1307,6 +1307,7 @@
     "voiceHoldKeyMetaShiftSpaceWin": "Win Shift Space",
     "voiceStop": "Stop recording",
     "voiceStopWithEsc": "Stop recording · Esc to cancel",
+    "voiceRecordingHint": "Listening — press Esc to cancel",
     "voicePolishing": "Cleaning up the text…",
     "voiceEngineOff": "Voice input is not enabled yet",
     "voiceNotInstalled": "The voice engine is not ready — tap the mic again to download it",
@@ -1315,6 +1316,7 @@
     "voiceMicUnavailable": "No usable microphone found",
     "voiceCaptureFailed": "Microphone is ready, but audio processing failed to start. Try again.",
     "voiceInstallFailed": "Voice engine installation failed",
+    "voiceInstallFailedRetry": "Voice engine install failed · Click to retry",
     "voiceDownloadConfirm": "Voice input needs a one-time model download (about 140 MB). Download it now?",
     "voiceDownloadConfirmOk": "Download and turn on",
     "voiceReady": "Voice input is ready — tap the mic to start",

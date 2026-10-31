@@ -13,9 +13,10 @@ import {
   type ChatInputHandle,
 } from "../../renderer/components/ChatInput";
 import {
-  ChatInputBottomBar,
+  ChatInputActionBar,
   shouldShowExpandButton,
-} from "../../renderer/components/ChatInputBottomBar";
+} from "../../renderer/components/ChatInputActionBar";
+import { ChatInputBottomBar } from "../../renderer/components/ChatInputBottomBar";
 
 vi.mock("react-i18next", () => ({
   // 底栏现在会经 StatusPopover → utils/i18n-format → i18n/config 间接引用这个插件，
@@ -33,20 +34,15 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => useIPCMock(),
 }));
 
-type BarProps = React.ComponentProps<typeof ChatInputBottomBar>;
+type BarProps = React.ComponentProps<typeof ChatInputActionBar>;
 
 /** 底栏除「随内容变化的两个 prop」之外的必填/可选 prop。 */
 const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
   onAttach: () => {},
   onAddFiles: () => {},
   attachedKeys: new Set<string>(),
-  canStop: false,
-  onStop: () => {},
-  isSubmitting: false,
   voice: {
     status: "idle",
-    level: 0,
-    seconds: 0,
     onToggle: () => {},
   },
 };
@@ -233,18 +229,16 @@ describe("shouldShowExpandButton", () => {
   });
 });
 
-describe("ChatInputBottomBar expand button", () => {
+describe("ChatInputActionBar expand button", () => {
   async function renderBar(props: Partial<BarProps>): Promise<void> {
     await act(async () => {
       root.render(
-        React.createElement(ChatInputBottomBar, {
+        React.createElement(ChatInputActionBar, {
           ...baseBarProps,
           onToggleExpand: () => {},
           hasInputContent: false,
           voice: {
             status: "idle",
-            level: 0,
-            seconds: 0,
             onToggle: () => {},
           },
           ...props,
@@ -291,7 +285,7 @@ describe("ChatInputBottomBar expand button", () => {
   });
 });
 
-describe("有内容才显示展开按钮（ChatInput → 底栏 整链路）", () => {
+describe("有内容才显示展开按钮（ChatInput → 左簇 整链路）", () => {
   function Harness() {
     const [hasInputContent, setHasInputContent] = React.useState(false);
     return React.createElement(ChatInput, {
@@ -301,10 +295,15 @@ describe("有内容才显示展开按钮（ChatInput → 底栏 整链路）", (
       placeholder: "Message",
       cardClassName: "",
       textareaClassName: "",
-      bottomSlot: React.createElement(ChatInputBottomBar, {
+      leadingSlot: React.createElement(ChatInputActionBar, {
         ...baseBarProps,
         onToggleExpand: () => {},
         hasInputContent,
+      }),
+      bottomSlot: React.createElement(ChatInputBottomBar, {
+        canStop: false,
+        onStop: () => {},
+        isSubmitting: false,
       }),
     });
   }

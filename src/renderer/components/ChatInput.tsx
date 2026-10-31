@@ -123,6 +123,10 @@ interface ChatInputProps {
   cardClassName: string;
   textareaClassName: string;
   bottomSlot: React.ReactNode;
+  /** 卡内左簇（附件 / 展开 / 麦克风），与编辑器同一行。缺省 = 不渲染。 */
+  leadingSlot?: React.ReactNode;
+  /** 卡片内、编辑器**上方**的一行（录音条这类一次性过程反馈）。缺省 = 不渲染。 */
+  topSlot?: React.ReactNode;
   /** Persistent settings rendered outside the input card. */
   footerSlot?: React.ReactNode;
   isExpanded?: boolean;
@@ -166,6 +170,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       cardClassName,
       textareaClassName,
       bottomSlot,
+      leadingSlot,
+      topSlot,
       footerSlot,
       isExpanded = false,
       onToggleExpand,
@@ -1262,179 +1268,190 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               className={`transition-colors ${isDragging ? "ring-2 ring-primary bg-primary/5" : ""} ${cardClassName}`}
             >
               <AttachmentTiles tiles={attachmentTiles} />
-              <div
-                ref={editorRef}
-                contentEditable={!disabled && !voiceRecording}
-                suppressContentEditableWarning
-                role="textbox"
-                aria-multiline="true"
-                aria-disabled={disabled || undefined}
-                aria-label={placeholder}
-                data-placeholder={placeholder}
-                spellCheck={false}
-                className={`chat-editor ${EDITOR_BASE_CLASS} ${textareaClassName}`}
-                onInput={() => {
-                  const el = editorRef.current;
-                  if (!el) return;
-                  // 编辑期间 DOM 是权威来源，state 只是它的镜像。
-                  // token 只存在于行首：一旦行首插入了别的字，它立即退回纯文本
-                  // —— 与气泡渲染同一条规则。组合期间不碰 DOM（设计文档 §5.5）。
-                  if (!isComposingRef.current) degradeNonLeadingTokens(el);
-                  const newValue = serializeEditor(el);
-                  const isComposing = isComposingRef.current;
+              {topSlot ? (
+                <div data-testid="chat-input-top">{topSlot}</div>
+              ) : null}
+              {/* 卡内一行：左簇 / 编辑器 / 发送键。
+                  `flex-wrap` + 编辑器 `basis-24`：宽度够时是一行；窄到编辑器放不下 96px
+                  时，编辑器整体换到下一行继续满宽 —— 否则它会被 `flex-1` 压成 0 宽，
+                  打字时看不见自己写的字（分屏可拖到 15% 宽）。 */}
+              <div className="flex flex-wrap items-end gap-1">
+                {leadingSlot}
+                <div
+                  ref={editorRef}
+                  contentEditable={!disabled && !voiceRecording}
+                  suppressContentEditableWarning
+                  role="textbox"
+                  aria-multiline="true"
+                  aria-disabled={disabled || undefined}
+                  aria-label={placeholder}
+                  data-placeholder={placeholder}
+                  spellCheck={false}
+                  className={`chat-editor ${EDITOR_BASE_CLASS} flex-1 basis-24 min-w-0 ${textareaClassName}`}
+                  onInput={() => {
+                    const el = editorRef.current;
+                    if (!el) return;
+                    // 编辑期间 DOM 是权威来源，state 只是它的镜像。
+                    // token 只存在于行首：一旦行首插入了别的字，它立即退回纯文本
+                    // —— 与气泡渲染同一条规则。组合期间不碰 DOM（设计文档 §5.5）。
+                    if (!isComposingRef.current) degradeNonLeadingTokens(el);
+                    const newValue = serializeEditor(el);
+                    const isComposing = isComposingRef.current;
 
-                  // Slash menu trigger: onKeyDown sets slashTriggerRef when '/' is pressed
-                  if (slashTriggerRef.current) {
-                    slashTriggerRef.current = false;
-                    if (el) {
-                      const cursorPos = getCaretOffset(el);
-                      // 只在文本开头触发：`/skill:x` 与 `/命令` 只在消息开头生效
-                      // （pi 用 startsWith 判定），句中插入会静默失效。
-                      // 不变量：菜单能打开的位置，必须正好是 token 能生效的位置。
-                      // 用 <= 1 而不是 === 1：拿不到光标时 getCaretOffset 也返回 0，
-                      // 那个情形与"斜杠在开头"一样应该开菜单，不该因为读不到选区就没反应。
-                      if (cursorPos <= 1) {
-                        setSlashStartIndex(cursorPos - 1);
-                        setSlashFilter("");
-                        setSlashSelectedIndex(0);
-                        setShowSlashMenu(true);
+                    // Slash menu trigger: onKeyDown sets slashTriggerRef when '/' is pressed
+                    if (slashTriggerRef.current) {
+                      slashTriggerRef.current = false;
+                      if (el) {
+                        const cursorPos = getCaretOffset(el);
+                        // 只在文本开头触发：`/skill:x` 与 `/命令` 只在消息开头生效
+                        // （pi 用 startsWith 判定），句中插入会静默失效。
+                        // 不变量：菜单能打开的位置，必须正好是 token 能生效的位置。
+                        // 用 <= 1 而不是 === 1：拿不到光标时 getCaretOffset 也返回 0，
+                        // 那个情形与"斜杠在开头"一样应该开菜单，不该因为读不到选区就没反应。
+                        if (cursorPos <= 1) {
+                          setSlashStartIndex(cursorPos - 1);
+                          setSlashFilter("");
+                          setSlashSelectedIndex(0);
+                          setShowSlashMenu(true);
+                        }
                       }
                     }
-                  }
 
-                  // Filter while slash menu is open.
-                  // 原文案：textarea 在组合期间会把 selectionStart 锁在组合起点，所以要取
-                  // selectionEnd。contenteditable 下 DOM 里已包含正在组合的文本、光标就在它
-                  // 之后，两者不再需要区分（依赖浏览器行为，由真机手验确认）。
-                  if (showSlashMenu && el) {
-                    const endPos = getCaretOffset(el);
-                    const query = newValue.slice(slashStartIndex + 1, endPos);
+                    // Filter while slash menu is open.
+                    // 原文案：textarea 在组合期间会把 selectionStart 锁在组合起点，所以要取
+                    // selectionEnd。contenteditable 下 DOM 里已包含正在组合的文本、光标就在它
+                    // 之后，两者不再需要区分（依赖浏览器行为，由真机手验确认）。
+                    if (showSlashMenu && el) {
+                      const endPos = getCaretOffset(el);
+                      const query = newValue.slice(slashStartIndex + 1, endPos);
+                      if (
+                        !isComposing &&
+                        (query.includes(" ") || query.includes("\n"))
+                      ) {
+                        closeSlashMenu();
+                      } else {
+                        setSlashFilter(query);
+                        setSlashSelectedIndex(0);
+                      }
+                    }
+
+                    // Detect if / was deleted → close menu.
+                    // 组合期间跳过：选区在组合区间内移动，会误判成"斜杠被删"。
+                    if (showSlashMenu && el && !isComposing) {
+                      if (getCaretOffset(el) <= slashStartIndex) {
+                        closeSlashMenu();
+                      }
+                    }
+
+                    setPrompt(newValue);
+                  }}
+                  onPaste={handlePaste}
+                  onCompositionStart={() => {
+                    isComposingRef.current = true;
+                  }}
+                  onCompositionEnd={() => {
+                    isComposingRef.current = false;
+                    // input 事件在 compositionend 之后触发，会用正确的选区重新过滤，
+                    // 所以这里不需要额外处理。
+                  }}
+                  onKeyDown={(e) => {
+                    // Detect '/' key for slash menu trigger (before any state check)
                     if (
-                      !isComposing &&
-                      (query.includes(" ") || query.includes("\n"))
+                      e.key === "/" &&
+                      !disabled &&
+                      !isComposingRef.current &&
+                      !e.ctrlKey &&
+                      !e.metaKey &&
+                      !e.altKey
                     ) {
-                      closeSlashMenu();
-                    } else {
-                      setSlashFilter(query);
-                      setSlashSelectedIndex(0);
+                      slashTriggerRef.current = true;
                     }
-                  }
 
-                  // Detect if / was deleted → close menu.
-                  // 组合期间跳过：选区在组合区间内移动，会误判成"斜杠被删"。
-                  if (showSlashMenu && el && !isComposing) {
-                    if (getCaretOffset(el) <= slashStartIndex) {
-                      closeSlashMenu();
+                    // Slash menu keyboard nav
+                    if (showSlashMenu) {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setSlashSelectedIndex((prev) =>
+                          Math.min(prev + 1, Math.max(0, visibleItemCount - 1)),
+                        );
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setSlashSelectedIndex((prev) => Math.max(prev - 1, 0));
+                        return;
+                      }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        // During IME composition, let Enter finalize the IME
+                        // instead of selecting a slash item. The
+                        // compositionend → onChange chain will update the
+                        // filter, so the user can press Enter again to select.
+                        if (isComposingRef.current || e.keyCode === 229) return;
+                        e.preventDefault();
+                        const item = getSlashItemByIndex(
+                          slashActiveTab,
+                          slashSelectedIndex,
+                        );
+                        if (item) selectSlashItem(item);
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        closeSlashMenu();
+                        return;
+                      }
+                      // Tab key: cycle through tabs
+                      if (e.key === "Tab") {
+                        e.preventDefault();
+                        const currentIdx = SLASH_TABS.indexOf(slashActiveTab);
+                        const nextIdx = (currentIdx + 1) % SLASH_TABS.length;
+                        handleTabChange(SLASH_TABS[nextIdx]);
+                        return;
+                      }
+                      // Cmd/Ctrl+1/2/3: switch to specific tab
+                      if (
+                        (e.metaKey || e.ctrlKey) &&
+                        e.key >= "1" &&
+                        e.key <= "3"
+                      ) {
+                        e.preventDefault();
+                        const index = Number(e.key) - 1;
+                        if (SLASH_TABS[index])
+                          handleTabChange(SLASH_TABS[index]);
+                        return;
+                      }
                     }
-                  }
 
-                  setPrompt(newValue);
-                }}
-                onPaste={handlePaste}
-                onCompositionStart={() => {
-                  isComposingRef.current = true;
-                }}
-                onCompositionEnd={() => {
-                  isComposingRef.current = false;
-                  // input 事件在 compositionend 之后触发，会用正确的选区重新过滤，
-                  // 所以这里不需要额外处理。
-                }}
-                onKeyDown={(e) => {
-                  // Detect '/' key for slash menu trigger (before any state check)
-                  if (
-                    e.key === "/" &&
-                    !disabled &&
-                    !isComposingRef.current &&
-                    !e.ctrlKey &&
-                    !e.metaKey &&
-                    !e.altKey
-                  ) {
-                    slashTriggerRef.current = true;
-                  }
-
-                  // Slash menu keyboard nav
-                  if (showSlashMenu) {
-                    if (e.key === "ArrowDown") {
+                    // Esc collapses expanded input (outside slash menu)
+                    if (e.key === "Escape" && isExpanded) {
                       e.preventDefault();
-                      setSlashSelectedIndex((prev) =>
-                        Math.min(prev + 1, Math.max(0, visibleItemCount - 1)),
-                      );
+                      onToggleExpand?.();
                       return;
                     }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setSlashSelectedIndex((prev) => Math.max(prev - 1, 0));
-                      return;
-                    }
+
                     if (e.key === "Enter" && !e.shiftKey) {
-                      // During IME composition, let Enter finalize the IME
-                      // instead of selecting a slash item. The
-                      // compositionend → onChange chain will update the
-                      // filter, so the user can press Enter again to select.
+                      // Block Enter during IME composition (e.g. pinyin → Chinese).
                       if (isComposingRef.current || e.keyCode === 229) return;
+                      // Expanded mode: Enter = newline, only submit on Cmd/Ctrl+Enter
+                      if (isExpanded && !e.metaKey && !e.ctrlKey) {
+                        e.preventDefault();
+                        document.execCommand("insertLineBreak");
+                        return;
+                      }
                       e.preventDefault();
-                      const item = getSlashItemByIndex(
-                        slashActiveTab,
-                        slashSelectedIndex,
-                      );
-                      if (item) selectSlashItem(item);
+                      handleSubmitInternal();
                       return;
                     }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      closeSlashMenu();
-                      return;
-                    }
-                    // Tab key: cycle through tabs
-                    if (e.key === "Tab") {
-                      e.preventDefault();
-                      const currentIdx = SLASH_TABS.indexOf(slashActiveTab);
-                      const nextIdx = (currentIdx + 1) % SLASH_TABS.length;
-                      handleTabChange(SLASH_TABS[nextIdx]);
-                      return;
-                    }
-                    // Cmd/Ctrl+1/2/3: switch to specific tab
-                    if (
-                      (e.metaKey || e.ctrlKey) &&
-                      e.key >= "1" &&
-                      e.key <= "3"
-                    ) {
-                      e.preventDefault();
-                      const index = Number(e.key) - 1;
-                      if (SLASH_TABS[index]) handleTabChange(SLASH_TABS[index]);
-                      return;
-                    }
-                  }
-
-                  // Esc collapses expanded input (outside slash menu)
-                  if (e.key === "Escape" && isExpanded) {
-                    e.preventDefault();
-                    onToggleExpand?.();
-                    return;
-                  }
-
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    // Block Enter during IME composition (e.g. pinyin → Chinese).
-                    if (isComposingRef.current || e.keyCode === 229) return;
-                    // Expanded mode: Enter = newline, only submit on Cmd/Ctrl+Enter
-                    if (isExpanded && !e.metaKey && !e.ctrlKey) {
+                    // Shift+Enter 换行。div 上不拦会插入块级 <div>，破坏单行流，
+                    // 所以显式插入 <br>（序列化时换算成 \n）。
+                    if (e.key === "Enter" && e.shiftKey && !isExpanded) {
                       e.preventDefault();
                       document.execCommand("insertLineBreak");
-                      return;
                     }
-                    e.preventDefault();
-                    handleSubmitInternal();
-                    return;
-                  }
-                  // Shift+Enter 换行。div 上不拦会插入块级 <div>，破坏单行流，
-                  // 所以显式插入 <br>（序列化时换算成 \n）。
-                  if (e.key === "Enter" && e.shiftKey && !isExpanded) {
-                    e.preventDefault();
-                    document.execCommand("insertLineBreak");
-                  }
-                }}
-              />
-              {bottomSlot}
+                  }}
+                />
+                {bottomSlot}
+              </div>
             </div>
             {footerSlot ? (
               <div data-testid="chat-input-footer">{footerSlot}</div>
