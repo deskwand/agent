@@ -2448,11 +2448,12 @@ export function ChatView() {
                 />
               }
               topSlot={
-                shouldShowRecordingStrip(voice.status) ? (
+                shouldShowRecordingStrip(voice.status, voice.polishing) ? (
                   <VoiceRecordingStrip
                     status={voice.status}
                     level={voice.level}
                     seconds={voice.seconds}
+                    polishing={voice.polishing}
                   />
                 ) : undefined
               }
@@ -2477,9 +2478,6 @@ export function ChatView() {
                   onInsertSkill={(name) =>
                     chatInputRef.current?.insertSkillChip(name)
                   }
-                  isExpanded={isInputExpanded}
-                  onToggleExpand={() => setIsInputExpanded((v) => !v)}
-                  hasInputContent={hasInputContent}
                   voice={toMicButtonProps(
                     voice,
                     voiceEngine.install,
@@ -2501,6 +2499,9 @@ export function ChatView() {
                   onStop={handleStop}
                   isSubmitting={isSubmitting}
                   submitDisabled={submitBlocked}
+                  isExpanded={isInputExpanded}
+                  onToggleExpand={() => setIsInputExpanded((v) => !v)}
+                  hasInputContent={hasInputContent}
                 />
               }
             />

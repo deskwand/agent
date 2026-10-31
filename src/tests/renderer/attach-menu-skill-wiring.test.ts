@@ -26,7 +26,6 @@ const baseProps: ChatInputActionBarProps = {
   onAttach: () => {},
   onAddFiles: () => {},
   attachedKeys: new Set<string>(),
-  hasInputContent: false,
   voice: {
     status: "idle",
     onToggle: () => {},

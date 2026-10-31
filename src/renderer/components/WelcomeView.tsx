@@ -798,11 +798,12 @@ export function WelcomeView() {
             )
           }
           topSlot={
-            shouldShowRecordingStrip(voice.status) ? (
+            shouldShowRecordingStrip(voice.status, voice.polishing) ? (
               <VoiceRecordingStrip
                 status={voice.status}
                 level={voice.level}
                 seconds={voice.seconds}
+                polishing={voice.polishing}
               />
             ) : undefined
           }
@@ -825,9 +826,6 @@ export function WelcomeView() {
                   chatInputRef.current?.insertSkillChip(name)
                 }
                 attachMenuDirection="down"
-                isExpanded={isInputExpanded}
-                onToggleExpand={() => setIsInputExpanded((v) => !v)}
-                hasInputContent={hasInputContent}
                 voice={toMicButtonProps(
                   voice,
                   voiceEngine.install,
@@ -850,6 +848,9 @@ export function WelcomeView() {
                 onStop={() => {}}
                 isSubmitting={isSubmitting}
                 submitDisabled={voice.status === "recording"}
+                isExpanded={isInputExpanded}
+                onToggleExpand={() => setIsInputExpanded((v) => !v)}
+                hasInputContent={hasInputContent}
               />
             )
           }

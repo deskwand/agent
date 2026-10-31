@@ -12,11 +12,11 @@ import {
   hasInputContent,
   type ChatInputHandle,
 } from "../../renderer/components/ChatInput";
+import { ChatInputActionBar } from "../../renderer/components/ChatInputActionBar";
 import {
-  ChatInputActionBar,
+  ChatInputBottomBar,
   shouldShowExpandButton,
-} from "../../renderer/components/ChatInputActionBar";
-import { ChatInputBottomBar } from "../../renderer/components/ChatInputBottomBar";
+} from "../../renderer/components/ChatInputBottomBar";
 
 vi.mock("react-i18next", () => ({
   // 底栏现在会经 StatusPopover → utils/i18n-format → i18n/config 间接引用这个插件，
@@ -34,17 +34,21 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => useIPCMock(),
 }));
 
-type BarProps = React.ComponentProps<typeof ChatInputActionBar>;
+type BarProps = React.ComponentProps<typeof ChatInputBottomBar>;
 
-/** 底栏除「随内容变化的两个 prop」之外的必填/可选 prop。 */
+/** 右簇（展开 + 发送）除「随内容变化的两个 prop」之外的必填/可选 prop。 */
 const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
+  canStop: false,
+  onStop: () => {},
+  isSubmitting: false,
+};
+
+/** 左簇（附件 + 麦克风）不变的那几项；单测右簇时只用来占位。 */
+const leadBarProps: React.ComponentProps<typeof ChatInputActionBar> = {
   onAttach: () => {},
   onAddFiles: () => {},
   attachedKeys: new Set<string>(),
-  voice: {
-    status: "idle",
-    onToggle: () => {},
-  },
+  voice: { status: "idle", onToggle: () => {} },
 };
 
 /**
@@ -103,11 +107,6 @@ function expandButton(): HTMLButtonElement | null {
   return container.querySelector<HTMLButtonElement>(
     'button[aria-label="chat.expandInput"]',
   );
-}
-
-/** 附件菜单的触发按钮（左 cluster 里那个 +）。用的就是它自己的 data 属性。 */
-function attachButton(): HTMLButtonElement | null {
-  return container.querySelector<HTMLButtonElement>("[data-attach-trigger]");
 }
 
 describe("hasInputContent", () => {
@@ -229,45 +228,50 @@ describe("shouldShowExpandButton", () => {
   });
 });
 
-describe("ChatInputActionBar expand button", () => {
+describe("展开按钮（右簇）", () => {
   async function renderBar(props: Partial<BarProps>): Promise<void> {
     await act(async () => {
       root.render(
-        React.createElement(ChatInputActionBar, {
+        React.createElement(ChatInputBottomBar, {
           ...baseBarProps,
           onToggleExpand: () => {},
           hasInputContent: false,
-          voice: {
-            status: "idle",
-            onToggle: () => {},
-          },
           ...props,
         }),
       );
     });
   }
 
-  it("renders no expand button when there is no content", async () => {
+  it("没有内容时不新增节点：那一格用 invisible 占着", async () => {
     await renderBar({ hasInputContent: false });
 
-    expect(expandButton()).toBeNull();
-    // 附件按钮仍在。jsdom 没有布局引擎，这里证明不了「没有空档」——
-    // 空档的有无由 §4.1 的 Chromium 探针负责（条件渲染本身不会留占位）。
-    expect(attachButton()).not.toBeNull();
+    const button = expandButton();
+    // 关键：元素在，只是看不见 —— 条件渲染的版本一出现就会推动编辑器与发送键
+    expect(button).not.toBeNull();
+    expect(button!.className).toContain("invisible");
+    // 右簇永远只有「展开 + 发送」两颗按钮，空态也一样
+    expect(container.querySelectorAll("button")).toHaveLength(2);
   });
 
-  it("renders the expand button in the left cluster once there is content", async () => {
+  it("有内容后是同一颗按钮原地变可见", async () => {
+    await renderBar({ hasInputContent: false });
+    const before = expandButton()!;
+
+    await renderBar({ hasInputContent: true });
+    const after = expandButton()!;
+
+    expect(after).toBe(before); // 同一个 DOM 节点：没有卸载重建，也就没有位移
+    expect(after.className).not.toContain("invisible");
+  });
+
+  it("与发送键同处右簇，且排在发送键前面", async () => {
     await renderBar({ hasInputContent: true });
 
-    const button = expandButton();
-    expect(button).not.toBeNull();
-    // 与附件触发按钮同处一个 div，且不在含发送键的那个 cluster 里。
-    // 不写死 class 字符串：左 cluster 加 shrink-0 / min-w-0 之类仍应通过。
-    const group = button!.closest("div")!;
-    expect(group.contains(attachButton())).toBe(true);
-    expect(
-      group.contains(container.querySelector('button[type="submit"]')),
-    ).toBe(false);
+    const button = expandButton()!;
+    const send = container.querySelector('button[type="submit"]')!;
+    // 同一个父节点 = 同一个右簇容器；展开在前，所以它不会把发送键推走
+    expect(button.parentElement).toBe(send.parentElement);
+    expect(button.nextElementSibling).toBe(send);
   });
 
   it("keeps the button while expanded without content", async () => {
@@ -285,7 +289,7 @@ describe("ChatInputActionBar expand button", () => {
   });
 });
 
-describe("有内容才显示展开按钮（ChatInput → 左簇 整链路）", () => {
+describe("打字时零位移（ChatInput → 右簇 整链路）", () => {
   function Harness() {
     const [hasInputContent, setHasInputContent] = React.useState(false);
     return React.createElement(ChatInput, {
@@ -295,48 +299,53 @@ describe("有内容才显示展开按钮（ChatInput → 左簇 整链路）", (
       placeholder: "Message",
       cardClassName: "",
       textareaClassName: "",
-      leadingSlot: React.createElement(ChatInputActionBar, {
+      leadingSlot: React.createElement(ChatInputActionBar, leadBarProps),
+      bottomSlot: React.createElement(ChatInputBottomBar, {
         ...baseBarProps,
         onToggleExpand: () => {},
         hasInputContent,
       }),
-      bottomSlot: React.createElement(ChatInputBottomBar, {
-        canStop: false,
-        onStop: () => {},
-        isSubmitting: false,
-      }),
     });
   }
 
-  it("adds the expand button when the first character is typed", async () => {
+  it("打字第一帧不新增节点、不换元素（这才是「零位移」的可测形式）", async () => {
     await act(async () => {
       root.render(React.createElement(Harness));
     });
-    expect(expandButton()).toBeNull();
+    const buttonCount = container.querySelectorAll("button").length;
+    // 空态它就在，只是看不见
+    const expand = expandButton()!;
+    expect(expand.className).toContain("invisible");
 
     await act(async () => {
       typeInto(editorEl(), "x");
     });
 
-    expect(expandButton()).not.toBeNull();
+    expect(container.querySelectorAll("button").length).toBe(buttonCount);
+    expect(expandButton()).toBe(expand);
+    expect(expandButton()!.className).not.toContain("invisible");
   });
 
-  it("removes the expand button again when the text is deleted", async () => {
+  it("删字后回到隐形，节点仍是同一颗", async () => {
     await act(async () => {
       root.render(React.createElement(Harness));
     });
     const editor = editorEl();
+    const buttonCount = container.querySelectorAll("button").length;
+    const expand = expandButton()!;
 
     await act(async () => {
       typeInto(editor, "x");
     });
-    expect(expandButton()).not.toBeNull();
+    expect(expandButton()!.className).not.toContain("invisible");
 
     await act(async () => {
       typeInto(editor, "");
     });
 
-    expect(expandButton()).toBeNull();
+    expect(expandButton()).toBe(expand);
+    expect(expandButton()!.className).toContain("invisible");
+    expect(container.querySelectorAll("button").length).toBe(buttonCount);
   });
 });
 

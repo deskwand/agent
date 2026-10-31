@@ -12,12 +12,24 @@ import type { VoiceStatus } from "../hooks/useVoiceInput";
  *
  * 位置与 AttachmentTiles 同一套语义：都在卡片内、都在编辑器上方，都让卡片变高
  * 而不是把按钮推走。
+ *
+ * 可见条件里为什么有 `polishing`：整理跑在 `status` 已经回到 `idle` 之后
+ * （`useVoiceInput` 的 teardown 先收状态，再 schedulePolish），而文字正是在那一刻
+ * 落进编辑器。只看 status 就等于在文字落地的同一帧抽掉这 28px，编辑器整块上跳。
  */
 export interface VoiceRecordingStripProps {
   status: VoiceStatus;
   /** 0..1，录音时的实时响度。 */
   level: number;
   seconds: number;
+  /**
+   * 这段文字还有一次整理在等（`useVoiceInput` 的 `polishing`）。
+   *
+   * 必须单独传：整理跑在 `status` 已经回到 `idle` **之后**（teardown 先收状态，
+   * 再 schedulePolish），而转写文字正是在那一刻落进编辑器。只看 status 就等于在
+   * 文字落地的同一帧抽掉这 28px，编辑器整块上跳。
+   */
+  polishing: boolean;
 }
 
 /** 波形槽位。固定 5 根，槽位号本身是常量，所以 key 不用数组序号。 */
@@ -61,35 +73,70 @@ function useLevelBars(level: number, active: boolean): number[] {
   return padded.map((value) => Math.max(LEVEL_FLOOR, Math.round(value * 100)));
 }
 
-/** 这一行什么时候该在。宿主据此决定传不传，`ChatInput` 自己不判断状态。 */
-export function shouldShowRecordingStrip(status: VoiceStatus): boolean {
-  return status === "recording" || status === "finishing";
+/**
+ * 这一行什么时候该在：录音、收尾、以及收尾之后的整理。
+ *
+ * `polishing` 只在 `idle` 时算（整理跑在 status 回到 idle 之后）。`requesting`
+ * 期间引擎正在起、`polishing` 还没来得及熄灭 —— 那一刻报"正在整理文字"是假的，
+ * 也与麦克风自己（它不给 busy 画 polish 环）不一致。
+ */
+export function shouldShowRecordingStrip(
+  status: VoiceStatus,
+  polishing: boolean,
+): boolean {
+  return (
+    status === "recording" ||
+    status === "finishing" ||
+    (polishing && status === "idle")
+  );
 }
 
 export function VoiceRecordingStrip({
   status,
   level,
   seconds,
+  polishing,
 }: VoiceRecordingStripProps) {
   const { t } = useTranslation();
-  // 录音中吃采样；收尾中保持 false，条就冻在最后一格。
+  // 只有录音中吃采样：收尾与整理都冻住最后一格（active 为假时 hook 既不推也不清）。
   const bars = useLevelBars(level, status === "recording");
-  if (!shouldShowRecordingStrip(status)) return null;
+  if (!shouldShowRecordingStrip(status, polishing)) return null;
+
+  // 录音优先：两者几乎不会同时为真（runPolish 在录音中会熄灭 polishing），
+  // 万一撞上，报更具体的那个。
+  const phase =
+    status === "recording"
+      ? "listening"
+      : status === "finishing"
+        ? "stopping"
+        : "polishing";
 
   return (
     <div
       data-testid="voice-recording-strip"
       className="mb-2 flex items-center gap-2 px-1 text-xs text-muted-foreground"
     >
-      <span
-        aria-hidden="true"
-        className="h-1.5 w-1.5 flex-none rounded-full bg-destructive"
-      />
-      <span className="flex-none tabular-nums">{formatSeconds(seconds)}</span>
+      {phase === "polishing" ? (
+        <span
+          aria-hidden="true"
+          className="h-2.5 w-2.5 flex-none animate-spin rounded-full border-[1.5px] border-muted-foreground border-t-transparent"
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="h-1.5 w-1.5 flex-none rounded-full bg-destructive"
+        />
+      )}
+      {/* 整理期间 teardown 已经把 seconds 清零，显示 0:00 就是撒谎 */}
+      {phase === "polishing" ? null : (
+        <span className="flex-none tabular-nums">{formatSeconds(seconds)}</span>
+      )}
       {/* 波形条 aria-hidden：它的含义已经在按钮的可访问名（「停止录音」）里。
           高度走 inline style —— 电平是运行时数据，Tailwind 不能穷举。 */}
       <span
-        className="flex h-3 flex-none items-end gap-[2px]"
+        className={`flex h-3 flex-none items-end gap-[2px] ${
+          phase === "polishing" ? "opacity-45" : ""
+        }`}
         aria-hidden="true"
       >
         {LEVEL_SLOTS.map((slot) => (
@@ -102,8 +149,13 @@ export function VoiceRecordingStrip({
         ))}
       </span>
       <span className="min-w-0 flex-1 truncate">
-        {/* 只 promise 真的还能按的键：收尾中 Esc 不会再取消（与麦克风气泡同一条规矩）。 */}
-        {status === "recording" ? t("chat.voiceRecordingHint") : null}
+        {/* 每条提示只能许诺真的还能按的键：收尾与整理时 Esc 都不会取消。
+            整理态复用麦克风的「正在整理文字…」—— 这是同一件事的两个位置。 */}
+        {phase === "listening"
+          ? t("chat.voiceRecordingHint")
+          : phase === "polishing"
+            ? t("chat.voicePolishing")
+            : null}
       </span>
     </div>
   );

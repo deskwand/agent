@@ -134,7 +134,10 @@ describe("两个聊天宿主都接上了新槽位", () => {
       expect(source).toContain("<ChatInputActionBar");
       expect(source).toContain("leadingSlot={");
       expect(source).toContain("topSlot={");
-      expect(source).toContain("shouldShowRecordingStrip(voice.status)");
+      expect(source).toContain(
+        "shouldShowRecordingStrip(voice.status, voice.polishing)",
+      );
+      expect(source).toContain("polishing={voice.polishing}");
     },
   );
 });

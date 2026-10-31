@@ -248,6 +248,7 @@ export function IdeaCaptureOverlay(): JSX.Element {
           status={voice.status}
           level={voice.level}
           seconds={voice.seconds}
+          polishing={voice.polishing}
         />
 
         <div className="flex items-center gap-3">

@@ -123,7 +123,7 @@ interface ChatInputProps {
   cardClassName: string;
   textareaClassName: string;
   bottomSlot: React.ReactNode;
-  /** 卡内左簇（附件 / 展开 / 麦克风），与编辑器同一行。缺省 = 不渲染。 */
+  /** 卡内左簇（附件 / 麦克风），与编辑器同一行。缺省 = 不渲染。 */
   leadingSlot?: React.ReactNode;
   /** 卡片内、编辑器**上方**的一行（录音条这类一次性过程反馈）。缺省 = 不渲染。 */
   topSlot?: React.ReactNode;
