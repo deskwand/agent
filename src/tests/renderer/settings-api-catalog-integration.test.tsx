@@ -212,25 +212,57 @@ describe("SettingsAPI catalog integration", () => {
     expect(confirm).toBeTruthy();
   });
 
-  it("点订阅套餐瓦片打开套餐弹窗（接线，不是组件单测）", async () => {
+  it("每个订阅套餐瓦片各自进自己的凭证页，不共享同一个弹窗", async () => {
+    await render();
+    await clickEntry("plan:custom:subscription-bailian-coding");
+
+    // 之前两个瓦片都打开同一个套餐弹窗、里面把两个套餐都渲染一遍
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="credential-api-key"]'),
+    ).not.toBeNull();
+    expect(container.textContent).toContain("百炼 Coding Plan");
+    expect(container.textContent).not.toContain("火山方舟 Coding Plan");
+
+    // 返回目录，点另一个套餐 → 换成它自己的页面
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="credential-cancel"]')
+        ?.click();
+    });
+    await flush();
+    await clickEntry("plan:custom:subscription-ark-coding");
+    expect(container.textContent).toContain("火山方舟 Coding Plan");
+    expect(container.textContent).not.toContain("百炼 Coding Plan");
+  });
+
+  it("已配置的订阅套餐出现在列表里，可以像别的供应商一样点开", async () => {
+    const planConfig = buildConfig({
+      isConfigured: true,
+      providers: {
+        "custom:subscription-bailian-coding": {
+          provider: "custom",
+          customProtocol: "openai",
+          name: "百炼 Coding Plan",
+          apiKey: "sk-sp-test",
+          baseUrl: "https://coding.dashscope.aliyuncs.com/v1",
+          defaultModel: "qwen3.7-plus",
+          models: [
+            { id: "qwen3.7-plus", label: "qwen3.7-plus", source: "preset" },
+          ],
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      },
+    });
+    (
+      window.electronAPI.config.get as unknown as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(planConfig);
+    useAppStore.setState({ appConfig: planConfig, isConfigured: true });
+
     await render();
     expect(
       container.querySelector(
-        '[data-testid="custom:subscription-bailian-coding-card"]',
-      ),
-    ).toBeNull();
-
-    await clickEntry("plan:custom:subscription-bailian-coding");
-
-    // 套餐弹窗迁到 shadcn Dialog 后经 portal 挂到 body，不再位于测试 container 内。
-    expect(
-      document.body.querySelector(
-        '[data-testid="custom:subscription-bailian-coding-card"]',
-      ),
-    ).not.toBeNull();
-    expect(
-      document.body.querySelector(
-        '[data-testid="custom:subscription-ark-coding-card"]',
+        '[data-testid="configured-provider-custom:subscription-bailian-coding"]',
       ),
     ).not.toBeNull();
   });

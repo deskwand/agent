@@ -29,7 +29,7 @@ import {
   profileKeyToProvider,
 } from "../../hooks/useApiConfigState";
 import { oauthProfileKey } from "../../../shared/oauth-utils";
-import { isCodingSubscriptionProfileKey } from "../../../shared/coding-subscriptions";
+import { getCodingSubscription } from "../../../shared/coding-subscriptions";
 import {
   getLocalGatewayPreset,
   type LocalGatewayId,
@@ -68,8 +68,7 @@ import {
   SettingsSection,
   SettingsSwitch,
 } from "./shared";
-import { CodingSubscriptionCards } from "./coding-subscription-cards";
-import { OAUTH_PROVIDERS } from "./provider-catalog";
+import { OAUTH_PROVIDERS, type ProviderCatalogEntry } from "./provider-catalog";
 import ApiDiagnosticsPanel from "../ApiDiagnosticsPanel";
 import { ProviderCatalogPage } from "./api/provider-catalog-page";
 import { ProviderCredentialForm } from "./api/provider-credential-form";
@@ -485,7 +484,6 @@ export function SettingsAPI({
   const visionDialogReturnFocus = useReturnFocus(rootRef);
   const oauthDisconnectReturnFocus = useReturnFocus(rootRef);
   const deleteDialogReturnFocus = useReturnFocus(rootRef);
-  const planDialogReturnFocus = useReturnFocus(rootRef);
   const setAppConfig = useAppStore((state) => state.setAppConfig);
   const setIsConfigured = useAppStore((state) => state.setIsConfigured);
   const [presets, setPresets] = useState<ProviderPresets>(
@@ -611,8 +609,6 @@ export function SettingsAPI({
   const [oauthErrors, setOAuthErrors] = useState<Record<string, string>>({});
   const [pendingOAuthLogoutProviderId, setPendingOAuthLogoutProviderId] =
     useState<string | null>(null);
-  // ── 订阅套餐弹窗（Coding Plan）：包住既有的 CodingSubscriptionCards ──
-  const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [localGatewayStatus, setLocalGatewayStatus] = useState<
     Partial<Record<LocalGatewayId, LocalGatewayProbeState>>
   >({});
@@ -719,7 +715,6 @@ export function SettingsAPI({
       Object.entries(providers).filter(
         ([profileKey, config]) =>
           profileKey !== "custom:deskwand" &&
-          !isCodingSubscriptionProfileKey(profileKey) &&
           config &&
           hasUsableCredentials(profileKey as ProviderProfileKey, config),
       ) as Array<[string, ApiProviderConfig]>
@@ -734,15 +729,10 @@ export function SettingsAPI({
    * 供应商走 configuredProviders（与列表同一份判断）；Coding Plan 被那个筛选
    * 排除在外，但它们确实已配置，所以单独补进来，否则中转分类的角标永远是空的。
    */
-  const configuredProfileKeys = useMemo(() => {
-    const keys = new Set(
-      configuredProviders.map((row) => row.profileKey as string),
-    );
-    for (const key of Object.keys(appConfig?.providers ?? {})) {
-      if (isCodingSubscriptionProfileKey(key)) keys.add(key);
-    }
-    return keys;
-  }, [configuredProviders, appConfig]);
+  const configuredProfileKeys = useMemo(
+    () => new Set(configuredProviders.map((row) => row.profileKey as string)),
+    [configuredProviders],
+  );
 
   const configuredLocalGateways = useMemo(() => {
     const ids = new Set<LocalGatewayId>();
@@ -773,6 +763,27 @@ export function SettingsAPI({
 
   const isCustomDraft = draft?.provider === "custom";
   // 保留原始下标：行编辑按 index 定位（手工行的 id 可以是空串，不能用 id 做 key）
+
+  /** 订阅套餐也是一条独立条目：进它自己的凭证页，不共享一个「套餐弹窗」。 */
+  const openPlanDraft = (entry: ProviderCatalogEntry) => {
+    const plan = getCodingSubscription(entry.id);
+    const existing = appConfig?.providers?.[entry.id as ProviderProfileKey];
+    startConnectRequest();
+    setOriginalProfileKey(existing ? (entry.id as ProviderProfileKey) : null);
+    setDraft({
+      profileKey: entry.id as ProviderProfileKey,
+      provider: "custom",
+      customProtocol: "openai",
+      name: plan?.name ?? existing?.name ?? "",
+      apiKey: existing?.apiKey ?? "",
+      baseUrl: plan?.baseUrl ?? existing?.baseUrl ?? "",
+      defaultModel: plan?.defaultModel ?? "",
+      models: [],
+    });
+    setError("");
+    setSuccessMessage("");
+    resetConnectState();
+  };
 
   const openCreate = (provider: ProviderType = "openrouter") => {
     startConnectRequest();
@@ -1466,14 +1477,6 @@ export function SettingsAPI({
     onSaved?.();
   };
 
-  const handleSubscriptionDelete = async (profileKey: string) => {
-    const deleted = await window.electronAPI.config.deleteProvider({
-      profileKey,
-    });
-    applyConfig(deleted.config);
-    onSaved?.();
-  };
-
   if (isLoadingConfig) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-3">
@@ -1625,7 +1628,8 @@ export function SettingsAPI({
                   onBack={() => setView(backFrom(view))}
                   onPickEntry={(entry) => {
                     if (entry.kind === "plan") {
-                      setPlanDialogOpen(true);
+                      openPlanDraft(entry);
+                      setView(pickCatalogEntry(view, entry));
                       return;
                     }
                     if (entry.kind === "cloud") {
@@ -1687,6 +1691,18 @@ export function SettingsAPI({
                     connectState === "failed" ? connectMessage : undefined
                   }
                   onSubmit={(values) => {
+                    if (view.entry.kind === "plan") {
+                      void handleSubscriptionSave(view.entry.id, values.apiKey)
+                        .then(() => setView(API_VIEW_LIST))
+                        .catch((cause: unknown) =>
+                          setError(
+                            cause instanceof Error
+                              ? cause.message
+                              : String(cause),
+                          ),
+                        );
+                      return;
+                    }
                     const next = {
                       ...draft,
                       name: values.name,
@@ -2876,46 +2892,6 @@ export function SettingsAPI({
             </div>
           </AlertDialogContent>
         </OccludingAlertDialog>
-      )}
-
-      {planDialogOpen && (
-        <OccludingDialog
-          open={planDialogOpen}
-          onOpenChange={(open) => {
-            if (!open) setPlanDialogOpen(false);
-          }}
-        >
-          <DialogContent
-            className="mx-4 w-full max-w-2xl gap-0 overflow-hidden rounded-2xl border border-border/60 bg-background p-0 [&>button]:hidden"
-            aria-describedby={undefined}
-            onInteractOutside={(event) => event.preventDefault()}
-            onEscapeKeyDown={(event) => event.preventDefault()}
-            {...planDialogReturnFocus.focusHandlers}
-          >
-            <div className="border-b border-border/60 px-5 py-4">
-              <DialogTitle className="text-sm font-medium text-foreground">
-                {t("api.planDialogTitle")}
-              </DialogTitle>
-            </div>
-            <div className="space-y-3 px-5 py-4">
-              <CodingSubscriptionCards
-                profiles={appConfig?.providers || {}}
-                onSave={handleSubscriptionSave}
-                onDelete={handleSubscriptionDelete}
-              />
-              <div className="flex justify-end">
-                <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={() => setPlanDialogOpen(false)}
-                  className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-hover-surface hover:text-foreground h-auto"
-                >
-                  {t("api.done")}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </OccludingDialog>
       )}
     </div>
   );

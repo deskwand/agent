@@ -309,29 +309,6 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     return opener;
   };
 
-  /** 目录页在「添加供应商」之后 */
-  const openCatalog = async (): Promise<void> => {
-    const add = container.querySelector<HTMLButtonElement>(
-      '[data-testid="provider-list-add"]',
-    );
-    expect(add, "添加入口必须存在").not.toBeNull();
-    await click(add!);
-    await flush();
-  };
-
-  const openPlanDialog = async (): Promise<HTMLButtonElement> => {
-    await renderSettings();
-    await openCatalog();
-    const opener = container.querySelector<HTMLButtonElement>(
-      '[data-catalog-entry="plan:custom:subscription-bailian-coding"]',
-    );
-    expect(opener, "订阅方案瓦片必须存在").not.toBeNull();
-    opener!.focus();
-    await click(opener!);
-    await flush();
-    return opener!;
-  };
-
   const openOauthDialog = async (): Promise<HTMLButtonElement> => {
     await renderSettings();
     // 断开入口收进了行尾 ⋯ 菜单
@@ -413,34 +390,6 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     expect(dialogs()).toHaveLength(0);
     expect(useAppStore.getState().browserOcclusionIds.size).toBe(0);
     expect(releaseSpy, "关闭恰一次 = release 恰一次").toHaveBeenCalledTimes(1);
-    expect(document.activeElement, "关闭后必须回到 opener").toBe(opener);
-  });
-
-  it("订阅方案：唯一 dialog + 标题 + occlusion 1 + 遮罩/Escape 不关 + 「完成」关闭恰一次回焦", async () => {
-    const opener = await openPlanDialog();
-    expect(dialogs()).toHaveLength(1);
-    expect(dialogs()[0].querySelector("h2")?.textContent).toBe(
-      i18n.t("api.planDialogTitle"),
-    );
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(1);
-    expect(dialogs()[0].className).toContain("[&>button]:hidden");
-    // 该弹窗没有本地化 X：api.done 是唯一关闭入口。
-    expect(
-      dialogs()[0].querySelector(
-        `button[aria-label="${i18n.t("common.close")}"]`,
-      ),
-    ).toBeNull();
-
-    await outsideClick(dialogs()[0]);
-    await pressEscape();
-    expect(dialogs(), "遮罩/Escape 后必须仍在").toHaveLength(1);
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(1);
-
-    await click(buttonIn(dialogs()[0], i18n.t("api.done")));
-    await flush();
-    expect(dialogs()).toHaveLength(0);
-    expect(useAppStore.getState().browserOcclusionIds.size).toBe(0);
-    expect(releaseSpy).toHaveBeenCalledTimes(1);
     expect(document.activeElement, "关闭后必须回到 opener").toBe(opener);
   });
 
@@ -586,11 +535,6 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
 
   it("视觉编辑：开窗后焦点进入 dialog，Tab 从末 tabbable 回绕到首 tabbable", async () => {
     await openVisionDialog();
-    await expectFocusTrap(dialogs()[0]);
-  });
-
-  it("订阅方案：开窗后焦点进入 dialog，Tab 从末 tabbable 回绕到首 tabbable", async () => {
-    await openPlanDialog();
     await expectFocusTrap(dialogs()[0]);
   });
 
