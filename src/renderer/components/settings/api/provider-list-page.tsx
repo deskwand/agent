@@ -1,8 +1,13 @@
 import { ChevronRight, MoreHorizontal, Plus } from "lucide-react";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ProviderPresets, ProviderProfileKey } from "../../../types";
 import { Button } from "../../app-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../ui/dropdown-menu";
 import {
   hostOf,
   oauthProviderIdForProfile,
@@ -45,7 +50,6 @@ export function ProviderListPage({
   onDisconnect,
 }: ProviderListPageProps) {
   const { t } = useTranslation();
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   if (rows.length === 0) {
     return (
@@ -106,7 +110,6 @@ export function ProviderListPage({
           const statusTone =
             modelCount === 0 && !status?.loggedIn ? "bg-warning" : "bg-success";
           const isActive = profileKey === activeProfileKey;
-          const menuOpen = openMenu === profileKey;
 
           return (
             <div
@@ -146,69 +149,65 @@ export function ProviderListPage({
                 <span className="font-mono text-xs text-muted-foreground">
                   {rightText}
                 </span>
-                <button
-                  type="button"
-                  data-testid={`provider-row-menu-${profileKey}`}
-                  aria-label={t("api.providerRowMenu")}
-                  aria-expanded={menuOpen}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setOpenMenu(menuOpen ? null : profileKey);
-                  }}
-                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-hover-surface hover:text-foreground"
-                >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </button>
+                {/* 菜单走 Radix 的 portal 版（DropdownMenuContent 自带 Portal）：
+                    行内 absolute 弹层会被外层 SettingsCard 的 overflow-hidden 裁掉，
+                    列表最后一行的菜单只露出上半截。改回行内 div 前先确认这一点。 */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      data-testid={`provider-row-menu-${profileKey}`}
+                      aria-label={t("api.providerRowMenu")}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-hover-surface hover:text-foreground data-[state=open]:bg-hover-surface"
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={6}
+                    className="min-w-[132px] border-border/60 bg-card shadow-elevated"
+                  >
+                    <DropdownMenuItem
+                      data-testid={`provider-row-edit-${profileKey}`}
+                      onSelect={() => onOpen(profileKey as ProviderProfileKey)}
+                      className="px-2.5 py-1.5 text-xs text-foreground focus:bg-hover-surface"
+                    >
+                      {t("api.editApi")}
+                    </DropdownMenuItem>
+                    {!isActive && (
+                      <DropdownMenuItem
+                        data-testid={`provider-row-set-active-${profileKey}`}
+                        onSelect={() =>
+                          onSetActive(profileKey as ProviderProfileKey)
+                        }
+                        className="px-2.5 py-1.5 text-xs text-foreground focus:bg-hover-surface"
+                      >
+                        {t("api.providerRowSetActive")}
+                      </DropdownMenuItem>
+                    )}
+                    {oauthId && status?.loggedIn && (
+                      <DropdownMenuItem
+                        data-testid="provider-row-disconnect"
+                        onSelect={() => onDisconnect(oauthId)}
+                        className="px-2.5 py-1.5 text-xs text-foreground focus:bg-hover-surface"
+                      >
+                        {t("api.providerRowDisconnect")}
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      data-testid={`provider-row-delete-${profileKey}`}
+                      onSelect={() =>
+                        onDelete(profileKey as ProviderProfileKey)
+                      }
+                      className="px-2.5 py-1.5 text-xs text-destructive focus:bg-destructive/10 focus:text-destructive"
+                    >
+                      {t("api.providerRowDelete")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-
-              {menuOpen && (
-                <div
-                  className="absolute right-2 top-11 z-20 min-w-[132px] rounded-lg border border-border/60 bg-card p-1 shadow-elevated"
-                  role="menu"
-                >
-                  {!isActive && (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      data-testid={`provider-row-set-active-${profileKey}`}
-                      onClick={() => {
-                        setOpenMenu(null);
-                        onSetActive(profileKey as ProviderProfileKey);
-                      }}
-                      className="block w-full rounded-md px-2.5 py-1.5 text-left text-xs text-foreground hover:bg-hover-surface"
-                    >
-                      {t("api.providerRowSetActive")}
-                    </button>
-                  )}
-                  {oauthId && status?.loggedIn && (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      data-testid="provider-row-disconnect"
-                      onClick={() => {
-                        setOpenMenu(null);
-                        onDisconnect(oauthId);
-                      }}
-                      className="block w-full rounded-md px-2.5 py-1.5 text-left text-xs text-foreground hover:bg-hover-surface"
-                    >
-                      {t("api.providerRowDisconnect")}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    role="menuitem"
-                    data-testid={`provider-row-delete-${profileKey}`}
-                    onClick={() => {
-                      setOpenMenu(null);
-                      onDelete(profileKey as ProviderProfileKey);
-                    }}
-                    className="block w-full rounded-md px-2.5 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10"
-                  >
-                    {t("api.providerRowDelete")}
-                  </button>
-                </div>
-              )}
             </div>
           );
         })}

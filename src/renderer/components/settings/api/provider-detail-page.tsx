@@ -1,4 +1,4 @@
-import { ChevronLeft, MoreHorizontal } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ProviderModelRow } from "../../../utils/merge-provider-models";
@@ -119,14 +119,6 @@ export function ProviderDetailPage({
           )}
           <p className="px-1 text-xs text-muted-foreground">{host}</p>
         </div>
-        <Button
-          variant="ghost"
-          type="button"
-          aria-label={t("api.providerRowMenu")}
-          className="h-auto flex-none rounded-lg p-1.5 text-muted-foreground hover:bg-hover-surface"
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
       </div>
 
       <section className="space-y-2 border-y border-border/60 py-4">

@@ -234,7 +234,6 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
   const dialogs = (role: "dialog" | "alertdialog" = "dialog"): HTMLElement[] =>
     Array.from(document.body.querySelectorAll<HTMLElement>(`[role="${role}"]`));
 
-
   // 弹窗动作必须按层查找：列表行里的 opener 与弹窗动作常常同一文案。
   const buttonIn = (layer: HTMLElement, text: string): HTMLButtonElement => {
     const button = Array.from(
@@ -252,6 +251,34 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     for (let i = 0; i < 5; i += 1) {
       await flush();
     }
+  };
+
+  /** 行尾（⋯）菜单是 Radix DropdownMenu：触发器只认左键 pointerdown。 */
+  const openRowMenu = async (profileKey: string): Promise<void> => {
+    const trigger = container.querySelector<HTMLElement>(
+      `[data-testid="provider-row-menu-${profileKey}"]`,
+    );
+    expect(trigger, "行尾 ⋯ 必须存在").not.toBeNull();
+    await act(async () => {
+      trigger!.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          ctrlKey: false,
+        }),
+      );
+    });
+    await flush();
+  };
+
+  /** 菜单内容 portal 到 document.body，不在测试 container 里。 */
+  const menuItem = (testId: string): HTMLElement => {
+    const el = document.body.querySelector<HTMLElement>(
+      `[data-testid="${testId}"]`,
+    );
+    expect(el, `菜单项 ${testId} 必须存在`).toBeTruthy();
+    return el!;
   };
 
   const outsideClick = async (content: HTMLElement): Promise<void> => {
@@ -286,38 +313,24 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
   const openOauthDialog = async (): Promise<HTMLButtonElement> => {
     await renderSettings();
     // 断开入口收进了行尾 ⋯ 菜单
-    await click(
-      container.querySelector<HTMLButtonElement>(
-        '[data-testid="provider-row-menu-oauth:openai-codex"]',
-      )!,
-    );
+    await openRowMenu("oauth:openai-codex");
+    const opener = menuItem("provider-row-disconnect") as HTMLButtonElement;
+    opener.focus();
+    await click(opener);
     await flush();
-    const opener = container.querySelector<HTMLButtonElement>(
-      '[data-testid="provider-row-disconnect"]',
-    );
-    expect(opener, "OAuth 断开按钮必须存在（登录态）").not.toBeNull();
-    opener!.focus();
-    await click(opener!);
-    await flush();
-    return opener!;
+    return opener;
   };
 
   const openDeleteDialog = async (): Promise<HTMLButtonElement> => {
     await renderSettings();
-    await click(
-      container.querySelector<HTMLButtonElement>(
-        '[data-testid="provider-row-menu-oauth:openai-codex"]',
-      )!,
-    );
+    await openRowMenu("oauth:openai-codex");
+    const opener = menuItem(
+      "provider-row-delete-oauth:openai-codex",
+    ) as HTMLButtonElement;
+    opener.focus();
+    await click(opener);
     await flush();
-    const opener = container.querySelector<HTMLButtonElement>(
-      '[data-testid="provider-row-delete-oauth:openai-codex"]',
-    );
-    expect(opener, "删除按钮必须存在").not.toBeNull();
-    opener!.focus();
-    await click(opener!);
-    await flush();
-    return opener!;
+    return opener;
   };
 
   it("OAuth 断开：确认恰一次、pending 立即清空而请求仍挂起、无额外取消调用", async () => {
@@ -409,17 +422,8 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     const second = deferred<{ config: AppConfig }>();
     deleteProvider.mockReturnValue(second.promise);
     // 菜单项点一次就卸载，重开菜单再点
-    await click(
-      container.querySelector<HTMLButtonElement>(
-        '[data-testid="provider-row-menu-oauth:openai-codex"]',
-      )!,
-    );
-    await flush();
-    await click(
-      container.querySelector<HTMLButtonElement>(
-        '[data-testid="provider-row-delete-oauth:openai-codex"]',
-      )!,
-    );
+    await openRowMenu("oauth:openai-codex");
+    await click(menuItem("provider-row-delete-oauth:openai-codex"));
     await flush();
     const confirmSecond = buttonIn(
       dialogs("alertdialog")[0],
@@ -478,17 +482,9 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     // 底层 OAuth 弹窗对外不可点，真实用户点不到它的「删除」。这里直接派发 click
     // 绕开指针模型，专门验证两层各自记住返回目标、关掉上层不覆写下层。
     // 删除入口在行尾 ⋯ 菜单里：合成点击直接派发，绕开 modal 的指针模型。
-    await click(
-      container.querySelector<HTMLButtonElement>(
-        '[data-testid="provider-row-menu-oauth:openai-codex"]',
-      )!,
-    );
-    await flush();
-    const deleteOpener = container.querySelector<HTMLButtonElement>(
-      '[data-testid="provider-row-delete-oauth:openai-codex"]',
-    );
-    expect(deleteOpener, "删除按钮必须存在").not.toBeNull();
-    await click(deleteOpener!);
+    await openRowMenu("oauth:openai-codex");
+    const deleteOpener = menuItem("provider-row-delete-oauth:openai-codex");
+    await click(deleteOpener);
     await flush();
 
     expect(dialogs("alertdialog"), "真实同时打开两层").toHaveLength(2);
@@ -516,6 +512,15 @@ describe("SettingsAPI 剩余四个弹窗外壳（Task 3 第 2 小步）", () => 
     expect(bottom.querySelector("h2")?.textContent).toBe(
       i18n.t("api.oauthDisconnect"),
     );
+    // 行尾 ⋯ 菜单换成 Radix DropdownMenu 后，删除入口（菜单项）在选中时随菜单一起卸载：
+    // 顶层关掉时回焦目标已 disconnected，落在 settings 根（useReturnFocus 的兜底）。
+    // 兜底不等于放羊：底层弹窗的焦点陷阱仍生效，下一次外部聚焦会被拉回弹窗内。
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="provider-list-add"]')
+        ?.focus();
+    });
+    await flush();
     expect(
       bottom.contains(document.activeElement),
       "关顶层后焦点必须回到底层弹窗内",

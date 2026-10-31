@@ -48,6 +48,25 @@ async function flush(): Promise<void> {
   await act(async () => {
     await Promise.resolve();
   });
+  // Radix 的焦点移动/菜单开合都在 setTimeout(0) 里。
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+/** Radix 的菜单触发器只认左键 pointerdown，合成 click 不会展开。 */
+async function pointerDown(el: Element): Promise<void> {
+  await act(async () => {
+    el.dispatchEvent(
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        ctrlKey: false,
+      }),
+    );
+  });
+  await flush();
 }
 
 describe("SettingsAPI OpenRouter login flow", () => {
@@ -243,15 +262,13 @@ describe("SettingsAPI OpenRouter login flow", () => {
     });
     await flush();
 
-    // 断开入口收进了行尾 ⋯ 菜单
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(
-          '[data-testid="provider-row-menu-openrouter"]',
-        )
-        ?.click();
-    });
-    const disconnectButton = container.querySelector(
+    // 断开入口收进了行尾 ⋯ 菜单（Radix DropdownMenu：内容 portal 到 document.body）
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[data-testid="provider-row-menu-openrouter"]',
+    );
+    expect(trigger, "行尾 ⋯ 必须存在").not.toBeNull();
+    await pointerDown(trigger!);
+    const disconnectButton = document.body.querySelector(
       '[data-testid="provider-row-disconnect"]',
     );
     expect(disconnectButton).not.toBeNull();
