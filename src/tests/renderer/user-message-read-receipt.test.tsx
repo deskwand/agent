@@ -2,8 +2,6 @@
 import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "../../renderer/i18n/config";
 import { MessageCard } from "../../renderer/components/MessageCard";
@@ -91,18 +89,17 @@ describe("user message read receipt", () => {
     ).not.toBeNull();
   });
 
-  it("colors the ring with theme tokens, not the fixed success green", () => {
-    // `--success` 是「固定语义层」，8 套主题共用一个绿，在单色聊天区里会跳
-    // 出画面。这条锁住：已读/未读都用随主题变的 foreground / muted-foreground。
-    const src = readFileSync(
-      path.join(
-        __dirname,
-        "../../renderer/components/message/ReadReceiptRing.tsx",
-      ),
-      "utf-8",
+  it("colors the two states with theme tokens, not the fixed success green", () => {
+    // `--success` 是「固定语义层」，所有主题共用一个绿，在单色聊天区里会跳。
+    // 断言落在**渲染出来的节点**上：把两个类名对调，这条就会红 —— 扫源码做不到。
+    render("read");
+    expect(container.querySelector('[aria-label="Read"]')?.className).toContain(
+      "text-foreground/70",
     );
-    expect(src).not.toContain("text-success");
-    expect(src).toContain("text-foreground/70");
-    expect(src).toContain("text-muted-foreground/75");
+
+    render("unread");
+    const unread = container.querySelector('[aria-label="Unread"]');
+    expect(unread?.className).toContain("text-muted-foreground/75");
+    expect(unread?.className).not.toContain("text-foreground");
   });
 });

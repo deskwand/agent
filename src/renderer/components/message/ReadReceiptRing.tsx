@@ -2,12 +2,12 @@ import { useTranslation } from "react-i18next";
 import type { ReadReceiptState } from "../../utils/message-read";
 
 /**
- * 气泡右侧的已读回执环（飞书那套）：未读 = 灰色空心环，已读 = 绿色环 + 对号。
+ * 气泡右侧的已读回执环（飞书那套）：未读 = 灰色空心环，已读 = 对号环。
  * 15px，挂在 22px（16 + gap 6）的窄槽里，不占正文宽度；也不参与元数据那排
  * （那排仍是悬停才淡入）。
  *
  * 颜色全走主题变量（`--foreground` / `--muted-foreground`），不用 `--success`：
- * 后者是「固定语义层」，不随 palette 变，8 套主题都是同一个绿 —— 在单色聊天区里一个
+ * 后者是「固定语义层」，不随 palette 变，所有主题共用一个绿 —— 在单色聊天区里一个
  * 绿勾会很跳。已读/未读的差别交给形状（实勾 vs 空心环）和深浅（foreground/70 vs
  * muted-foreground/75），颜色跟着主题走。
  *
