@@ -2982,7 +2982,16 @@
       "title": "Context",
       "used": "{{used}} / {{total}}",
       "estimated": "estimated",
-      "compacting": "Compacting…"
+      "compacting": "Compacting…",
+      "breakdownSystem": "System prompt & tools",
+      "breakdownUser": "User messages",
+      "breakdownAssistant": "Assistant replies",
+      "breakdownThinking": "Thinking",
+      "breakdownToolCalls": "Tool calls",
+      "breakdownToolResults": "Tool results",
+      "breakdownMedia": "Images & files",
+      "breakdownFree": "Free space",
+      "breakdownScaled": "Estimates differ from the total — shares are scaled"
     },
     "outputs": {
       "title": "Outputs",

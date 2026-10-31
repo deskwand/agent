@@ -2979,7 +2979,16 @@
       "title": "上下文",
       "used": "{{used}} / {{total}}",
       "estimated": "估算",
-      "compacting": "压缩中…"
+      "compacting": "压缩中…",
+      "breakdownSystem": "系统提示词与工具",
+      "breakdownUser": "用户消息",
+      "breakdownAssistant": "助手回复",
+      "breakdownThinking": "思考过程",
+      "breakdownToolCalls": "工具调用",
+      "breakdownToolResults": "工具结果",
+      "breakdownMedia": "图片与附件",
+      "breakdownFree": "空闲",
+      "breakdownScaled": "估算与总量不一致，占比按比例折算"
     },
     "outputs": {
       "title": "输出内容",
