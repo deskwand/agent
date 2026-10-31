@@ -236,6 +236,42 @@ describe("轻量任务模型", () => {
     });
   });
 
+  it("先选具体模型、再切回跟随主模型，三个字段都回落", async () => {
+    await openUtilityTab();
+
+    await openMenu(container, "utility-model");
+    await act(async () => {
+      document
+        .querySelector<HTMLElement>(
+          '[data-testid="utility-model-option-deepseek|deepseek-flash"]',
+        )!
+        .click();
+    });
+    await flush();
+
+    await openMenu(container, "utility-model");
+    await act(async () => {
+      document
+        .querySelector<HTMLElement>(
+          '[data-testid="utility-model-option-follow-main"]',
+        )!
+        .click();
+    });
+    await flush();
+
+    await act(async () => byTestId<HTMLButtonElement>("utility-save")!.click());
+    await flush();
+
+    // providerProfileKey 必须被清掉，否则配置里会留下「跟随主模型 + 指定供应商」的矛盾状态
+    expect(save).toHaveBeenCalledWith({
+      utilityRuntime: expect.objectContaining({
+        inheritFromActive: true,
+        providerProfileKey: undefined,
+        model: "",
+      }),
+    });
+  });
+
   it("已配置的轻量任务模型在进页面时回显", async () => {
     const config = buildConfig({
       providers: { deepseek },

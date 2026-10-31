@@ -545,8 +545,6 @@ export function SettingsAPI({
   const [utilityMessage, setUtilityMessage] = useState<
     "saved" | "error" | null
   >(null);
-  /** 轻量任务下拉的选中值；"follow-main" = 跟随主模型 */
-  const [utilitySelection, setUtilitySelection] = useState("follow-main");
 
   // ── OAuth state ──
   const [oauthStatuses, setOAuthStatuses] = useState<
@@ -633,12 +631,6 @@ export function SettingsAPI({
       }
       if (nextConfig.utilityRuntime) {
         setUtilityDraft(nextConfig.utilityRuntime);
-        setUtilitySelection(
-          nextConfig.utilityRuntime.inheritFromActive ||
-            !nextConfig.utilityRuntime.providerProfileKey
-            ? "follow-main"
-            : `${nextConfig.utilityRuntime.providerProfileKey}|${nextConfig.utilityRuntime.model}`,
-        );
       }
       // Initialize search / webAccess state from config
       setSearchDraft(searchAddInheritedDefaults(nextConfig));
@@ -761,6 +753,16 @@ export function SettingsAPI({
     }
     return options;
   }, [configuredProviders, presets, t]);
+
+  /**
+   * 下拉的选中值从草稿派生，不再单独存一份 state ——
+   * 两份状态在「重新读配置」时必然要手工同步，迟早会漂。
+   */
+  const utilitySelection = useMemo(() => {
+    const { inheritFromActive, providerProfileKey, model } = utilityDraft;
+    if (inheritFromActive || !providerProfileKey) return "follow-main";
+    return `${providerProfileKey}|${model}`;
+  }, [utilityDraft]);
 
   const visionSourceCandidates = useMemo(
     () =>
@@ -2234,7 +2236,13 @@ export function SettingsAPI({
                   <SettingsFormSelect
                     value={utilitySelection}
                     onChange={(next) => {
-                      setUtilitySelection(next);
+                      const picked = parseUtilitySelection(next);
+                      setUtilityDraft((prev) => ({
+                        ...prev,
+                        inheritFromActive: !picked,
+                        providerProfileKey: picked?.profileKey,
+                        model: picked?.model ?? "",
+                      }));
                       setUtilityMessage(null);
                     }}
                     label={t("api.utilityModel")}
@@ -2253,12 +2261,9 @@ export function SettingsAPI({
                       setIsUtilitySaving(true);
                       setUtilityMessage(null);
                       try {
-                        const picked = parseUtilitySelection(utilitySelection);
                         const saved = await window.electronAPI.config.save({
                           utilityRuntime: {
-                            inheritFromActive: !picked,
-                            providerProfileKey: picked?.profileKey,
-                            model: picked?.model ?? "",
+                            ...utilityDraft,
                             timeoutMs: utilityDraft.timeoutMs || 180000,
                           },
                         });
