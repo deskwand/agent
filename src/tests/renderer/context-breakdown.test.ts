@@ -218,3 +218,92 @@ describe("buildContextBreakdown", () => {
     expect(result.rows.reduce((acc, r) => acc + r.tokens, 0)).toBe(10_000);
   });
 });
+
+describe("buildContextBreakdown: 系统侧三分", () => {
+  const parts = { promptTokens: 3_000, toolTokens: 6_000, skillTokens: 1_000 };
+  const oneMessage = () => [
+    msg("user", [{ type: "text" as const, text: "a".repeat(400) }]),
+  ]; // 100 tokens
+
+  it("按实测比例把残差分给系统提示词 / 工具定义 / 技能", () => {
+    // 总量 11_000 − 消息 100 = 残差 10_900，按 3000/6000/1000 分
+    const result = buildContextBreakdown(
+      oneMessage(),
+      11_000,
+      100_000,
+      undefined,
+      parts,
+    );
+    const byId = Object.fromEntries(result.rows.map((r) => [r.id, r.tokens]));
+
+    expect(result.systemSplit).toBe(true);
+    expect(result.systemTotal).toBe(10_900);
+    expect(byId.system).toBe(3_270);
+    expect(byId.tools).toBe(6_540);
+    expect(byId.skills).toBe(1_090); // 最后一块吃掉舍入误差
+    expect(byId.system + byId.tools + byId.skills).toBe(10_900);
+  });
+
+  it("没有比例时退回一行系统提示词与工具（旧行为）", () => {
+    const result = buildContextBreakdown(oneMessage(), 11_000, 100_000);
+    const systemSide = result.rows.filter((row) =>
+      ["system", "tools", "skills"].includes(row.id),
+    );
+    expect(result.systemSplit).toBe(false);
+    expect(systemSide).toHaveLength(1);
+    expect(systemSide[0].tokens).toBe(10_900);
+  });
+
+  it("比例全为 0 时不拆（不能凭空造出三行）", () => {
+    const result = buildContextBreakdown(
+      oneMessage(),
+      11_000,
+      100_000,
+      undefined,
+      {
+        promptTokens: 0,
+        toolTokens: 0,
+        skillTokens: 0,
+      },
+    );
+    expect(result.systemSplit).toBe(false);
+    expect(result.rows.find((r) => r.id === "system")?.tokens).toBe(10_900);
+  });
+
+  it("压缩后仍按上次测得的系统侧总量拆开", () => {
+    const result = buildContextBreakdown(
+      [
+        msg("user", [{ type: "text", text: "a".repeat(40_000) }]),
+        msg("assistant", [{ type: "text", text: "b".repeat(40_000) }]),
+      ],
+      10_000,
+      100_000,
+      6_000,
+      parts,
+    );
+    const byId = Object.fromEntries(result.rows.map((r) => [r.id, r.tokens]));
+
+    expect(result.scaled).toBe(true);
+    expect(byId.system).toBe(1_800);
+    expect(byId.tools).toBe(3_600);
+    expect(byId.skills).toBe(600);
+    expect(result.rows.reduce((acc, r) => acc + r.tokens, 0)).toBe(10_000);
+  });
+
+  it("残差很小时三行加起来仍然等于残差，0 份额的行不出现", () => {
+    const result = buildContextBreakdown(
+      oneMessage(),
+      105,
+      100_000,
+      undefined,
+      parts,
+    );
+    const systemSide = result.rows.filter((row) =>
+      ["system", "tools", "skills"].includes(row.id),
+    );
+
+    // 行按体量降序排，所以这里只验集合：0 份额的「技能」不出现
+    expect(systemSide.map((row) => row.id).sort()).toEqual(["system", "tools"]);
+    expect(systemSide.reduce((acc, row) => acc + row.tokens, 0)).toBe(5);
+  });
+});

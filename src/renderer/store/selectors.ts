@@ -28,6 +28,7 @@ import type {
 } from "../types";
 import type { ImageSource } from "../components/ImageLightbox";
 import type { GlobalNotice, SessionExecutionClock } from "./index";
+import type { PromptParts } from "../../shared/prompt-parts";
 
 /** 稳定空数组：selector 每次返回新数组会让 useSyncExternalStore 判定快照不稳定并无限重渲。 */
 const EMPTY_MESSAGES: Message[] = [];
@@ -214,6 +215,18 @@ export function useActiveContextWindow(): number | undefined {
   return useAppStore((s) =>
     s.activeSessionId
       ? s.sessionStates[s.activeSessionId]?.contextWindow
+      : undefined,
+  );
+}
+
+/**
+ * 系统侧三块的量级（仅权重）。undefined = 本会话还没量到，
+ * 调用方要退回一行「系统提示词与工具」。
+ */
+export function useActivePromptParts(): PromptParts | undefined {
+  return useAppStore((s) =>
+    s.activeSessionId
+      ? (s.sessionStates[s.activeSessionId]?.promptParts ?? undefined)
       : undefined,
   );
 }

@@ -57,3 +57,27 @@ describe("image passthrough wiring (multimodal images)", () => {
     expect(src).toContain("const hasImages = messageHasImages(");
   });
 });
+
+describe("prompt parts measurement wiring (context breakdown)", () => {
+  it("量的时机在本轮工具策略之后", () => {
+    const src = readSrc();
+    // 语音轮会 setActiveToolsByName 收窄名单：在它之前量到的是上一轮的工具集。
+    // 这里按源码顺序钉住，别把调用挪回建会话那一段。
+    const measureAt = src.indexOf("this.reportPromptParts(");
+    const policyAt = src.indexOf("applySessionTurnPolicyToSdk(");
+    expect(measureAt).toBeGreaterThan(policyAt);
+  });
+
+  it("把当轮档案的提示词段一起量进去", () => {
+    const src = readSrc();
+    // SDK 的 systemPrompt 在两次 run 之间回到 base，forced prompt 不在里面。
+    expect(src).toContain(
+      "this.reportPromptParts(session.id, piSession, profile)",
+    );
+  });
+
+  it("值不变就不重复上报", () => {
+    const src = readSrc();
+    expect(src).toContain("record.promptParts = parts");
+  });
+});

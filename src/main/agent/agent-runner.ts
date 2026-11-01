@@ -29,6 +29,8 @@ import {
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 import { createNestedToolCallTracker } from "./nested-tool-call-tracker";
+import { measureSessionPromptParts } from "./prompt-parts";
+import type { PromptParts } from "../../shared/prompt-parts";
 import { TokenSpeedReporter } from "./token-speed";
 import {
   createTurnProfileExtension,
@@ -476,6 +478,8 @@ interface CachedPiSession {
   piSessionFile?: string;
   /** 本轮档案（设计 §3.1）。每轮 run() 无条件覆盖，所以不需要清理。 */
   turnProfile?: TurnProfile;
+  /** 上一次报给渲染层的「系统提示词 / 工具 / 技能」量级，用来跳过重复上报。 */
+  promptParts?: PromptParts;
   /** ModelRuntime this cold-start created (unregister after dispose). */
   createdRuntime?: ModelRuntime;
 }
@@ -4767,6 +4771,12 @@ Tool routing:\n
           piSession,
           this.piSessions.get(session.id),
         );
+        // 上下文分类要把「系统提示词 / 工具定义 / 技能」分开，而这三样文本只在 SDK
+        // 手里（渲染层只有总量与消息估算）。**必须等工具策略落定后再量**：语音轮会
+        // 收窄 active 集合，早一步量到的是上一轮的工具集。语音段同理 —— SDK 的
+        // `systemPrompt` 在两次 run 之间回到 base，forced prompt 不在里面，只能用
+        // 本轮档案的段落补上。只读 getter，不改提示词文本，所以不动提示词缓存。
+        this.reportPromptParts(session.id, piSession, profile);
         // 本轮生效的档案与工具集。与上面那行 "Session thinking level" 同类：
         // 提示词/工具没生效时，这一行能直接判出是 kind 没传到、还是档案没选中。
         const activeToolsThisTurn = piSession.getActiveToolNames();
@@ -5409,6 +5419,45 @@ Tool routing:\n
       type: "stream.partial",
       payload: { sessionId, delta, turnId },
     });
+  }
+
+  /**
+   * 把「系统提示词 / 工具定义 / 技能」三块的量级发给渲染层。
+   *
+   * 渲染层拿它当权重，把「总量 − 消息侧」的残差分成三行。量失败就不发：
+   * 那边会退回一行「系统提示词与工具」，比发一堆 0 让三行凭空消失好。
+   *
+   * **值没变就不发**：稳态下每轮量出来的一模一样，而每次发都是一个新对象，
+   * 会让渲染层的 useMemo / effect 白跑一遍。缓存挂在会话记录上，随会话淘汰一起走。
+   */
+  private reportPromptParts(
+    sessionId: string,
+    piSession: PiAgentSession,
+    profile?: TurnProfile,
+  ): void {
+    const record = this.piSessions.get(sessionId);
+    try {
+      const parts = measureSessionPromptParts(
+        piSession,
+        profile?.systemPromptSection,
+      );
+      const last = record?.promptParts;
+      if (
+        last &&
+        last.promptTokens === parts.promptTokens &&
+        last.toolTokens === parts.toolTokens &&
+        last.skillTokens === parts.skillTokens
+      ) {
+        return;
+      }
+      if (record) record.promptParts = parts;
+      this.sendToRenderer({
+        type: "session.promptParts",
+        payload: { sessionId, ...parts },
+      });
+    } catch (error) {
+      logWarn("[AgentRunner] Failed to measure prompt parts:", error);
+    }
   }
 }
 

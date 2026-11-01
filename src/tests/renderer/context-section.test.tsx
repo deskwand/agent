@@ -54,6 +54,11 @@ function seed(opts: {
   contextWindow?: number;
   historyHydrated?: boolean;
   compaction?: { status: string; estimatedTokens?: number };
+  promptParts?: {
+    promptTokens: number;
+    toolTokens: number;
+    skillTokens: number;
+  };
 }) {
   useAppStore.setState({
     activeSessionId: "s1",
@@ -63,6 +68,7 @@ function seed(opts: {
         messages: opts.messages,
         contextWindow: opts.contextWindow,
         compaction: opts.compaction ?? { status: "idle" },
+        promptParts: opts.promptParts ?? null,
       },
     },
   } as never);
@@ -160,6 +166,73 @@ describe("ContextSection", () => {
     ).map((segment) => Number.parseFloat(segment.style.width));
     expect(widths.length).toBeGreaterThan(0);
     expect(widths.reduce((sum, width) => sum + width, 0)).toBeCloseTo(50);
+  });
+
+  it("splits the system side into prompt / tools / skills once measured", async () => {
+    seed({
+      messages: withUsage(50_000),
+      contextWindow: 100_000,
+      promptParts: {
+        promptTokens: 3_000,
+        toolTokens: 6_000,
+        skillTokens: 1_000,
+      },
+    });
+    await render();
+
+    expect(text()).toContain("overview.context.breakdownSystem");
+    expect(text()).toContain("overview.context.breakdownTools");
+    expect(text()).toContain("overview.context.breakdownSkills");
+    expect(text()).not.toContain("overview.context.breakdownSystemTools");
+  });
+
+  it("keeps the merged label until the system side has been measured", async () => {
+    seed({ messages: withUsage(50_000), contextWindow: 100_000 });
+    await render();
+
+    // 量到之前那一行是整个残差（含工具与技能），标签不能写成「系统提示词」
+    expect(text()).toContain("overview.context.breakdownSystemTools");
+    expect(text()).not.toContain("overview.context.breakdownTools");
+  });
+
+  it("keeps the three-way split after a compaction, using the measured total", async () => {
+    const history = [
+      userMessage(376_000), // ≈94k tokens
+      {
+        id: "usage",
+        sessionId: "s1",
+        role: "assistant" as const,
+        timestamp: 2,
+        content: [],
+        tokenUsage: { input: 0, output: 0, totalPromptInput: 100_000 },
+      },
+    ];
+    const promptParts = {
+      promptTokens: 3_000,
+      toolTokens: 6_000,
+      skillTokens: 1_000,
+    };
+    // 压缩前：残差 ≈6k，按 3/6/1 分成 1.8k / 3.6k / 0.6k
+    seed({ messages: history, contextWindow: 1_000_000, promptParts });
+    await render();
+    expect(text()).toContain("≈1.8k");
+    expect(text()).toContain("≈3.6k");
+    expect(text()).toContain("≈600");
+
+    // 压缩后：历史仍全量（≈94k）但总量降到 10k ⇒ 走折算分支，
+    // 系统侧总量沿用上一次测得的 6k，三行按同一比例摊回去。
+    seed({
+      messages: history,
+      contextWindow: 1_000_000,
+      promptParts,
+      compaction: { status: "success", estimatedTokens: 10_000 },
+    });
+    await render();
+
+    expect(text()).toContain("overview.context.breakdownScaled");
+    expect(text()).toContain("≈1.8k");
+    expect(text()).toContain("≈3.6k");
+    expect(text()).toContain("≈600");
   });
 
   it("estimates the free row too when the total itself is an estimate", async () => {

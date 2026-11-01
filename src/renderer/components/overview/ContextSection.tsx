@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
 import {
   useActiveContextWindow,
+  useActivePromptParts,
   useActiveSessionMessages,
 } from "../../store/selectors";
 import { AppProgress } from "../app-progress";
@@ -13,7 +14,12 @@ import {
   formatTokenCount,
 } from "../../utils/context-usage";
 import { buildContextBreakdown } from "../../utils/context-breakdown";
-import { DOT_CLASS, LABEL_KEY, SEGMENT_CLASS } from "./context-breakdown-style";
+import {
+  DOT_CLASS,
+  LABEL_KEY,
+  MERGED_SYSTEM_LABEL_KEY,
+  SEGMENT_CLASS,
+} from "./context-breakdown-style";
 import type { CompactionState } from "../../types";
 import { OverviewSection } from "./OverviewSection";
 
@@ -62,6 +68,7 @@ export function ContextSection() {
   const { t } = useTranslation();
   const messages = useActiveSessionMessages();
   const contextWindow = useActiveContextWindow();
+  const promptParts = useActivePromptParts();
   const compaction =
     useAppStore((s) =>
       s.activeSessionId
@@ -106,19 +113,26 @@ export function ContextSection() {
         usage.tokens,
         contextWindow,
         systemHint,
+        promptParts,
       ),
-    [historyHydrated, messages, usage.tokens, contextWindow, systemHint],
+    [
+      historyHydrated,
+      messages,
+      usage.tokens,
+      contextWindow,
+      systemHint,
+      promptParts,
+    ],
   );
   const showPercent = breakdown.windowTokens !== null;
 
-  // 只在未折算时记录：那时的 system 行就是「总量 − 消息估算」的残差。
+  // 只在未折算时记录：那时的系统侧总量就是「总量 − 消息估算」的残差。
+  // 记录的是三块之和（拆开之后没有单独的 system 行了）。
   useEffect(() => {
-    if (breakdown.scaled || breakdown.rows.length === 0) return;
-    const systemTokens = breakdown.rows.find((row) => row.id === "system");
-    if (!systemTokens) return;
+    if (breakdown.scaled || breakdown.systemTotal <= 0) return;
     systemHintRef.current = {
       sessionId: activeSessionId,
-      tokens: systemTokens.tokens,
+      tokens: breakdown.systemTotal,
     };
   }, [breakdown, activeSessionId]);
 
@@ -172,7 +186,13 @@ export function ContextSection() {
             {breakdown.rows.map((row) => (
               <BreakdownRow
                 key={row.id}
-                label={t(LABEL_KEY[row.id])}
+                // 没量到三块比例时这一行是整个残差，标签必须退回合并版 ——
+                // 否则「系统提示词 ≈108.6k」把工具与技能冒充成了系统提示词。
+                label={t(
+                  row.id === "system" && !breakdown.systemSplit
+                    ? MERGED_SYSTEM_LABEL_KEY
+                    : LABEL_KEY[row.id],
+                )}
                 tokens={row.tokens}
                 percent={row.percent}
                 swatch={DOT_CLASS[row.id]}

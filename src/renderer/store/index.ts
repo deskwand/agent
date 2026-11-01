@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { DEFAULT_THEME_ACCENT, DEFAULT_THEME_PRESET } from "../../shared/theme";
 import type { NestedToolRuntimeUi } from "../../shared/nested-tool-calls";
+import type { PromptParts } from "../../shared/prompt-parts";
 import type { IdeaSummary } from "../../shared/ideas";
 import type { SubagentActivity } from "../../shared/subagent-activity";
 import { collectCurrentPlan, type CurrentTodos } from "../utils/current-todos";
@@ -86,6 +87,12 @@ export interface SessionState {
   tokenSpeed?: { tokensPerSecond: number; estimated: boolean } | null;
   traceSteps: TraceStep[];
   contextWindow: number;
+  /**
+   * 系统侧三块的量级（主进程实测）：系统提示词本体 / 工具声明 / 技能清单。
+   * 只当权重用 —— 上下文占用仍然只有 provider 报的那一个精确数。null = 还没量到
+   * （本会话还没跑过一轮，或量失败），此时表格退回一行「系统提示词与工具」。
+   */
+  promptParts?: PromptParts | null;
   compaction: CompactionState;
   retry: RetryState;
   inputQueue: QueuedInput[];
@@ -158,6 +165,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   tokenSpeed: null,
   traceSteps: [],
   contextWindow: 0,
+  promptParts: null,
   compaction: { status: "idle" },
   retry: { active: false, attempt: 0 },
   inputQueue: [],
@@ -595,6 +603,7 @@ interface AppState {
 
   // Context window actions
   setSessionContextWindow: (sessionId: string, contextWindow: number) => void;
+  setSessionPromptParts: (sessionId: string, parts: PromptParts | null) => void;
   setSessionCompaction: (
     sessionId: string,
     status: CompactionStatus,
@@ -2038,6 +2047,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       sessionStates: patchSession(state.sessionStates, sessionId, {
         contextWindow,
+      }),
+    })),
+
+  setSessionPromptParts: (sessionId, parts) =>
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        promptParts: parts,
       }),
     })),
 

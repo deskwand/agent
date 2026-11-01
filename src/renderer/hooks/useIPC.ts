@@ -581,6 +581,14 @@ function registerSharedIpcListener(): () => void {
           );
           break;
 
+        case "session.promptParts":
+          store.setSessionPromptParts(event.payload.sessionId, {
+            promptTokens: event.payload.promptTokens,
+            toolTokens: event.payload.toolTokens,
+            skillTokens: event.payload.skillTokens,
+          });
+          break;
+
         case "session.compaction":
           store.setSessionCompaction(
             event.payload.sessionId,

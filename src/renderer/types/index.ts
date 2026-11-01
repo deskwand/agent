@@ -740,6 +740,19 @@ export type ServerEvent =
       payload: { sessionId: string; contextWindow: number };
     }
   | {
+      /**
+       * 系统侧三块的量级（主进程实测的系统提示词本体 / 工具声明 / 技能清单）。
+       * 渲染层只拿它当权重，把系统侧残差分成三行。
+       */
+      type: "session.promptParts";
+      payload: {
+        sessionId: string;
+        promptTokens: number;
+        toolTokens: number;
+        skillTokens: number;
+      };
+    }
+  | {
       type: "session.compaction";
       payload: {
         sessionId: string;
