@@ -6,7 +6,6 @@ import {
   useActivePromptParts,
   useActiveSessionMessages,
 } from "../../store/selectors";
-import { AppProgress } from "../app-progress";
 import {
   computeContextUsage,
   contextUsageLevel,
@@ -152,26 +151,27 @@ export function ContextSection() {
             {t("overview.context.compacting")}
           </span>
         )}
+        <span className="flex-1" />
+        <span className="text-[11px] tabular-nums text-muted-foreground">
+          {t("overview.context.used", {
+            used: formatTokenCount(usage.tokens ?? 0),
+            // 窗口未知时不要渲染成「430.4k / 0」。
+            total: showPercent ? formatTokenCount(contextWindow ?? 0) : "--",
+          })}
+        </span>
       </div>
-      <AppProgress
-        value={usage.percentage}
-        max={100}
-        className="mx-1 h-1.5"
-        aria-label={t("overview.context.title")}
-      />
-      <p className="px-1 text-[11px] text-muted-foreground">
-        {t("overview.context.used", {
-          used: formatTokenCount(usage.tokens ?? 0),
-          // 窗口未知时不要渲染成「430.4k / 0」。
-          total: showPercent ? formatTokenCount(contextWindow ?? 0) : "--",
-        })}
-      </p>
       {breakdown.rows.length > 0 && (
         <div className="space-y-1 pt-0.5">
           {showPercent && (
             <div
               className="mx-1 flex h-1.5 gap-px overflow-hidden rounded-full bg-muted"
-              aria-hidden="true"
+              // 这一条就是「用了多少」的唯一进度条：填充比例 = 已用 / 窗口，
+              // 剩余轨道 = 空闲。分段只解释填充的构成，不再单独画一条总长条。
+              role="progressbar"
+              aria-label={t("overview.context.title")}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(usage.percentage)}
             >
               {breakdown.rows.map((row) => (
                 <div

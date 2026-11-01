@@ -127,7 +127,8 @@ describe("ContextSection", () => {
 
     expect(text()).toContain("--");
     expect(text()).not.toContain("0%");
-    expect(container.querySelector('div[aria-hidden="true"]')).toBeNull();
+    // 窗口未知时连条都不画（百分比列是 "--"，画一条空的等于声称 0%）
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
   });
 
   it("renders no rows when usage is unknown", async () => {
@@ -162,7 +163,7 @@ describe("ContextSection", () => {
     await render();
 
     const widths = Array.from(
-      container.querySelectorAll<HTMLElement>("div[aria-hidden='true'] > div"),
+      container.querySelectorAll<HTMLElement>('[role="progressbar"] > div'),
     ).map((segment) => Number.parseFloat(segment.style.width));
     expect(widths.length).toBeGreaterThan(0);
     expect(widths.reduce((sum, width) => sum + width, 0)).toBeCloseTo(50);
@@ -233,6 +234,16 @@ describe("ContextSection", () => {
     expect(text()).toContain("≈1.8k");
     expect(text()).toContain("≈3.6k");
     expect(text()).toContain("≈600");
+  });
+
+  it("draws exactly one bar: the segmented one", async () => {
+    seed({ messages: withUsage(50_000), contextWindow: 100_000 });
+    await render();
+
+    // 曾经有两条：一条总占用进度条 + 一条构成条，同一个 50% 画了两遍。
+    expect(container.querySelectorAll('[role="progressbar"]')).toHaveLength(1);
+    const bar = container.querySelector('[role="progressbar"]');
+    expect(bar?.getAttribute("aria-valuenow")).toBe("50");
   });
 
   it("estimates the free row too when the total itself is an estimate", async () => {
