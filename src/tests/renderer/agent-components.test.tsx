@@ -27,6 +27,8 @@ function view(id: string, overrides: Partial<PersistentAgentView> = {}) {
     schedule: { kind: "interval", every: 30, unit: "minute" },
     enabled: true,
     nextPeriodicAt: null,
+    nextCheckInAt: null,
+    checkInNote: null,
     consecutiveFailures: 0,
     lastWakeupAt: null,
     lastError: null,
@@ -253,5 +255,16 @@ describe("AgentEditModal", () => {
     act(() => button("删除").click());
     await flush();
     expect(api.delete).toHaveBeenCalledWith("3", { deleteSession: true });
+  });
+});
+
+describe("AgentEditModal interval wording", () => {
+  it("labels interval as a max interval and explains the fallback", async () => {
+    act(() => root.render(<AgentEditModal onClose={() => undefined} />));
+    await flush();
+    expect(button("最长间隔")).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "伙伴会按任务情况自己安排更早的唤醒",
+    );
   });
 });

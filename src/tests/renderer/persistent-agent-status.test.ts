@@ -18,13 +18,19 @@ function view(
     schedule: { kind: "interval", every: 30, unit: "minute" },
     enabled: true,
     nextPeriodicAt: null,
+    nextCheckInAt: null,
+    checkInNote: null,
     consecutiveFailures: 0,
     lastWakeupAt: null,
     lastError: null,
     createdAt: 0,
     updatedAt: 0,
     status: "sleeping",
-    nextWakeup: { at: new Date(2026, 10, 1, 20, 0).getTime(), reason: null },
+    nextWakeup: {
+      at: new Date(2026, 10, 1, 20, 0).getTime(),
+      kind: "periodic",
+      reason: null,
+    },
     pendingWakeupCount: 0,
     ...overrides,
   };
@@ -70,6 +76,7 @@ describe("formatAgentStatus", () => {
     const scheduled = view({
       nextWakeup: {
         at: new Date(2026, 10, 2, 9, 0).getTime(),
+        kind: "appointment",
         reason: "早间检查",
       },
     });
@@ -78,6 +85,35 @@ describe("formatAgentStatus", () => {
     );
     expect(formatAgentStatus(scheduled, false, t, NOW, false)).toBe(
       "休眠中 · 下次 11-02 09:00",
+    );
+  });
+});
+
+describe("formatAgentStatus by wake kind", () => {
+  const t = i18n.t.bind(i18n);
+  const at = new Date(2026, 10, 1, 20, 0).getTime();
+
+  it("shows the watchdog deadline as the latest wake time", () => {
+    const watchdog = view({
+      nextWakeup: { at, kind: "watchdog", reason: null },
+    });
+    expect(formatAgentStatus(watchdog, false, t, NOW)).toBe(
+      "休眠中 · 最晚 20:00",
+    );
+  });
+
+  it("shows a check-in note and a plain periodic wakeup", () => {
+    const checkIn = view({
+      nextWakeup: { at, kind: "check_in", reason: "看 CI" },
+    });
+    expect(formatAgentStatus(checkIn, false, t, NOW)).toBe(
+      "休眠中 · 下次 20:00 看 CI",
+    );
+    const periodic = view({
+      nextWakeup: { at, kind: "periodic", reason: null },
+    });
+    expect(formatAgentStatus(periodic, false, t, NOW)).toBe(
+      "休眠中 · 下次 20:00",
     );
   });
 });

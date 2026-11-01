@@ -57,6 +57,8 @@ const agent = {
   schedule: { kind: "interval", every: 30, unit: "minute" },
   enabled: true,
   nextPeriodicAt: null,
+  nextCheckInAt: null,
+  checkInNote: null,
   consecutiveFailures: 0,
   lastWakeupAt: null,
   lastError: null,

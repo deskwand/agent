@@ -138,16 +138,30 @@ describe("PersistentAgentManager", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(prompts).toHaveLength(1);
     expect(prompts[0].prompt).toContain("- 预约：看互动数据");
-    expect(prompts[0].prompt).toContain("周期唤醒");
+    expect(prompts[0].prompt).not.toContain("兜底唤醒");
   });
 
   it("delivers once with missed count when the timer fires late", async () => {
-    const agent = await manager.create(input());
-    clock = T + 95 * MIN; // 机器睡眠：时钟跳过去了，定时器还没跑
+    const agent = await manager.create(
+      input({ schedule: { kind: "daily", times: ["08:30"] } }),
+    );
+    clock = new Date(2026, 10, 3, 9, 35).getTime(); // 机器睡眠：时钟跳过去了，定时器还没跑
     await vi.advanceTimersByTimeAsync(30 * MIN);
     expect(prompts).toHaveLength(1);
     expect(prompts[0].prompt).toContain("应用未运行期间错过 2 次唤醒");
-    expect(manager.get(agent.id)!.nextPeriodicAt).toBe(T + 120 * MIN);
+    expect(manager.get(agent.id)!.nextPeriodicAt).toBe(
+      new Date(2026, 10, 4, 8, 30).getTime(),
+    );
+  });
+
+  it("interval wakes once without a missed count after sleep", async () => {
+    const agent = await manager.create(input());
+    clock = T + 95 * MIN;
+    await vi.advanceTimersByTimeAsync(30 * MIN);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].prompt).toContain("兜底唤醒");
+    expect(prompts[0].prompt).not.toContain("错过");
+    expect(manager.get(agent.id)!.nextPeriodicAt).toBe(T + 125 * MIN);
   });
 
   it("update recomputes next periodic time from now without firing", async () => {
@@ -258,6 +272,26 @@ describe("PersistentAgentManager", () => {
   });
 
   it("start delivers overdue agents once with missed count", async () => {
+    await manager.create(
+      input({ schedule: { kind: "daily", times: ["08:30"] } }),
+    );
+    manager.stop();
+    clock = new Date(2026, 10, 2, 9, 0).getTime();
+    const restarted = new PersistentAgentManager({
+      store,
+      sessions,
+      checkWorkspace: () => null,
+      onEvent: () => undefined,
+      now: () => clock,
+    });
+    restarted.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].prompt).toContain("错过 1 次唤醒");
+    restarted.stop();
+  });
+
+  it("start delivers an overdue interval agent once without a missed count", async () => {
     await manager.create(input());
     manager.stop();
     clock = T + 65 * MIN;
@@ -271,7 +305,7 @@ describe("PersistentAgentManager", () => {
     restarted.start();
     await vi.advanceTimersByTimeAsync(0);
     expect(prompts).toHaveLength(1);
-    expect(prompts[0].prompt).toContain("错过 1 次唤醒");
+    expect(prompts[0].prompt).not.toContain("错过");
     restarted.stop();
   });
 
@@ -322,5 +356,129 @@ describe("PersistentAgentManager", () => {
     expect(sessions.releaseSession).toHaveBeenCalledWith(a.sessionId);
     expect(sessions.deleteSession).toHaveBeenCalledWith(b.sessionId);
     expect(manager.list()).toHaveLength(0);
+  });
+});
+
+describe("PersistentAgentManager adaptive wakeup", () => {
+  it("turn end resets the watchdog deadline", async () => {
+    const agent = await manager.create(input());
+    clock = T + 20 * MIN;
+    manager.onTurnFinished(agent.sessionId, "success");
+    expect(manager.get(agent.id)!.nextPeriodicAt).toBe(T + 50 * MIN);
+    await advance(29 * MIN);
+    expect(prompts).toHaveLength(0);
+    await advance(1 * MIN);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].prompt).toContain("兜底唤醒");
+  });
+
+  it("a user chat turn also resets the watchdog", async () => {
+    const agent = await manager.create(input());
+    clock = T + 10 * MIN;
+    manager.onTurnFinished(agent.sessionId, "success");
+    expect(manager.get(agent.id)!.nextPeriodicAt).toBe(T + 40 * MIN);
+  });
+
+  it("fires a check-in before the watchdog and clears it", async () => {
+    const agent = await manager.create(input());
+    manager.setCheckIn(agent.id, T + 5 * MIN, "看 CI");
+    await advance(5 * MIN);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].prompt).toContain("- 签到：看 CI");
+    expect(manager.get(agent.id)!.nextCheckInAt).toBeNull();
+  });
+
+  it("caps a check-in at the watchdog", async () => {
+    const agent = await manager.create(input());
+    expect(manager.setCheckIn(agent.id, T + 90 * MIN, null)).toMatchObject({
+      runAt: T + 30 * MIN,
+      capped: true,
+    });
+  });
+
+  it("does not cap check-ins for daily rules", async () => {
+    const agent = await manager.create(
+      input({ schedule: { kind: "daily", times: ["23:00"] } }),
+    );
+    expect(manager.setCheckIn(agent.id, T + 600 * MIN, null).capped).toBe(
+      false,
+    );
+  });
+
+  it("rejects a check-in under one minute", async () => {
+    const agent = await manager.create(input());
+    expect(() => manager.setCheckIn(agent.id, T + 30_000, null)).toThrow(
+      "Check-in must be at least 1 minute in the future.",
+    );
+  });
+
+  it("check-in due with watchdog suppresses the watchdog line", async () => {
+    const agent = await manager.create(input());
+    manager.setCheckIn(agent.id, T + 30 * MIN, "x");
+    await advance(30 * MIN);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].prompt).toContain("- 签到：x");
+    expect(prompts[0].prompt).not.toContain("兜底唤醒");
+  });
+
+  it("drops a queued watchdog trigger when a chat turn ends", async () => {
+    const agent = await manager.create(input());
+    running.add(agent.sessionId);
+    await advance(30 * MIN);
+    expect(prompts).toHaveLength(0);
+    running.delete(agent.sessionId);
+    manager.onTurnFinished(agent.sessionId, "success");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(prompts).toHaveLength(0);
+  });
+
+  it("update clamps an existing check-in to the new deadline", async () => {
+    const agent = await manager.create(
+      input({ schedule: { kind: "interval", every: 1, unit: "hour" } }),
+    );
+    manager.setCheckIn(agent.id, T + 50 * MIN, null);
+    manager.update(agent.id, {
+      schedule: { kind: "interval", every: 10, unit: "minute" },
+    });
+    expect(manager.get(agent.id)!.nextCheckInAt).toBe(T + 10 * MIN);
+  });
+
+  it("keeps a deadline armed when watchdog delivery throws", async () => {
+    const agent = await manager.create(input());
+    const send = vi.fn(async (_sessionId: string, _prompt: string) => {
+      throw new Error("boom");
+    });
+    sessions.continueSession = send;
+    await advance(30 * MIN);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(manager.get(agent.id)!.nextPeriodicAt).toBe(T + 60 * MIN);
+    await advance(30 * MIN);
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it("view reports the next wakeup kind", async () => {
+    const agent = await manager.create(input());
+    expect(manager.get(agent.id)!.nextWakeup).toMatchObject({
+      kind: "watchdog",
+      reason: null,
+    });
+    manager.setCheckIn(agent.id, T + 20 * MIN, "看 CI");
+    expect(manager.get(agent.id)!.nextWakeup).toMatchObject({
+      kind: "check_in",
+      reason: "看 CI",
+    });
+    manager.scheduleWakeup(agent.id, T + 10 * MIN, "发帖");
+    expect(manager.get(agent.id)!.nextWakeup).toMatchObject({
+      kind: "appointment",
+      reason: "发帖",
+    });
+  });
+
+  it("resume clears a stale check-in", async () => {
+    const agent = await manager.create(input());
+    manager.setCheckIn(agent.id, T + 5 * MIN, "x");
+    manager.pause(agent.id);
+    manager.resume(agent.id);
+    expect(manager.get(agent.id)!.nextCheckInAt).toBeNull();
   });
 });

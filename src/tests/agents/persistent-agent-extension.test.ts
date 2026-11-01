@@ -1,10 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
-import { PersistentAgentExtension } from "../../main/agents/persistent-agent-extension";
+import {
+  PersistentAgentExtension,
+  buildAgentPromptSuffix,
+} from "../../main/agents/persistent-agent-extension";
 import type { PersistentAgentManager } from "../../main/agents/persistent-agent-manager";
 import type { BeforeSessionRunContext } from "../../main/extensions/agent-runtime-extension";
 import type { Session } from "../../renderer/types";
 
-const agent = { id: "a1", name: "推特运营", instructions: "每天发两条" };
+const agent = {
+  id: "a1",
+  name: "推特运营",
+  instructions: "每天发两条",
+  schedule: { kind: "interval", every: 30, unit: "minute" },
+};
 
 function context(kind: Session["kind"]): BeforeSessionRunContext {
   return {
@@ -20,6 +28,7 @@ function fakeManager(found: boolean) {
     findBySessionId: vi.fn(() => (found ? agent : null)),
     onTurnFinished: vi.fn(),
     onSessionLost: vi.fn(),
+    setCheckIn: vi.fn(),
   } as unknown as PersistentAgentManager & {
     onTurnFinished: ReturnType<typeof vi.fn>;
   };
@@ -28,7 +37,27 @@ function fakeManager(found: boolean) {
 describe("PersistentAgentExtension", () => {
   it("leaves ordinary sessions untouched", async () => {
     const ext = new PersistentAgentExtension(() => fakeManager(true));
-    expect(await ext.beforeSessionRun(context("ordinary"))).toEqual({});
+    const result = await ext.beforeSessionRun(context("ordinary"));
+    expect(result).toEqual({});
+    expect(result.customTools).toBeUndefined();
+    expect(result.systemPromptSuffix).toBeUndefined();
+  });
+
+  it("prompt suffix states the fallback interval", async () => {
+    const ext = new PersistentAgentExtension(() => fakeManager(true));
+    const result = await ext.beforeSessionRun(context("agent"));
+    expect(result.systemPromptSuffix).toContain(
+      "at most 30 minutes after your last turn ends",
+    );
+  });
+
+  it("prompt suffix for daily rules only mentions check-ins", () => {
+    const suffix = buildAgentPromptSuffix({
+      ...agent,
+      schedule: { kind: "daily", times: ["09:00"] },
+    });
+    expect(suffix).not.toContain("at most");
+    expect(suffix).toContain("set_next_check_in");
   });
 
   it("injects a time-free persona suffix and the wakeup tools", async () => {
@@ -41,6 +70,7 @@ describe("PersistentAgentExtension", () => {
     expect(result.customTools?.map((tool) => tool.name)).toEqual([
       "schedule_wakeup",
       "cancel_wakeup",
+      "set_next_check_in",
     ]);
   });
 

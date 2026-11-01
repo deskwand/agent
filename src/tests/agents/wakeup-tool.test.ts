@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createWakeupTools,
+  formatIntervalForModel,
   parseWakeupTime,
 } from "../../main/agents/wakeup-tool";
 import type { PersistentAgentManager } from "../../main/agents/persistent-agent-manager";
@@ -81,5 +82,68 @@ describe("wakeup tools", () => {
       undefined as never,
     );
     expect(textOf(cancelled)).toBe("No pending wakeup with that id.");
+  });
+});
+
+describe("set_next_check_in", () => {
+  const signal = new AbortController().signal;
+  const run = (manager: PersistentAgentManager, params: object) => {
+    const tool = createWakeupTools(manager, "a1", () => NOW).find(
+      (candidate) => candidate.name === "set_next_check_in",
+    )!;
+    return tool.execute("c1", params, signal, undefined, undefined as never);
+  };
+
+  it("reports a capped time", async () => {
+    const runAt = NOW + 60 * 60_000;
+    const manager = {
+      setCheckIn: vi.fn(() => ({
+        runAt,
+        capped: true,
+        schedule: { kind: "interval", every: 60, unit: "minute" },
+      })),
+    } as unknown as PersistentAgentManager;
+    const text = textOf(await run(manager, { in_minutes: 120 }));
+    expect(text).toBe(
+      "Check-in set for 2026-11-01 09:00 (capped at your 60 minutes maximum).",
+    );
+  });
+
+  it("passes the note and returns errors as text", async () => {
+    const setCheckIn = vi.fn(() => ({
+      runAt: NOW + 300_000,
+      capped: false,
+      schedule: { kind: "daily", times: ["23:00"] },
+    }));
+    const manager = {
+      setCheckIn,
+    } as unknown as PersistentAgentManager;
+    expect(textOf(await run(manager, { in_minutes: 5, note: " 看 CI " }))).toBe(
+      "Check-in set for 2026-11-01 08:05.",
+    );
+    expect(setCheckIn).toHaveBeenCalledWith("a1", NOW + 300_000, "看 CI");
+
+    const failing = {
+      setCheckIn: vi.fn(() => {
+        throw new Error("Check-in must be at least 1 minute in the future.");
+      }),
+    } as unknown as PersistentAgentManager;
+    expect(textOf(await run(failing, { in_minutes: 0 }))).toBe(
+      "Check-in must be at least 1 minute in the future.",
+    );
+  });
+});
+
+describe("formatIntervalForModel", () => {
+  it("pluralises and ignores non-interval rules", () => {
+    expect(
+      formatIntervalForModel({ kind: "interval", every: 1, unit: "hour" }),
+    ).toBe("1 hour");
+    expect(
+      formatIntervalForModel({ kind: "interval", every: 30, unit: "minute" }),
+    ).toBe("30 minutes");
+    expect(
+      formatIntervalForModel({ kind: "daily", times: ["09:00"] }),
+    ).toBeNull();
   });
 });

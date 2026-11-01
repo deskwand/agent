@@ -39,6 +39,9 @@ export function formatAgentStatus(
   if (agent.status === "error") return t("persistentAgents.status.error");
   if (!agent.nextWakeup) return t("persistentAgents.status.idle");
   const time = formatWakeTime(agent.nextWakeup.at, now);
+  if (agent.nextWakeup.kind === "watchdog") {
+    return t("persistentAgents.status.sleepingWatchdog", { time });
+  }
   return withReason && agent.nextWakeup.reason
     ? t("persistentAgents.status.sleepingReason", {
         time,

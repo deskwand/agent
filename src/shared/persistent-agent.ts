@@ -24,13 +24,16 @@ export interface PersistentAgent {
   avatarSeed: string;
   schedule: AgentScheduleConfig;
   enabled: boolean;
-  /** 周期规则的下次时间（不含自主预约）。 */
+  /** interval：兜底 deadline；daily/weekly：下个固定时刻（不含签到与预约）。 */
   nextPeriodicAt: number | null;
   consecutiveFailures: number;
   lastWakeupAt: number | null;
   lastError: string | null;
   createdAt: number;
   updatedAt: number;
+  /** 模型设的下次签到。 */
+  nextCheckInAt: number | null;
+  checkInNote: string | null;
 }
 
 export interface PersistentAgentWakeup {
@@ -43,8 +46,12 @@ export interface PersistentAgentWakeup {
 
 export interface PersistentAgentView extends PersistentAgent {
   status: PersistentAgentStatus;
-  /** reason 为 null 表示周期唤醒。 */
-  nextWakeup: { at: number; reason: string | null } | null;
+  /** reason：签到为 note，预约为原因，其余 null。 */
+  nextWakeup: {
+    at: number;
+    kind: PersistentAgentWakeKind;
+    reason: string | null;
+  } | null;
   pendingWakeupCount: number;
 }
 
@@ -83,3 +90,9 @@ export function parseAgentWakeup(text: string): string | null {
   if (!trimmed.startsWith(OPEN) || !trimmed.endsWith(CLOSE)) return null;
   return trimmed.slice(OPEN.length, trimmed.length - CLOSE.length).trim();
 }
+
+export type PersistentAgentWakeKind =
+  | "watchdog"
+  | "periodic"
+  | "check_in"
+  | "appointment";

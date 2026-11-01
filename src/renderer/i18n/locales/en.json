@@ -3060,7 +3060,8 @@
       "error": "Last wakeup failed",
       "idle": "Sleeping",
       "sleeping": "Sleeping · next {{time}}",
-      "sleepingReason": "Sleeping · next {{time}} {{reason}}"
+      "sleepingReason": "Sleeping · next {{time}} {{reason}}",
+      "sleepingWatchdog": "Sleeping · by {{time}} at the latest"
     },
     "form": {
       "createTitle": "New teammate",
@@ -3071,8 +3072,13 @@
       "workspace": "Working folder",
       "pickWorkspace": "Choose folder",
       "schedule": "Wake schedule",
-      "mode": { "interval": "Interval", "daily": "Daily", "weekly": "Weekly" },
+      "mode": {
+        "interval": "Max interval",
+        "daily": "Daily",
+        "weekly": "Weekly"
+      },
       "every": "Every",
+      "intervalHint": "Your teammate schedules earlier wakeups as work needs; it is always woken after this long without activity.",
       "unit": "Unit",
       "units": { "minute": "minutes", "hour": "hours", "day": "days" },
       "wakeImmediately": "Wake once right after creating",

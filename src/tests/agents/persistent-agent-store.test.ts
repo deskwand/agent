@@ -29,6 +29,8 @@ function agent(overrides: Partial<PersistentAgent> = {}): PersistentAgent {
     lastError: null,
     createdAt: 1_000,
     updatedAt: 1_000,
+    nextCheckInAt: null,
+    checkInNote: null,
     ...overrides,
   };
 }
@@ -121,5 +123,39 @@ describe("persistent agent store migration", () => {
     expect(migrated.get("old")?.avatarSeed).toBe("old");
     migrated.update("old", { avatarSeed: "x" });
     expect(migrated.get("old")?.avatarSeed).toBe("x");
+  });
+});
+
+describe("persistent agent store check-in", () => {
+  it("persists check-in fields through insert and update", () => {
+    store.insert(agent());
+    expect(store.get("a1")?.nextCheckInAt).toBeNull();
+    store.update("a1", { nextCheckInAt: 305_000, checkInNote: "看 CI" });
+    expect(store.get("a1")?.nextCheckInAt).toBe(305_000);
+    expect(store.get("a1")?.checkInNote).toBe("看 CI");
+    store.update("a1", { nextCheckInAt: null, checkInNote: null });
+    expect(store.get("a1")?.nextCheckInAt).toBeNull();
+    expect(store.get("a1")?.checkInNote).toBeNull();
+  });
+
+  it("adds check-in columns to a table created without them", () => {
+    closeDatabase();
+    const path = join(dir, "legacy-check-in.db");
+    const legacy = new DatabaseSync(path);
+    legacy.exec(`
+      CREATE TABLE persistent_agents (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, instructions TEXT NOT NULL,
+        cwd TEXT NOT NULL, session_id TEXT NOT NULL, schedule_config TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1, next_periodic_at INTEGER,
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        last_wakeup_at INTEGER, last_error TEXT,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+    `);
+    legacy.close();
+    const migrated = createPersistentAgentStore(initDatabase(path));
+    migrated.insert(agent());
+    expect(migrated.get("a1")?.nextCheckInAt).toBeNull();
+    expect(migrated.get("a1")?.checkInNote).toBeNull();
   });
 });

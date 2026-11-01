@@ -17,15 +17,20 @@ import type {
   SessionRunErrorContext,
 } from "../extensions/agent-runtime-extension";
 import type { PersistentAgentManager } from "./persistent-agent-manager";
-import { createWakeupTools } from "./wakeup-tool";
+import { createWakeupTools, formatIntervalForModel } from "./wakeup-tool";
 
 export function buildAgentPromptSuffix(
-  agent: Pick<PersistentAgent, "name" | "instructions">,
+  agent: Pick<PersistentAgent, "name" | "instructions" | "schedule">,
 ): string {
+  const interval = formatIntervalForModel(agent.schedule);
+  const cadence = interval
+    ? `If you don't set a check-in, you'll be woken at most ${interval} after your last turn ends. While work is in progress or you are waiting on something, set a short check-in with set_next_check_in; when there is nothing to do, don't set one and let the fallback wake you.`
+    : "Use set_next_check_in to come back sooner than your next scheduled time when work is in progress.";
   return [
     "<persistent_agent>",
     `You are a long-running agent named "${agent.name}". You are woken up periodically and by wakeups you schedule; each wakeup arrives as an <agent_wakeup> message. The user may also talk to you directly in this session.`,
     "Use schedule_wakeup to plan follow-ups, and keep long-term state (plans, what you have already handled, results) in note files in your working directory, because older context may be compacted.",
+    cadence,
     "",
     agent.instructions,
     "</persistent_agent>",

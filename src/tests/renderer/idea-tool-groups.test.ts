@@ -142,8 +142,12 @@ describe("idea 调用的摘要分组", () => {
 });
 
 describe("wakeup 工具的摘要分组", () => {
-  it("schedule_wakeup / cancel_wakeup 计入「安排唤醒」，不落进通用工具数", () => {
-    for (const name of ["schedule_wakeup", "cancel_wakeup"]) {
+  it("schedule_wakeup / cancel_wakeup / set_next_check_in 计入「安排唤醒」，不落进通用工具数", () => {
+    for (const name of [
+      "schedule_wakeup",
+      "cancel_wakeup",
+      "set_next_check_in",
+    ]) {
       const summary = topLevelSummary(name);
       expect(summary.wakeupCount, name).toBe(1);
       expect(summary.usedToolCount, name).toBe(0);

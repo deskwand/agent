@@ -36,7 +36,7 @@ export interface ProcessSummary {
   ideaLookupCount?: number;
   /** 记录想法的次数（`idea_add`）。 */
   ideaAddedCount?: number;
-  /** 常驻智能体安排 / 取消唤醒的次数（`schedule_wakeup` + `cancel_wakeup`）。 */
+  /** 常驻智能体安排 / 取消唤醒与设置签到的次数（`schedule_wakeup` + `cancel_wakeup` + `set_next_check_in`）。 */
   wakeupCount?: number;
 }
 
@@ -346,7 +346,11 @@ function buildProcessSummary(
       ideaAddedCount += 1;
       countedAsSpecific = true;
     }
-    if (lower === "schedule_wakeup" || lower === "cancel_wakeup") {
+    if (
+      lower === "schedule_wakeup" ||
+      lower === "cancel_wakeup" ||
+      lower === "set_next_check_in"
+    ) {
       wakeupCount += 1;
       countedAsSpecific = true;
     }

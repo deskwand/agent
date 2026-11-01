@@ -151,6 +151,13 @@ const MSG: Record<Locale, MessageTable> = {
     "agents.wakeup.listSeparator": "、",
     "agents.wakeup.weekday": "周日,周一,周二,周三,周四,周五,周六",
     "agents.wakeup.weekdayShort": "日,一,二,三,四,五,六",
+    "agents.wakeup.checkIn": "- 签到：{{note}}",
+    "agents.wakeup.checkInBare": "- 签到",
+    "agents.wakeup.watchdog": "- 兜底唤醒：已有 {{duration}} 没有活动",
+    "agents.wakeup.cadence": "未设签到时，最长 {{duration}} 唤醒一次",
+    "agents.wakeup.duration.minute": "{{every}} 分钟",
+    "agents.wakeup.duration.hour": "{{every}} 小时",
+    "agents.wakeup.duration.day": "{{every}} 天",
     "agents.notify.autoPausedTitle": "伙伴已暂停",
     "agents.notify.autoPausedBody":
       "「{{name}}」连续失败 {{count}} 次，已自动暂停",
@@ -314,6 +321,14 @@ const MSG: Record<Locale, MessageTable> = {
     "agents.wakeup.listSeparator": ", ",
     "agents.wakeup.weekday": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
     "agents.wakeup.weekdayShort": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
+    "agents.wakeup.checkIn": "- Check-in: {{note}}",
+    "agents.wakeup.checkInBare": "- Check-in",
+    "agents.wakeup.watchdog": "- Fallback wakeup: no activity for {{duration}}",
+    "agents.wakeup.cadence":
+      "Without a check-in you are woken at most every {{duration}}",
+    "agents.wakeup.duration.minute": "{{every}} min",
+    "agents.wakeup.duration.hour": "{{every}} h",
+    "agents.wakeup.duration.day": "{{every}} day(s)",
     "agents.notify.autoPausedTitle": "Teammate paused",
     "agents.notify.autoPausedBody":
       '"{{name}}" failed {{count}} times in a row and was paused',

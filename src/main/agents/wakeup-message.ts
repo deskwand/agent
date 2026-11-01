@@ -14,7 +14,9 @@ import { t } from "../i18n";
 export type WakeupTrigger =
   | { type: "periodic" }
   | { type: "scheduled"; reason: string }
-  | { type: "manual" };
+  | { type: "manual" }
+  | { type: "check_in"; note: string | null }
+  | { type: "watchdog" };
 
 export interface WakeupMessageInput {
   now: number;
@@ -83,7 +85,11 @@ export function buildWakeupMessage(input: WakeupMessageInput): string {
   const seen = new Set<string>();
   for (const trigger of input.triggers) {
     const key =
-      trigger.type === "scheduled" ? `s:${trigger.reason}` : trigger.type;
+      trigger.type === "scheduled"
+        ? `s:${trigger.reason}`
+        : trigger.type === "check_in"
+          ? `c:${trigger.note ?? ""}`
+          : trigger.type;
     if (seen.has(key)) continue;
     seen.add(key);
     if (trigger.type === "periodic") {
@@ -92,6 +98,18 @@ export function buildWakeupMessage(input: WakeupMessageInput): string {
       );
     } else if (trigger.type === "scheduled") {
       lines.push(t("agents.wakeup.scheduled", { reason: trigger.reason }));
+    } else if (trigger.type === "check_in") {
+      lines.push(
+        trigger.note
+          ? t("agents.wakeup.checkIn", { note: trigger.note })
+          : t("agents.wakeup.checkInBare"),
+      );
+    } else if (trigger.type === "watchdog") {
+      lines.push(
+        t("agents.wakeup.watchdog", {
+          duration: describeInterval(input.schedule) ?? "",
+        }),
+      );
     } else {
       lines.push(t("agents.wakeup.manual"));
     }
@@ -109,5 +127,18 @@ export function buildWakeupMessage(input: WakeupMessageInput): string {
     lines.push(t("agents.wakeup.missed", { count: input.missedCount }));
   }
 
+  const interval = describeInterval(input.schedule);
+  if (interval) {
+    lines.push(t("agents.wakeup.cadence", { duration: interval }));
+  }
+
   return wrapAgentWakeup(lines.join("\n"));
+}
+
+/** interval 规则的时长描述（如「30 分钟」）；其他规则返回 null。 */
+export function describeInterval(schedule: AgentScheduleConfig): string | null {
+  if (schedule.kind !== "interval") return null;
+  return t(`agents.wakeup.duration.${schedule.unit}`, {
+    every: schedule.every,
+  });
 }

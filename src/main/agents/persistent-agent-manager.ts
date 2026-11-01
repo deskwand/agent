@@ -4,8 +4,12 @@
  * 常驻智能体的生命周期与唤醒调度。
  *
  * 一个智能体绑定一个永久会话；唤醒 = 往这个会话 `continueSession` 一条
- * `<agent_wakeup>` 消息。唤醒来源只有两种：周期规则（`nextPeriodicAt`）与智能体
- * 自己预约的唤醒（store 里的 wakeups）。每个智能体只挂一个定时器，指向两者中更早的那个。
+ * `<agent_wakeup>` 消息。唤醒来源有四种：
+ * - 兜底（interval 规则）：`nextPeriodicAt` 是 deadline，每轮结束重置为「结束时刻 + N」；
+ * - 周期（daily / weekly 规则）：`nextPeriodicAt` 是下个固定时刻；
+ * - 签到：智能体自己设的下次唤醒（`nextCheckInAt`，单槽位，interval 下不晚于兜底）；
+ * - 预约：智能体预约的具体时刻（store 里的 wakeups）。
+ * 每个智能体只挂一个定时器，指向它们中最早的那个。
  *
  * 会话忙（用户在聊 / 上一轮唤醒没跑完）时不并发投递：触发原因先攒在内存里，
  * 轮次结束时合并成一条再投。
@@ -169,6 +173,8 @@ export class PersistentAgentManager {
       lastError: null,
       createdAt: now,
       updatedAt: now,
+      nextCheckInAt: null,
+      checkInNote: null,
     };
     this.store.insert(agent);
     this.arm(agent.id);
@@ -182,12 +188,22 @@ export class PersistentAgentManager {
     id: string,
     patch: PersistentAgentUpdateInput,
   ): PersistentAgentView | null {
-    const updated = this.store.update(id, {
-      ...patch,
-      ...(patch.schedule
-        ? { nextPeriodicAt: nextPeriodicFrom(patch.schedule, this.now()) }
-        : {}),
-    });
+    let scheduleFields: Partial<PersistentAgent> = {};
+    if (patch.schedule) {
+      const deadline = nextPeriodicFrom(patch.schedule, this.now());
+      scheduleFields = { nextPeriodicAt: deadline };
+      // 改成 interval 后，已有签到不能晚于新的兜底 deadline
+      const checkInAt = this.store.get(id)?.nextCheckInAt ?? null;
+      if (
+        patch.schedule.kind === "interval" &&
+        deadline !== null &&
+        checkInAt !== null &&
+        checkInAt > deadline
+      ) {
+        scheduleFields.nextCheckInAt = deadline;
+      }
+    }
+    const updated = this.store.update(id, { ...patch, ...scheduleFields });
     if (!updated) return null;
     if (patch.name !== undefined) {
       this.sessions.renameSession(updated.sessionId, updated.name);
@@ -231,6 +247,8 @@ export class PersistentAgentManager {
       consecutiveFailures: 0,
       lastError: null,
       nextPeriodicAt: nextPeriodicFrom(agent.schedule, this.now()),
+      nextCheckInAt: null,
+      checkInNote: null,
     });
     this.arm(id);
     return this.emit(id);
@@ -311,13 +329,20 @@ export class PersistentAgentManager {
         }
       }
     }
+    this.resetWatchdog(agent.id);
     this.emit(agent.id);
 
     const queued = this.pending.get(agent.id);
     if (queued && this.store.get(agent.id)?.enabled) {
       this.pending.delete(agent.id);
+      // 伙伴刚结束一轮，排队的兜底触发作废；其他触发照常投
+      const triggers = queued.triggers.filter(
+        (trigger) => trigger.type !== "watchdog",
+      );
       // 轮次结束钩子触发时会话可能还没切回 idle；continueSession 本身会排队，直接投
-      void this.deliver(agent.id, queued.triggers, queued.missedCount, true);
+      if (triggers.length > 0) {
+        void this.deliver(agent.id, triggers, queued.missedCount, true);
+      }
     }
   }
 
@@ -332,18 +357,78 @@ export class PersistentAgentManager {
     this.emit(agent.id);
   }
 
+  /** 设置下次签到（覆盖式）。校验失败抛 Error，文案是给模型看的英文。 */
+  setCheckIn(
+    agentId: string,
+    runAt: number,
+    note: string | null,
+  ): { runAt: number; capped: boolean; schedule: AgentScheduleConfig } {
+    const agent = this.store.get(agentId);
+    if (!agent) throw new Error("Unknown agent.");
+    const now = this.now();
+    if (runAt < now + MIN_WAKEUP_DELAY_MS) {
+      throw new Error("Check-in must be at least 1 minute in the future.");
+    }
+    let at = runAt;
+    let capped = false;
+    if (agent.schedule.kind === "interval") {
+      const limit = nextPeriodicFrom(agent.schedule, now);
+      if (limit !== null && at > limit) {
+        at = limit;
+        capped = true;
+      }
+    }
+    this.store.update(agentId, { nextCheckInAt: at, checkInNote: note });
+    this.arm(agentId);
+    this.emit(agentId);
+    return { runAt: at, capped, schedule: agent.schedule };
+  }
+
+  /** 一轮结束后重置 interval 兜底 deadline，并把签到截到它之内。 */
+  private resetWatchdog(id: string): void {
+    const agent = this.store.get(id);
+    if (!agent?.enabled || agent.schedule.kind !== "interval") return;
+    const deadline = nextPeriodicFrom(agent.schedule, this.now());
+    if (deadline === null) return;
+    this.store.update(id, {
+      nextPeriodicAt: deadline,
+      ...(agent.nextCheckInAt !== null && agent.nextCheckInAt > deadline
+        ? { nextCheckInAt: deadline }
+        : {}),
+    });
+    this.arm(id);
+  }
+
   private toView(agent: PersistentAgent): PersistentAgentView {
     const wakeups = this.store.listWakeups(agent.id);
     const earliest = wakeups[0];
     let nextWakeup: PersistentAgentView["nextWakeup"] = null;
     if (agent.enabled) {
-      if (
-        earliest &&
-        (agent.nextPeriodicAt === null || earliest.runAt < agent.nextPeriodicAt)
-      ) {
-        nextWakeup = { at: earliest.runAt, reason: earliest.reason };
-      } else if (agent.nextPeriodicAt !== null) {
-        nextWakeup = { at: agent.nextPeriodicAt, reason: null };
+      // 同一时刻的优先级：预约 > 签到 > 兜底 / 周期（候选顺序即优先级，严格小于才替换）
+      const candidates: NonNullable<PersistentAgentView["nextWakeup"]>[] = [];
+      if (earliest) {
+        candidates.push({
+          at: earliest.runAt,
+          kind: "appointment",
+          reason: earliest.reason,
+        });
+      }
+      if (agent.nextCheckInAt !== null) {
+        candidates.push({
+          at: agent.nextCheckInAt,
+          kind: "check_in",
+          reason: agent.checkInNote,
+        });
+      }
+      if (agent.nextPeriodicAt !== null) {
+        candidates.push({
+          at: agent.nextPeriodicAt,
+          kind: agent.schedule.kind === "interval" ? "watchdog" : "periodic",
+          reason: null,
+        });
+      }
+      for (const candidate of candidates) {
+        if (!nextWakeup || candidate.at < nextWakeup.at) nextWakeup = candidate;
       }
     }
     return {
@@ -378,9 +463,9 @@ export class PersistentAgentManager {
 
   private nextTarget(agent: PersistentAgent): number | null {
     const earliest = this.store.listWakeups(agent.id)[0]?.runAt ?? null;
-    if (agent.nextPeriodicAt === null) return earliest;
-    if (earliest === null) return agent.nextPeriodicAt;
-    return Math.min(agent.nextPeriodicAt, earliest);
+    const candidates = [agent.nextCheckInAt, agent.nextPeriodicAt, earliest];
+    const present = candidates.filter((at): at is number => at !== null);
+    return present.length > 0 ? Math.min(...present) : null;
   }
 
   private arm(id: string): void {
@@ -413,16 +498,31 @@ export class PersistentAgentManager {
     const triggers: WakeupTrigger[] = [];
     let missedCount = 0;
     let nextPeriodicAt = agent.nextPeriodicAt;
+    let nextCheckInAt = agent.nextCheckInAt;
+    let checkInNote = agent.checkInNote;
+    const checkInDue = nextCheckInAt !== null && nextCheckInAt <= now;
+    if (checkInDue) {
+      triggers.push({ type: "check_in", note: checkInNote });
+      nextCheckInAt = null;
+      checkInNote = null;
+    }
     if (nextPeriodicAt !== null && nextPeriodicAt <= now) {
-      triggers.push({ type: "periodic" });
-      const rule = toRule(agent.schedule, agent.createdAt, nextPeriodicAt);
-      missedCount = countSlotsBetween(rule, nextPeriodicAt, now);
-      nextPeriodicAt = computeNextRunAt(rule, now);
+      if (agent.schedule.kind === "interval") {
+        // 兜底不算错过：只醒一次。签到同时到期时，签到行已说明原因，不再加兜底行。
+        if (!checkInDue) triggers.push({ type: "watchdog" });
+        // 先留一个新 deadline：投递失败时定时器也不会失联，轮次结束再按结束时刻覆盖
+        nextPeriodicAt = nextPeriodicFrom(agent.schedule, now);
+      } else {
+        triggers.push({ type: "periodic" });
+        const rule = toRule(agent.schedule, agent.createdAt, nextPeriodicAt);
+        missedCount = countSlotsBetween(rule, nextPeriodicAt, now);
+        nextPeriodicAt = computeNextRunAt(rule, now);
+      }
     }
     for (const due of this.store.takeDueWakeups(id, now)) {
       triggers.push({ type: "scheduled", reason: due.reason });
     }
-    this.store.update(id, { nextPeriodicAt });
+    this.store.update(id, { nextPeriodicAt, nextCheckInAt, checkInNote });
     await this.deliver(id, triggers, missedCount);
   }
 

@@ -3057,7 +3057,8 @@
       "error": "上次出错",
       "idle": "休眠中",
       "sleeping": "休眠中 · 下次 {{time}}",
-      "sleepingReason": "休眠中 · 下次 {{time}} {{reason}}"
+      "sleepingReason": "休眠中 · 下次 {{time}} {{reason}}",
+      "sleepingWatchdog": "休眠中 · 最晚 {{time}}"
     },
     "form": {
       "createTitle": "新建伙伴",
@@ -3068,8 +3069,9 @@
       "workspace": "工作目录",
       "pickWorkspace": "选择文件夹",
       "schedule": "唤醒周期",
-      "mode": { "interval": "固定间隔", "daily": "每天", "weekly": "每周" },
+      "mode": { "interval": "最长间隔", "daily": "每天", "weekly": "每周" },
       "every": "每",
+      "intervalHint": "伙伴会按任务情况自己安排更早的唤醒；超过这个间隔没有活动时一定会唤醒。",
       "unit": "单位",
       "units": { "minute": "分钟", "hour": "小时", "day": "天" },
       "wakeImmediately": "创建后立即唤醒一次",

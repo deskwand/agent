@@ -57,8 +57,12 @@ export function getToolIcon(name: string) {
   // 想法三件套（经 codemode 调用）：与 rail 的 ideas 图标一致
   if (n === "idea_search" || n === "idea_read" || n === "idea_add")
     return <Lightbulb className="w-3.5 h-3.5" />;
-  // 常驻智能体的唤醒工具
-  if (n === "schedule_wakeup" || n === "cancel_wakeup")
+  // 常驻智能体的唤醒与签到工具
+  if (
+    n === "schedule_wakeup" ||
+    n === "cancel_wakeup" ||
+    n === "set_next_check_in"
+  )
     return <AlarmClock className="w-3.5 h-3.5" />;
   if (n === "office_read_xlsx") return <Table className="w-3.5 h-3.5" />;
   if (n === "office_read_docx") return <FileText className="w-3.5 h-3.5" />;

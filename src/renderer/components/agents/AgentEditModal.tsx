@@ -243,35 +243,41 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
                 ))}
               </div>
               {schedule.mode === "interval" ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{t("persistentAgents.form.every")}</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    aria-label={t("persistentAgents.form.every")}
-                    className="w-20"
-                    value={schedule.every}
-                    onChange={(e) =>
-                      patchSchedule({ every: Number(e.target.value) })
-                    }
-                  />
-                  <select
-                    aria-label={t("persistentAgents.form.unit")}
-                    className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
-                    value={schedule.unit}
-                    onChange={(e) =>
-                      patchSchedule({
-                        unit: e.target.value as AgentScheduleFormState["unit"],
-                      })
-                    }
-                  >
-                    {(["minute", "hour", "day"] as const).map((unit) => (
-                      <option key={unit} value={unit}>
-                        {t(`persistentAgents.form.units.${unit}`)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{t("persistentAgents.form.every")}</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      aria-label={t("persistentAgents.form.every")}
+                      className="w-20"
+                      value={schedule.every}
+                      onChange={(e) =>
+                        patchSchedule({ every: Number(e.target.value) })
+                      }
+                    />
+                    <select
+                      aria-label={t("persistentAgents.form.unit")}
+                      className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                      value={schedule.unit}
+                      onChange={(e) =>
+                        patchSchedule({
+                          unit: e.target
+                            .value as AgentScheduleFormState["unit"],
+                        })
+                      }
+                    >
+                      {(["minute", "hour", "day"] as const).map((unit) => (
+                        <option key={unit} value={unit}>
+                          {t(`persistentAgents.form.units.${unit}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("persistentAgents.form.intervalHint")}
+                  </p>
+                </>
               ) : (
                 <>
                   {schedule.mode === "weekly" && (
