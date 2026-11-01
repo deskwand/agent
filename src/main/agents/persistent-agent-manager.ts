@@ -160,6 +160,7 @@ export class PersistentAgentManager {
       instructions: input.instructions,
       cwd: input.cwd,
       sessionId,
+      avatarSeed: input.avatarSeed?.trim() || uuidv4(),
       schedule: input.schedule,
       enabled: true,
       nextPeriodicAt: nextPeriodicFrom(input.schedule, now),

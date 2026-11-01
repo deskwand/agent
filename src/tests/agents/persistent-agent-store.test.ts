@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { closeDatabase, initDatabase } from "../../main/db/database";
 import {
   createPersistentAgentStore,
@@ -19,6 +20,7 @@ function agent(overrides: Partial<PersistentAgent> = {}): PersistentAgent {
     instructions: "运营推特号",
     cwd: "/tmp/agent",
     sessionId: "s1",
+    avatarSeed: "seed-a1",
     schedule: { kind: "interval", every: 30, unit: "minute" },
     enabled: true,
     nextPeriodicAt: 2_000,
@@ -81,11 +83,43 @@ describe("persistent agent store", () => {
     expect(store.countWakeups("a1")).toBe(0);
   });
 
+  it("round-trips the avatar seed", () => {
+    store.insert(agent({ avatarSeed: "abc" }));
+    expect(store.get("a1")?.avatarSeed).toBe("abc");
+  });
+
   it("refuses to delete another agent's wakeup", () => {
     store.insert(agent());
     store.insert(agent({ id: "a2", sessionId: "s2" }));
     store.insertWakeup(wakeup("w1", 500, "a2"));
     expect(store.deleteWakeup("a1", "w1")).toBe(false);
     expect(store.deleteWakeup("a2", "w1")).toBe(true);
+  });
+});
+
+describe("persistent agent store migration", () => {
+  it("adds avatar_seed to an existing table and falls back to id", () => {
+    closeDatabase();
+    const path = join(dir, "legacy.db");
+    const legacy = new DatabaseSync(path);
+    legacy.exec(`
+      CREATE TABLE persistent_agents (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, instructions TEXT NOT NULL,
+        cwd TEXT NOT NULL, session_id TEXT NOT NULL, schedule_config TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1, next_periodic_at INTEGER,
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        last_wakeup_at INTEGER, last_error TEXT,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      INSERT INTO persistent_agents (id, name, instructions, cwd, session_id,
+        schedule_config, created_at, updated_at)
+      VALUES ('old', 'n', 'i', '/tmp', 's-old',
+        '{"kind":"interval","every":30,"unit":"minute"}', 1, 1);
+    `);
+    legacy.close();
+    const migrated = createPersistentAgentStore(initDatabase(path));
+    expect(migrated.get("old")?.avatarSeed).toBe("old");
+    migrated.update("old", { avatarSeed: "x" });
+    expect(migrated.get("old")?.avatarSeed).toBe("x");
   });
 });

@@ -11,6 +11,7 @@ import {
 import { Button } from "../app-button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { AgentEditModal } from "./AgentEditModal";
+import { PartnerAvatar } from "./PartnerAvatar";
 
 const ICON_BUTTON =
   "h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-hover-surface";
@@ -48,6 +49,7 @@ export function AgentSessionBar({ sessionId }: { sessionId: string }) {
 
   return (
     <span className="titlebar-no-drag inline-flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+      <PartnerAvatar seed={agent.avatarSeed} size={18} />
       <span className="truncate" data-agent-status>
         {formatAgentStatus(agent, running, t, Date.now())}
       </span>

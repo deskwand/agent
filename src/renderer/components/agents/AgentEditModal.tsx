@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Folder, X } from "lucide-react";
+import { Folder, Shuffle, X } from "lucide-react";
 import type { PersistentAgentView } from "../../../shared/persistent-agent";
 import { useAppStore } from "../../store";
 import { usePersistentAgentStore } from "../../store/persistent-agents";
 import type { ClientEvent } from "../../types";
 import { Button } from "../app-button";
 import { TimePicker } from "../TimePicker";
+import { PartnerAvatar } from "./PartnerAvatar";
 import { OccludingDialog } from "../ui/occluding-dialog";
 import { DialogClose, DialogContent, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -46,6 +47,9 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
   const removeSession = useAppStore((s) => s.removeSession);
   const upsert = usePersistentAgentStore((s) => s.upsert);
   const [name, setName] = useState(agent?.name ?? "");
+  const [avatarSeed, setAvatarSeed] = useState(
+    () => agent?.avatarSeed ?? crypto.randomUUID(),
+  );
   const [instructions, setInstructions] = useState(agent?.instructions ?? "");
   const [cwd, setCwd] = useState(agent?.cwd ?? workingDir ?? "");
   const [schedule, setSchedule] = useState<AgentScheduleFormState>(
@@ -86,6 +90,7 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
             name,
             instructions,
             schedule: config,
+            avatarSeed,
           })
         : await window.electronAPI.persistentAgents.create({
             name,
@@ -93,6 +98,7 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
             cwd,
             schedule: config,
             wakeImmediately,
+            avatarSeed,
           });
       if (saved) upsert(saved);
       onClose();
@@ -163,6 +169,18 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
           </div>
         ) : (
           <div className="px-5 py-4 space-y-4">
+            <div className="flex items-center gap-3" data-avatar-preview>
+              <PartnerAvatar seed={avatarSeed} size={48} />
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => setAvatarSeed(crypto.randomUUID())}
+                className="h-auto gap-1.5 px-2 py-1 text-xs text-muted-foreground"
+              >
+                <Shuffle className="h-3.5 w-3.5" />
+                {t("persistentAgents.form.shuffleAvatar")}
+              </Button>
+            </div>
             <div className="space-y-1">
               <label className={FIELD_LABEL} htmlFor="agent-name">
                 {t("persistentAgents.form.name")}

@@ -14,6 +14,7 @@ function view(
     instructions: "",
     cwd: "/tmp",
     sessionId: "s1",
+    avatarSeed: "seed",
     schedule: { kind: "interval", every: 30, unit: "minute" },
     enabled: true,
     nextPeriodicAt: null,

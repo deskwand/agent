@@ -20,6 +20,8 @@ export interface PersistentAgent {
   instructions: string;
   cwd: string;
   sessionId: string;
+  /** 头像种子：新建时随机，与名字无关（改名不换脸）。 */
+  avatarSeed: string;
   schedule: AgentScheduleConfig;
   enabled: boolean;
   /** 周期规则的下次时间（不含自主预约）。 */
@@ -52,11 +54,12 @@ export interface PersistentAgentCreateInput {
   cwd: string;
   schedule: AgentScheduleConfig;
   wakeImmediately: boolean;
+  avatarSeed?: string;
 }
 
 /** 工作目录随会话绑定，建好后不能改（改了会话也不会跟着换目录）。 */
 export type PersistentAgentUpdateInput = Partial<
-  Pick<PersistentAgent, "name" | "instructions" | "schedule">
+  Pick<PersistentAgent, "name" | "instructions" | "schedule" | "avatarSeed">
 >;
 
 /** 会话丢失时写进 lastError 的固定值，渲染层按它显示文案。 */

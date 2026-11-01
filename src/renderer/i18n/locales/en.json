@@ -3050,6 +3050,8 @@
   },
   "persistentAgents": {
     "title": "Teammates",
+    "expand": "Expand teammates",
+    "collapse": "Collapse teammates",
     "create": "New teammate",
     "status": {
       "running": "Running",
@@ -3074,6 +3076,7 @@
       "unit": "Unit",
       "units": { "minute": "minutes", "hour": "hours", "day": "days" },
       "wakeImmediately": "Wake once right after creating",
+      "shuffleAvatar": "Shuffle",
       "create": "Create",
       "required": "Fill in the name, role and goals, and working folder",
       "invalidSchedule": "Invalid schedule: intervals need at least 5 minutes, and daily or weekly needs at least one time"

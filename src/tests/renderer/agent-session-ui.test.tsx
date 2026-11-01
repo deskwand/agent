@@ -28,6 +28,7 @@ function view(overrides: Partial<PersistentAgentView> = {}) {
     instructions: "",
     cwd: "/tmp",
     sessionId: "s1",
+    avatarSeed: "seed",
     schedule: { kind: "interval", every: 30, unit: "minute" },
     enabled: true,
     nextPeriodicAt: null,

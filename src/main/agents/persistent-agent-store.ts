@@ -37,6 +37,7 @@ interface AgentRow {
   instructions: string;
   cwd: string;
   session_id: string;
+  avatar_seed: string | null;
   schedule_config: string;
   enabled: number;
   next_periodic_at: number | null;
@@ -75,6 +76,7 @@ function ensureSchema(raw: DatabaseSync): void {
       consecutive_failures INTEGER NOT NULL DEFAULT 0,
       last_wakeup_at       INTEGER,
       last_error           TEXT,
+      avatar_seed          TEXT,
       created_at           INTEGER NOT NULL,
       updated_at           INTEGER NOT NULL
     );
@@ -90,6 +92,13 @@ function ensureSchema(raw: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_persistent_agent_wakeups_agent
       ON persistent_agent_wakeups(agent_id, run_at);
   `);
+  // 头像种子是后加的列：早期建的表没有它
+  const columns = raw.prepare("PRAGMA table_info(persistent_agents)").all() as {
+    name: string;
+  }[];
+  if (!columns.some((column) => column.name === "avatar_seed")) {
+    raw.exec("ALTER TABLE persistent_agents ADD COLUMN avatar_seed TEXT");
+  }
 }
 
 function parseSchedule(value: string): AgentScheduleConfig {
@@ -109,6 +118,7 @@ function toAgent(row: AgentRow): PersistentAgent {
     instructions: row.instructions,
     cwd: row.cwd,
     sessionId: row.session_id,
+    avatarSeed: row.avatar_seed || row.id,
     schedule: parseSchedule(row.schedule_config),
     enabled: row.enabled === 1,
     nextPeriodicAt: row.next_periodic_at,
@@ -127,6 +137,7 @@ function toRow(agent: PersistentAgent): AgentRow {
     instructions: agent.instructions,
     cwd: agent.cwd,
     session_id: agent.sessionId,
+    avatar_seed: agent.avatarSeed,
     schedule_config: JSON.stringify(agent.schedule),
     enabled: agent.enabled ? 1 : 0,
     next_periodic_at: agent.nextPeriodicAt,
@@ -167,11 +178,11 @@ export function createPersistentAgentStore(
     INSERT INTO persistent_agents (
       id, name, instructions, cwd, session_id, schedule_config, enabled,
       next_periodic_at, consecutive_failures, last_wakeup_at, last_error,
-      created_at, updated_at
+      avatar_seed, created_at, updated_at
     ) VALUES (
       :id, :name, :instructions, :cwd, :session_id, :schedule_config, :enabled,
       :next_periodic_at, :consecutive_failures, :last_wakeup_at, :last_error,
-      :created_at, :updated_at
+      :avatar_seed, :created_at, :updated_at
     )
   `);
   const updateAgent = raw.prepare(`
@@ -181,7 +192,7 @@ export function createPersistentAgentStore(
       enabled = :enabled, next_periodic_at = :next_periodic_at,
       consecutive_failures = :consecutive_failures,
       last_wakeup_at = :last_wakeup_at, last_error = :last_error,
-      updated_at = :updated_at
+      avatar_seed = :avatar_seed, updated_at = :updated_at
     WHERE id = :id
   `);
   const deleteAgent = raw.prepare("DELETE FROM persistent_agents WHERE id = ?");

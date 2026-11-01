@@ -3047,6 +3047,8 @@
   },
   "persistentAgents": {
     "title": "伙伴",
+    "expand": "展开伙伴",
+    "collapse": "收起伙伴",
     "create": "新建伙伴",
     "status": {
       "running": "运行中",
@@ -3071,6 +3073,7 @@
       "unit": "单位",
       "units": { "minute": "分钟", "hour": "小时", "day": "天" },
       "wakeImmediately": "创建后立即唤醒一次",
+      "shuffleAvatar": "换一个",
       "create": "创建",
       "required": "请填写名称、角色与目标和工作目录",
       "invalidSchedule": "唤醒周期无效：间隔至少 5 分钟，每天 / 每周至少选一个时间"

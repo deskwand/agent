@@ -23,6 +23,7 @@ function view(id: string, overrides: Partial<PersistentAgentView> = {}) {
     instructions: "do things",
     cwd: "/tmp/work",
     sessionId: `s-${id}`,
+    avatarSeed: "seed",
     schedule: { kind: "interval", every: 30, unit: "minute" },
     enabled: true,
     nextPeriodicAt: null,
@@ -89,6 +90,9 @@ describe("AgentSidebarGroup", () => {
       root.render(
         <AgentSidebarGroup
           activeSessionId={null}
+          expanded
+          motionVersion={0}
+          onToggle={() => undefined}
           onOpenSession={onOpen}
           onCreate={() => undefined}
         />,
@@ -99,6 +103,62 @@ describe("AgentSidebarGroup", () => {
     expect(rows).toHaveLength(2);
     act(() => (rows[1] as HTMLButtonElement).click());
     expect(onOpen).toHaveBeenCalledWith("s-2");
+  });
+
+  function renderGroup(expanded: boolean) {
+    const onToggle = vi.fn();
+    const onCreate = vi.fn();
+    // 挂载时会 list() 一次覆盖 store，所以由 list 返回伙伴
+    api.list.mockResolvedValue([view("1")]);
+    act(() =>
+      root.render(
+        <AgentSidebarGroup
+          activeSessionId={null}
+          expanded={expanded}
+          motionVersion={0}
+          onToggle={onToggle}
+          onOpenSession={() => undefined}
+          onCreate={onCreate}
+        />,
+      ),
+    );
+    return { onToggle, onCreate };
+  }
+
+  it("hides rows when collapsed and toggles from the header", async () => {
+    const { onToggle } = renderGroup(false);
+    await flush();
+    expect(container.querySelectorAll("[data-agent-row]")).toHaveLength(0);
+    act(() =>
+      (
+        container.querySelector(
+          'button[aria-label="展开伙伴"]',
+        ) as HTMLButtonElement
+      ).click(),
+    );
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an avatar with a status dot on each row", async () => {
+    renderGroup(true);
+    await flush();
+    const row = container.querySelector("[data-agent-row]")!;
+    expect(row.querySelector("img")).not.toBeNull();
+    expect(row.querySelector("[data-agent-status-dot]")).not.toBeNull();
+  });
+
+  it("create button does not toggle the group", async () => {
+    const { onToggle, onCreate } = renderGroup(true);
+    await flush();
+    act(() =>
+      (
+        container.querySelector(
+          'button[aria-label="新建伙伴"]',
+        ) as HTMLButtonElement
+      ).click(),
+    );
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });
 
@@ -132,8 +192,49 @@ describe("AgentEditModal", () => {
       cwd: "/tmp/work",
       schedule: { kind: "interval", every: 30, unit: "minute" },
       wakeImmediately: true,
+      avatarSeed: expect.any(String),
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shuffles the avatar and saves the new seed", async () => {
+    useAppStore.setState({ workingDir: "/tmp/work" });
+    api.create.mockResolvedValue(view("9"));
+    const uuid = vi
+      .spyOn(crypto, "randomUUID")
+      .mockReturnValueOnce("seed-1-0000-0000-0000-000000000000")
+      .mockReturnValueOnce("seed-2-0000-0000-0000-000000000000");
+    act(() => root.render(<AgentEditModal onClose={() => undefined} />));
+    await flush();
+    const avatar = () =>
+      document.querySelector("[data-avatar-preview] img")!.getAttribute("src");
+    const before = avatar();
+    act(() => button("换一个").click());
+    expect(avatar()).not.toBe(before);
+    act(() => {
+      setInput(document.querySelector("#agent-name")!, "n");
+      setInput(document.querySelector("#agent-instructions")!, "i");
+    });
+    act(() => button("创建").click());
+    await flush();
+    expect(api.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        avatarSeed: "seed-2-0000-0000-0000-000000000000",
+      }),
+    );
+    uuid.mockRestore();
+  });
+
+  it("cancel after shuffle keeps the old seed", async () => {
+    const onClose = vi.fn();
+    act(() =>
+      root.render(<AgentEditModal agent={view("3")} onClose={onClose} />),
+    );
+    await flush();
+    act(() => button("换一个").click());
+    act(() => button("取消").click());
+    expect(onClose).toHaveBeenCalled();
+    expect(api.update).not.toHaveBeenCalled();
   });
 
   it("deletes the agent together with its session when asked", async () => {

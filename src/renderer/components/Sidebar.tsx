@@ -75,6 +75,7 @@ const DEFAULT_EXPANDED_PROJECTS = 3;
 const ORDINARY_SESSION_GROUP_KEY = "__ordinary_sessions__";
 /** 「项目」外层折叠行的持久化 key；内层各项目仍用各自 cwd 作 key。 */
 const PROJECTS_GROUP_KEY = "__projects__";
+const PARTNERS_GROUP_KEY = "__partners__";
 const SIDEBAR_PINS_STORAGE_KEY = "deskwand.sidebarPins";
 const SIDEBAR_GROUP_EXPANSION_STORAGE_KEY = "deskwand.sidebarGroupExpansion";
 // 展开更多按所属列表设置左内边距；收起按钮保留原有左右留白。
@@ -304,6 +305,12 @@ export function Sidebar({
     return projectExpansionOverrides.get(ORDINARY_SESSION_GROUP_KEY) ?? true;
   };
 
+  const resolvePartnersExpanded = (): boolean => {
+    // 用户显式的展开 / 收起优先（同「项目」组）：否则看着伙伴会话时「收起」会点不动。
+    // 伙伴会话只能从这个分组打开（搜索不收录），默认展开就保证了高亮行可见。
+    return projectExpansionOverrides.get(PARTNERS_GROUP_KEY) ?? true;
+  };
+
   const resolveProjectsExpanded = (): boolean => {
     const override = projectExpansionOverrides.get(PROJECTS_GROUP_KEY);
     if (override !== undefined) return override;
@@ -317,6 +324,7 @@ export function Sidebar({
 
   const ordinarySessionsExpanded = resolveOrdinarySessionsExpanded();
   const projectsExpanded = resolveProjectsExpanded();
+  const partnersExpanded = resolvePartnersExpanded();
 
   const resolveSessionVisibleCount = (
     groupKey: string,
@@ -1348,6 +1356,14 @@ export function Sidebar({
               <div>
                 <AgentSidebarGroup
                   activeSessionId={activeSessionId}
+                  expanded={partnersExpanded}
+                  motionVersion={
+                    sectionMotionVersions.get(PARTNERS_GROUP_KEY) ?? 0
+                  }
+                  onToggle={() => {
+                    requestSectionMotion(PARTNERS_GROUP_KEY);
+                    setProjectExpanded(PARTNERS_GROUP_KEY, !partnersExpanded);
+                  }}
                   onOpenSession={(sessionId) =>
                     void handleSessionClick(sessionId)
                   }

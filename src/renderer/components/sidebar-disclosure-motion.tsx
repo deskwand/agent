@@ -5,6 +5,8 @@ import {
   FolderOpen,
   MessageSquare,
   MessageSquareText,
+  Users,
+  UsersRound,
 } from "lucide-react";
 
 const SECTION_DURATION_MS = 220;
@@ -25,7 +27,7 @@ interface SidebarAnimatedSectionProps {
 interface SidebarGroupIconProps {
   expanded: boolean;
   motionVersion: number;
-  kind: "sessions" | "project";
+  kind: "sessions" | "project" | "partners";
   /** 图标右上角的状态角标：asking = 静态警示色（停下等你），running = 主色脉冲（还在跑）。
    *  只在分组收起时画 —— 展开了就由子层自己说。 */
   badgeKind?: "asking" | "running" | null;
@@ -355,7 +357,20 @@ export function SidebarGroupIcon({
       className="relative h-4 w-4 flex-shrink-0 overflow-visible"
       aria-hidden="true"
     >
-      {kind === "sessions" ? (
+      {kind === "partners" ? (
+        <>
+          <Users
+            ref={collapsedRef}
+            className={iconClassName}
+            style={collapsedStyle}
+          />
+          <UsersRound
+            ref={expandedRef}
+            className={iconClassName}
+            style={expandedStyle}
+          />
+        </>
+      ) : kind === "sessions" ? (
         <>
           <MessageSquare
             ref={collapsedRef}

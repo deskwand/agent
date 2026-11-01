@@ -275,6 +275,15 @@ describe("PersistentAgentManager", () => {
     restarted.stop();
   });
 
+  it("generates an avatar seed unless one is given", async () => {
+    const generated = await manager.create(input());
+    expect(generated.avatarSeed).not.toBe("");
+    expect(generated.avatarSeed).not.toBe(generated.name);
+    const given = await manager.create(input({ avatarSeed: "s" }));
+    expect(given.avatarSeed).toBe("s");
+    expect(manager.update(given.id, { avatarSeed: "t" })!.avatarSeed).toBe("t");
+  });
+
   it("renames the bound session when the agent is renamed", async () => {
     const agent = await manager.create(input());
     manager.update(agent.id, { name: "X 运营" });
