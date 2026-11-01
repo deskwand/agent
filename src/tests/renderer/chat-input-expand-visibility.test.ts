@@ -264,7 +264,7 @@ describe("展开按钮（右簇）", () => {
     expect(after.className).not.toContain("invisible");
   });
 
-  it("与麦克风、发送键同处右簇，顺序是 展开 → 麦克风 → 发送", async () => {
+  it("与麦克风、发送键同处右簇，顺序是 展开浮层 → 发送 → 麦克风", async () => {
     await renderBar({ hasInputContent: true });
 
     const button = expandButton()!;
@@ -278,12 +278,34 @@ describe("展开按钮（右簇）", () => {
     expect(trail.contains(mic)).toBe(true);
     // 展开在最前：它显隐只改自己那格，不推走麦克风与发送键
     expect(trail.firstElementChild).toBe(button);
+    expect(button.className).toContain("absolute");
+    expect(button.className).toContain("pointer-events-none");
+    expect(button.className).toContain(
+      "group-hover/composer:pointer-events-auto",
+    );
     // DOM 顺序 = 视觉顺序（麦克风外面包了一层容器，所以比 aria-label 而不是 nextElementSibling）
     expect(
       [...trail.querySelectorAll("button")].map((b) =>
         b.getAttribute("aria-label"),
       ),
-    ).toEqual(["chat.expandInput", "chat.voiceStart", "chat.sendMessage"]);
+    ).toEqual(["chat.expandInput", "chat.sendMessage", "chat.voiceStart"]);
+  });
+
+  it("keeps send mounted but hidden for an empty draft, and keeps stop visible", async () => {
+    await renderBar({ hasInputContent: false });
+    const send = container.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    )!;
+    expect(send.className).toContain("invisible");
+    await renderBar({ hasInputContent: true });
+    expect(container.querySelector('button[type="submit"]')).toBe(send);
+    expect(send.className).not.toContain("invisible");
+    await renderBar({ hasInputContent: false, canStop: true });
+    const stop = container.querySelector<HTMLButtonElement>(
+      '[aria-label="chat.stop"]',
+    )!;
+    expect(stop.className).not.toContain("invisible");
+    expect(stop.disabled).toBe(false);
   });
 
   it("keeps the button while expanded without content", async () => {

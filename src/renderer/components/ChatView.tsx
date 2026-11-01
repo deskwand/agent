@@ -107,7 +107,7 @@ import {
 } from "../utils/input-queue-drain";
 import { ChatInputActionBar } from "./ChatInputActionBar";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
-import { ChatInputFooterBar, WorkspaceChip } from "./ChatInputFooterBar";
+import { ChatInputFooterBar } from "./ChatInputFooterBar";
 import { toMicButtonProps } from "./VoiceMicButton";
 import {
   shouldShowRecordingStrip,
@@ -2453,11 +2453,10 @@ export function ChatView() {
               onAttachmentsChange={handleAttachmentsChange}
               voiceRecording={voice.status === "recording"}
               placeholder={t("chat.typeMessage")}
-              cardClassName="px-1.5 py-1.5 rounded-6xl bg-background/50 shadow-elevated"
+              cardClassName="rounded-3xl border border-border/60 bg-background/60 shadow-sm px-3 py-2"
               textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed py-1.5 overflow-hidden"
               footerSlot={
                 <ChatInputFooterBar
-                  leftSlot={<WorkspaceChip cwd={activeSessionCwd ?? null} />}
                   model={activeModel}
                   modelOptions={modelOptions}
                   activeProviderProfileKey={activeProviderProfileKey}

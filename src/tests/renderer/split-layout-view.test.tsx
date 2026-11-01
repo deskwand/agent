@@ -128,6 +128,24 @@ afterEach(() => {
 });
 
 describe("SplitLayout", () => {
+  it("shows each pane's own directory beside its session title", async () => {
+    useAppStore.setState({
+      sessions: [
+        { ...session("S1"), cwd: "/work/alpha" },
+        { ...session("S2"), cwd: "/work/beta" },
+      ],
+    });
+    setLayout(twoPanes("S1", "S2"), "P1");
+    await mount();
+    expect(
+      pane("P1").querySelector('[title="/work/alpha"]')?.textContent,
+    ).toContain("alpha");
+    expect(pane("P1").querySelector('[title="/work/beta"]')).toBeNull();
+    expect(
+      pane("P2").querySelector('[title="/work/beta"]')?.textContent,
+    ).toContain("beta");
+  });
+
   it("单叶子无会话渲染 WelcomeView", async () => {
     setLayout(leaf("P1", null), "P1");
     await mount();

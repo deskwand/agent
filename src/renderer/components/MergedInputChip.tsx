@@ -260,13 +260,7 @@ export function MergedInputChip({
             ref={triggerRef}
             type="button"
             disabled={disabled}
-            // ⚠️ `font-normal [&_svg]:size-3` 是给 `<Button>` base 擦屁股（与活动 chip 同族的迁移回归）：
-            // 这里的 `h-9` / `text-xs` 是**有意**写的（和输入框底行其它 36px 控件同高），但 base 的
-            // `font-medium` 与 `[&_svg]:size-4` 没人顶：Chromium + 构建 CSS 实测字 12px/**500**、
-            // chevron **16px**（作者写的是 `h-3 w-3`）；写回后 12px/400、12px == 迁移前的原生 `<button>`。
-            className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-border/40 bg-background/60 px-2 text-xs font-normal text-foreground transition-[width,background-color] duration-150 hover:bg-hover-surface disabled:opacity-50 [&_svg]:size-3 ${
-              menuOpen ? "w-[15rem] justify-center" : "max-w-[18rem]"
-            }`}
+            className="inline-flex h-7 py-0 min-w-0 max-w-[18rem] items-center gap-3 rounded-md px-1 text-xs font-normal text-foreground transition-colors hover:bg-hover-surface disabled:opacity-50 [&_svg]:size-3"
             aria-label={combinedLabel}
             title={combinedLabel}
           >

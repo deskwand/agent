@@ -189,3 +189,29 @@ describe("顶栏播放控件", () => {
     );
   });
 });
+
+describe("会话工作目录", () => {
+  it("displays the project beside the title and updates with the active session", async () => {
+    useAppStore.setState({
+      activeView: "chat",
+      activeSessionId: "a",
+      sessions: [
+        { ...voiceSession("a"), title: "First chat", cwd: "/work/alpha" },
+        { ...voiceSession("b"), title: "Second chat", cwd: "/work/beta" },
+      ],
+    });
+    await mount();
+    const directory = container.querySelector('[title="/work/alpha"]')!;
+    expect(directory.textContent).toContain("alpha");
+    expect(directory.parentElement?.parentElement?.textContent).toContain(
+      "First chat",
+    );
+    await act(async () => useAppStore.setState({ activeSessionId: "b" }));
+    expect(container.querySelector('[title="/work/alpha"]')).toBeNull();
+    expect(
+      container.querySelector('[title="/work/beta"]')?.textContent,
+    ).toContain("beta");
+    await act(async () => useAppStore.setState({ activeView: "settings" }));
+    expect(container.querySelector('[title="/work/beta"]')).toBeNull();
+  });
+});

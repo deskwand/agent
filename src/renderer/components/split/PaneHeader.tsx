@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Columns2, Rows2, X } from "lucide-react";
 import { Button } from "../app-button";
+import { WorkspaceChip } from "../WorkspaceChip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { usePaneSession } from "./pane-context";
 import { useSplitRectsStore } from "./split-rects-context";
@@ -59,6 +60,11 @@ export function PaneHeader({
       <span className="min-w-0 flex-1 truncate">
         {session?.title ?? t("sidebar.newChat")}
       </span>
+      {session?.cwd && (
+        <span className="min-w-0 max-w-[30%]">
+          <WorkspaceChip cwd={session.cwd} />
+        </span>
+      )}
       {status && (
         <span
           data-status={status}

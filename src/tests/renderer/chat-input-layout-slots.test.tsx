@@ -88,6 +88,14 @@ describe("录音条槽位", () => {
 });
 
 describe("卡内单行布局", () => {
+  it("reserves space above the card for the floating expand control", async () => {
+    await renderInput({ onToggleExpand: () => {} });
+    const card = container.querySelector<HTMLElement>(
+      '[data-testid="chat-input-card"]',
+    )!;
+    expect(card.parentElement?.className).toContain("pt-6");
+  });
+
   it("左簇、编辑器、底栏是同一个 flex 行的三个兄弟", async () => {
     await renderInput({
       leadingSlot: <span data-testid="leading-stub">+</span>,
@@ -145,7 +153,7 @@ describe("两个聊天宿主都接上了新槽位", () => {
 });
 
 describe("麦克风在右簇", () => {
-  it("顺序是 展开 → 麦克风 → 发送，且展开键在无内容时仍占位", async () => {
+  it("顺序是 展开浮层 → 发送 → 麦克风，且展开键在无内容时仍占位", async () => {
     await act(async () => {
       root.render(
         React.createElement(ChatInputBottomBar, {
@@ -165,8 +173,8 @@ describe("麦克风在右簇", () => {
     );
     expect(labels).toEqual([
       "chat.expandInput",
-      "chat.voiceStart",
       "chat.sendMessage",
+      "chat.voiceStart",
     ]);
     // 无内容时展开键是 invisible 占位，不是被条件渲染掉
     const expand = container.querySelector<HTMLElement>(

@@ -615,7 +615,7 @@ export function WelcomeView() {
       className={`flex-1 min-h-0 flex flex-col items-center overflow-y-auto ${PAGE_INSET_X} py-10 md:py-14`}
     >
       <div className="my-auto max-w-[52.5rem] w-full shrink-0 space-y-7">
-        {/* 标题只说「做什么」；「落在哪个项目」由底栏的项目 chip 交代一次。
+        {/* 标题只说「做什么」；「落在哪个项目」由输入框上方的项目 chip 交代一次。
             从前标题也重复了项目名，同一个词在一屏里出现两次。 */}
         <p className="text-base font-medium tracking-[-0.02em] text-muted-foreground text-center">
           {t("welcome.title")}
@@ -715,6 +715,17 @@ export function WelcomeView() {
         {/* 本机能力清单：只在未配置首屏出现，默认折叠成一行（设计 §2.3） */}
         {showConnectCards && <CapabilityIntro />}
 
+        {/* 创建会话前，在输入框上方选择工作项目。 */}
+        {!showConnectCards && (
+          <div className="flex justify-center">
+            <ProjectMenuChip
+              workingDir={workingDir}
+              projects={projects}
+              onSelectProject={(cwd) => void handleSelectProject(cwd)}
+            />
+          </div>
+        )}
+
         {/* Chat Input — same as ChatView */}
         <ChatInput
           ref={chatInputRef}
@@ -734,18 +745,11 @@ export function WelcomeView() {
               ? t("connect.startPlaceholder")
               : t("welcome.placeholder")
           }
-          cardClassName={`rounded-6xl bg-background/60 shadow-elevated px-1.5 py-1.5${showConnectCards ? " cursor-not-allowed" : ""}`}
+          cardClassName={`rounded-3xl border border-border/60 bg-background/60 shadow-sm px-3 py-2${showConnectCards ? " cursor-not-allowed" : ""}`}
           textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed py-1.5 overflow-hidden"
           footerSlot={
             showConnectCards ? undefined : (
               <ChatInputFooterBar
-                leftSlot={
-                  <ProjectMenuChip
-                    workingDir={workingDir}
-                    projects={projects}
-                    onSelectProject={(cwd) => void handleSelectProject(cwd)}
-                  />
-                }
                 model={selectedModel}
                 modelOptions={modelOptions}
                 activeProviderProfileKey={selectedProviderProfileKey}

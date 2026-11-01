@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ProviderProfileKey } from "../types";
-import { ArrowUp, Maximize2, Minimize2, Square } from "lucide-react";
+import { CornerDownLeft, Maximize2, Minimize2, Square } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { Button } from "./app-button";
 import { VoiceMicButton, type VoiceMicButtonProps } from "./VoiceMicButton";
@@ -23,20 +23,7 @@ export interface ContextStatusDetails {
   tokenSpeedLabel?: string;
 }
 
-/**
- * 输入卡内的右簇：展开 + 麦克风 + 发送。
- *
- * 左簇（仅附件）在 `ChatInputActionBar`：两者分别落在编辑器左右两侧，
- * 由 `ChatInput` 的同一条 flex 行排布。
- *
- * 麦克风恒定 36×36（`MIC_SLOT_CLASS`，六态都不改宽），放进右簇不会推挤编辑器；
- * 它从前在左簇，等于让每行草稿先缩进 38px 才写到字。
- *
- * 展开按钮为什么在这里、且为什么常驻一个隐形槽位：它是按「有没有内容」出现的。
- * 夹在左簇里会把编辑器左边缘右推 38px，而那正是用户敲下第一个字的时刻；
- * 放到发送键左边之后它只影响编辑器右边界，再把槽位改成常驻（`invisible`），连那点
- * 都不变 —— 打字时画面完全静止。
- */
+/** 卡内右簇：发送 / 停止、麦克风；展开入口浮在卡片右上角，不占编辑宽度。 */
 export interface ChatInputBottomBarProps {
   canStop: boolean;
   onStop: () => void;
@@ -77,19 +64,17 @@ export function ChatInputBottomBar({
   const showExpandButton = shouldShowExpandButton(isExpanded, hasInputContent);
 
   return (
-    <div className="flex shrink-0 items-center justify-end gap-2">
+    <div className="flex shrink-0 items-center justify-end gap-1">
       {onToggleExpand && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
+              size="iconXs"
               type="button"
               onClick={onToggleExpand}
               aria-label={expandLabel}
-              /* ⚠️ 槽位常驻、只用 invisible 切换：这一格一旦条件渲染，打字第一帧就会
-                 把编辑器右边界（和窄 pane 下的发送键）推来推去。
-                 visibility:hidden 不进可访问树、不可聚焦，所以空态对键盘与读屏是透明的。 */
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-hover-surface transition-colors ${
+              className={`absolute -top-6 right-2 h-6 w-6 rounded-md text-muted-foreground pointer-events-none opacity-0 transition-opacity hover:bg-hover-surface hover:text-foreground group-hover/composer:pointer-events-auto group-hover/composer:opacity-100 group-focus-within/composer:pointer-events-auto group-focus-within/composer:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 ${
                 showExpandButton ? "" : "invisible"
               }`}
             >
@@ -104,26 +89,25 @@ export function ChatInputBottomBar({
         </Tooltip>
       )}
 
-      <VoiceMicButton {...voice} />
-
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
+            size="icon"
             type={canStop ? "button" : "submit"}
             onClick={canStop ? onStop : undefined}
             disabled={!canStop && (isSubmitting || submitDisabled)}
             aria-label={submitLabel}
-            className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition-all duration-150 ${
+            className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition-colors ${
               canStop
                 ? "bg-primary text-background hover:bg-primary/90"
-                : "bg-primary text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 active:scale-95 active:translate-y-px"
+                : `text-foreground hover:bg-hover-surface disabled:opacity-50 disabled:cursor-not-allowed ${hasInputContent ? "" : "invisible"}`
             }`}
           >
             {canStop ? (
               <Square className="w-4 h-4" />
             ) : (
-              <ArrowUp className="w-4 h-4" />
+              <CornerDownLeft className="w-4 h-4" />
             )}
           </Button>
         </TooltipTrigger>
@@ -132,19 +116,12 @@ export function ChatInputBottomBar({
             回车提交表单的路径不受影响。 */}
         <TooltipContent side="bottom">{submitLabel}</TooltipContent>
       </Tooltip>
+      <VoiceMicButton {...voice} />
     </div>
   );
 }
 
-/**
- * 展开按钮是否可见。
- *
- * 已展开时即使草稿被清空也保持可见——否则清空后无法用按钮收起。
- *
- * 判的只是**可见性**，不是渲染：按钮始终在 DOM 里（`invisible` 占位），所以它出现
- * 时不会推动编辑器或发送键。这是这一格唯一安稳的做法 —— 条件渲染的版本在左簇里会
- * 把编辑器左边缘右推 38px，在右簇里会缩窄编辑区。
- */
+/** 有内容时提供展开入口；展开后即使清空草稿也保留收起入口。 */
 export function shouldShowExpandButton(
   isExpanded: boolean,
   hasInputContent: boolean,

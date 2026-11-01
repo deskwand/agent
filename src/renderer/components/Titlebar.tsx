@@ -20,6 +20,7 @@ import { VoiceMiniButton } from "./voice-mode/VoiceMiniButton";
 import { FeedListenButton } from "./FeedListenButton";
 import { Button } from "./app-button";
 import { useIsGitRepo } from "../hooks/use-is-git-repo";
+import { WorkspaceChip } from "./WorkspaceChip";
 
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin";
@@ -166,10 +167,16 @@ export function Titlebar() {
       )}
 
       {/* 标题在左簇与右簇之间居中。注意：不要加 titlebar-no-drag，这一块要保持可拖窗 */}
-      <div className="flex-1 min-w-0 px-3 flex justify-center">
+      <div className="flex-1 min-w-0 px-3 flex items-center justify-center gap-2">
         <span className="min-w-0 truncate text-sm font-medium text-foreground">
           {showSessionHeader ? activeSessionTitle : ""}
         </span>
+        {/* 目录与标题共用会话数据源；目录区域允许悬停查看完整路径。 */}
+        {showSessionHeader ? (
+          <span className="titlebar-no-drag min-w-0 max-w-[40%]">
+            <WorkspaceChip cwd={activeSessionCwd ?? null} />
+          </span>
+        ) : null}
       </div>
 
       <div className="flex items-center">
