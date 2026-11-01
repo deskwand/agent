@@ -31,6 +31,8 @@ function agent(overrides: Partial<PersistentAgent> = {}): PersistentAgent {
     updatedAt: 1_000,
     nextCheckInAt: null,
     checkInNote: null,
+    trustedRecipients: [],
+    riskyCapabilities: { shell: false, browser: false, computer: false },
     ...overrides,
   };
 }
@@ -157,5 +159,65 @@ describe("persistent agent store check-in", () => {
     migrated.insert(agent());
     expect(migrated.get("a1")?.nextCheckInAt).toBeNull();
     expect(migrated.get("a1")?.checkInNote).toBeNull();
+  });
+
+  it("migrates old rows: all capabilities on, empty allowlist", () => {
+    closeDatabase();
+    const path = join(dir, "legacy-risky.db");
+    const legacy = new DatabaseSync(path);
+    legacy.exec(`
+      CREATE TABLE persistent_agents (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, instructions TEXT NOT NULL,
+        cwd TEXT NOT NULL, session_id TEXT NOT NULL, schedule_config TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1, next_periodic_at INTEGER,
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        last_wakeup_at INTEGER, last_error TEXT, avatar_seed TEXT,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+        next_check_in_at INTEGER, check_in_note TEXT
+      );
+      INSERT INTO persistent_agents (id, name, instructions, cwd, session_id,
+        schedule_config, created_at, updated_at)
+      VALUES ('old', 'n', 'i', '/tmp', 's-old',
+        '{"kind":"interval","every":30,"unit":"minute"}', 1, 1);
+    `);
+    legacy.close();
+    const migrated = createPersistentAgentStore(initDatabase(path));
+    expect(migrated.get("old")?.riskyCapabilities).toEqual({
+      shell: true,
+      browser: true,
+      computer: true,
+    });
+    expect(migrated.get("old")?.trustedRecipients).toEqual([]);
+  });
+
+  it("round-trips trustedRecipients and riskyCapabilities", () => {
+    const custom = {
+      trustedRecipients: ["bob@x.com"],
+      riskyCapabilities: { shell: true, browser: false, computer: true },
+    };
+    store.insert(agent(custom));
+    expect(store.get("a1")).toMatchObject(custom);
+    store.update("a1", { trustedRecipients: [] });
+    expect(store.get("a1")?.trustedRecipients).toEqual([]);
+    expect(store.get("a1")?.riskyCapabilities).toEqual(
+      custom.riskyCapabilities,
+    );
+  });
+
+  it("treats corrupt risky_capabilities as all disabled", () => {
+    store.insert(agent());
+    closeDatabase();
+    const path = join(dir, "cowork.db");
+    const raw = new DatabaseSync(path);
+    raw
+      .prepare("UPDATE persistent_agents SET risky_capabilities = ?")
+      .run("{not json");
+    raw.close();
+    const reopened = createPersistentAgentStore(initDatabase(path));
+    expect(reopened.get("a1")?.riskyCapabilities).toEqual({
+      shell: false,
+      browser: false,
+      computer: false,
+    });
   });
 });

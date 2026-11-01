@@ -9,6 +9,7 @@ import type {
   CommandResult,
   SessionDeletedContext,
   SessionRunErrorContext,
+  ToolCallGuard,
 } from "./agent-runtime-extension";
 import { logError, logWarn } from "../utils/logger";
 
@@ -51,6 +52,7 @@ export class AgentRuntimeExtensionManager {
     const promptPrefixes: string[] = [];
     const systemPromptSuffixes: string[] = [];
     const customTools: AgentRuntimeCustomTool[] = [];
+    const toolCallGuards: ToolCallGuard[] = [];
 
     for (const extension of this.extensions) {
       if (!extension.beforeSessionRun) {
@@ -70,6 +72,9 @@ export class AgentRuntimeExtensionManager {
         if (result.customTools?.length) {
           customTools.push(...result.customTools);
         }
+        if (result.toolCallGuard) {
+          toolCallGuards.push(result.toolCallGuard);
+        }
       } catch (error) {
         logError(
           `[AgentRuntimeExtensionManager] beforeSessionRun failed for ${extension.name}:`,
@@ -82,6 +87,7 @@ export class AgentRuntimeExtensionManager {
       promptPrefix: promptPrefixes.join("\n\n").trim() || undefined,
       systemPromptSuffix: systemPromptSuffixes.join("\n\n").trim() || undefined,
       customTools: mergeCustomTools(customTools),
+      toolCallGuard: composeToolCallGuards(toolCallGuards),
     };
   }
 
@@ -186,4 +192,18 @@ export class AgentRuntimeExtensionManager {
       }),
     );
   }
+}
+
+function composeToolCallGuards(
+  guards: ToolCallGuard[],
+): ToolCallGuard | undefined {
+  if (guards.length === 0) return undefined;
+  if (guards.length === 1) return guards[0];
+  return async (call, context) => {
+    for (const guard of guards) {
+      const verdict = await guard(call, context);
+      if (verdict) return verdict;
+    }
+    return undefined;
+  };
 }

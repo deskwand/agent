@@ -549,3 +549,32 @@ describe("PersistentAgentManager adaptive wakeup", () => {
     expect(memoryDispose).not.toHaveBeenCalled();
   });
 });
+
+describe("teammate outbound safety fields", () => {
+  it("defaults to all risky capabilities off and an empty allowlist", async () => {
+    const view = await manager.create(input());
+    expect(view.riskyCapabilities).toEqual({
+      shell: false,
+      browser: false,
+      computer: false,
+    });
+    expect(view.trustedRecipients).toEqual([]);
+  });
+
+  it("stores riskyCapabilities given at create and on update", async () => {
+    const caps = { shell: true, browser: false, computer: true };
+    const view = await manager.create(input({ riskyCapabilities: caps }));
+    expect(view.riskyCapabilities).toEqual(caps);
+    const next = { shell: false, browser: true, computer: false };
+    manager.update(view.id, { riskyCapabilities: next });
+    expect(store.get(view.id)?.riskyCapabilities).toEqual(next);
+  });
+
+  it("addTrustedRecipient lowercases, trims and dedupes", async () => {
+    const view = await manager.create(input());
+    manager.addTrustedRecipient(view.id, " Bob@X.com ");
+    manager.addTrustedRecipient(view.id, "bob@x.com");
+    expect(store.get(view.id)?.trustedRecipients).toEqual(["bob@x.com"]);
+    expect(() => manager.addTrustedRecipient("missing", "a@b.c")).not.toThrow();
+  });
+});

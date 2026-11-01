@@ -2,6 +2,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Folder, Shuffle, X } from "lucide-react";
 import type { PersistentAgentView } from "../../../shared/persistent-agent";
+import {
+  ALL_RISKY_DISABLED,
+  RISKY_CAPABILITIES,
+  type RiskyCapabilities,
+} from "../../../shared/agent-risky-capabilities";
 import { useAppStore } from "../../store";
 import { usePersistentAgentStore } from "../../store/persistent-agents";
 import type { ClientEvent } from "../../types";
@@ -57,6 +62,12 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
       : DEFAULT_AGENT_SCHEDULE_FORM,
   );
   const [wakeImmediately, setWakeImmediately] = useState(true);
+  const [risky, setRisky] = useState<RiskyCapabilities>(
+    agent?.riskyCapabilities ?? ALL_RISKY_DISABLED,
+  );
+  const [trusted, setTrusted] = useState<string[]>(
+    agent?.trustedRecipients ?? [],
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -90,6 +101,12 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
             instructions,
             schedule: config,
             avatarSeed,
+            riskyCapabilities: risky,
+            // Only when something was removed: an approval granted while this
+            // modal was open must not be overwritten by the opening snapshot.
+            ...(trusted.length < (agent.trustedRecipients?.length ?? 0)
+              ? { trustedRecipients: trusted }
+              : {}),
           })
         : await window.electronAPI.persistentAgents.create({
             name,
@@ -98,6 +115,7 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
             schedule: config,
             wakeImmediately,
             avatarSeed,
+            riskyCapabilities: risky,
           });
       if (saved) upsert(saved);
       onClose();
@@ -339,6 +357,65 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
                 </>
               )}
             </div>
+            <div className="space-y-2">
+              <span className={FIELD_LABEL}>
+                {t("persistentAgents.form.riskyTitle")}
+              </span>
+              <p className="text-xs text-muted-foreground">
+                {t("persistentAgents.form.riskyHint")}
+              </p>
+              {RISKY_CAPABILITIES.map((cap) => (
+                <label key={cap} className="flex items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    data-risky={cap}
+                    className="mt-0.5"
+                    checked={risky[cap]}
+                    onChange={(e) =>
+                      setRisky((prev) => ({ ...prev, [cap]: e.target.checked }))
+                    }
+                  />
+                  <span>
+                    <span className="block text-foreground">
+                      {t(`persistentAgents.form.risky.${cap}`)}
+                    </span>
+                    <span className="block text-muted-foreground">
+                      {t(`persistentAgents.form.risky.${cap}Desc`)}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {agent && trusted.length > 0 && (
+              <div className="space-y-2">
+                <span className={FIELD_LABEL}>
+                  {t("persistentAgents.form.trustedTitle")}
+                </span>
+                <ul className="space-y-1">
+                  {trusted.map((recipient) => (
+                    <li
+                      key={recipient}
+                      className="flex items-center justify-between gap-2 text-xs text-foreground"
+                    >
+                      <span className="truncate">{recipient}</span>
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        aria-label={`${t("persistentAgents.form.trustedRemove")} ${recipient}`}
+                        onClick={() =>
+                          setTrusted((prev) =>
+                            prev.filter((r) => r !== recipient),
+                          )
+                        }
+                        className="h-auto px-2 py-1 text-xs text-muted-foreground"
+                      >
+                        {t("persistentAgents.form.trustedRemove")}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {!agent && (
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <input

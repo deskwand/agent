@@ -11,6 +11,12 @@ import type {
   PersistentAgent,
   PersistentAgentWakeup,
 } from "../../shared/persistent-agent";
+import {
+  ALL_RISKY_DISABLED,
+  ALL_RISKY_ENABLED,
+  RISKY_CAPABILITIES,
+  type RiskyCapabilities,
+} from "../../shared/agent-risky-capabilities";
 import { logError } from "../utils/logger";
 
 export interface PersistentAgentStore {
@@ -48,6 +54,8 @@ interface AgentRow {
   updated_at: number;
   next_check_in_at: number | null;
   check_in_note: string | null;
+  trusted_recipients: string | null;
+  risky_capabilities: string | null;
 }
 
 interface WakeupRow {
@@ -82,7 +90,9 @@ function ensureSchema(raw: DatabaseSync): void {
       created_at           INTEGER NOT NULL,
       updated_at           INTEGER NOT NULL,
       next_check_in_at     INTEGER,
-      check_in_note        TEXT
+      check_in_note        TEXT,
+      trusted_recipients   TEXT,
+      risky_capabilities   TEXT
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_persistent_agents_session
       ON persistent_agents(session_id);
@@ -112,6 +122,52 @@ function ensureSchema(raw: DatabaseSync): void {
   if (!columns.some((column) => column.name === "check_in_note")) {
     raw.exec("ALTER TABLE persistent_agents ADD COLUMN check_in_note TEXT");
   }
+  // 外发安全是后加的两列
+  if (!columns.some((column) => column.name === "trusted_recipients")) {
+    raw.exec(
+      "ALTER TABLE persistent_agents ADD COLUMN trusted_recipients TEXT",
+    );
+  }
+  if (!columns.some((column) => column.name === "risky_capabilities")) {
+    raw.exec(
+      "ALTER TABLE persistent_agents ADD COLUMN risky_capabilities TEXT",
+    );
+  }
+}
+
+function parseTrustedRecipients(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === "string");
+    }
+  } catch (error) {
+    logError("[PersistentAgentStore] Bad trusted_recipients:", error);
+  }
+  return [];
+}
+
+/** 旧行（NULL，迁移前）保持原行为：全部开启；坏 JSON / 结构不符一律全部关闭（失败即关）。 */
+function parseRiskyCapabilities(value: string | null): RiskyCapabilities {
+  if (!value) return { ...ALL_RISKY_ENABLED };
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown> | null;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      RISKY_CAPABILITIES.every((key) => typeof parsed[key] === "boolean")
+    ) {
+      return {
+        shell: parsed.shell === true,
+        browser: parsed.browser === true,
+        computer: parsed.computer === true,
+      };
+    }
+  } catch (error) {
+    logError("[PersistentAgentStore] Bad risky_capabilities:", error);
+  }
+  return { ...ALL_RISKY_DISABLED };
 }
 
 function parseSchedule(value: string): AgentScheduleConfig {
@@ -142,6 +198,8 @@ function toAgent(row: AgentRow): PersistentAgent {
     updatedAt: row.updated_at,
     nextCheckInAt: row.next_check_in_at ?? null,
     checkInNote: row.check_in_note ?? null,
+    trustedRecipients: parseTrustedRecipients(row.trusted_recipients),
+    riskyCapabilities: parseRiskyCapabilities(row.risky_capabilities),
   };
 }
 
@@ -163,6 +221,8 @@ function toRow(agent: PersistentAgent): AgentRow {
     updated_at: agent.updatedAt,
     next_check_in_at: agent.nextCheckInAt,
     check_in_note: agent.checkInNote,
+    trusted_recipients: JSON.stringify(agent.trustedRecipients),
+    risky_capabilities: JSON.stringify(agent.riskyCapabilities),
   };
 }
 
@@ -195,11 +255,13 @@ export function createPersistentAgentStore(
     INSERT INTO persistent_agents (
       id, name, instructions, cwd, session_id, schedule_config, enabled,
       next_periodic_at, consecutive_failures, last_wakeup_at, last_error,
-      avatar_seed, created_at, updated_at, next_check_in_at, check_in_note
+      avatar_seed, created_at, updated_at, next_check_in_at, check_in_note,
+      trusted_recipients, risky_capabilities
     ) VALUES (
       :id, :name, :instructions, :cwd, :session_id, :schedule_config, :enabled,
       :next_periodic_at, :consecutive_failures, :last_wakeup_at, :last_error,
-      :avatar_seed, :created_at, :updated_at, :next_check_in_at, :check_in_note
+      :avatar_seed, :created_at, :updated_at, :next_check_in_at, :check_in_note,
+      :trusted_recipients, :risky_capabilities
     )
   `);
   const updateAgent = raw.prepare(`
@@ -210,7 +272,9 @@ export function createPersistentAgentStore(
       consecutive_failures = :consecutive_failures,
       last_wakeup_at = :last_wakeup_at, last_error = :last_error,
       avatar_seed = :avatar_seed, updated_at = :updated_at,
-      next_check_in_at = :next_check_in_at, check_in_note = :check_in_note
+      next_check_in_at = :next_check_in_at, check_in_note = :check_in_note,
+      trusted_recipients = :trusted_recipients,
+      risky_capabilities = :risky_capabilities
     WHERE id = :id
   `);
   const deleteAgent = raw.prepare("DELETE FROM persistent_agents WHERE id = ?");

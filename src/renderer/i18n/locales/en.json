@@ -3084,6 +3084,18 @@
       "unit": "Unit",
       "units": { "minute": "minutes", "hour": "hours", "day": "days" },
       "wakeImmediately": "Wake once right after creating",
+      "riskyTitle": "Risky capabilities",
+      "riskyHint": "Off by default. Turn on only what this teammate needs.",
+      "risky": {
+        "shell": "Command line",
+        "shellDesc": "Run any command, reach the network, read and write any file",
+        "browser": "Browser control",
+        "browserDesc": "Use websites with your signed-in sessions and submit forms",
+        "computer": "Computer control",
+        "computerDesc": "Operate any app on your desktop"
+      },
+      "trustedTitle": "Approved recipients",
+      "trustedRemove": "Remove",
       "shuffleAvatar": "Shuffle",
       "create": "Create",
       "required": "Please fill in the name and role",

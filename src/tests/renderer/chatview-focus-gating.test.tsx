@@ -295,4 +295,36 @@ describe("ChatView focus gating", () => {
     });
     expect(voiceMock.cancel).toHaveBeenCalledTimes(1);
   });
+
+  it("pins guard approval cards above the composer, not ordinary ask_user ids", async () => {
+    const question = {
+      question: "Approve sending to evil@x?",
+      header: "h",
+      type: "yesno" as const,
+    };
+    useAppStore.setState({
+      pendingAskUsers: {
+        "guard:call-1": {
+          sessionId: "S2",
+          toolCallId: "guard:call-1",
+          questions: [question],
+        },
+        "ask-1": {
+          sessionId: "S2",
+          toolCallId: "ask-1",
+          questions: [{ ...question, question: "Ordinary question?" }],
+        },
+        "guard:other": {
+          sessionId: "S1",
+          toolCallId: "guard:other",
+          questions: [{ ...question, question: "Other session?" }],
+        },
+      },
+    });
+    await renderPane2();
+    const text = container.textContent ?? "";
+    expect(text).toContain("Approve sending to evil@x?");
+    expect(text).not.toContain("Ordinary question?");
+    expect(text).not.toContain("Other session?");
+  });
 });

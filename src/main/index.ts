@@ -61,7 +61,10 @@ import { IdeaService } from "./ideas/idea-service";
 import { IdeasExtension } from "./ideas/ideas-extension";
 import { PersistentAgentExtension } from "./agents/persistent-agent-extension";
 import type { PersistentAgentManager } from "./agents/persistent-agent-manager";
-import { createPersistentAgentRuntime } from "./agents/persistent-agent-runtime";
+import {
+  createPersistentAgentRuntime,
+  notifyApprovalNeeded,
+} from "./agents/persistent-agent-runtime";
 import { createTeammateStorage } from "./agents/teammate-storage";
 import { registerPersistentAgentIpc } from "./agents/persistent-agent-ipc";
 import type {
@@ -878,6 +881,8 @@ function createWindow() {
 
   // Notify renderer about config status after window is ready
   mainWindow.webContents.on("did-finish-load", () => {
+    // A reloaded renderer lost its pending ask cards; replay them.
+    sessionManager?.resendPendingAskUsers();
     const isConfigured = configStore.isConfigured();
     log("[Config] Notifying renderer, isConfigured:", isConfigured);
     sendToRenderer({
@@ -1264,7 +1269,15 @@ app
       }),
       new GoalExtension(db),
       new IdeasExtension(ideaService),
-      new PersistentAgentExtension(() => persistentAgentManager),
+      new PersistentAgentExtension(
+        () => persistentAgentManager,
+        (agentName) =>
+          notifyApprovalNeeded(agentName, () => {
+            if (!mainWindow || mainWindow.isDestroyed()) return;
+            mainWindow.show();
+            mainWindow.focus();
+          }),
+      ),
     ]);
 
     // Initialize session manager before creating an interactive window.

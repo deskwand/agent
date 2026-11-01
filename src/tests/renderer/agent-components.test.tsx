@@ -29,6 +29,8 @@ function view(id: string, overrides: Partial<PersistentAgentView> = {}) {
     nextPeriodicAt: null,
     nextCheckInAt: null,
     checkInNote: null,
+    trustedRecipients: [],
+    riskyCapabilities: { shell: false, browser: false, computer: false },
     consecutiveFailures: 0,
     lastWakeupAt: null,
     lastError: null,
@@ -193,8 +195,78 @@ describe("AgentEditModal", () => {
       schedule: { kind: "interval", every: 30, unit: "minute" },
       wakeImmediately: true,
       avatarSeed: expect.any(String),
+      riskyCapabilities: { shell: false, browser: false, computer: false },
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows three unchecked risky toggles and sends the chosen ones", async () => {
+    useAppStore.setState({ workingDir: "/tmp/work" });
+    api.create.mockResolvedValue(view("9"));
+    act(() => root.render(<AgentEditModal onClose={() => undefined} />));
+    await flush();
+    const toggle = (name: string) =>
+      document.querySelector(`input[data-risky="${name}"]`) as HTMLInputElement;
+    expect(
+      ["shell", "browser", "computer"].map((n) => toggle(n).checked),
+    ).toEqual([false, false, false]);
+    act(() => toggle("shell").click());
+    act(() => {
+      setInput(document.querySelector("#agent-name")!, "n");
+      setInput(document.querySelector("#agent-instructions")!, "i");
+    });
+    act(() => button("创建").click());
+    await flush();
+    expect(api.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        riskyCapabilities: { shell: true, browser: false, computer: false },
+      }),
+    );
+  });
+
+  it("removes an approved recipient and sends the remaining list", async () => {
+    api.update.mockResolvedValue(view("3"));
+    act(() =>
+      root.render(
+        <AgentEditModal
+          agent={view("3", { trustedRecipients: ["a@x.com", "b@x.com"] })}
+          onClose={() => undefined}
+        />,
+      ),
+    );
+    await flush();
+    expect(document.body.textContent).toContain("a@x.com");
+    const remove = document.querySelector(
+      'button[aria-label="移除 a@x.com"]',
+    ) as HTMLButtonElement;
+    act(() => remove.click());
+    expect(document.body.textContent).not.toContain("a@x.com");
+    act(() => button("保存").click());
+    await flush();
+    expect(api.update).toHaveBeenCalledWith(
+      "3",
+      expect.objectContaining({ trustedRecipients: ["b@x.com"] }),
+    );
+  });
+
+  it("omits trustedRecipients on save when nothing was removed", async () => {
+    api.update.mockResolvedValue(view("3"));
+    act(() =>
+      root.render(
+        <AgentEditModal
+          agent={view("3", { trustedRecipients: ["a@x.com"] })}
+          onClose={() => undefined}
+        />,
+      ),
+    );
+    await flush();
+    act(() => button("保存").click());
+    await flush();
+    const payload = api.update.mock.calls.at(-1)?.[1] as Record<
+      string,
+      unknown
+    >;
+    expect("trustedRecipients" in payload).toBe(false);
   });
 
   it("shuffles the avatar and saves the new seed", async () => {

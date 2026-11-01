@@ -162,6 +162,8 @@ import { createOfficeTools } from "./tools/office/office-tools";
 import { codemodeOnly } from "./tools/tool-exposure";
 import { createTodoTools } from "./tools/todo-tools";
 import { createAskUserTools } from "./tools/ask-user-tools";
+import { createToolCallGuardExtension } from "./tool-call-guard-extension";
+import type { ToolCallGuard } from "../extensions/agent-runtime-extension";
 import { webAccessCache } from "./tools/web-access/cache";
 import { resolveWebAccessProviderAuth } from "./tools/web-access/config-adapter";
 import { createWebAccessTools } from "./tools/web-access/web-tools";
@@ -511,6 +513,8 @@ export class AgentRunner {
     questions: AskUserPromptList,
   ) => Promise<AskUserResult>;
   private pathResolver: PathResolver;
+  /** Per-session tool-call guard, refreshed every turn (pi sessions are cached). */
+  private readonly toolCallGuards = new Map<string, ToolCallGuard>();
   /** 每个会话一个子代理活动 tap；会话释放时一并销毁。 */
   private subagentTaps = new Map<string, SubagentTap>();
   /** 本会话激活时登记进插件全局列表的条目；必须由我们主动摘掉（见 releaseSubagentSession）。 */
@@ -652,6 +656,7 @@ export class AgentRunner {
       unregisterSessionModelRuntime(runtime);
       this.sessionModelRuntimes.delete(sessionId);
     }
+    this.toolCallGuards.delete(sessionId);
     if (cached) {
       this.disposeCachedPiSession(cached);
       // 会话关闭/淘汰：解绑扩展 UI（关闭 TUI Modal、清终端输入订阅）
@@ -809,6 +814,7 @@ export class AgentRunner {
       unregisterSessionModelRuntime(modelRuntime);
       this.sessionModelRuntimes.delete(sessionId);
     }
+    this.toolCallGuards.delete(sessionId);
     if (!cached) return;
     this.piSessions.delete(sessionId);
     resetUiState();
@@ -2903,6 +2909,11 @@ export class AgentRunner {
             systemPromptSuffix: undefined,
             customTools: [],
           };
+      if (extensionResult.toolCallGuard) {
+        this.toolCallGuards.set(session.id, extensionResult.toolCallGuard);
+      } else {
+        this.toolCallGuards.delete(session.id);
+      }
       const systemPromptSuffix =
         extensionResult.systemPromptSuffix?.trim() || "";
       const extensionSignature = JSON.stringify({
@@ -3520,6 +3531,16 @@ Tool routing:\n
         extensionFactories.push(
           createTurnProfileExtension(
             () => this.piSessions.get(session.id)?.turnProfile,
+          ),
+        );
+
+        extensionFactories.push(
+          createToolCallGuardExtension(
+            () => this.toolCallGuards.get(session.id),
+            this.requestAskUser
+              ? (cardId, questions) =>
+                  this.requestAskUser!(session.id, cardId, questions)
+              : undefined,
           ),
         );
 

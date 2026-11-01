@@ -53,6 +53,7 @@ import {
 } from "../utils/subagent-card";
 import { getToolLabel } from "./message/toolHelpers";
 import { RetryStatusRow } from "./message/RetryStatusRow";
+import { GuardApprovalCards } from "./message/GuardApprovalCards";
 import type {
   Message,
   ContentBlock,
@@ -2333,6 +2334,10 @@ export function ChatView() {
 
       {/* Input */}
       <div className="bg-transparent">
+        <GuardApprovalCards
+          sessionId={activeSessionId}
+          className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-1`}
+        />
         {inputQueue.length > 0 && (
           <div className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-1`}>
             <ChatInputQueueBar

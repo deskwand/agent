@@ -8,6 +8,10 @@ import type {
   PersistentAgentCreateInput,
   PersistentAgentUpdateInput,
 } from "../../shared/persistent-agent";
+import {
+  RISKY_CAPABILITIES,
+  type RiskyCapabilities,
+} from "../../shared/agent-risky-capabilities";
 import type { PersistentAgentManager } from "./persistent-agent-manager";
 
 export interface PersistentAgentIpcDeps {
@@ -35,6 +39,27 @@ export function registerPersistentAgentIpc({
       throw new Error(`${field} is required`);
     }
   };
+  const assertRiskyCapabilities = (
+    value: unknown,
+  ): value is RiskyCapabilities => {
+    const ok =
+      typeof value === "object" &&
+      value !== null &&
+      RISKY_CAPABILITIES.every(
+        (key) => typeof (value as Record<string, unknown>)[key] === "boolean",
+      );
+    if (!ok) throw new Error("riskyCapabilities is invalid");
+    return true;
+  };
+  const normalizeRecipients = (value: unknown): string[] => {
+    if (
+      !Array.isArray(value) ||
+      !value.every((item): item is string => typeof item === "string")
+    ) {
+      throw new Error("trustedRecipients is invalid");
+    }
+    return value.map((item) => item.trim().toLowerCase()).filter(Boolean);
+  };
 
   ipcMain.handle("persistentAgents.list", () => getManager()?.list() ?? []);
   ipcMain.handle(
@@ -44,6 +69,9 @@ export function registerPersistentAgentIpc({
       assertText(input.name ?? "", "Name");
       assertText(input.instructions ?? "", "Instructions");
       if (input.cwd?.trim()) assertWorkspace(input.cwd);
+      if (input.riskyCapabilities !== undefined) {
+        assertRiskyCapabilities(input.riskyCapabilities);
+      }
       return manager.create({
         ...input,
         name: input.name.trim(),
@@ -57,8 +85,14 @@ export function registerPersistentAgentIpc({
       const manager = requireManager();
       assertText(patch.name, "Name");
       assertText(patch.instructions, "Instructions");
+      if (patch.riskyCapabilities !== undefined) {
+        assertRiskyCapabilities(patch.riskyCapabilities);
+      }
       return manager.update(id, {
         ...patch,
+        ...(patch.trustedRecipients !== undefined
+          ? { trustedRecipients: normalizeRecipients(patch.trustedRecipients) }
+          : {}),
         ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
         ...(patch.instructions !== undefined
           ? { instructions: patch.instructions.trim() }

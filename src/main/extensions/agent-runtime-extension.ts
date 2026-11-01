@@ -1,6 +1,7 @@
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "@sinclair/typebox";
 import type { Message, Session } from "../../renderer/types";
+import type { AskUserPromptList, AskUserResult } from "../../shared/ask-user";
 
 export type AgentRuntimeCustomTool = ToolDefinition<TSchema, unknown>;
 
@@ -15,6 +16,8 @@ export interface BeforeSessionRunResult {
   promptPrefix?: string;
   systemPromptSuffix?: string;
   customTools?: AgentRuntimeCustomTool[];
+  /** Vetoes tool calls for this session run; see ToolCallGuard. */
+  toolCallGuard?: ToolCallGuard;
 }
 
 export interface AfterSessionRunContext {
@@ -84,3 +87,13 @@ export interface AgentRuntimeExtension {
     context: SessionRunErrorContext,
   ): Promise<AfterSessionRunResult | void>;
 }
+
+export interface ToolCallGuardContext {
+  /** Absent when the session cannot show cards (e.g. no requestAskUser wired). */
+  askUser?: (questions: AskUserPromptList) => Promise<AskUserResult>;
+}
+
+export type ToolCallGuard = (
+  call: { toolName: string; input: Record<string, unknown> },
+  context: ToolCallGuardContext,
+) => Promise<{ block: true; reason: string } | undefined>;

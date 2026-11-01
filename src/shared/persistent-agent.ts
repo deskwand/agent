@@ -1,6 +1,7 @@
 /**
  * 常驻智能体的共享类型与常量（主进程 / preload / 渲染层共用）。
  */
+import type { RiskyCapabilities } from "./agent-risky-capabilities";
 
 export type AgentScheduleConfig =
   | { kind: "interval"; every: number; unit: "minute" | "hour" | "day" }
@@ -34,6 +35,10 @@ export interface PersistentAgent {
   /** 模型设的下次签到。 */
   nextCheckInAt: number | null;
   checkInNote: string | null;
+  /** 已获准的外发收件人（小写），命中后免审批。 */
+  trustedRecipients: string[];
+  /** 高风险能力开关（shell / 浏览器 / 电脑操作）。 */
+  riskyCapabilities: RiskyCapabilities;
 }
 
 export interface PersistentAgentWakeup {
@@ -63,11 +68,20 @@ export interface PersistentAgentCreateInput {
   schedule: AgentScheduleConfig;
   wakeImmediately: boolean;
   avatarSeed?: string;
+  riskyCapabilities?: RiskyCapabilities;
 }
 
 /** 工作目录随会话绑定，建好后不能改（改了会话也不会跟着换目录）。 */
 export type PersistentAgentUpdateInput = Partial<
-  Pick<PersistentAgent, "name" | "instructions" | "schedule" | "avatarSeed">
+  Pick<
+    PersistentAgent,
+    | "name"
+    | "instructions"
+    | "schedule"
+    | "avatarSeed"
+    | "riskyCapabilities"
+    | "trustedRecipients"
+  >
 >;
 
 /** 会话丢失时写进 lastError 的固定值，渲染层按它显示文案。 */

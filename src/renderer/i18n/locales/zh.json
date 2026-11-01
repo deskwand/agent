@@ -3077,6 +3077,18 @@
       "unit": "单位",
       "units": { "minute": "分钟", "hour": "小时", "day": "天" },
       "wakeImmediately": "创建后立即唤醒一次",
+      "riskyTitle": "高危能力",
+      "riskyHint": "默认关闭。只在伙伴确实需要时开启。",
+      "risky": {
+        "shell": "命令行",
+        "shellDesc": "运行任意命令、联网、读写任意文件",
+        "browser": "浏览器操作",
+        "browserDesc": "用你的登录状态操作网站、提交表单",
+        "computer": "电脑操作",
+        "computerDesc": "操作你桌面上的任何应用"
+      },
+      "trustedTitle": "已批准的收件对象",
+      "trustedRemove": "移除",
       "shuffleAvatar": "换一个",
       "create": "创建",
       "required": "请填写名称和角色与目标",

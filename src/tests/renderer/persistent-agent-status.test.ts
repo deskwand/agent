@@ -20,6 +20,8 @@ function view(
     nextPeriodicAt: null,
     nextCheckInAt: null,
     checkInNote: null,
+    trustedRecipients: [],
+    riskyCapabilities: { shell: false, browser: false, computer: false },
     consecutiveFailures: 0,
     lastWakeupAt: null,
     lastError: null,

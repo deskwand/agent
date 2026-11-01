@@ -182,6 +182,7 @@ describe("AgentRunner.rewindSessionFile", () => {
     lastSteeringLengths: Map<string, unknown>;
     subagentTaps: Map<string, unknown>;
     subagentRegistryEntries: Map<string, unknown>;
+    toolCallGuards: Map<string, unknown>;
     rewindSessionFile: AgentRunner["rewindSessionFile"];
   };
 
@@ -194,6 +195,7 @@ describe("AgentRunner.rewindSessionFile", () => {
     runner.lastSteeringLengths = new Map();
     runner.subagentTaps = new Map();
     runner.subagentRegistryEntries = new Map();
+    runner.toolCallGuards = new Map();
     return runner;
   }
 

@@ -222,7 +222,11 @@ export class SessionManager {
   > = new Map();
   private pendingAskUsers: Map<
     string,
-    { sessionId: string; resolve: (result: AskUserResult) => void }
+    {
+      sessionId: string;
+      questions: AskUserQuestion[];
+      resolve: (result: AskUserResult) => void;
+    }
   > = new Map();
   private sandboxInitPromises: Map<string, Promise<void>> = new Map();
   private sessionTitleAttempts: Set<string> = new Set();
@@ -2797,12 +2801,26 @@ export class SessionManager {
     questions: AskUserQuestion[],
   ): Promise<AskUserResult> {
     return new Promise((resolve) => {
-      this.pendingAskUsers.set(toolCallId, { sessionId, resolve });
+      this.pendingAskUsers.set(toolCallId, { sessionId, questions, resolve });
       this.sendToRenderer({
         type: "askUser.request",
         payload: { sessionId, toolCallId, questions },
       });
     });
+  }
+
+  /** Re-sends every outstanding ask (renderer reload / window recreated lost them). */
+  resendPendingAskUsers(): void {
+    for (const [toolCallId, entry] of this.pendingAskUsers) {
+      this.sendToRenderer({
+        type: "askUser.request",
+        payload: {
+          sessionId: entry.sessionId,
+          toolCallId,
+          questions: entry.questions,
+        },
+      });
+    }
   }
 
   handleAskUserResponse(

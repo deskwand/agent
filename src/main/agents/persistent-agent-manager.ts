@@ -15,6 +15,7 @@
  * 轮次结束时合并成一条再投。
  */
 import { v4 as uuidv4 } from "uuid";
+import { ALL_RISKY_DISABLED } from "../../shared/agent-risky-capabilities";
 import {
   AGENT_SESSION_LOST_ERROR,
   MAX_CONSECUTIVE_FAILURES,
@@ -188,6 +189,8 @@ export class PersistentAgentManager {
       updatedAt: now,
       nextCheckInAt: null,
       checkInNote: null,
+      trustedRecipients: [],
+      riskyCapabilities: { ...(input.riskyCapabilities ?? ALL_RISKY_DISABLED) },
     };
     this.store.insert(agent);
     this.arm(agent.id);
@@ -223,6 +226,18 @@ export class PersistentAgentManager {
     }
     this.arm(id);
     return this.emit(id);
+  }
+
+  /** 把收件人加入免审批名单（小写去空白；已存在或队友不存在则忽略）。 */
+  addTrustedRecipient(agentId: string, recipient: string): void {
+    const agent = this.store.get(agentId);
+    const normalized = recipient.trim().toLowerCase();
+    if (!agent || !normalized) return;
+    if (agent.trustedRecipients.includes(normalized)) return;
+    this.store.update(agentId, {
+      trustedRecipients: [...agent.trustedRecipients, normalized],
+    });
+    this.emit(agentId);
   }
 
   async delete(

@@ -47,6 +47,23 @@ describe("session-manager ask_user", () => {
     });
   });
 
+  it("resendPendingAskUsers 重发所有仍挂起的提问", async () => {
+    const sm = makeSessionManager();
+    const promise = sm.requestAskUser("s-1", "t-1", questions);
+    const send = spySend(sm);
+    sm.resendPendingAskUsers();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({
+      type: "askUser.request",
+      payload: { sessionId: "s-1", toolCallId: "t-1", questions },
+    });
+    sm.handleAskUserResponse("s-1", "t-1", { "0": "SQLite" });
+    await promise;
+    send.mockClear();
+    sm.resendPendingAskUsers();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("answers 结构非法时忽略并保持 pending", async () => {
     const sm = makeSessionManager();
     const promise = sm.requestAskUser("s-1", "t-1", questions);

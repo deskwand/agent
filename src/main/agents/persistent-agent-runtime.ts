@@ -75,3 +75,20 @@ export function createPersistentAgentRuntime(
     },
   });
 }
+
+/** Desktop notification telling the user a teammate is waiting for outbound approval. */
+export function notifyApprovalNeeded(
+  agentName: string,
+  onClick?: () => void,
+): void {
+  try {
+    const notification = new Notification({
+      title: t("agents.notify.approvalTitle"),
+      body: t("agents.notify.approvalBody", { name: agentName }),
+    });
+    if (onClick) notification.on("click", onClick);
+    notification.show();
+  } catch (error) {
+    logError("[PersistentAgents] Notification failed:", error);
+  }
+}

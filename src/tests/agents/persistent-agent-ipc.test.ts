@@ -88,4 +88,44 @@ describe("registerPersistentAgentIpc", () => {
     ).toThrow("bad");
     expect(create).not.toHaveBeenCalled();
   });
+
+  it("validates and passes through riskyCapabilities / trustedRecipients on update", () => {
+    const update = vi.fn();
+    const handlers = register({ update } as unknown as PersistentAgentManager);
+    const handler = handlers.get("persistentAgents.update")!;
+    expect(() =>
+      handler(null, "a1", { riskyCapabilities: { shell: "yes" } }),
+    ).toThrow();
+    expect(() => handler(null, "a1", { trustedRecipients: [1] })).toThrow();
+    const caps = { shell: true, browser: false, computer: false };
+    handler(null, "a1", {
+      riskyCapabilities: caps,
+      trustedRecipients: [" Bob@X.com "],
+    });
+    expect(update).toHaveBeenCalledWith("a1", {
+      riskyCapabilities: caps,
+      trustedRecipients: ["bob@x.com"],
+    });
+  });
+
+  it("validates and passes riskyCapabilities through on create", () => {
+    const create = vi.fn();
+    const handlers = register({ create } as unknown as PersistentAgentManager);
+    const base = {
+      name: "n",
+      instructions: "i",
+      cwd: "/tmp",
+      schedule: { kind: "interval", every: 30, unit: "minute" },
+      wakeImmediately: false,
+    };
+    const handler = handlers.get("persistentAgents.create")!;
+    expect(() =>
+      handler(null, { ...base, riskyCapabilities: { shell: true } }),
+    ).toThrow();
+    const caps = { shell: false, browser: true, computer: false };
+    handler(null, { ...base, riskyCapabilities: caps });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ riskyCapabilities: caps }),
+    );
+  });
 });

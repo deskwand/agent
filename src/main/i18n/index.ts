@@ -161,6 +161,14 @@ const MSG: Record<Locale, MessageTable> = {
     "agents.notify.autoPausedTitle": "伙伴已暂停",
     "agents.notify.autoPausedBody":
       "「{{name}}」连续失败 {{count}} 次，已自动暂停",
+    "agents.approval.header": "外发审批",
+    "agents.approval.question":
+      "伙伴「{{name}}」想发送给 {{recipients}}{{attachments}}。允许吗？\n\n{{preview}}",
+    "agents.approval.withAttachments": "（含附件）",
+    "agents.approval.knownRecipients": "已批准的对象",
+    "agents.notify.approvalTitle": "伙伴需要你的批准",
+    "agents.notify.approvalBody":
+      "「{{name}}」想往外发送内容，请在会话里确认。",
   },
   en: {
     // ── goal ──
@@ -332,6 +340,14 @@ const MSG: Record<Locale, MessageTable> = {
     "agents.notify.autoPausedTitle": "Teammate paused",
     "agents.notify.autoPausedBody":
       '"{{name}}" failed {{count}} times in a row and was paused',
+    "agents.approval.header": "Approval",
+    "agents.approval.question":
+      'Teammate "{{name}}" wants to send to {{recipients}}{{attachments}}. Allow?\n\n{{preview}}',
+    "agents.approval.withAttachments": " (with attachments)",
+    "agents.approval.knownRecipients": "approved recipients",
+    "agents.notify.approvalTitle": "A teammate needs your approval",
+    "agents.notify.approvalBody":
+      '"{{name}}" wants to send something out. Review it in the session.',
   },
 };
 

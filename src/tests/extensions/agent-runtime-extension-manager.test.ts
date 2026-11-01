@@ -127,3 +127,56 @@ describe("AgentRuntimeExtensionManager.onSessionRunError", () => {
     expect(result.goalStatus?.status).toBe("paused");
   });
 });
+
+describe("AgentRuntimeExtensionManager toolCallGuard composition", () => {
+  const call = { toolName: "bash", input: {} };
+  const ctx = {};
+  it("composes guards in order; first block wins", async () => {
+    const manager = new AgentRuntimeExtensionManager([
+      {
+        name: "a",
+        beforeSessionRun: async () => ({
+          toolCallGuard: async () => undefined,
+        }),
+      },
+      {
+        name: "b",
+        beforeSessionRun: async () => ({
+          toolCallGuard: async () => ({
+            block: true as const,
+            reason: "b says no",
+          }),
+        }),
+      },
+      {
+        name: "c",
+        beforeSessionRun: async () => ({
+          toolCallGuard: async () => ({ block: true as const, reason: "c" }),
+        }),
+      },
+    ]);
+    const result = await manager.beforeSessionRun({
+      session: createSession(),
+      prompt: "x",
+      existingMessages: [],
+      isColdStart: true,
+    });
+    expect(await result.toolCallGuard?.(call, ctx)).toEqual({
+      block: true,
+      reason: "b says no",
+    });
+  });
+
+  it("leaves toolCallGuard undefined when no extension provides one", async () => {
+    const manager = new AgentRuntimeExtensionManager([
+      createExtension("one", "p", "s"),
+    ]);
+    const result = await manager.beforeSessionRun({
+      session: createSession(),
+      prompt: "x",
+      existingMessages: [],
+      isColdStart: true,
+    });
+    expect(result.toolCallGuard).toBeUndefined();
+  });
+});
