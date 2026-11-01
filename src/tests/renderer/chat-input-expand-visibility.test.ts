@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 //
-// 注意：jsdom 没有布局引擎，本文件只能验证「行为」（有内容才渲染、展开态保留、
-// 渲染在左 cluster、ChatInput → 底栏整链路出现/消失）。「显隐不产生位移」这类像素
-// 结论由 design-docs/2026-09-14-expand-button-visibility-probe*.html 的 Chromium 实测覆盖。
+// 注意：jsdom 没有布局引擎，本文件只能验证「行为」（发送键随内容显隐、节点不重建、
+// 编辑区高度上限这一条数值约定）。像素与观感归真机。
 
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -13,10 +12,7 @@ import {
   type ChatInputHandle,
 } from "../../renderer/components/ChatInput";
 import { ChatInputActionBar } from "../../renderer/components/ChatInputActionBar";
-import {
-  ChatInputBottomBar,
-  shouldShowExpandButton,
-} from "../../renderer/components/ChatInputBottomBar";
+import { ChatInputBottomBar } from "../../renderer/components/ChatInputBottomBar";
 
 vi.mock("react-i18next", () => ({
   // 底栏现在会经 StatusPopover → utils/i18n-format → i18n/config 间接引用这个插件，
@@ -36,8 +32,8 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
 
 type BarProps = React.ComponentProps<typeof ChatInputBottomBar>;
 
-/** 右簇（展开 + 麦克风 + 发送）除「随内容变化的两个 prop」之外的必填/可选 prop。 */
-const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
+/** 右簇（发送 + 麦克风）除「随内容变化的那一个 prop」之外的必填/可选 prop。 */
+const baseBarProps: Omit<BarProps, "hasInputContent"> = {
   canStop: false,
   onStop: () => {},
   isSubmitting: false,
@@ -101,12 +97,6 @@ async function renderInput(onContentChange: (hasContent: boolean) => void) {
     );
   });
   return ref;
-}
-
-function expandButton(): HTMLButtonElement | null {
-  return container.querySelector<HTMLButtonElement>(
-    'button[aria-label="chat.expandInput"]',
-  );
 }
 
 describe("hasInputContent", () => {
@@ -213,28 +203,52 @@ describe("ChatInput content reporting", () => {
   });
 });
 
-describe("shouldShowExpandButton", () => {
-  it("hides the button for an empty, collapsed input", () => {
-    expect(shouldShowExpandButton(false, false)).toBe(false);
+describe("编辑区高度上限", () => {
+  /** jsdom 的 scrollHeight 恒为 0，这里给出一个可控的内容高度。 */
+  function stubScrollHeight(editor: HTMLElement, value: number) {
+    Object.defineProperty(editor, "scrollHeight", {
+      configurable: true,
+      get: () => value,
+    });
+  }
+
+  it("长到 15 行就停住，再多转内部滚动", async () => {
+    await renderInput(() => {});
+    const editor = editorEl();
+    // lineHeight 读不到时按 24 兜底，与实现同一个口径
+    stubScrollHeight(editor, 24 * 40);
+
+    await act(async () => {
+      typeInto(
+        editor,
+        Array.from({ length: 40 }, (_, i) => `L${i}`).join("\n"),
+      );
+    });
+
+    expect(editor.style.height).toBe(`${24 * 15}px`);
+    expect(editor.style.overflowY).toBe("auto");
   });
 
-  it("shows the button as soon as there is content", () => {
-    expect(shouldShowExpandButton(false, true)).toBe(true);
-  });
+  it("短草稿按内容长高，不滚动", async () => {
+    await renderInput(() => {});
+    const editor = editorEl();
+    stubScrollHeight(editor, 24 * 2);
 
-  it("keeps the button visible while expanded, even after the draft is cleared", () => {
-    expect(shouldShowExpandButton(true, false)).toBe(true);
-    expect(shouldShowExpandButton(true, true)).toBe(true);
+    await act(async () => {
+      typeInto(editor, "两行\n草稿");
+    });
+
+    expect(editor.style.height).toBe(`${24 * 2}px`);
+    expect(editor.style.overflowY).toBe("hidden");
   });
 });
 
-describe("展开按钮（右簇）", () => {
+describe("右簇（发送 + 麦克风）", () => {
   async function renderBar(props: Partial<BarProps>): Promise<void> {
     await act(async () => {
       root.render(
         React.createElement(ChatInputBottomBar, {
           ...baseBarProps,
-          onToggleExpand: () => {},
           hasInputContent: false,
           ...props,
         }),
@@ -242,84 +256,34 @@ describe("展开按钮（右簇）", () => {
     });
   }
 
-  it("没有内容时不新增节点：那一格用 invisible 占着", async () => {
-    await renderBar({ hasInputContent: false });
-
-    const button = expandButton();
-    // 关键：元素在，只是看不见 —— 条件渲染的版本一出现就会推动编辑器与发送键
-    expect(button).not.toBeNull();
-    expect(button!.className).toContain("invisible");
-    // 右簇永远是「展开 + 麦克风 + 发送」三颗按钮，空态也一样
-    expect(container.querySelectorAll("button")).toHaveLength(3);
-  });
-
-  it("有内容后是同一颗按钮原地变可见", async () => {
-    await renderBar({ hasInputContent: false });
-    const before = expandButton()!;
-
-    await renderBar({ hasInputContent: true });
-    const after = expandButton()!;
-
-    expect(after).toBe(before); // 同一个 DOM 节点：没有卸载重建，也就没有位移
-    expect(after.className).not.toContain("invisible");
-  });
-
-  it("与麦克风、发送键同处右簇，顺序是 展开浮层 → 发送 → 麦克风", async () => {
+  it("只渲染发送与麦克风两颗按钮，没有展开入口", async () => {
     await renderBar({ hasInputContent: true });
 
-    const button = expandButton()!;
-    const send = container.querySelector('button[type="submit"]')!;
-    const mic = container.querySelector<HTMLElement>(
-      '[aria-label="chat.voiceStart"]',
-    )!;
-    const trail = button.parentElement!;
-    // 同一个父节点 = 同一个右簇容器
-    expect(trail).toBe(send.parentElement);
-    expect(trail.contains(mic)).toBe(true);
-    // 展开在最前：它显隐只改自己那格，不推走麦克风与发送键
-    expect(trail.firstElementChild).toBe(button);
-    expect(button.className).toContain("absolute");
-    expect(button.className).toContain("pointer-events-none");
-    expect(button.className).toContain(
-      "group-hover/composer:pointer-events-auto",
+    const labels = [...container.querySelectorAll("button")].map((b) =>
+      b.getAttribute("aria-label"),
     );
-    // DOM 顺序 = 视觉顺序（麦克风外面包了一层容器，所以比 aria-label 而不是 nextElementSibling）
-    expect(
-      [...trail.querySelectorAll("button")].map((b) =>
-        b.getAttribute("aria-label"),
-      ),
-    ).toEqual(["chat.expandInput", "chat.sendMessage", "chat.voiceStart"]);
+    expect(labels).toEqual(["chat.sendMessage", "chat.voiceStart"]);
   });
 
-  it("keeps send mounted but hidden for an empty draft, and keeps stop visible", async () => {
+  it("空草稿时发送键在 DOM 里但不可见，有内容后原地变可见", async () => {
     await renderBar({ hasInputContent: false });
     const send = container.querySelector<HTMLButtonElement>(
       'button[type="submit"]',
     )!;
     expect(send.className).toContain("invisible");
+
     await renderBar({ hasInputContent: true });
     expect(container.querySelector('button[type="submit"]')).toBe(send);
     expect(send.className).not.toContain("invisible");
+  });
+
+  it("生成中时停止键始终可见可用", async () => {
     await renderBar({ hasInputContent: false, canStop: true });
     const stop = container.querySelector<HTMLButtonElement>(
       '[aria-label="chat.stop"]',
     )!;
     expect(stop.className).not.toContain("invisible");
     expect(stop.disabled).toBe(false);
-  });
-
-  it("keeps the button while expanded without content", async () => {
-    await renderBar({ hasInputContent: false, isExpanded: true });
-
-    expect(
-      container.querySelector('button[aria-label="chat.collapseInput"]'),
-    ).not.toBeNull();
-  });
-
-  it("renders no expand button when onToggleExpand is absent", async () => {
-    await renderBar({ hasInputContent: true, onToggleExpand: undefined });
-
-    expect(expandButton()).toBeNull();
   });
 });
 
@@ -336,7 +300,6 @@ describe("打字时零位移（ChatInput → 右簇 整链路）", () => {
       leadingSlot: React.createElement(ChatInputActionBar, leadBarProps),
       bottomSlot: React.createElement(ChatInputBottomBar, {
         ...baseBarProps,
-        onToggleExpand: () => {},
         hasInputContent,
       }),
     });
@@ -347,38 +310,38 @@ describe("打字时零位移（ChatInput → 右簇 整链路）", () => {
       root.render(React.createElement(Harness));
     });
     const buttonCount = container.querySelectorAll("button").length;
-    // 空态它就在，只是看不见
-    const expand = expandButton()!;
-    expect(expand.className).toContain("invisible");
+    // 空态发送键就在，只是看不见
+    const send = container.querySelector('button[type="submit"]')!;
+    expect(send.className).toContain("invisible");
 
     await act(async () => {
       typeInto(editorEl(), "x");
     });
 
     expect(container.querySelectorAll("button").length).toBe(buttonCount);
-    expect(expandButton()).toBe(expand);
-    expect(expandButton()!.className).not.toContain("invisible");
+    expect(container.querySelector('button[type="submit"]')).toBe(send);
+    expect(send.className).not.toContain("invisible");
   });
 
-  it("删字后回到隐形，节点仍是同一颗", async () => {
+  it("删字后发送键回到隐形，节点仍是同一颗", async () => {
     await act(async () => {
       root.render(React.createElement(Harness));
     });
     const editor = editorEl();
     const buttonCount = container.querySelectorAll("button").length;
-    const expand = expandButton()!;
+    const send = container.querySelector('button[type="submit"]')!;
 
     await act(async () => {
       typeInto(editor, "x");
     });
-    expect(expandButton()!.className).not.toContain("invisible");
+    expect(send.className).not.toContain("invisible");
 
     await act(async () => {
       typeInto(editor, "");
     });
 
-    expect(expandButton()).toBe(expand);
-    expect(expandButton()!.className).toContain("invisible");
+    expect(container.querySelector('button[type="submit"]')).toBe(send);
+    expect(send.className).toContain("invisible");
     expect(container.querySelectorAll("button").length).toBe(buttonCount);
   });
 });

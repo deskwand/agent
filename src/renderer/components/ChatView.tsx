@@ -365,7 +365,6 @@ export function ChatView() {
     submitAskUser,
   } = useIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
   const [useTextInput, setUseTextInput] = useState(false);
   useEffect(() => setUseTextInput(false), [activeSessionId]);
@@ -487,7 +486,6 @@ export function ChatView() {
   const previousScrollTopRef = useRef(0);
   const prevMessageCountRef = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
-  const scrollToBottomByButtonRef = useRef<() => void>(() => {});
   const previousSessionIdRef = useRef<string | null>(null);
   const initializedSessionIdRef = useRef<string | null>(null);
   const pendingPrependAnchorRef = useRef<{
@@ -1741,6 +1739,8 @@ export function ChatView() {
   ]);
 
   // Additional scroll trigger for content height changes (e.g., TodoWrite expand/collapse)
+  // 也观察滚动容器本身：输入框长高会压缩视口，而消息区高度不变 —— 只盯消息区的话
+  // 这种情况下不会回调，最后一条消息就留在折线以下。
   useEffect(() => {
     const container = scrollContainerRef.current;
     const messagesContainer = messagesContainerRef.current;
@@ -1754,6 +1754,7 @@ export function ChatView() {
     });
 
     resizeObserver.observe(messagesContainer);
+    resizeObserver.observe(container);
 
     return () => {
       resizeObserver.disconnect();
@@ -1766,7 +1767,6 @@ export function ChatView() {
     // 重置跟随状态，覆盖旧会话中用户手动上滚的残留
     isAtBottomRef.current = true;
     previousScrollTopRef.current = 0;
-    setIsInputExpanded(false);
     const rafId = requestAnimationFrame(() => {
       const c = scrollContainerRef.current;
       if (c && typeof c.scrollTo === "function") {
@@ -1775,15 +1775,6 @@ export function ChatView() {
     });
     return () => cancelAnimationFrame(rafId);
   }, [activeSessionId]);
-
-  // Scroll to bottom when input expands, so messages area follows
-  useEffect(() => {
-    if (!isInputExpanded) return;
-    const raf = requestAnimationFrame(() => {
-      scrollToBottomByButtonRef.current();
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [isInputExpanded]);
 
   useEffect(() => {
     const titleEl = titleRef.current;
@@ -2159,11 +2150,6 @@ export function ChatView() {
     c?.scrollTo({ top: c.scrollHeight, behavior: "instant" });
   };
 
-  // An expansion frame must restore the latest committed tail window.
-  useLayoutEffect(() => {
-    scrollToBottomByButtonRef.current = scrollToBottomByButton;
-  });
-
   if (!activeSession) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -2447,8 +2433,6 @@ export function ChatView() {
               onCommand={handleCommand}
               disabled={isSubmitting}
               submitDisabled={submitBlocked}
-              isExpanded={isInputExpanded}
-              onToggleExpand={() => setIsInputExpanded((v) => !v)}
               onContentChange={setHasInputContent}
               onAttachmentsChange={handleAttachmentsChange}
               voiceRecording={voice.status === "recording"}
@@ -2562,8 +2546,6 @@ export function ChatView() {
                   onStop={handleStop}
                   isSubmitting={isSubmitting}
                   submitDisabled={submitBlocked}
-                  isExpanded={isInputExpanded}
-                  onToggleExpand={() => setIsInputExpanded((v) => !v)}
                   hasInputContent={hasInputContent}
                   voice={toMicButtonProps(
                     voice,

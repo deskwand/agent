@@ -29,10 +29,7 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
 vi.mock("../../renderer/components/ChatInput", async () => {
   const ReactModule = await import("react");
   return {
-    ChatInput: ReactModule.forwardRef(function MockChatInput(
-      props: { onToggleExpand?: () => void },
-      ref,
-    ) {
+    ChatInput: ReactModule.forwardRef(function MockChatInput(_, ref) {
       ReactModule.useImperativeHandle(ref, () => ({
         clear: () => {},
         focus: () => {},
@@ -41,9 +38,9 @@ vi.mock("../../renderer/components/ChatInput", async () => {
         isEmpty: () => true,
         selectFiles: () => {},
       }));
+      // ChatInput 已没有展开态；替身只占位，没有任何交互。
       return ReactModule.createElement("button", {
-        "aria-label": "test.expandInput",
-        onClick: props.onToggleExpand,
+        "aria-label": "test.chatInputStub",
       });
     }),
   };
@@ -1553,40 +1550,6 @@ describe("ChatView auto-follow", () => {
     expect(
       container.querySelector(".pointer-events-none.absolute.inset-x-0.top-3"),
     ).toBeNull();
-  });
-
-  it("restores the latest tail when an input-expansion frame runs after completion", async () => {
-    const scroller = await renderStreamingWindow();
-    await stopFollowing(scroller);
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
-      frames.push(callback);
-      return frames.length;
-    });
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(
-          'button[aria-label="test.expandInput"]',
-        )!
-        .click();
-    });
-    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
-    expect(
-      scroller.querySelector('[data-message-id="reply-34"]'),
-    ).not.toBeNull();
-
-    await act(async () => {
-      for (const callback of frames.splice(0)) callback(0);
-    });
-
-    expect(
-      scroller.querySelector('[data-message-id="reply-34"]'),
-    ).not.toBeNull();
-    expect(renderedIds(scroller)).toHaveLength(400);
-    expect(renderedIds(scroller)[0]).toBe("history-136");
-    expect(
-      scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop,
-    ).toBeLessThanOrEqual(1);
   });
 
   it.each(["button", "scroll", "wheel"] as const)(

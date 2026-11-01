@@ -2,7 +2,7 @@
 //
 // 录音条（topSlot）与卡内单行的结构约定：
 //   - 录音条必须在**卡片内**、编辑器**上方**（在卡外等于把它丢进消息区）；
-//   - 左簇（附件）/ 编辑器 / 右簇（展开、麦克风、发送）必须是**同一行**的兄弟，
+//   - 左簇（附件）/ 编辑器 / 右簇（发送、麦克风）必须是**同一行**的兄弟，
 //     且编辑器能伸缩。
 //
 // jsdom 没有布局引擎，钉不了像素；能钉的是结构与 class token。像素结论见
@@ -88,14 +88,6 @@ describe("录音条槽位", () => {
 });
 
 describe("卡内单行布局", () => {
-  it("reserves space above the card for the floating expand control", async () => {
-    await renderInput({ onToggleExpand: () => {} });
-    const card = container.querySelector<HTMLElement>(
-      '[data-testid="chat-input-card"]',
-    )!;
-    expect(card.parentElement?.className).toContain("pt-6");
-  });
-
   it("左簇、编辑器、底栏是同一个 flex 行的三个兄弟", async () => {
     await renderInput({
       leadingSlot: <span data-testid="leading-stub">+</span>,
@@ -153,15 +145,13 @@ describe("两个聊天宿主都接上了新槽位", () => {
 });
 
 describe("麦克风在右簇", () => {
-  it("顺序是 展开浮层 → 发送 → 麦克风，且展开键在无内容时仍占位", async () => {
+  it("顺序是 发送 → 麦克风，且没有展开按钮", async () => {
     await act(async () => {
       root.render(
         React.createElement(ChatInputBottomBar, {
           canStop: false,
           onStop: () => {},
           isSubmitting: false,
-          isExpanded: false,
-          onToggleExpand: () => {},
           hasInputContent: false,
           voice: { status: "idle", onToggle: () => {} },
         }),
@@ -171,15 +161,6 @@ describe("麦克风在右簇", () => {
     const labels = [...container.querySelectorAll("button")].map((b) =>
       b.getAttribute("aria-label"),
     );
-    expect(labels).toEqual([
-      "chat.expandInput",
-      "chat.sendMessage",
-      "chat.voiceStart",
-    ]);
-    // 无内容时展开键是 invisible 占位，不是被条件渲染掉
-    const expand = container.querySelector<HTMLElement>(
-      '[aria-label="chat.expandInput"]',
-    )!;
-    expect(expand.className).toContain("invisible");
+    expect(labels).toEqual(["chat.sendMessage", "chat.voiceStart"]);
   });
 });

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ProviderProfileKey } from "../types";
-import { CornerDownLeft, Maximize2, Minimize2, Square } from "lucide-react";
+import { CornerDownLeft, Square } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { Button } from "./app-button";
 import { VoiceMicButton, type VoiceMicButtonProps } from "./VoiceMicButton";
@@ -23,14 +23,12 @@ export interface ContextStatusDetails {
   tokenSpeedLabel?: string;
 }
 
-/** 卡内右簇：发送 / 停止、麦克风；展开入口浮在卡片右上角，不占编辑宽度。 */
+/** 卡内右簇：发送 / 停止、麦克风。编辑区自行长高，不设展开按钮。 */
 export interface ChatInputBottomBarProps {
   canStop: boolean;
   onStop: () => void;
   isSubmitting: boolean;
   submitDisabled?: boolean;
-  isExpanded?: boolean;
-  onToggleExpand?: () => void;
   /**
    * 草稿是否非空（来自 ChatInput 的 onContentChange）。
    * 必填：漏接线要变成编译错误，而不是静默不显示按钮。
@@ -50,45 +48,15 @@ export function ChatInputBottomBar({
   onStop,
   isSubmitting,
   submitDisabled = false,
-  isExpanded = false,
-  onToggleExpand,
   hasInputContent,
   voice,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
 
   const submitLabel = canStop ? t("chat.stop") : t("chat.sendMessage");
-  const expandLabel = isExpanded
-    ? t("chat.collapseInput")
-    : t("chat.expandInput");
-  const showExpandButton = shouldShowExpandButton(isExpanded, hasInputContent);
 
   return (
     <div className="flex shrink-0 items-center justify-end gap-1">
-      {onToggleExpand && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="iconXs"
-              type="button"
-              onClick={onToggleExpand}
-              aria-label={expandLabel}
-              className={`absolute -top-6 right-2 h-6 w-6 rounded-md text-muted-foreground pointer-events-none opacity-0 transition-opacity hover:bg-hover-surface hover:text-foreground group-hover/composer:pointer-events-auto group-hover/composer:opacity-100 group-focus-within/composer:pointer-events-auto group-focus-within/composer:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 ${
-                showExpandButton ? "" : "invisible"
-              }`}
-            >
-              {isExpanded ? (
-                <Minimize2 className="w-4 h-4" />
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{expandLabel}</TooltipContent>
-        </Tooltip>
-      )}
-
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -119,12 +87,4 @@ export function ChatInputBottomBar({
       <VoiceMicButton {...voice} />
     </div>
   );
-}
-
-/** 有内容时提供展开入口；展开后即使清空草稿也保留收起入口。 */
-export function shouldShowExpandButton(
-  isExpanded: boolean,
-  hasInputContent: boolean,
-): boolean {
-  return isExpanded || hasInputContent;
 }

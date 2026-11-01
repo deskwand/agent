@@ -129,8 +129,6 @@ interface ChatInputProps {
   topSlot?: React.ReactNode;
   /** Persistent settings rendered outside the input card. */
   footerSlot?: React.ReactNode;
-  isExpanded?: boolean;
-  onToggleExpand?: () => void;
   slashMenuDirection?: "up" | "down";
   /** 附件列表变化时上报，供选择器标记「已添加」 */
   onAttachmentsChange?: (files: ChatInputAttachedFile[]) => void;
@@ -173,8 +171,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       leadingSlot,
       topSlot,
       footerSlot,
-      isExpanded = false,
-      onToggleExpand,
       slashMenuDirection,
       onAttachmentsChange,
       draftKey,
@@ -265,13 +261,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       el.style.height = "auto";
       const computedStyle = window.getComputedStyle(el);
       const lineHeight = Number.parseFloat(computedStyle.lineHeight) || 24;
-      const maxHeight = lineHeight * (isExpanded ? 15 : 6);
-      const minHeight = isExpanded ? lineHeight * 5 : 0;
-      const rawHeight = Math.min(el.scrollHeight, maxHeight);
-      const nextHeight = Math.max(rawHeight, minHeight);
+      // 不设展开态：编辑区自己长到 15 行，再多就内部滚动（与 Claude 的输入框同口径）。
+      const maxHeight = lineHeight * 15;
+      const nextHeight = Math.min(el.scrollHeight, maxHeight);
       el.style.height = `${nextHeight}px`;
       el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
-    }, [isExpanded]);
+    }, []);
 
     const getPlainText = useCallback(
       () => serializeEditor(editorRef.current),
@@ -296,7 +291,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       adjustEditorHeight();
     }, [prompt, adjustEditorHeight]);
 
-    // --- 向父组件上报草稿内容（底栏据此决定展开按钮是否可见）---
+    // --- 向父组件上报草稿内容（底栏据此决定发送键是否可见）---
     useEffect(() => {
       onContentChange?.(
         hasInputContent(
@@ -1198,11 +1193,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       }
       // --- end /compact ---
 
-      // Collapse back after submit if expanded
-      if (isExpanded) {
-        onToggleExpand?.();
-      }
-
       onSubmit({
         text: currentPrompt.trim(),
         images: pastedImages,
@@ -1225,8 +1215,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       voiceRecording,
       onSubmit,
       onCompact,
-      isExpanded,
-      onToggleExpand,
     ]);
 
     const handleFormSubmit = (e: React.FormEvent) => {
@@ -1244,7 +1232,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           className="relative w-full"
         >
           {/* Input card wrapper — keeps slash menu outside card div so space-y-* doesn't add margin to textarea */}
-          <div className={`relative ${onToggleExpand ? "pt-6" : ""}`}>
+          <div className="relative">
             {/* Slash command menu */}
             {showSlashMenu && !disabled && (
               <div ref={slashMenuRef}>
@@ -1265,7 +1253,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             {/* Input card */}
             <div
               data-testid="chat-input-card"
-              className={`group/composer relative transition-colors ${isDragging ? "ring-2 ring-primary bg-primary/5" : ""} ${cardClassName}`}
+              className={`transition-colors ${isDragging ? "ring-2 ring-primary bg-primary/5" : ""} ${cardClassName}`}
             >
               <AttachmentTiles tiles={attachmentTiles} />
               {topSlot ? (
@@ -1422,29 +1410,16 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       }
                     }
 
-                    // Esc collapses expanded input (outside slash menu)
-                    if (e.key === "Escape" && isExpanded) {
-                      e.preventDefault();
-                      onToggleExpand?.();
-                      return;
-                    }
-
                     if (e.key === "Enter" && !e.shiftKey) {
                       // Block Enter during IME composition (e.g. pinyin → Chinese).
                       if (isComposingRef.current || e.keyCode === 229) return;
-                      // Expanded mode: Enter = newline, only submit on Cmd/Ctrl+Enter
-                      if (isExpanded && !e.metaKey && !e.ctrlKey) {
-                        e.preventDefault();
-                        document.execCommand("insertLineBreak");
-                        return;
-                      }
                       e.preventDefault();
                       handleSubmitInternal();
                       return;
                     }
                     // Shift+Enter 换行。div 上不拦会插入块级 <div>，破坏单行流，
                     // 所以显式插入 <br>（序列化时换算成 \n）。
-                    if (e.key === "Enter" && e.shiftKey && !isExpanded) {
+                    if (e.key === "Enter" && e.shiftKey) {
                       e.preventDefault();
                       document.execCommand("insertLineBreak");
                     }
@@ -1471,7 +1446,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
  * `/goal` 单独发是合法的。
  *
  * 单一来源：提交门禁、`isEmpty()` 与 `onContentChange` 上报共用它，三者必须永远一致
- * ——「展开按钮可见」与「能否提交」不能互相矛盾。改动此函数即同时改动三者，
+ * ——「发送键可见」与「能否提交」不能互相矛盾。改动此函数即同时改动三者，
  * 这是刻意的：三处对「有没有内容」必须是同一个答案。
  * 但取值来源不完全相同：提交门禁与 `isEmpty()` 读 `getPlainText()`（DOM 是权威来源，
  * state 可能比它旧一帧），`onContentChange` 走 effect 读同一份。判定函数相同，不是同一个值。

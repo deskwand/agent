@@ -92,7 +92,6 @@ function hasUsableProviderConfig(
 export function WelcomeView() {
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
   const { startSession, invoke, isElectron } = useIPC();
   const paneId = usePaneId();
@@ -732,8 +731,6 @@ export function WelcomeView() {
           draftKey={NEW_SESSION_DRAFT_KEY}
           onSubmit={handleSubmit}
           disabled={isSubmitting || showConnectCards}
-          isExpanded={isInputExpanded}
-          onToggleExpand={() => setIsInputExpanded((v) => !v)}
           onContentChange={setHasInputContent}
           onAttachmentsChange={handleAttachmentsChange}
           // 与 ChatView 一致：录音期间编辑器只读、提交被拦。门禁在 ChatInput 自身，
@@ -853,8 +850,6 @@ export function WelcomeView() {
                 onStop={() => {}}
                 isSubmitting={isSubmitting}
                 submitDisabled={voice.status === "recording"}
-                isExpanded={isInputExpanded}
-                onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}
                 voice={toMicButtonProps(
                   voice,
