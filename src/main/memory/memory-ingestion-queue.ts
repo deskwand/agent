@@ -14,4 +14,9 @@ export class MemoryIngestionQueue {
       .catch(() => undefined);
     return next;
   }
+
+  /** 等当前所有任务链 settle（不抛错）；用于删除伙伴前排空后台写入。 */
+  async drain(): Promise<void> {
+    await Promise.allSettled([...this.chains.values()]);
+  }
 }

@@ -3071,6 +3071,8 @@
       "instructionsPlaceholder": "You run the @your_account X account: post 1–2 product updates a day and reply to technical mentions in a friendly, professional tone.",
       "workspace": "Working folder",
       "pickWorkspace": "Choose folder",
+      "autoWorkspace": "Create a dedicated workspace",
+      "resetWorkspace": "Use default",
       "schedule": "Wake schedule",
       "mode": {
         "interval": "Max interval",
@@ -3084,13 +3086,13 @@
       "wakeImmediately": "Wake once right after creating",
       "shuffleAvatar": "Shuffle",
       "create": "Create",
-      "required": "Fill in the name, role and goals, and working folder",
+      "required": "Please fill in the name and role",
       "invalidSchedule": "Invalid schedule: intervals need at least 5 minutes, and daily or weekly needs at least one time"
     },
     "delete": {
       "action": "Delete",
       "title": "Delete \"{{name}}\"?",
-      "alsoSession": "Also delete its session (kept as a regular session by default)",
+      "alsoSession": "Also delete its session, memory and dedicated workspace (kept by default)",
       "confirm": "Delete"
     },
     "bar": {

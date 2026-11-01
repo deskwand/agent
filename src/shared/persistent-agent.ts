@@ -58,7 +58,8 @@ export interface PersistentAgentView extends PersistentAgent {
 export interface PersistentAgentCreateInput {
   name: string;
   instructions: string;
-  cwd: string;
+  /** 省略时由主进程分配伙伴专属工作区。 */
+  cwd?: string;
   schedule: AgentScheduleConfig;
   wakeImmediately: boolean;
   avatarSeed?: string;

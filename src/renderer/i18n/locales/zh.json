@@ -3068,6 +3068,8 @@
       "instructionsPlaceholder": "你负责运营 @your_account 推特号：每天发 1–2 条产品动态，回复技术相关的提及，语气友好专业。",
       "workspace": "工作目录",
       "pickWorkspace": "选择文件夹",
+      "autoWorkspace": "自动创建专属工作区",
+      "resetWorkspace": "恢复默认",
       "schedule": "唤醒周期",
       "mode": { "interval": "最长间隔", "daily": "每天", "weekly": "每周" },
       "every": "每",
@@ -3077,13 +3079,13 @@
       "wakeImmediately": "创建后立即唤醒一次",
       "shuffleAvatar": "换一个",
       "create": "创建",
-      "required": "请填写名称、角色与目标和工作目录",
+      "required": "请填写名称和角色与目标",
       "invalidSchedule": "唤醒周期无效：间隔至少 5 分钟，每天 / 每周至少选一个时间"
     },
     "delete": {
       "action": "删除",
       "title": "删除「{{name}}」？",
-      "alsoSession": "同时删除它的会话（默认保留为普通会话）",
+      "alsoSession": "同时删除它的会话、记忆和专属工作区（默认保留）",
       "confirm": "删除"
     },
     "bar": {

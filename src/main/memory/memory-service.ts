@@ -131,14 +131,18 @@ export class MemoryService {
   private coreStore: CoreMemoryStore | null = null;
   private stateStore: MemorySessionStateStore | null = null;
   private experienceStore: ExperienceMemoryStore | null = null;
+  private readonly storageRootOverride?: string;
 
   constructor(
     private readonly db: DatabaseInstance,
     options?: {
       llmClient?: MemoryLLMClientLike;
       prompts?: Partial<MemoryPromptSet>;
+      /** 显式存储根目录（伙伴记忆用），优先于配置与默认目录。 */
+      storageRoot?: string;
     },
   ) {
+    this.storageRootOverride = options?.storageRoot;
     this.llmClient = options?.llmClient || new MemoryLLMClient();
     const promptSet: MemoryPromptSet = {
       ...DEFAULT_MEMORY_PROMPTS,
@@ -641,7 +645,9 @@ export class MemoryService {
     const configuredRoot =
       this.getAppConfig().memoryRuntime.storageRoot?.trim();
     const storageRoot = path.resolve(
-      configuredRoot || path.join(app.getPath("userData"), "memory"),
+      this.storageRootOverride?.trim() ||
+        configuredRoot ||
+        path.join(app.getPath("userData"), "memory"),
     );
 
     assertSafeMemoryPaths(storageRoot);
@@ -693,5 +699,10 @@ export class MemoryService {
   private getExperienceStore(): ExperienceMemoryStore {
     this.ensureStores();
     return this.experienceStore!;
+  }
+
+  /** 等后台写入/抽取队列排空（不抛错）。 */
+  drain(): Promise<void> {
+    return this.queue.drain();
   }
 }

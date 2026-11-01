@@ -43,7 +43,6 @@ const SEGMENT =
 
 export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
   const { t } = useTranslation();
-  const workingDir = useAppStore((s) => s.workingDir);
   const removeSession = useAppStore((s) => s.removeSession);
   const upsert = usePersistentAgentStore((s) => s.upsert);
   const [name, setName] = useState(agent?.name ?? "");
@@ -51,7 +50,7 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
     () => agent?.avatarSeed ?? crypto.randomUUID(),
   );
   const [instructions, setInstructions] = useState(agent?.instructions ?? "");
-  const [cwd, setCwd] = useState(agent?.cwd ?? workingDir ?? "");
+  const [cwd, setCwd] = useState(agent?.cwd ?? "");
   const [schedule, setSchedule] = useState<AgentScheduleFormState>(
     agent
       ? fromAgentScheduleConfig(agent.schedule)
@@ -74,7 +73,7 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
 
   const save = async () => {
     const config = toAgentScheduleConfig(schedule);
-    if (!name.trim() || !instructions.trim() || !cwd.trim()) {
+    if (!name.trim() || !instructions.trim()) {
       setError(t("persistentAgents.form.required"));
       return;
     }
@@ -95,7 +94,7 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
         : await window.electronAPI.persistentAgents.create({
             name,
             instructions,
-            cwd,
+            ...(cwd ? { cwd } : {}),
             schedule: config,
             wakeImmediately,
             avatarSeed,
@@ -207,19 +206,37 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
               <span className={FIELD_LABEL}>
                 {t("persistentAgents.form.workspace")}
               </span>
-              <Button
-                variant="outline"
-                type="button"
-                // 工作目录绑定在会话上，建好后不能改
-                disabled={Boolean(agent)}
-                onClick={() => void pickFolder()}
-                className="w-full justify-start gap-2 text-xs h-9"
-              >
-                <Folder className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">
-                  {cwd || t("persistentAgents.form.pickWorkspace")}
-                </span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border px-3 text-xs text-foreground">
+                  <Folder className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">
+                    {cwd || t("persistentAgents.form.autoWorkspace")}
+                  </span>
+                </div>
+                {/* 工作目录绑定在会话上，建好后不能改 */}
+                {!agent && (
+                  <>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => void pickFolder()}
+                      className="text-xs h-9"
+                    >
+                      {t("persistentAgents.form.pickWorkspace")}
+                    </Button>
+                    {cwd && (
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={() => setCwd("")}
+                        className="text-xs h-9 px-2 text-muted-foreground"
+                      >
+                        {t("persistentAgents.form.resetWorkspace")}
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <span className={FIELD_LABEL}>

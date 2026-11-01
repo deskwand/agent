@@ -9,7 +9,7 @@ function readProjectFile(relativePath: string): string {
 describe("memory integration wiring", () => {
   it("registers the memory extension in the main process and exposes IPC handlers", () => {
     const mainIndex = readProjectFile("src/main/index.ts");
-    expect(mainIndex).toContain("new MemoryExtension(memoryService)");
+    expect(mainIndex).toContain("new MemoryExtension(memoryService,");
     expect(mainIndex).toContain('"memory.search"');
     expect(mainIndex).toContain('ipcMain.handle("memory.setEnabled"');
     expect(mainIndex).toContain('ipcMain.handle("memory.clearAll"');
@@ -24,7 +24,7 @@ describe("memory integration wiring", () => {
     expect(runner).toContain("this.extensionManager.beforeSessionRun");
     expect(runner).toContain("skillsSignature");
     expect(memoryExtension).toContain(
-      "customTools: this.memoryService.getTools(session.cwd)",
+      "customTools: service.getTools(session.cwd)",
     );
     expect(memoryExtension).toContain("systemPromptSuffix");
   });

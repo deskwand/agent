@@ -127,4 +127,87 @@ describe("MemoryExtension", () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  describe("teammate routing", () => {
+    function mockService(enabled = true) {
+      return {
+        isEnabled: () => enabled,
+        getTools: vi.fn(() => []),
+        enqueueIngestion: vi.fn(async () => {}),
+        deleteSession: vi.fn(async () => {}),
+      };
+    }
+    function setup(agentId: string | null, globalEnabled = true) {
+      const teammate = mockService();
+      const global = mockService(globalEnabled);
+      const getForAgent = vi.fn(() => teammate);
+      const ext = new MemoryExtension(global as unknown as MemoryService, {
+        registry: {
+          getForAgent: getForAgent as unknown as () => MemoryService,
+        },
+        resolveAgentId: () => agentId,
+      });
+      return { teammate, global, getForAgent, ext };
+    }
+    const beforeCtx = (session: Record<string, unknown>) => ({
+      session: session as never,
+      prompt: "x",
+      existingMessages: [],
+      isColdStart: true,
+    });
+
+    it("routes agent sessions to the teammate service", async () => {
+      const { teammate, global, ext } = setup("a1");
+      await ext.beforeSessionRun!(
+        beforeCtx({ ...createSession(), kind: "agent", cwd: "/w" }),
+      );
+      expect(teammate.getTools).toHaveBeenCalledWith("/w");
+      expect(global.getTools).not.toHaveBeenCalled();
+    });
+
+    it("gives an orphaned agent session no memory at all", async () => {
+      const { teammate, global, ext } = setup(null);
+      const session = { ...createSession(), kind: "agent" as const };
+      expect(await ext.beforeSessionRun!(beforeCtx(session))).toBeUndefined();
+      await ext.afterSessionRun({ session, prompt: "x", messages: [] });
+      expect(teammate.enqueueIngestion).not.toHaveBeenCalled();
+      expect(global.enqueueIngestion).not.toHaveBeenCalled();
+    });
+
+    it("enables teammate memory even when session.memoryEnabled is false", async () => {
+      const { teammate, ext } = setup("a1");
+      const session = {
+        ...createSession(),
+        kind: "agent" as const,
+        memoryEnabled: false,
+      };
+      const result = await ext.beforeSessionRun!(beforeCtx(session));
+      expect(result?.customTools).toBeDefined();
+      await ext.afterSessionRun({ session, prompt: "x", messages: [] });
+      expect(teammate.enqueueIngestion).toHaveBeenCalledTimes(1);
+      const arg = (
+        teammate.enqueueIngestion.mock.calls as unknown as Array<
+          [{ session: { memoryEnabled: boolean } }]
+        >
+      )[0][0];
+      expect(arg.session.memoryEnabled).toBe(true);
+    });
+
+    it("disables teammate memory when the global switch is off", async () => {
+      const { teammate, ext } = setup("a1", false);
+      const session = { ...createSession(), kind: "agent" as const };
+      expect(await ext.beforeSessionRun!(beforeCtx(session))).toBeUndefined();
+      await ext.afterSessionRun({ session, prompt: "x", messages: [] });
+      expect(teammate.enqueueIngestion).not.toHaveBeenCalled();
+    });
+
+    it("keeps ordinary sessions on the global service", async () => {
+      const { global, getForAgent, ext } = setup("a1");
+      await ext.beforeSessionRun!(
+        beforeCtx({ ...createSession(), kind: "ordinary" }),
+      );
+      expect(global.getTools).toHaveBeenCalled();
+      expect(getForAgent).not.toHaveBeenCalled();
+    });
+  });
 });

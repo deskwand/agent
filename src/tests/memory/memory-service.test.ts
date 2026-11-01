@@ -1028,4 +1028,22 @@ describe("MemoryService", () => {
       ),
     ).toBe(false);
   });
+
+  it("writes stores under an explicit storageRoot, ignoring config", async () => {
+    const root = path.join(storageRoot, "teammate-a");
+    const svc = new MemoryService(db, {
+      llmClient: new MockMemoryLLMClient(),
+      storageRoot: root,
+    });
+    await svc.upsertCoreMemory("preferences", "lang", "zh");
+    expect(fs.existsSync(path.join(root, "core_memory.json"))).toBe(true);
+    expect(service.getCoreMemoryRaw()).toEqual({});
+  });
+
+  it("rejects a filesystem-root storageRoot", () => {
+    const svc = new MemoryService(db, {
+      storageRoot: path.parse(process.cwd()).root,
+    });
+    expect(() => svc.getCoreMemoryRaw()).toThrow(/filesystem root/);
+  });
 });

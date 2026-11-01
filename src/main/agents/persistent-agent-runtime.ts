@@ -10,7 +10,10 @@ import type { SessionManager } from "../session/session-manager";
 import type { ServerEvent } from "../../renderer/types";
 import { MAX_CONSECUTIVE_FAILURES } from "../../shared/persistent-agent";
 import { logError } from "../utils/logger";
-import { PersistentAgentManager } from "./persistent-agent-manager";
+import {
+  PersistentAgentManager,
+  type TeammateStoragePort,
+} from "./persistent-agent-manager";
 import { createPersistentAgentStore } from "./persistent-agent-store";
 
 export interface PersistentAgentRuntimeDeps {
@@ -18,6 +21,7 @@ export interface PersistentAgentRuntimeDeps {
   sessionManager: SessionManager;
   sendToRenderer: (event: ServerEvent) => void;
   checkWorkspace: (cwd: string) => string | null;
+  storage: TeammateStoragePort;
 }
 
 export function createPersistentAgentRuntime(
@@ -27,6 +31,7 @@ export function createPersistentAgentRuntime(
   return new PersistentAgentManager({
     store: createPersistentAgentStore(deps.db),
     checkWorkspace: deps.checkWorkspace,
+    storage: deps.storage,
     sessions: {
       createAgentSession: (name, cwd) =>
         sessionManager.createSessionRecord(name, cwd, { kind: "agent" }).id,

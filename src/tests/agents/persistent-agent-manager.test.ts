@@ -7,7 +7,7 @@ import {
   vi,
   type Mock,
 } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeDatabase, initDatabase } from "../../main/db/database";
@@ -21,6 +21,11 @@ import {
   type AgentSessionPort,
   type PersistentAgentEvent,
 } from "../../main/agents/persistent-agent-manager";
+import { createTeammateStorage } from "../../main/agents/teammate-storage";
+import {
+  getTeammateRoot,
+  getTeammateWorkspace,
+} from "../../main/agents/teammate-paths";
 import type {
   AgentScheduleConfig,
   PersistentAgentCreateInput,
@@ -44,6 +49,8 @@ let sessions: AgentSessionPort & {
 };
 let manager: PersistentAgentManager;
 let sessionSeq: number;
+let createdSessions: { name: string; cwd: string }[];
+let memoryDispose: Mock<(agentId: string) => Promise<void>>;
 
 function input(
   overrides: Partial<PersistentAgentCreateInput> = {},
@@ -76,8 +83,11 @@ beforeEach(() => {
   events = [];
   workspaceError = null;
   sessionSeq = 0;
+  createdSessions = [];
+  memoryDispose = vi.fn(async () => {});
   sessions = {
-    createAgentSession: () => {
+    createAgentSession: (name, cwd) => {
+      createdSessions.push({ name, cwd });
       sessionSeq += 1;
       const id = `s${sessionSeq}`;
       existing.add(id);
@@ -95,6 +105,7 @@ beforeEach(() => {
   manager = new PersistentAgentManager({
     store,
     sessions,
+    storage: createTeammateStorage(dir, { dispose: memoryDispose }),
     checkWorkspace: () => workspaceError,
     onEvent: (event) => events.push(event),
     now: () => clock,
@@ -280,6 +291,7 @@ describe("PersistentAgentManager", () => {
     const restarted = new PersistentAgentManager({
       store,
       sessions,
+      storage: createTeammateStorage(dir, { dispose: memoryDispose }),
       checkWorkspace: () => null,
       onEvent: () => undefined,
       now: () => clock,
@@ -298,6 +310,7 @@ describe("PersistentAgentManager", () => {
     const restarted = new PersistentAgentManager({
       store,
       sessions,
+      storage: createTeammateStorage(dir, { dispose: memoryDispose }),
       checkWorkspace: () => null,
       onEvent: () => undefined,
       now: () => clock,
@@ -334,6 +347,7 @@ describe("PersistentAgentManager", () => {
     const restarted = new PersistentAgentManager({
       store,
       sessions,
+      storage: createTeammateStorage(dir, { dispose: memoryDispose }),
       checkWorkspace: () => null,
       onEvent: (event) => seen.push(event),
       now: () => clock,
@@ -480,5 +494,58 @@ describe("PersistentAgentManager adaptive wakeup", () => {
     manager.pause(agent.id);
     manager.resume(agent.id);
     expect(manager.get(agent.id)!.nextCheckInAt).toBeNull();
+  });
+
+  it("creates a managed workspace when cwd is omitted", async () => {
+    const view = await manager.create(input({ cwd: undefined }));
+    const ws = getTeammateWorkspace(dir, view.id);
+    expect(view.cwd).toBe(ws);
+    expect(existsSync(ws)).toBe(true);
+    expect(createdSessions.at(-1)?.cwd).toBe(ws);
+  });
+
+  it("uses the given cwd without creating a workspace", async () => {
+    const view = await manager.create(input({ cwd: "/tmp/agent" }));
+    expect(view.cwd).toBe("/tmp/agent");
+    expect(existsSync(getTeammateRoot(dir, view.id))).toBe(false);
+  });
+
+  it("treats a blank cwd as omitted", async () => {
+    const view = await manager.create(input({ cwd: "  " }));
+    expect(view.cwd).toBe(getTeammateWorkspace(dir, view.id));
+    expect(existsSync(view.cwd)).toBe(true);
+  });
+
+  it("recreates a missing managed workspace before waking", async () => {
+    const view = await manager.create(input({ cwd: undefined }));
+    rmSync(view.cwd, { recursive: true });
+    await manager.wakeNow(view.id);
+    expect(existsSync(view.cwd)).toBe(true);
+    expect(prompts.at(-1)?.sessionId).toBe(view.sessionId);
+  });
+
+  it("deleteSession:true removes the teammate dir after disposing memory", async () => {
+    const view = await manager.create(input({ cwd: undefined }));
+    await manager.delete(view.id, { deleteSession: true });
+    await vi.waitFor(() =>
+      expect(existsSync(getTeammateRoot(dir, view.id))).toBe(false),
+    );
+    expect(memoryDispose).toHaveBeenCalledWith(view.id);
+  });
+
+  it("deleteSession:true keeps an external cwd", async () => {
+    const ext = mkdtempSync(join(tmpdir(), "ext-"));
+    const view = await manager.create(input({ cwd: ext }));
+    await manager.delete(view.id, { deleteSession: true });
+    await vi.waitFor(() => expect(memoryDispose).toHaveBeenCalled());
+    expect(existsSync(ext)).toBe(true);
+    rmSync(ext, { recursive: true, force: true });
+  });
+
+  it("deleteSession:false removes nothing", async () => {
+    const view = await manager.create(input({ cwd: undefined }));
+    await manager.delete(view.id, { deleteSession: false });
+    expect(existsSync(view.cwd)).toBe(true);
+    expect(memoryDispose).not.toHaveBeenCalled();
   });
 });

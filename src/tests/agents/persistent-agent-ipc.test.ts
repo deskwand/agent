@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { registerPersistentAgentIpc } from "../../main/agents/persistent-agent-ipc";
 import type { PersistentAgentManager } from "../../main/agents/persistent-agent-manager";
 
 type Handler = (event: unknown, ...args: unknown[]) => unknown;
 
-function register(manager: PersistentAgentManager | null, workspace = null) {
+function register(
+  manager: PersistentAgentManager | null,
+  workspace: string | null = null,
+  checkWorkspace: (cwd: string) => string | null = () => workspace,
+) {
   const handlers = new Map<string, Handler>();
   registerPersistentAgentIpc({
     ipcMain: {
@@ -13,7 +17,7 @@ function register(manager: PersistentAgentManager | null, workspace = null) {
       },
     } as never,
     getManager: () => manager,
-    checkWorkspace: () => workspace,
+    checkWorkspace,
   });
   return handlers;
 }
@@ -54,5 +58,34 @@ describe("registerPersistentAgentIpc", () => {
         wakeImmediately: false,
       }),
     ).toThrow("Name is required");
+  });
+
+  it("skips workspace validation on create when cwd is omitted", async () => {
+    const create = vi.fn(async () => ({ id: "a1" }));
+    const check = vi.fn(() => "bad");
+    const handlers = register({ create } as never, null, check);
+    await handlers.get("persistentAgents.create")!(null, {
+      name: "n",
+      instructions: "x",
+      schedule: { kind: "interval", every: 30, unit: "minute" },
+      wakeImmediately: false,
+    });
+    expect(check).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalled();
+  });
+
+  it("still validates a given cwd on create", () => {
+    const create = vi.fn();
+    const handlers = register({ create } as never, "bad");
+    expect(() =>
+      handlers.get("persistentAgents.create")!(null, {
+        name: "n",
+        instructions: "x",
+        cwd: "/nope",
+        schedule: { kind: "interval", every: 30, unit: "minute" },
+        wakeImmediately: false,
+      }),
+    ).toThrow("bad");
+    expect(create).not.toHaveBeenCalled();
   });
 });

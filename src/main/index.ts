@@ -56,11 +56,13 @@ import { createPetImageActions } from "./desktop-pet/pet-image-actions";
 import { PET_IMAGE_ERROR_KEYS } from "./desktop-pet/pet-image";
 import { SkillsManager, validateSkillName } from "./skills/skills-manager";
 import { MemoryService } from "./memory/memory-service";
+import { TeammateMemoryRegistry } from "./memory/teammate-memory-registry";
 import { IdeaService } from "./ideas/idea-service";
 import { IdeasExtension } from "./ideas/ideas-extension";
 import { PersistentAgentExtension } from "./agents/persistent-agent-extension";
 import type { PersistentAgentManager } from "./agents/persistent-agent-manager";
 import { createPersistentAgentRuntime } from "./agents/persistent-agent-runtime";
+import { createTeammateStorage } from "./agents/teammate-storage";
 import { registerPersistentAgentIpc } from "./agents/persistent-agent-ipc";
 import type {
   IdeaCreateInput,
@@ -1249,9 +1251,17 @@ app
     const db = initDatabase();
 
     memoryService = new MemoryService(db);
+    const teammateMemory = new TeammateMemoryRegistry(
+      db,
+      app.getPath("userData"),
+    );
     ideaService = new IdeaService();
     const extensionManager = new AgentRuntimeExtensionManager([
-      new MemoryExtension(memoryService),
+      new MemoryExtension(memoryService, {
+        registry: teammateMemory,
+        resolveAgentId: (sessionId) =>
+          persistentAgentManager?.findBySessionId(sessionId)?.id ?? null,
+      }),
       new GoalExtension(db),
       new IdeasExtension(ideaService),
       new PersistentAgentExtension(() => persistentAgentManager),
@@ -1525,6 +1535,7 @@ app
       sessionManager,
       sendToRenderer,
       checkWorkspace: getWorkspacePathUnsupportedReason,
+      storage: createTeammateStorage(app.getPath("userData"), teammateMemory),
     });
     persistentAgentManager.start();
 

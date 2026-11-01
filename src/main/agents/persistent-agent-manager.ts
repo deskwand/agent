@@ -48,6 +48,14 @@ export interface AgentSessionPort {
   deleteSession(sessionId: string): Promise<void>;
 }
 
+export interface TeammateStoragePort {
+  /** mkdir -p 专属工作区并返回其路径。 */
+  ensureWorkspace(agentId: string): string;
+  isManagedWorkspace(agent: { id: string; cwd: string }): boolean;
+  /** 等记忆写完后删除 teammates/<id>/ 整个目录。 */
+  removeAgentData(agentId: string): Promise<void>;
+}
+
 export type PersistentAgentEvent =
   | { type: "updated"; agent: PersistentAgentView }
   | { type: "removed"; agentId: string }
@@ -56,6 +64,7 @@ export type PersistentAgentEvent =
 export interface PersistentAgentManagerOptions {
   store: PersistentAgentStore;
   sessions: AgentSessionPort;
+  storage: TeammateStoragePort;
   /** 返回工作目录不可用的原因；可用时返回 null。 */
   checkWorkspace: (cwd: string) => string | null;
   onEvent: (event: PersistentAgentEvent) => void;
@@ -103,6 +112,7 @@ function nextPeriodicFrom(
 export class PersistentAgentManager {
   private readonly store: PersistentAgentStore;
   private readonly sessions: AgentSessionPort;
+  private readonly storage: TeammateStoragePort;
   private readonly checkWorkspace: (cwd: string) => string | null;
   private readonly onEvent: (event: PersistentAgentEvent) => void;
   private readonly now: () => number;
@@ -115,6 +125,7 @@ export class PersistentAgentManager {
   constructor(options: PersistentAgentManagerOptions) {
     this.store = options.store;
     this.sessions = options.sessions;
+    this.storage = options.storage;
     this.checkWorkspace = options.checkWorkspace;
     this.onEvent = options.onEvent;
     this.now = options.now ?? (() => Date.now());
@@ -157,12 +168,14 @@ export class PersistentAgentManager {
     input: PersistentAgentCreateInput,
   ): Promise<PersistentAgentView> {
     const now = this.now();
-    const sessionId = this.sessions.createAgentSession(input.name, input.cwd);
+    const id = uuidv4();
+    const cwd = input.cwd?.trim() || this.storage.ensureWorkspace(id);
+    const sessionId = this.sessions.createAgentSession(input.name, cwd);
     const agent: PersistentAgent = {
-      id: uuidv4(),
+      id,
       name: input.name,
       instructions: input.instructions,
-      cwd: input.cwd,
+      cwd,
       sessionId,
       avatarSeed: input.avatarSeed?.trim() || uuidv4(),
       schedule: input.schedule,
@@ -222,6 +235,9 @@ export class PersistentAgentManager {
     this.store.delete(id);
     if (options.deleteSession) {
       await this.sessions.deleteSession(agent.sessionId);
+      void this.storage
+        .removeAgentData(id)
+        .catch((e) => logError("[PersistentAgents] remove data failed:", e));
     } else if (this.sessions.sessionExists(agent.sessionId)) {
       this.sessions.releaseSession(agent.sessionId);
     }
@@ -238,9 +254,13 @@ export class PersistentAgentManager {
   resume(id: string): PersistentAgentView | null {
     const agent = this.store.get(id);
     if (!agent) return null;
-    const sessionId = this.sessions.sessionExists(agent.sessionId)
-      ? agent.sessionId
-      : this.sessions.createAgentSession(agent.name, agent.cwd);
+    let sessionId = agent.sessionId;
+    if (!this.sessions.sessionExists(sessionId)) {
+      if (this.storage.isManagedWorkspace(agent)) {
+        this.storage.ensureWorkspace(agent.id);
+      }
+      sessionId = this.sessions.createAgentSession(agent.name, agent.cwd);
+    }
     this.store.update(id, {
       enabled: true,
       sessionId,
@@ -545,7 +565,15 @@ export class PersistentAgentManager {
       this.onSessionLost(agent.sessionId);
       return;
     }
-    const unavailable = this.checkWorkspace(agent.cwd);
+    let unavailable: string | null;
+    try {
+      if (this.storage.isManagedWorkspace(agent)) {
+        this.storage.ensureWorkspace(agent.id);
+      }
+      unavailable = this.checkWorkspace(agent.cwd);
+    } catch (error) {
+      unavailable = error instanceof Error ? error.message : String(error);
+    }
     if (unavailable) {
       this.store.update(id, { lastError: unavailable });
       this.arm(id);

@@ -177,7 +177,6 @@ describe("AgentEditModal", () => {
   });
 
   it("creates an agent with the default schedule and immediate wakeup", async () => {
-    useAppStore.setState({ workingDir: "/tmp/work" });
     api.create.mockResolvedValue(view("9"));
     const onClose = vi.fn();
     act(() => root.render(<AgentEditModal onClose={onClose} />));
@@ -191,7 +190,6 @@ describe("AgentEditModal", () => {
     expect(api.create).toHaveBeenCalledWith({
       name: "推特运营",
       instructions: "运营推特号",
-      cwd: "/tmp/work",
       schedule: { kind: "interval", every: 30, unit: "minute" },
       wakeImmediately: true,
       avatarSeed: expect.any(String),
@@ -200,7 +198,6 @@ describe("AgentEditModal", () => {
   });
 
   it("shuffles the avatar and saves the new seed", async () => {
-    useAppStore.setState({ workingDir: "/tmp/work" });
     api.create.mockResolvedValue(view("9"));
     const uuid = vi
       .spyOn(crypto, "randomUUID")
@@ -225,6 +222,68 @@ describe("AgentEditModal", () => {
       }),
     );
     uuid.mockRestore();
+  });
+
+  it("defaults to an auto workspace and submits without cwd", async () => {
+    api.create.mockResolvedValue(view("9"));
+    act(() => root.render(<AgentEditModal onClose={() => undefined} />));
+    await flush();
+    expect(document.body.textContent).toContain("自动创建专属工作区");
+    act(() => {
+      setInput(document.querySelector("#agent-name")!, "n");
+      setInput(document.querySelector("#agent-instructions")!, "i");
+    });
+    act(() => button("创建").click());
+    await flush();
+    expect(api.create).toHaveBeenCalledWith(
+      expect.not.objectContaining({ cwd: expect.anything() }),
+    );
+  });
+
+  it("submits the picked folder as cwd", async () => {
+    api.create.mockResolvedValue(view("9"));
+    const invoke = vi.fn().mockResolvedValue("/repo");
+    (
+      window as unknown as { electronAPI: { invoke: unknown } }
+    ).electronAPI.invoke = invoke;
+    act(() => root.render(<AgentEditModal onClose={() => undefined} />));
+    await flush();
+    act(() => button("选择文件夹").click());
+    await flush();
+    expect(document.body.textContent).toContain("/repo");
+    act(() => {
+      setInput(document.querySelector("#agent-name")!, "n");
+      setInput(document.querySelector("#agent-instructions")!, "i");
+    });
+    act(() => button("创建").click());
+    await flush();
+    expect(api.create).toHaveBeenCalledWith(
+      expect.objectContaining({ cwd: "/repo" }),
+    );
+  });
+
+  it("returns to the auto workspace after picking a folder and resetting", async () => {
+    api.create.mockResolvedValue(view("9"));
+    const invoke = vi.fn().mockResolvedValue("/repo");
+    (
+      window as unknown as { electronAPI: { invoke: unknown } }
+    ).electronAPI.invoke = invoke;
+    act(() => root.render(<AgentEditModal onClose={() => undefined} />));
+    await flush();
+    act(() => button("选择文件夹").click());
+    await flush();
+    act(() => button("恢复默认").click());
+    await flush();
+    expect(document.body.textContent).toContain("自动创建专属工作区");
+    act(() => {
+      setInput(document.querySelector("#agent-name")!, "n");
+      setInput(document.querySelector("#agent-instructions")!, "i");
+    });
+    act(() => button("创建").click());
+    await flush();
+    expect(api.create).toHaveBeenCalledWith(
+      expect.not.objectContaining({ cwd: expect.anything() }),
+    );
   });
 
   it("cancel after shuffle keeps the old seed", async () => {

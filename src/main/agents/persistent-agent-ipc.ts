@@ -43,7 +43,7 @@ export function registerPersistentAgentIpc({
       const manager = requireManager();
       assertText(input.name ?? "", "Name");
       assertText(input.instructions ?? "", "Instructions");
-      assertWorkspace(input.cwd);
+      if (input.cwd?.trim()) assertWorkspace(input.cwd);
       return manager.create({
         ...input,
         name: input.name.trim(),
