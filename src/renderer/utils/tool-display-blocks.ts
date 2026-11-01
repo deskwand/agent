@@ -36,6 +36,8 @@ export interface ProcessSummary {
   ideaLookupCount?: number;
   /** 记录想法的次数（`idea_add`）。 */
   ideaAddedCount?: number;
+  /** 常驻智能体安排 / 取消唤醒的次数（`schedule_wakeup` + `cancel_wakeup`）。 */
+  wakeupCount?: number;
 }
 
 export interface ResultSummary {
@@ -225,6 +227,7 @@ function buildProcessSummary(
   let voiceChangeCount = 0;
   let ideaLookupCount = 0;
   let ideaAddedCount = 0;
+  let wakeupCount = 0;
   let todoUpdateCount = 0;
   let scriptCount = 0;
   let calledRead = false;
@@ -343,6 +346,10 @@ function buildProcessSummary(
       ideaAddedCount += 1;
       countedAsSpecific = true;
     }
+    if (lower === "schedule_wakeup" || lower === "cancel_wakeup") {
+      wakeupCount += 1;
+      countedAsSpecific = true;
+    }
     if (!countedAsSpecific) {
       usedToolCount += 1;
     }
@@ -371,6 +378,7 @@ function buildProcessSummary(
     calledSearch,
     ideaLookupCount,
     ideaAddedCount,
+    wakeupCount,
   };
 }
 
@@ -666,7 +674,8 @@ export type ProcessSummaryFragment = {
     | "tasklist"
     | "tts"
     | "tool"
-    | "ideas";
+    | "ideas"
+    | "wakeup";
 };
 
 export function getProcessSummaryFragments(
@@ -741,6 +750,13 @@ export function getProcessSummaryFragments(
     fragments.push({
       text: t(pluralKey("tool.grouped.savedIdeas", count), { count }),
       iconType: "ideas",
+    });
+  }
+  if ((summary.wakeupCount ?? 0) > 0) {
+    const count = summary.wakeupCount ?? 0;
+    fragments.push({
+      text: t(pluralKey("tool.grouped.scheduledWakeups", count), { count }),
+      iconType: "wakeup",
     });
   }
   if (summary.commandCount > 0) {

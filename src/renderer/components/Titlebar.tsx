@@ -21,6 +21,7 @@ import { FeedListenButton } from "./FeedListenButton";
 import { Button } from "./app-button";
 import { useIsGitRepo } from "../hooks/use-is-git-repo";
 import { WorkspaceChip } from "./WorkspaceChip";
+import { AgentSessionBar } from "./agents/AgentSessionBar";
 
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin";
@@ -176,6 +177,9 @@ export function Titlebar() {
           <span className="titlebar-no-drag min-w-0 max-w-[40%]">
             <WorkspaceChip cwd={activeSessionCwd ?? null} />
           </span>
+        ) : null}
+        {showSessionHeader && activeSessionId ? (
+          <AgentSessionBar sessionId={activeSessionId} />
         ) : null}
       </div>
 

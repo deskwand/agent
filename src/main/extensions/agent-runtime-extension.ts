@@ -21,6 +21,8 @@ export interface AfterSessionRunContext {
   session: Session;
   prompt: string;
   messages: Message[];
+  /** 本轮结果：runner 内部吞掉的模型错误只体现在这里（不会走 onSessionRunError）。 */
+  outcome?: "success" | "failure" | "cancelled" | "unknown";
 }
 
 export interface AfterSessionRunResult {

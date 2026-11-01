@@ -88,6 +88,8 @@ export function buildSidebarSessionGroups(
 
   for (const session of sessions) {
     if (session.archived) continue;
+    // 常驻智能体的会话只从「智能体」分组进入
+    if (session.kind === "agent") continue;
     if (!isProjectSession(session)) {
       if (
         !normalizedQuery ||

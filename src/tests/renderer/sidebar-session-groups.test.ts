@@ -438,3 +438,25 @@ describe("listWorkspaceProjects", () => {
     ]);
   });
 });
+
+describe("persistent agent sessions", () => {
+  it("keeps agent sessions out of every sidebar group", () => {
+    const groups = buildSidebarSessionGroups(
+      [
+        session("plain"),
+        session("agent", { kind: "agent" }),
+        session("agent-project", {
+          kind: "agent",
+          isProjectMode: true,
+          cwd: "/work/alpha",
+        }),
+      ],
+      "",
+    );
+    const ids = [
+      ...groups.unscopedSessions,
+      ...groups.projectGroups.flatMap((group) => group.sessions),
+    ].map((s) => s.id);
+    expect(ids).toEqual(["plain"]);
+  });
+});

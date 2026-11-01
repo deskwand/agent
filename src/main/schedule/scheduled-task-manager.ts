@@ -17,6 +17,14 @@ import {
 } from "../../shared/schedule/task-title";
 import { getLocale } from "../i18n";
 import { log, logError } from "../utils/logger";
+import {
+  MAX_TIMER_DELAY_MS,
+  computeNextRunAt,
+  isRepeatingRule,
+  normalizeRepeatEvery,
+  normalizeRepeatUnit,
+  normalizeScheduleConfig,
+} from "./schedule-rules";
 
 export type ScheduleRepeatUnit = "minute" | "hour" | "day";
 export type ScheduledTaskWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -92,8 +100,6 @@ export interface ScheduledTaskStore {
 export interface ScheduledTaskRunResult {
   sessionId: string;
 }
-
-const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 interface ScheduledTaskExecutionRecord {
   success: boolean;
@@ -245,7 +251,7 @@ export class ScheduledTaskManager {
   toggle(id: string, enabled: boolean): ScheduledTask | null {
     const current = this.store.get(id);
     if (!current) return null;
-    if (enabled && !isRepeatingTask(current)) {
+    if (enabled && !isRepeatingRule(current)) {
       const oneTimeRunAt = current.nextRunAt ?? current.runAt;
       if (oneTimeRunAt <= this.now()) {
         throw new Error(
@@ -342,7 +348,7 @@ export class ScheduledTaskManager {
       return task;
     }
 
-    if (isRepeatingTask(task)) {
+    if (isRepeatingRule(task)) {
       const nextRunAt = computeNextRunAt(task, this.now());
       if (nextRunAt !== null) {
         const updated = this.store.update(task.id, {
@@ -366,7 +372,7 @@ export class ScheduledTaskManager {
 
   private computeToggleNextRunAt(task: ScheduledTask): number {
     const now = this.now();
-    if (isRepeatingTask(task)) {
+    if (isRepeatingRule(task)) {
       const nextRunAt = computeNextRunAt(task, now);
       if (nextRunAt !== null) {
         return nextRunAt;
@@ -414,172 +420,4 @@ export class ScheduledTaskManager {
       this.timers.delete(taskId);
     }
   }
-}
-
-function normalizeRepeatEvery(value: number | null | undefined): number | null {
-  if (typeof value !== "number") return null;
-  if (!Number.isFinite(value)) return null;
-  const normalized = Math.floor(value);
-  if (normalized <= 0) return null;
-  return normalized;
-}
-
-function normalizeRepeatUnit(
-  value: ScheduleRepeatUnit | null | undefined,
-): ScheduleRepeatUnit | null {
-  if (value === "minute" || value === "hour" || value === "day") {
-    return value;
-  }
-  return null;
-}
-
-function normalizeScheduleConfig(
-  value: ScheduledTaskScheduleConfig | null | undefined,
-): ScheduledTaskScheduleConfig | null {
-  if (!value) {
-    return null;
-  }
-  if (value.kind === "daily") {
-    const times = normalizeScheduleTimes(value.times);
-    if (times.length === 0) {
-      return null;
-    }
-    return { kind: "daily", times };
-  }
-  if (value.kind === "weekly") {
-    const times = normalizeScheduleTimes(value.times);
-    const weekdays = normalizeWeekdays(value.weekdays);
-    if (times.length === 0 || weekdays.length === 0) {
-      return null;
-    }
-    return { kind: "weekly", weekdays, times };
-  }
-  return null;
-}
-
-function isRepeatingTask(task: ScheduledTask): boolean {
-  return (
-    task.scheduleConfig !== null || Boolean(task.repeatEvery && task.repeatUnit)
-  );
-}
-
-function computeNextRunAt(task: ScheduledTask, now: number): number | null {
-  if (task.scheduleConfig) {
-    return computeNextRunAtFromScheduleConfig(task.scheduleConfig, now);
-  }
-  const intervalMs = getIntervalMs(task.repeatEvery, task.repeatUnit);
-  if (intervalMs === null) return null;
-  const nextBase = task.nextRunAt ?? task.runAt;
-  if (!Number.isFinite(nextBase)) return null;
-  if (nextBase > now) return nextBase;
-  const skippedIntervals = Math.floor((now - nextBase) / intervalMs) + 1;
-  return nextBase + skippedIntervals * intervalMs;
-}
-
-function getIntervalMs(
-  repeatEvery: number | null,
-  repeatUnit: ScheduleRepeatUnit | null,
-): number | null {
-  if (!repeatEvery || !repeatUnit) return null;
-  if (repeatUnit === "minute") return repeatEvery * 60 * 1000;
-  if (repeatUnit === "hour") return repeatEvery * 60 * 60 * 1000;
-  return repeatEvery * 24 * 60 * 60 * 1000;
-}
-
-function normalizeScheduleTimes(times: string[]): string[] {
-  if (!Array.isArray(times)) {
-    return [];
-  }
-  const validTimes = Array.from(
-    new Set(times.filter((time) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(time))),
-  );
-  return validTimes.sort((left, right) => compareTimeStrings(left, right));
-}
-
-function normalizeWeekdays(days: number[]): ScheduledTaskWeekday[] {
-  if (!Array.isArray(days)) {
-    return [];
-  }
-  const normalized = Array.from(
-    new Set(
-      days.filter(
-        (day): day is ScheduledTaskWeekday =>
-          Number.isInteger(day) && day >= 0 && day <= 6,
-      ),
-    ),
-  );
-  return normalized.sort((left, right) => left - right);
-}
-
-function compareTimeStrings(left: string, right: string): number {
-  return toTimeMinutes(left) - toTimeMinutes(right);
-}
-
-function toTimeMinutes(value: string): number {
-  const [hour, minute] = value.split(":").map(Number);
-  return hour * 60 + minute;
-}
-
-function computeNextRunAtFromScheduleConfig(
-  scheduleConfig: ScheduledTaskScheduleConfig,
-  now: number,
-): number | null {
-  if (scheduleConfig.kind === "daily") {
-    return findNextScheduledSlot(now, scheduleConfig.times);
-  }
-  return findNextScheduledSlot(
-    now,
-    scheduleConfig.times,
-    scheduleConfig.weekdays,
-  );
-}
-
-function findNextScheduledSlot(
-  now: number,
-  times: string[],
-  weekdays?: ScheduledTaskWeekday[],
-): number | null {
-  const normalizedTimes = normalizeScheduleTimes(times);
-  if (normalizedTimes.length === 0) {
-    return null;
-  }
-  const allowedWeekdays = weekdays
-    ? new Set(normalizeWeekdays(weekdays))
-    : null;
-  const nowDate = new Date(now);
-
-  for (let dayOffset = 0; dayOffset <= 14; dayOffset += 1) {
-    const candidateDate = new Date(
-      nowDate.getFullYear(),
-      nowDate.getMonth(),
-      nowDate.getDate() + dayOffset,
-      0,
-      0,
-      0,
-      0,
-    );
-    if (
-      allowedWeekdays &&
-      !allowedWeekdays.has(candidateDate.getDay() as ScheduledTaskWeekday)
-    ) {
-      continue;
-    }
-    for (const time of normalizedTimes) {
-      const [hour, minute] = time.split(":").map(Number);
-      const candidate = new Date(
-        candidateDate.getFullYear(),
-        candidateDate.getMonth(),
-        candidateDate.getDate(),
-        hour,
-        minute,
-        0,
-        0,
-      ).getTime();
-      if (candidate > now) {
-        return candidate;
-      }
-    }
-  }
-
-  return null;
 }

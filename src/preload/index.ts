@@ -20,6 +20,12 @@ import type {
 } from "../renderer/types";
 import type { FeedBodyPayload, FeedSnapshot } from "../shared/feed";
 import type {
+  PersistentAgentCreateInput,
+  PersistentAgentUpdateInput,
+  PersistentAgentView,
+  PersistentAgentWakeup,
+} from "../shared/persistent-agent";
+import type {
   IdeaCreateInput,
   IdeaList,
   IdeaStatus,
@@ -838,6 +844,33 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("schedule.runNow", id),
   },
 
+  persistentAgents: {
+    list: (): Promise<PersistentAgentView[]> =>
+      ipcRenderer.invoke("persistentAgents.list"),
+    create: (input: PersistentAgentCreateInput): Promise<PersistentAgentView> =>
+      ipcRenderer.invoke("persistentAgents.create", input),
+    update: (
+      id: string,
+      patch: PersistentAgentUpdateInput,
+    ): Promise<PersistentAgentView | null> =>
+      ipcRenderer.invoke("persistentAgents.update", id, patch),
+    delete: (
+      id: string,
+      options: { deleteSession: boolean },
+    ): Promise<boolean> =>
+      ipcRenderer.invoke("persistentAgents.delete", id, options),
+    pause: (id: string): Promise<PersistentAgentView | null> =>
+      ipcRenderer.invoke("persistentAgents.pause", id),
+    resume: (id: string): Promise<PersistentAgentView | null> =>
+      ipcRenderer.invoke("persistentAgents.resume", id),
+    wakeNow: (id: string): Promise<PersistentAgentView | null> =>
+      ipcRenderer.invoke("persistentAgents.wakeNow", id),
+    listWakeups: (id: string): Promise<PersistentAgentWakeup[]> =>
+      ipcRenderer.invoke("persistentAgents.listWakeups", id),
+    cancelWakeup: (agentId: string, wakeupId: string): Promise<boolean> =>
+      ipcRenderer.invoke("persistentAgents.cancelWakeup", agentId, wakeupId),
+  },
+
   memory: {
     search: (payload: {
       query: string;
@@ -1546,6 +1579,25 @@ declare global {
         delete: (id: string) => Promise<{ success: boolean }>;
         toggle: (id: string, enabled: boolean) => Promise<ScheduleTask | null>;
         runNow: (id: string) => Promise<ScheduleTask | null>;
+      };
+      persistentAgents: {
+        list: () => Promise<PersistentAgentView[]>;
+        create: (
+          input: PersistentAgentCreateInput,
+        ) => Promise<PersistentAgentView>;
+        update: (
+          id: string,
+          patch: PersistentAgentUpdateInput,
+        ) => Promise<PersistentAgentView | null>;
+        delete: (
+          id: string,
+          options: { deleteSession: boolean },
+        ) => Promise<boolean>;
+        pause: (id: string) => Promise<PersistentAgentView | null>;
+        resume: (id: string) => Promise<PersistentAgentView | null>;
+        wakeNow: (id: string) => Promise<PersistentAgentView | null>;
+        listWakeups: (id: string) => Promise<PersistentAgentWakeup[]>;
+        cancelWakeup: (agentId: string, wakeupId: string) => Promise<boolean>;
       };
       memory: {
         search: (payload: {

@@ -56,3 +56,16 @@ it("keeps a created voice record usable after a restart", () => {
   expect(listed?.status).toBe("idle");
   expect(listed?.allowedTools).toEqual(VOICE_TURN.tools);
 });
+
+it("keeps an agent session record kind after a restart", () => {
+  const send = vi.fn();
+  let db = initDatabase();
+  const created = new SessionManager(db, send).createSessionRecord(
+    "Agent",
+    undefined,
+    { kind: "agent" },
+  );
+  closeDatabase();
+  db = initDatabase();
+  expect(db.sessions.get(created.id)?.session_kind).toBe("agent");
+});

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Columns2, Rows2, X } from "lucide-react";
 import { Button } from "../app-button";
 import { WorkspaceChip } from "../WorkspaceChip";
+import { AgentSessionBar } from "../agents/AgentSessionBar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { usePaneSession } from "./pane-context";
 import { useSplitRectsStore } from "./split-rects-context";
@@ -65,6 +66,7 @@ export function PaneHeader({
           <WorkspaceChip cwd={session.cwd} />
         </span>
       )}
+      {session && <AgentSessionBar sessionId={session.id} />}
       {status && (
         <span
           data-status={status}

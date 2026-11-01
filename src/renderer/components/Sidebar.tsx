@@ -67,6 +67,8 @@ import {
 } from "./ui/dropdown-menu";
 import { Input } from "./ui/input";
 import { Button } from "./app-button";
+import { AgentSidebarGroup } from "./agents/AgentSidebarGroup";
+import { AgentEditModal } from "./agents/AgentEditModal";
 
 const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
@@ -173,6 +175,7 @@ export function Sidebar({
   const [sshHosts, setSshHosts] = useState<SshHostConfig[]>([]);
   const [pickerHost, setPickerHost] = useState<SshHostConfig | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [agentEditorOpen, setAgentEditorOpen] = useState(false);
   const scrollListRef = useRef<HTMLDivElement>(null);
 
   // Exclude archived sessions from normal display
@@ -1343,6 +1346,13 @@ export function Sidebar({
               className="flex-1 overflow-y-auto px-3 pt-2 pb-4 sidebar-scroll"
             >
               <div>
+                <AgentSidebarGroup
+                  activeSessionId={activeSessionId}
+                  onOpenSession={(sessionId) =>
+                    void handleSessionClick(sessionId)
+                  }
+                  onCreate={() => setAgentEditorOpen(true)}
+                />
                 <section>
                   <Button
                     variant="ghost"
@@ -1751,6 +1761,9 @@ export function Sidebar({
         )}
       </aside>
       {/* ⚠️ 共享面板已删 ✗ —— 已改为**每行一个菜单** ✓（见上面那条 `DropdownMenu`）。 */}
+      {agentEditorOpen && (
+        <AgentEditModal onClose={() => setAgentEditorOpen(false)} />
+      )}
     </>
   );
 }

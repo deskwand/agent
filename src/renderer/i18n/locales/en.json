@@ -1861,6 +1861,8 @@
       "lookedUpIdeas_other": "Looked up {{count}} ideas",
       "savedIdeas_one": "Saved {{count}} idea",
       "savedIdeas_other": "Saved {{count}} ideas",
+      "scheduledWakeups_one": "Scheduled {{count}} wakeup",
+      "scheduledWakeups_other": "Scheduled {{count}} wakeups",
       "managedGoal": "Managed goal",
       "executedCommands_one": "Executed {{count}} command",
       "executedCommands_other": "Executed {{count}} commands",
@@ -3044,6 +3046,52 @@
       "awaitingPermission": "Awaiting permission",
       "done": "Done",
       "error": "Error"
+    }
+  },
+  "persistentAgents": {
+    "title": "Agents",
+    "create": "New agent",
+    "status": {
+      "running": "Running",
+      "paused": "Paused",
+      "sessionLost": "Session lost",
+      "error": "Last wakeup failed",
+      "idle": "Sleeping",
+      "sleeping": "Sleeping · next {{time}}",
+      "sleepingReason": "Sleeping · next {{time}} {{reason}}"
+    },
+    "form": {
+      "createTitle": "New agent",
+      "editTitle": "Edit agent",
+      "name": "Name",
+      "instructions": "Role and goals",
+      "instructionsPlaceholder": "You run the @your_account X account: post 1–2 product updates a day and reply to technical mentions in a friendly, professional tone.",
+      "workspace": "Working folder",
+      "pickWorkspace": "Choose folder",
+      "schedule": "Wake schedule",
+      "mode": { "interval": "Interval", "daily": "Daily", "weekly": "Weekly" },
+      "every": "Every",
+      "unit": "Unit",
+      "units": { "minute": "minutes", "hour": "hours", "day": "days" },
+      "wakeImmediately": "Wake once right after creating",
+      "create": "Create",
+      "required": "Fill in the name, role and goals, and working folder",
+      "invalidSchedule": "Invalid schedule: intervals need at least 5 minutes, and daily or weekly needs at least one time"
+    },
+    "delete": {
+      "action": "Delete",
+      "title": "Delete \"{{name}}\"?",
+      "alsoSession": "Also delete its session (kept as a regular session by default)",
+      "confirm": "Delete"
+    },
+    "bar": {
+      "wakeups": "Upcoming wakeups",
+      "noWakeups": "No upcoming wakeups",
+      "cancelWakeup": "Cancel this wakeup",
+      "wakeNow": "Wake now",
+      "pause": "Pause",
+      "resume": "Resume",
+      "settings": "Settings"
     }
   }
 }

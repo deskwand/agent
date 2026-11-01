@@ -11,6 +11,7 @@ const scheduleFiles = [
   path.resolve(process.cwd(), 'src/renderer/components/ScheduleCalendar.tsx'),
   path.resolve(process.cwd(), 'src/renderer/components/ScheduleToolbar.tsx'),
   path.resolve(process.cwd(), 'src/renderer/components/ScheduleEditModal.tsx'),
+  path.resolve(process.cwd(), 'src/renderer/components/TimePicker.tsx'),
 ];
 const appContent = readFileSync(appPath, 'utf8');
 const scheduleContent = scheduleFiles

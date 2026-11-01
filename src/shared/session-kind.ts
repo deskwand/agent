@@ -1,5 +1,5 @@
-export type SessionKind = "ordinary" | "voice";
+export type SessionKind = "ordinary" | "voice" | "agent";
 
 export function normalizeSessionKind(value: unknown): SessionKind {
-  return value === "voice" ? "voice" : "ordinary";
+  return value === "voice" || value === "agent" ? value : "ordinary";
 }

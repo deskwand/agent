@@ -1860,6 +1860,8 @@
       "lookedUpIdeas_other": "已查阅 {{count}} 条想法",
       "savedIdeas_one": "已记录 {{count}} 条想法",
       "savedIdeas_other": "已记录 {{count}} 条想法",
+      "scheduledWakeups_one": "已安排 {{count}} 次唤醒",
+      "scheduledWakeups_other": "已安排 {{count}} 次唤醒",
       "managedGoal": "已管理目标",
       "executedCommands_one": "已执行了 {{count}} 条命令",
       "executedCommands_other": "已执行了 {{count}} 条命令",
@@ -3041,6 +3043,52 @@
       "awaitingPermission": "等待授权",
       "done": "已完成",
       "error": "出错"
+    }
+  },
+  "persistentAgents": {
+    "title": "智能体",
+    "create": "新建智能体",
+    "status": {
+      "running": "运行中",
+      "paused": "已暂停",
+      "sessionLost": "会话丢失",
+      "error": "上次出错",
+      "idle": "休眠中",
+      "sleeping": "休眠中 · 下次 {{time}}",
+      "sleepingReason": "休眠中 · 下次 {{time}} {{reason}}"
+    },
+    "form": {
+      "createTitle": "新建智能体",
+      "editTitle": "编辑智能体",
+      "name": "名称",
+      "instructions": "角色与目标",
+      "instructionsPlaceholder": "你负责运营 @your_account 推特号：每天发 1–2 条产品动态，回复技术相关的提及，语气友好专业。",
+      "workspace": "工作目录",
+      "pickWorkspace": "选择文件夹",
+      "schedule": "唤醒周期",
+      "mode": { "interval": "固定间隔", "daily": "每天", "weekly": "每周" },
+      "every": "每",
+      "unit": "单位",
+      "units": { "minute": "分钟", "hour": "小时", "day": "天" },
+      "wakeImmediately": "创建后立即唤醒一次",
+      "create": "创建",
+      "required": "请填写名称、角色与目标和工作目录",
+      "invalidSchedule": "唤醒周期无效：间隔至少 5 分钟，每天 / 每周至少选一个时间"
+    },
+    "delete": {
+      "action": "删除",
+      "title": "删除「{{name}}」？",
+      "alsoSession": "同时删除它的会话（默认保留为普通会话）",
+      "confirm": "删除"
+    },
+    "bar": {
+      "wakeups": "待执行预约",
+      "noWakeups": "没有待执行的预约",
+      "cancelWakeup": "取消这次预约",
+      "wakeNow": "立即唤醒",
+      "pause": "暂停",
+      "resume": "恢复",
+      "settings": "设置"
     }
   }
 }

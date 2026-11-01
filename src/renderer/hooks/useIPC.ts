@@ -26,6 +26,7 @@ import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 import type { ElementSelection } from "../../shared/ipc-types";
 import type { TurnProfileName } from "../../shared/voice-mode";
 import { toElementSelectionRefs } from "../../shared/element-selection-ref";
+import { usePersistentAgentStore } from "../store/persistent-agents";
 
 // Check if running in Electron
 const isElectron =
@@ -314,6 +315,14 @@ function registerSharedIpcListener(): () => void {
 
         case "session.update":
           store.updateSession(event.payload.sessionId, event.payload.updates);
+          break;
+
+        case "persistent-agent.update":
+          usePersistentAgentStore.getState().upsert(event.payload.agent);
+          break;
+
+        case "persistent-agent.remove":
+          usePersistentAgentStore.getState().remove(event.payload.agentId);
           break;
 
         case "pi.set-editor-text": {

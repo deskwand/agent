@@ -140,3 +140,25 @@ describe("idea 调用的摘要分组", () => {
     ]);
   });
 });
+
+describe("wakeup 工具的摘要分组", () => {
+  it("schedule_wakeup / cancel_wakeup 计入「安排唤醒」，不落进通用工具数", () => {
+    for (const name of ["schedule_wakeup", "cancel_wakeup"]) {
+      const summary = topLevelSummary(name);
+      expect(summary.wakeupCount, name).toBe(1);
+      expect(summary.usedToolCount, name).toBe(0);
+    }
+  });
+
+  it("渲染成带唤醒图标的片段", async () => {
+    await i18n.changeLanguage("zh");
+    const fragments = getProcessSummaryFragments(
+      { ...empty, wakeupCount: 3 },
+      i18n.t,
+    );
+    expect(fragments).toContainEqual({
+      text: "已安排 3 次唤醒",
+      iconType: "wakeup",
+    });
+  });
+});

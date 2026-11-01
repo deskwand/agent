@@ -50,6 +50,8 @@ import {
 import { Button } from "./app-button";
 import { ReadReceiptRing } from "./message/ReadReceiptRing";
 import type { ReadReceiptState } from "../utils/message-read";
+import { parseAgentWakeup } from "../../shared/persistent-agent";
+import { AgentWakeupRow } from "./message/AgentWakeupRow";
 
 const EMPTY_NESTED_CALLS = {};
 const EMPTY_MESSAGES: Message[] = [];
@@ -622,6 +624,14 @@ export const MessageCard = memo(function MessageCard({
   if (!isUser && visibleBlocks.length === 0) {
     return null;
   }
+
+  // 常驻智能体的自动唤醒消息：渲染成系统条目（hooks 都已在上面调用过）
+  const wakeupBody = isUser
+    ? parseAgentWakeup(
+        contentBlocks.find((block) => block.type === "text")?.text ?? "",
+      )
+    : null;
+  if (wakeupBody !== null) return <AgentWakeupRow body={wakeupBody} />;
 
   return (
     <div>

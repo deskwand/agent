@@ -134,6 +134,26 @@ const MSG: Record<Locale, MessageTable> = {
     "pet.imageInvalid": "这张图片无法使用，请换一张 PNG、JPG、WebP 或 GIF。",
     "pet.imageTooLarge": "图片太大（超过 10MB 或 8192px），请换一张小一点的。",
     "pet.imageWriteFailed": "无法保存图片，请检查磁盘空间后重试。",
+    // ── persistent agents ──
+    "agents.wakeup.header": "[自动唤醒] {{time}}（{{weekday}}）",
+    "agents.wakeup.reasons": "触发原因：",
+    "agents.wakeup.periodic": "- 周期唤醒（{{rule}}）",
+    "agents.wakeup.scheduled": "- 预约：{{reason}}",
+    "agents.wakeup.manual": "- 手动唤醒",
+    "agents.wakeup.upcoming": "待执行预约：{{items}}",
+    "agents.wakeup.upcomingSeparator": "；",
+    "agents.wakeup.missed": "应用未运行期间错过 {{count}} 次唤醒",
+    "agents.wakeup.ruleInterval.minute": "每 {{every}} 分钟",
+    "agents.wakeup.ruleInterval.hour": "每 {{every}} 小时",
+    "agents.wakeup.ruleInterval.day": "每 {{every}} 天",
+    "agents.wakeup.ruleDaily": "每天 {{times}}",
+    "agents.wakeup.ruleWeekly": "每周{{days}} {{times}}",
+    "agents.wakeup.listSeparator": "、",
+    "agents.wakeup.weekday": "周日,周一,周二,周三,周四,周五,周六",
+    "agents.wakeup.weekdayShort": "日,一,二,三,四,五,六",
+    "agents.notify.autoPausedTitle": "常驻智能体已暂停",
+    "agents.notify.autoPausedBody":
+      "「{{name}}」连续失败 {{count}} 次，已自动暂停",
   },
   en: {
     // ── goal ──
@@ -275,6 +295,28 @@ const MSG: Record<Locale, MessageTable> = {
       "That image is too large (over 10MB or 8192px). Choose a smaller one.",
     "pet.imageWriteFailed":
       "Couldn't save the image. Check disk space and try again.",
+
+    // ── persistent agents ──
+    "agents.wakeup.header": "[Auto wakeup] {{time}} ({{weekday}})",
+    "agents.wakeup.reasons": "Triggered by:",
+    "agents.wakeup.periodic": "- Periodic wakeup ({{rule}})",
+    "agents.wakeup.scheduled": "- Scheduled: {{reason}}",
+    "agents.wakeup.manual": "- Manual wakeup",
+    "agents.wakeup.upcoming": "Upcoming wakeups: {{items}}",
+    "agents.wakeup.upcomingSeparator": "; ",
+    "agents.wakeup.missed":
+      "Missed {{count}} wakeup(s) while the app was not running",
+    "agents.wakeup.ruleInterval.minute": "every {{every}} min",
+    "agents.wakeup.ruleInterval.hour": "every {{every}} h",
+    "agents.wakeup.ruleInterval.day": "every {{every}} day(s)",
+    "agents.wakeup.ruleDaily": "daily at {{times}}",
+    "agents.wakeup.ruleWeekly": "weekly on {{days}} at {{times}}",
+    "agents.wakeup.listSeparator": ", ",
+    "agents.wakeup.weekday": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
+    "agents.wakeup.weekdayShort": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
+    "agents.notify.autoPausedTitle": "Agent paused",
+    "agents.notify.autoPausedBody":
+      '"{{name}}" failed {{count}} times in a row and was paused',
   },
 };
 

@@ -1713,6 +1713,7 @@ export class SessionManager {
               session,
               prompt: enhancedPrompt,
               messages: stableMessages,
+              outcome: petOutcome,
             })
             .catch((error) => {
               logCtxError(
@@ -2961,6 +2962,23 @@ export class SessionManager {
 
   getPetStateTracker(): PetStateTracker {
     return this.petTracker;
+  }
+
+  hasSession(sessionId: string): boolean {
+    return this.loadSession(sessionId) !== null;
+  }
+
+  /** 常驻智能体删除但保留会话时，把会话改回普通会话。 */
+  setSessionKind(sessionId: string, kind: SessionKind): void {
+    if (!this.loadSession(sessionId)) return;
+    this.db.sessions.update(sessionId, {
+      session_kind: kind,
+      updated_at: Date.now(),
+    });
+    this.sendToRenderer({
+      type: "session.update",
+      payload: { sessionId, updates: { kind } },
+    });
   }
 }
 

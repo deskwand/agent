@@ -30,6 +30,7 @@ import type { VoiceShortcut } from "../../shared/voice-shortcuts";
 // Session types
 import type { FeedPhase, FeedRunStatus } from "../../shared/feed";
 import type { SessionKind } from "../../shared/session-kind";
+import type { PersistentAgentView } from "../../shared/persistent-agent";
 
 export interface Session {
   id: string;
@@ -905,6 +906,14 @@ export type ServerEvent =
   | {
       type: "stream.nestedToolCalls";
       payload: { sessionId: string; runtime: NestedToolRuntimeUi };
+    }
+  | {
+      type: "persistent-agent.update";
+      payload: { agent: PersistentAgentView };
+    }
+  | {
+      type: "persistent-agent.remove";
+      payload: { agentId: string };
     };
 
 // Settings types

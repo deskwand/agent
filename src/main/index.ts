@@ -58,6 +58,10 @@ import { SkillsManager, validateSkillName } from "./skills/skills-manager";
 import { MemoryService } from "./memory/memory-service";
 import { IdeaService } from "./ideas/idea-service";
 import { IdeasExtension } from "./ideas/ideas-extension";
+import { PersistentAgentExtension } from "./agents/persistent-agent-extension";
+import type { PersistentAgentManager } from "./agents/persistent-agent-manager";
+import { createPersistentAgentRuntime } from "./agents/persistent-agent-runtime";
+import { registerPersistentAgentIpc } from "./agents/persistent-agent-ipc";
 import type {
   IdeaCreateInput,
   IdeaStatus,
@@ -353,6 +357,7 @@ let ideaService: IdeaService | null = null;
 let feedService: FeedService | null = null;
 let feedScheduler: FeedScheduler | null = null;
 let scheduledTaskManager: ScheduledTaskManager | null = null;
+let persistentAgentManager: PersistentAgentManager | null = null;
 let petWindowController: PetWindowController | null = null;
 let voiceIpc: VoiceIpcHandle | null = null;
 let ttsIpc: TtsIpcHandle | null = null;
@@ -1249,6 +1254,7 @@ app
       new MemoryExtension(memoryService),
       new GoalExtension(db),
       new IdeasExtension(ideaService),
+      new PersistentAgentExtension(() => persistentAgentManager),
     ]);
 
     // Initialize session manager before creating an interactive window.
@@ -1513,6 +1519,15 @@ app
     });
     scheduledTaskManager.start();
 
+    // 常驻智能体：一个智能体绑定一个永久会话，按周期 + 自主预约唤醒
+    persistentAgentManager = createPersistentAgentRuntime({
+      db,
+      sessionManager,
+      sendToRenderer,
+      checkWorkspace: getWorkspacePathUnsupportedReason,
+    });
+    persistentAgentManager.start();
+
     // ---- 动态（feed）：后台生成 + 未读计数，默认关闭 ----
     const feedImagesDir = join(app.getPath("userData"), "feed-images");
     const feedTempDir = join(app.getPath("temp"), "deskwand-feed");
@@ -1761,6 +1776,7 @@ async function cleanupSandboxResources(): Promise<void> {
 
   stopNavServer();
   scheduledTaskManager?.stop();
+  persistentAgentManager?.stop();
   tray?.destroy();
   tray = null;
   petWindowController?.dispose();
@@ -1863,6 +1879,7 @@ app.on("before-quit", async (event) => {
     if (isQuittingForUpdate) {
       stopNavServer();
       scheduledTaskManager?.stop();
+      persistentAgentManager?.stop();
       tray?.destroy();
       tray = null;
       try {
@@ -3390,6 +3407,12 @@ registerConnectorsIpc({
     }
   },
   activateMcpServer: (name, config) => activateDeskwandMcpServer(name, config),
+});
+
+registerPersistentAgentIpc({
+  ipcMain,
+  getManager: () => persistentAgentManager,
+  checkWorkspace: getWorkspacePathUnsupportedReason,
 });
 
 // 邮箱：账号级 IPC。与连接页共用 `mcp.json`，但删一个邮箱走的是账号通道 ——

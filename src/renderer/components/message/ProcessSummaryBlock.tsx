@@ -15,6 +15,7 @@ import {
   Folder,
   ListTodo,
   Volume2,
+  AlarmClock,
 } from "lucide-react";
 import type { Message, ContentBlock } from "../../types";
 import {
@@ -54,6 +55,9 @@ const PROCESS_ICON_MAP: Record<
   memory: <Brain className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
   ideas: (
     <Lightbulb className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+  ),
+  wakeup: (
+    <AlarmClock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
   ),
   command: (
     <MonitorPlay className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />

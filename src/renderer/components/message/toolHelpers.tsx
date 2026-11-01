@@ -20,6 +20,7 @@ import {
   Send,
   Volume2,
   Lightbulb,
+  AlarmClock,
 } from "lucide-react";
 
 /** Map a tool name to a small icon element */
@@ -56,6 +57,9 @@ export function getToolIcon(name: string) {
   // 想法三件套（经 codemode 调用）：与 rail 的 ideas 图标一致
   if (n === "idea_search" || n === "idea_read" || n === "idea_add")
     return <Lightbulb className="w-3.5 h-3.5" />;
+  // 常驻智能体的唤醒工具
+  if (n === "schedule_wakeup" || n === "cancel_wakeup")
+    return <AlarmClock className="w-3.5 h-3.5" />;
   if (n === "office_read_xlsx") return <Table className="w-3.5 h-3.5" />;
   if (n === "office_read_docx") return <FileText className="w-3.5 h-3.5" />;
   if (n === "office_read_pptx") return <Presentation className="w-3.5 h-3.5" />;
