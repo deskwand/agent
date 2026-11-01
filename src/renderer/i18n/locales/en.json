@@ -3049,8 +3049,8 @@
     }
   },
   "persistentAgents": {
-    "title": "Agents",
-    "create": "New agent",
+    "title": "Teammates",
+    "create": "New teammate",
     "status": {
       "running": "Running",
       "paused": "Paused",
@@ -3061,8 +3061,8 @@
       "sleepingReason": "Sleeping · next {{time}} {{reason}}"
     },
     "form": {
-      "createTitle": "New agent",
-      "editTitle": "Edit agent",
+      "createTitle": "New teammate",
+      "editTitle": "Edit teammate",
       "name": "Name",
       "instructions": "Role and goals",
       "instructionsPlaceholder": "You run the @your_account X account: post 1–2 product updates a day and reply to technical mentions in a friendly, professional tone.",

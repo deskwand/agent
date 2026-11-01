@@ -3046,8 +3046,8 @@
     }
   },
   "persistentAgents": {
-    "title": "智能体",
-    "create": "新建智能体",
+    "title": "伙伴",
+    "create": "新建伙伴",
     "status": {
       "running": "运行中",
       "paused": "已暂停",
@@ -3058,8 +3058,8 @@
       "sleepingReason": "休眠中 · 下次 {{time}} {{reason}}"
     },
     "form": {
-      "createTitle": "新建智能体",
-      "editTitle": "编辑智能体",
+      "createTitle": "新建伙伴",
+      "editTitle": "编辑伙伴",
       "name": "名称",
       "instructions": "角色与目标",
       "instructionsPlaceholder": "你负责运营 @your_account 推特号：每天发 1–2 条产品动态，回复技术相关的提及，语气友好专业。",

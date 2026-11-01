@@ -151,7 +151,7 @@ const MSG: Record<Locale, MessageTable> = {
     "agents.wakeup.listSeparator": "、",
     "agents.wakeup.weekday": "周日,周一,周二,周三,周四,周五,周六",
     "agents.wakeup.weekdayShort": "日,一,二,三,四,五,六",
-    "agents.notify.autoPausedTitle": "常驻智能体已暂停",
+    "agents.notify.autoPausedTitle": "伙伴已暂停",
     "agents.notify.autoPausedBody":
       "「{{name}}」连续失败 {{count}} 次，已自动暂停",
   },
@@ -314,7 +314,7 @@ const MSG: Record<Locale, MessageTable> = {
     "agents.wakeup.listSeparator": ", ",
     "agents.wakeup.weekday": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
     "agents.wakeup.weekdayShort": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
-    "agents.notify.autoPausedTitle": "Agent paused",
+    "agents.notify.autoPausedTitle": "Teammate paused",
     "agents.notify.autoPausedBody":
       '"{{name}}" failed {{count}} times in a row and was paused',
   },
