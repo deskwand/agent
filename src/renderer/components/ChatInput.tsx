@@ -1253,7 +1253,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             {/* Input card */}
             <div
               data-testid="chat-input-card"
-              className={`transition-colors ${isDragging ? "ring-2 ring-primary bg-primary/5" : ""} ${cardClassName}`}
+              className={`transition-colors ${isDragging ? "ring-2 ring-primary" : ""} ${cardClassName}`}
             >
               <AttachmentTiles tiles={attachmentTiles} />
               {topSlot ? (

@@ -122,7 +122,7 @@ export function AttachmentTiles({ tiles }: { tiles: AttachmentTile[] }) {
             key={tile.key}
             title={tile.hint}
             onClick={tile.onOpen}
-            className={`${TILE_CLASS} flex flex-col items-center justify-center bg-muted px-2${tile.onOpen ? " hover:bg-selected-surface" : ""}`}
+            className={`${TILE_CLASS} flex flex-col items-center justify-center bg-card px-2${tile.onOpen ? " hover:bg-selected-surface" : ""}`}
           >
             <FileText
               className="h-6 w-6 shrink-0 text-muted-foreground"

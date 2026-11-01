@@ -443,4 +443,95 @@ describe("主题对比度不变量", () => {
       `高亮对底色不到 1.5：\n${invisible.join("\n")}`,
     ).toEqual([]);
   });
+
+  // 用户反馈：聊天输入框的占位提示在深色主题下「看不清」。
+  // 量下来真因不在字的亮度：旧输入框是 `bg-background/60`（透明到与页面同色），
+  // 字实际上是飘在纯黑上 —— 而参考实现里占位符对面板只有 3.7 就能看清，
+  // 因为它那块面板比页面亮一档。所以两件事一起锁：
+  //   1）面板必须是抬升面（bg-muted），不能退回与页面同色的 bg-background；
+  //      「抬升面确实比页面亮」由 §9-4 按 token 管，这里只盯着输入框用的是哪个类。
+  //   2）占位符从正文色往面板上混，对 **--muted** 算：14 块落在 6.5–9.5 这个带里。
+  //      混色的底写回 --background（面板上偏暗）、或者退回单档 --muted-foreground，都红。
+  it("§9-11 聊天输入框的面板看得见、占位提示读得清", () => {
+    // 会话内 / 欢迎页空态两个入口共用同一套卡面类名，必须同步。
+    // 不套 classNameAt：它的 marker 不能含引号，而这里要盯的正是属性本身。
+    const cardLinesOf = (file: string): string[] =>
+      fs
+        .readFileSync(path.join(RENDERER, file), "utf8")
+        .split("\n")
+        .filter((l) => l.includes("cardClassName="));
+    // 断言**每一条** cardClassName（而不是"只有一条"）：以后再加一个输入框入口
+    // 时，新那条也会被同一套判据盯住，而不是把测试整体拖红。
+    const cardLines = [
+      ...cardLinesOf("components/ChatView.tsx"),
+      ...cardLinesOf("components/WelcomeView.tsx"),
+    ];
+    expect(cardLines.length, "找不到任何 cardClassName 定义").toBeGreaterThan(0);
+    for (const cls of cardLines) {
+      // 逐字匹配：`bg-muted/60`（半透明面板 = 原来的毛病）与 `bg-muted-foreground`
+      // 都包含 "bg-muted"，用 toContain 会漏判。
+      expect(cls, "输入框面板要用抬升面 bg-muted").toMatch(/(^|\s)bg-muted(\s|$)/);
+      expect(cls, "输入框面板不能是半透明的 bg-muted/NN").not.toMatch(
+        /(^|\s)bg-muted\/\d+/,
+      );
+      expect(
+        cls,
+        "输入框不能退回与页面同色的 bg-background",
+      ).not.toMatch(/(^|\s)bg-background(\s|$)/);
+    }
+
+    const rule = /\.chat-editor:empty::before\s*\{([\s\S]*?)\}/.exec(css)?.[1];
+    expect(
+      rule,
+      "globals.css 里找不到 .chat-editor:empty::before",
+    ).toBeTruthy();
+    const value = declarationOf(rule!, "color").replace(/\s+/g, " ");
+    const mix =
+      /^color-mix\(\s*in srgb,\s*var\((--[\w-]+)\)\s+([\d.]+)%,\s*var\((--[\w-]+)\)\s*\)$/.exec(
+        value,
+      );
+    expect(
+      mix,
+      `占位符颜色必须由两个 token 不透明地混出来（不能回到单档灰）：${value}`,
+    ).not.toBeNull();
+    const [, aTok, pct, bTok] = mix!;
+    expect(aTok, "占位符要从 --foreground 推导").toBe("--foreground");
+    // 混色底必须是面板色：混到 --background 上在抬升面里会偏暗。
+    expect(bTok, "占位符要混回面板色 --muted").toBe("--muted");
+
+    const alpha = Number(pct) / 100;
+    // 绝对比值带，不用「正文对比度的百分之几」：对比度是倍率，取百分比没有感知意义，
+    // 而且和下面的下限会互相打架（正文 13.78 时 65% 只剩 8.96）。
+    const FLOOR = 6.5;
+    const CEILING = 9.5;
+    // 正文得明显高于上限，带子才有意义（当前实测 13.78–18.10）。
+    const MIN_TYPED = 10;
+    const tooDim: string[] = [];
+    const tooBright: string[] = [];
+    const weakTyped: string[] = [];
+    for (const block of blocks) {
+      const head = block.slice(0, 60).replace(/\s+/g, " ");
+      const fg = tokenOf(block, "--foreground");
+      const panel = tokenOf(block, "--muted");
+      const typed = contrast(fg, panel);
+      if (typed < MIN_TYPED) {
+        weakTyped.push(`${typed.toFixed(2)}  ${head}`);
+      }
+      const r = contrast(composite(panel, fg, alpha), panel);
+      if (r < FLOOR) tooDim.push(`${r.toFixed(2)}  ${head}`);
+      if (r > CEILING) tooBright.push(`${r.toFixed(2)}  ${head}`);
+    }
+    expect(
+      weakTyped,
+      `正文在面板上不足 ${MIN_TYPED}，占位符的亮暗带失去参照：\n${weakTyped.join("\n")}`,
+    ).toEqual([]);
+    expect(
+      tooDim,
+      `占位提示在面板上低于 ${FLOOR}：\n${tooDim.join("\n")}`,
+    ).toEqual([]);
+    expect(
+      tooBright,
+      `占位提示在面板上超过 ${CEILING}，会与已输入的文字争：\n${tooBright.join("\n")}`,
+    ).toEqual([]);
+  });
 });

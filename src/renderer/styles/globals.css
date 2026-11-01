@@ -967,10 +967,21 @@
     margin-bottom: 0;
   }
 
-  /* contenteditable 没有原生 placeholder，用 :empty 伪元素补。 */
+  /* contenteditable 没有原生 placeholder，用 :empty 伪元素补。
+     color 不取 --muted-foreground，而是从正文色往面板底色上混 —— 先搞清两个坑：
+     1）旧值 --muted-foreground 在纯黑上实测只有 7.6，而输入框当时是
+        bg-background/60（透明到背景同色），字实际上飘在黑底上，用户反馈「看不清」；
+        对比参考实现（Cursor）：它把面板抬到比页面亮一档（1.33），占位符对面板
+        只有 3.7 就能看 —— 看得清靠的是**面板**，不是字更亮。
+     2）面板改成 --muted 后（见 ChatView / WelcomeView 的 cardClassName），
+        这里的对比度**必须对 --muted 算**，不能再写 var(--background)：
+        混到背景色上在抬升面板里会偏暗。
+     70% 的标定：全 14 块实测对面板 7.57–8.00（深）/ 7.12–7.33（亮），
+     而正文在同面板上是 13.78–18.16 —— 读得清，又一眼分得出「这是提示」。
+     门槛由 theme-contrast-invariants.test.ts 的 §9-11 守着，别改回单档灰。 */
   .chat-editor:empty::before {
     content: attr(data-placeholder);
-    color: var(--muted-foreground);
+    color: color-mix(in srgb, var(--foreground) 70%, var(--muted));
     pointer-events: none;
   }
 

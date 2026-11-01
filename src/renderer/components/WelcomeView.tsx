@@ -742,7 +742,7 @@ export function WelcomeView() {
               ? t("connect.startPlaceholder")
               : t("welcome.placeholder")
           }
-          cardClassName={`rounded-3xl border border-border/60 bg-background/60 shadow-sm px-3 py-2${showConnectCards ? " cursor-not-allowed" : ""}`}
+          cardClassName={`rounded-3xl border border-border bg-muted shadow-sm px-3 py-2${showConnectCards ? " cursor-not-allowed" : ""}`}
           textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed py-1.5 overflow-hidden"
           footerSlot={
             showConnectCards ? undefined : (

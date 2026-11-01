@@ -2442,7 +2442,7 @@ export function ChatView() {
               onAttachmentsChange={handleAttachmentsChange}
               voiceRecording={voice.status === "recording"}
               placeholder={t("chat.typeMessage")}
-              cardClassName="rounded-3xl border border-border/60 bg-background/60 shadow-sm px-3 py-2"
+              cardClassName="rounded-3xl border border-border bg-muted shadow-sm px-3 py-2"
               textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed py-1.5 overflow-hidden"
               footerSlot={
                 <ChatInputFooterBar
