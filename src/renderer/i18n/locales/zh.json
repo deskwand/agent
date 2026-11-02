@@ -3057,8 +3057,7 @@
       "error": "上次出错",
       "idle": "休眠中",
       "sleeping": "休眠中 · 下次 {{time}}",
-      "sleepingReason": "休眠中 · 下次 {{time}} {{reason}}",
-      "sleepingWatchdog": "休眠中 · 最晚 {{time}}"
+      "sleepingReason": "休眠中 · 下次 {{time}} {{reason}}"
     },
     "form": {
       "createTitle": "新建伙伴",
@@ -3070,13 +3069,6 @@
       "pickWorkspace": "选择文件夹",
       "autoWorkspace": "自动创建专属工作区",
       "resetWorkspace": "恢复默认",
-      "schedule": "唤醒周期",
-      "mode": { "interval": "最长间隔", "daily": "每天", "weekly": "每周" },
-      "every": "每",
-      "intervalHint": "伙伴会按任务情况自己安排更早的唤醒；超过这个间隔没有活动时一定会唤醒。",
-      "unit": "单位",
-      "units": { "minute": "分钟", "hour": "小时", "day": "天" },
-      "wakeImmediately": "创建后立即唤醒一次",
       "riskyTitle": "高危能力",
       "riskyHint": "默认关闭。只在伙伴确实需要时开启。",
       "risky": {
@@ -3091,8 +3083,7 @@
       "trustedRemove": "移除",
       "shuffleAvatar": "换一个",
       "create": "创建",
-      "required": "请填写名称和角色与目标",
-      "invalidSchedule": "唤醒周期无效：间隔至少 5 分钟，每天 / 每周至少选一个时间"
+      "required": "请填写名称和角色与目标"
     },
     "delete": {
       "action": "删除",

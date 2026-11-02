@@ -47,7 +47,6 @@ describe("buildWakeupMessage", () => {
         "- 周期唤醒（每 30 分钟）",
         "- 预约：发布今晚的话题帖",
         "待执行预约：11-02 09:00 早间互动检查",
-        "未设签到时，最长 30 分钟 唤醒一次",
         "</agent_wakeup>",
       ].join("\n"),
     );
@@ -119,21 +118,12 @@ describe("buildWakeupMessage check-in and watchdog", () => {
     expect(bare).not.toContain("- 签到：");
   });
 
-  it("renders the watchdog line and cadence footer for interval rules", () => {
-    const lines = buildWakeupMessage({
-      ...base,
-      triggers: [{ type: "watchdog" }],
-    }).split("\n");
-    expect(lines).toContain("- 兜底唤醒：已有 30 分钟 没有活动");
-    expect(lines[lines.length - 2]).toBe("未设签到时，最长 30 分钟 唤醒一次");
-  });
-
-  it("omits the cadence footer for daily rules", () => {
+  it("renders the watchdog line without a cadence footer", () => {
     const text = buildWakeupMessage({
       ...base,
-      schedule: { kind: "daily", times: ["09:00"] },
-      triggers: [{ type: "periodic" }],
+      triggers: [{ type: "watchdog" }],
     });
+    expect(text).toContain("- 兜底唤醒：已有 30 分钟 没有活动");
     expect(text).not.toContain("未设签到时");
   });
 

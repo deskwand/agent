@@ -111,3 +111,14 @@ export type PersistentAgentWakeKind =
   | "periodic"
   | "check_in"
   | "appointment";
+
+/**
+ * 伙伴的内置心跳。这不是用户可调的设置：界面上不出现，也不允许改。
+ * 它只保证"再闲也不会永远不被叫醒"；伙伴自己用 set_next_check_in /
+ * schedule_wakeup 安排更早的节奏。新建伙伴与主进程的 schedule 解析兜底共用这一份。
+ */
+export const DEFAULT_AGENT_HEARTBEAT: AgentScheduleConfig = {
+  kind: "interval",
+  every: 30,
+  unit: "minute",
+};

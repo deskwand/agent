@@ -154,7 +154,6 @@ const MSG: Record<Locale, MessageTable> = {
     "agents.wakeup.checkIn": "- 签到：{{note}}",
     "agents.wakeup.checkInBare": "- 签到",
     "agents.wakeup.watchdog": "- 兜底唤醒：已有 {{duration}} 没有活动",
-    "agents.wakeup.cadence": "未设签到时，最长 {{duration}} 唤醒一次",
     "agents.wakeup.duration.minute": "{{every}} 分钟",
     "agents.wakeup.duration.hour": "{{every}} 小时",
     "agents.wakeup.duration.day": "{{every}} 天",
@@ -332,8 +331,6 @@ const MSG: Record<Locale, MessageTable> = {
     "agents.wakeup.checkIn": "- Check-in: {{note}}",
     "agents.wakeup.checkInBare": "- Check-in",
     "agents.wakeup.watchdog": "- Fallback wakeup: no activity for {{duration}}",
-    "agents.wakeup.cadence":
-      "Without a check-in you are woken at most every {{duration}}",
     "agents.wakeup.duration.minute": "{{every}} min",
     "agents.wakeup.duration.hour": "{{every}} h",
     "agents.wakeup.duration.day": "{{every}} day(s)",

@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Folder, Shuffle, X } from "lucide-react";
-import type { PersistentAgentView } from "../../../shared/persistent-agent";
+import {
+  DEFAULT_AGENT_HEARTBEAT,
+  type PersistentAgentView,
+} from "../../../shared/persistent-agent";
 import {
   ALL_RISKY_DISABLED,
   RISKY_CAPABILITIES,
@@ -11,19 +14,11 @@ import { useAppStore } from "../../store";
 import { usePersistentAgentStore } from "../../store/persistent-agents";
 import type { ClientEvent } from "../../types";
 import { Button } from "../app-button";
-import { TimePicker } from "../TimePicker";
 import { PartnerAvatar } from "./PartnerAvatar";
 import { OccludingDialog } from "../ui/occluding-dialog";
 import { DialogClose, DialogContent, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import {
-  DEFAULT_AGENT_SCHEDULE_FORM,
-  fromAgentScheduleConfig,
-  toAgentScheduleConfig,
-  type AgentScheduleFormState,
-  type AgentWeekday,
-} from "./agent-schedule-form";
 
 interface AgentEditModalProps {
   /** 不传 = 新建。 */
@@ -31,20 +26,7 @@ interface AgentEditModalProps {
   onClose: () => void;
 }
 
-const WEEKDAYS: AgentWeekday[] = [1, 2, 3, 4, 5, 6, 0];
-const WEEKDAY_KEYS: Record<AgentWeekday, string> = {
-  0: "schedule.weekdaySunday",
-  1: "schedule.weekdayMonday",
-  2: "schedule.weekdayTuesday",
-  3: "schedule.weekdayWednesday",
-  4: "schedule.weekdayThursday",
-  5: "schedule.weekdayFriday",
-  6: "schedule.weekdaySaturday",
-};
-
 const FIELD_LABEL = "text-xs font-medium text-muted-foreground";
-const SEGMENT =
-  "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors h-auto";
 
 export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
   const { t } = useTranslation();
@@ -56,12 +38,6 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
   );
   const [instructions, setInstructions] = useState(agent?.instructions ?? "");
   const [cwd, setCwd] = useState(agent?.cwd ?? "");
-  const [schedule, setSchedule] = useState<AgentScheduleFormState>(
-    agent
-      ? fromAgentScheduleConfig(agent.schedule)
-      : DEFAULT_AGENT_SCHEDULE_FORM,
-  );
-  const [wakeImmediately, setWakeImmediately] = useState(true);
   const [risky, setRisky] = useState<RiskyCapabilities>(
     agent?.riskyCapabilities ?? ALL_RISKY_DISABLED,
   );
@@ -73,9 +49,6 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteSession, setDeleteSession] = useState(false);
 
-  const patchSchedule = (patch: Partial<AgentScheduleFormState>) =>
-    setSchedule((prev) => ({ ...prev, ...patch }));
-
   const pickFolder = async () => {
     const event: ClientEvent = { type: "folder.select", payload: {} };
     const picked = await window.electronAPI.invoke<string | null>(event);
@@ -83,13 +56,8 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
   };
 
   const save = async () => {
-    const config = toAgentScheduleConfig(schedule);
     if (!name.trim() || !instructions.trim()) {
       setError(t("persistentAgents.form.required"));
-      return;
-    }
-    if (!config) {
-      setError(t("persistentAgents.form.invalidSchedule"));
       return;
     }
     setSaving(true);
@@ -99,9 +67,14 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
         ? await window.electronAPI.persistentAgents.update(agent.id, {
             name,
             instructions,
-            schedule: config,
             avatarSeed,
             riskyCapabilities: risky,
+            // 唤醒节奏不再由用户设置：interval 就是内置心跳，保存时顺手归一到
+            // 30 分钟，免得老伙伴早先选的 5 分钟继续偷偷烧额度；daily / weekly
+            // 是用户当初定下的固定时刻，原样留在库里，不下发。
+            ...(agent.schedule.kind === "interval"
+              ? { schedule: DEFAULT_AGENT_HEARTBEAT }
+              : {}),
             // Only when something was removed: an approval granted while this
             // modal was open must not be overwritten by the opening snapshot.
             ...(trusted.length < (agent.trustedRecipients?.length ?? 0)
@@ -112,8 +85,8 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
             name,
             instructions,
             ...(cwd ? { cwd } : {}),
-            schedule: config,
-            wakeImmediately,
+            schedule: DEFAULT_AGENT_HEARTBEAT,
+            wakeImmediately: true,
             avatarSeed,
             riskyCapabilities: risky,
           });
@@ -258,107 +231,6 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
             </div>
             <div className="space-y-2">
               <span className={FIELD_LABEL}>
-                {t("persistentAgents.form.schedule")}
-              </span>
-              <div className="flex gap-1 bg-muted rounded-lg p-0.5 border border-border">
-                {(["interval", "daily", "weekly"] as const).map((mode) => (
-                  <Button
-                    variant="ghost"
-                    key={mode}
-                    type="button"
-                    onClick={() => patchSchedule({ mode })}
-                    className={`${SEGMENT} ${
-                      schedule.mode === mode
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {t(`persistentAgents.form.mode.${mode}`)}
-                  </Button>
-                ))}
-              </div>
-              {schedule.mode === "interval" ? (
-                <>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{t("persistentAgents.form.every")}</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      aria-label={t("persistentAgents.form.every")}
-                      className="w-20"
-                      value={schedule.every}
-                      onChange={(e) =>
-                        patchSchedule({ every: Number(e.target.value) })
-                      }
-                    />
-                    <select
-                      aria-label={t("persistentAgents.form.unit")}
-                      className="h-9 rounded-md border border-border bg-background px-2 text-xs text-foreground"
-                      value={schedule.unit}
-                      onChange={(e) =>
-                        patchSchedule({
-                          unit: e.target
-                            .value as AgentScheduleFormState["unit"],
-                        })
-                      }
-                    >
-                      {(["minute", "hour", "day"] as const).map((unit) => (
-                        <option key={unit} value={unit}>
-                          {t(`persistentAgents.form.units.${unit}`)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {t("persistentAgents.form.intervalHint")}
-                  </p>
-                </>
-              ) : (
-                <>
-                  {schedule.mode === "weekly" && (
-                    <div className="flex flex-wrap gap-1">
-                      {WEEKDAYS.map((day) => {
-                        const on = schedule.weekdays.includes(day);
-                        return (
-                          <Button
-                            variant="ghost"
-                            key={day}
-                            type="button"
-                            aria-pressed={on}
-                            onClick={() =>
-                              patchSchedule({
-                                weekdays: on
-                                  ? schedule.weekdays.filter((d) => d !== day)
-                                  : [...schedule.weekdays, day],
-                              })
-                            }
-                            className={`px-2 py-1 text-xs rounded-md border h-auto ${
-                              on
-                                ? "border-primary bg-primary/10 text-primary-text"
-                                : "border-border text-muted-foreground"
-                            }`}
-                          >
-                            {t(WEEKDAY_KEYS[day])}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <TimePicker
-                    selected={schedule.times}
-                    onChange={(next) =>
-                      setSchedule((prev) => ({
-                        ...prev,
-                        times:
-                          typeof next === "function" ? next(prev.times) : next,
-                      }))
-                    }
-                  />
-                </>
-              )}
-            </div>
-            <div className="space-y-2">
-              <span className={FIELD_LABEL}>
                 {t("persistentAgents.form.riskyTitle")}
               </span>
               <p className="text-xs text-muted-foreground">
@@ -415,16 +287,6 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
                   ))}
                 </ul>
               </div>
-            )}
-            {!agent && (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={wakeImmediately}
-                  onChange={(e) => setWakeImmediately(e.target.checked)}
-                />
-                {t("persistentAgents.form.wakeImmediately")}
-              </label>
             )}
           </div>
         )}

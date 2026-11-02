@@ -11,6 +11,7 @@ import type {
   PersistentAgent,
   PersistentAgentWakeup,
 } from "../../shared/persistent-agent";
+import { DEFAULT_AGENT_HEARTBEAT } from "../../shared/persistent-agent";
 import {
   ALL_RISKY_DISABLED,
   ALL_RISKY_ENABLED,
@@ -66,11 +67,7 @@ interface WakeupRow {
   created_at: number;
 }
 
-const FALLBACK_SCHEDULE: AgentScheduleConfig = {
-  kind: "interval",
-  every: 30,
-  unit: "minute",
-};
+const FALLBACK_SCHEDULE: AgentScheduleConfig = DEFAULT_AGENT_HEARTBEAT;
 
 function ensureSchema(raw: DatabaseSync): void {
   raw.exec(`

@@ -389,13 +389,58 @@ describe("AgentEditModal", () => {
   });
 });
 
-describe("AgentEditModal interval wording", () => {
-  it("labels interval as a max interval and explains the fallback", async () => {
+describe("AgentEditModal hides the wake schedule", () => {
+  it("shows no wake-schedule controls", async () => {
     act(() => root.render(<AgentEditModal onClose={() => undefined} />));
     await flush();
-    expect(button("最长间隔")).toBeTruthy();
-    expect(document.body.textContent).toContain(
-      "伙伴会按任务情况自己安排更早的唤醒",
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("唤醒周期");
+    expect(text).not.toContain("最长间隔");
+    expect(text).not.toContain("创建后立即唤醒一次");
+  });
+
+  it("does not send schedule when saving an existing teammate", async () => {
+    api.update.mockResolvedValue(view("3"));
+    act(() =>
+      root.render(
+        <AgentEditModal
+          agent={view("3", {
+            schedule: { kind: "daily", times: ["09:00"] },
+          })}
+          onClose={() => undefined}
+        />,
+      ),
+    );
+    await flush();
+    act(() => button("保存").click());
+    await flush();
+    const payload = api.update.mock.calls.at(-1)?.[1] as Record<
+      string,
+      unknown
+    >;
+    expect("schedule" in payload).toBe(false);
+  });
+
+  it("normalizes an old interval teammate to the built-in heartbeat", async () => {
+    api.update.mockResolvedValue(view("3"));
+    act(() =>
+      root.render(
+        <AgentEditModal
+          agent={view("3", {
+            schedule: { kind: "interval", every: 5, unit: "minute" },
+          })}
+          onClose={() => undefined}
+        />,
+      ),
+    );
+    await flush();
+    act(() => button("保存").click());
+    await flush();
+    expect(api.update).toHaveBeenCalledWith(
+      "3",
+      expect.objectContaining({
+        schedule: { kind: "interval", every: 30, unit: "minute" },
+      }),
     );
   });
 });

@@ -3060,8 +3060,7 @@
       "error": "Last wakeup failed",
       "idle": "Sleeping",
       "sleeping": "Sleeping · next {{time}}",
-      "sleepingReason": "Sleeping · next {{time}} {{reason}}",
-      "sleepingWatchdog": "Sleeping · by {{time}} at the latest"
+      "sleepingReason": "Sleeping · next {{time}} {{reason}}"
     },
     "form": {
       "createTitle": "New teammate",
@@ -3073,17 +3072,6 @@
       "pickWorkspace": "Choose folder",
       "autoWorkspace": "Create a dedicated workspace",
       "resetWorkspace": "Use default",
-      "schedule": "Wake schedule",
-      "mode": {
-        "interval": "Max interval",
-        "daily": "Daily",
-        "weekly": "Weekly"
-      },
-      "every": "Every",
-      "intervalHint": "Your teammate schedules earlier wakeups as work needs; it is always woken after this long without activity.",
-      "unit": "Unit",
-      "units": { "minute": "minutes", "hour": "hours", "day": "days" },
-      "wakeImmediately": "Wake once right after creating",
       "riskyTitle": "Risky capabilities",
       "riskyHint": "Off by default. Turn on only what this teammate needs.",
       "risky": {
@@ -3098,8 +3086,7 @@
       "trustedRemove": "Remove",
       "shuffleAvatar": "Shuffle",
       "create": "Create",
-      "required": "Please fill in the name and role",
-      "invalidSchedule": "Invalid schedule: intervals need at least 5 minutes, and daily or weekly needs at least one time"
+      "required": "Please fill in the name and role"
     },
     "delete": {
       "action": "Delete",

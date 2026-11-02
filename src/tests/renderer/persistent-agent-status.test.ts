@@ -70,52 +70,43 @@ describe("formatAgentStatus", () => {
       ),
     ).toBe("上次出错");
   });
-
-  it("renders the next wakeup with and without a reason", () => {
-    expect(formatAgentStatus(view(), false, t, NOW)).toBe(
-      "休眠中 · 下次 20:00",
-    );
-    const scheduled = view({
-      nextWakeup: {
-        at: new Date(2026, 10, 2, 9, 0).getTime(),
-        kind: "appointment",
-        reason: "早间检查",
-      },
-    });
-    expect(formatAgentStatus(scheduled, false, t, NOW)).toBe(
-      "休眠中 · 下次 11-02 09:00 早间检查",
-    );
-    expect(formatAgentStatus(scheduled, false, t, NOW, false)).toBe(
-      "休眠中 · 下次 11-02 09:00",
-    );
-  });
 });
 
-describe("formatAgentStatus by wake kind", () => {
+describe("formatAgentStatus hides the system heartbeat", () => {
   const t = i18n.t.bind(i18n);
   const at = new Date(2026, 10, 1, 20, 0).getTime();
 
-  it("shows the watchdog deadline as the latest wake time", () => {
+  it("shows a plain sleeping status when only the system is scheduled", () => {
+    // view() 默认的 nextWakeup 就是 periodic（老 daily / weekly 伙伴）
+    expect(formatAgentStatus(view(), false, t, NOW)).toBe("休眠中");
+    expect(formatAgentStatus(view({ nextWakeup: null }), false, t, NOW)).toBe(
+      "休眠中",
+    );
     const watchdog = view({
       nextWakeup: { at, kind: "watchdog", reason: null },
     });
-    expect(formatAgentStatus(watchdog, false, t, NOW)).toBe(
-      "休眠中 · 最晚 20:00",
-    );
+    expect(formatAgentStatus(watchdog, false, t, NOW)).toBe("休眠中");
   });
 
-  it("shows a check-in note and a plain periodic wakeup", () => {
+  it("still shows what the teammate scheduled for itself", () => {
     const checkIn = view({
       nextWakeup: { at, kind: "check_in", reason: "看 CI" },
     });
     expect(formatAgentStatus(checkIn, false, t, NOW)).toBe(
       "休眠中 · 下次 20:00 看 CI",
     );
-    const periodic = view({
-      nextWakeup: { at, kind: "periodic", reason: null },
+    const appointment = view({
+      nextWakeup: {
+        at: new Date(2026, 10, 2, 9, 0).getTime(),
+        kind: "appointment",
+        reason: "早间检查",
+      },
     });
-    expect(formatAgentStatus(periodic, false, t, NOW)).toBe(
-      "休眠中 · 下次 20:00",
+    expect(formatAgentStatus(appointment, false, t, NOW)).toBe(
+      "休眠中 · 下次 11-02 09:00 早间检查",
+    );
+    expect(formatAgentStatus(appointment, false, t, NOW, false)).toBe(
+      "休眠中 · 下次 11-02 09:00",
     );
   });
 });

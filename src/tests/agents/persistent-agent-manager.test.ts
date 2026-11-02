@@ -331,6 +331,17 @@ describe("PersistentAgentManager", () => {
     expect(manager.update(given.id, { avatarSeed: "t" })!.avatarSeed).toBe("t");
   });
 
+  it("keeps the stored rule when the update carries no schedule", async () => {
+    const agent = await manager.create(
+      input({ schedule: { kind: "daily", times: ["09:00"] } }),
+    );
+    const deadline = agent.nextPeriodicAt;
+    manager.update(agent.id, { name: "改名" });
+    const after = manager.get(agent.id)!;
+    expect(after.schedule).toEqual({ kind: "daily", times: ["09:00"] });
+    expect(after.nextPeriodicAt).toBe(deadline);
+  });
+
   it("renames the bound session when the agent is renamed", async () => {
     const agent = await manager.create(input());
     manager.update(agent.id, { name: "X 运营" });

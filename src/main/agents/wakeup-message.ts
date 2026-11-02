@@ -127,11 +127,6 @@ export function buildWakeupMessage(input: WakeupMessageInput): string {
     lines.push(t("agents.wakeup.missed", { count: input.missedCount }));
   }
 
-  const interval = describeInterval(input.schedule);
-  if (interval) {
-    lines.push(t("agents.wakeup.cadence", { duration: interval }));
-  }
-
   return wrapAgentWakeup(lines.join("\n"));
 }
 

@@ -37,15 +37,17 @@ export function formatAgentStatus(
       : t("persistentAgents.status.paused");
   }
   if (agent.status === "error") return t("persistentAgents.status.error");
-  if (!agent.nextWakeup) return t("persistentAgents.status.idle");
-  const time = formatWakeTime(agent.nextWakeup.at, now);
-  if (agent.nextWakeup.kind === "watchdog") {
-    return t("persistentAgents.status.sleepingWatchdog", { time });
+  const wake = agent.nextWakeup;
+  // 兜底（watchdog）与周期（periodic）是系统的心跳，属于实现细节，
+  // 不把时间摆给用户看；只有伙伴自己排的签到与预约才显示——那是它给的承诺。
+  if (!wake || wake.kind === "watchdog" || wake.kind === "periodic") {
+    return t("persistentAgents.status.idle");
   }
-  return withReason && agent.nextWakeup.reason
+  const time = formatWakeTime(wake.at, now);
+  return withReason && wake.reason
     ? t("persistentAgents.status.sleepingReason", {
         time,
-        reason: agent.nextWakeup.reason,
+        reason: wake.reason,
       })
     : t("persistentAgents.status.sleeping", { time });
 }
