@@ -3049,10 +3049,10 @@
     }
   },
   "persistentAgents": {
-    "title": "Teammates",
-    "expand": "Expand teammates",
-    "collapse": "Collapse teammates",
-    "create": "New teammate",
+    "title": "Bots",
+    "expand": "Expand bots",
+    "collapse": "Collapse bots",
+    "create": "New bot",
     "status": {
       "running": "Running",
       "paused": "Paused",
@@ -3063,8 +3063,8 @@
       "sleepingReason": "Sleeping · next {{time}} {{reason}}"
     },
     "form": {
-      "createTitle": "New teammate",
-      "editTitle": "Edit teammate",
+      "createTitle": "New bot",
+      "editTitle": "Edit bot",
       "name": "Name",
       "instructions": "Role and goals",
       "instructionsPlaceholder": "You run the @your_account X account: post 1–2 product updates a day and reply to technical mentions in a friendly, professional tone.",
@@ -3073,7 +3073,7 @@
       "autoWorkspace": "Create a dedicated workspace",
       "resetWorkspace": "Use default",
       "riskyTitle": "Risky capabilities",
-      "riskyHint": "Off by default. Turn on only what this teammate needs.",
+      "riskyHint": "Off by default. Turn on only what this bot needs.",
       "risky": {
         "shell": "Command line",
         "shellDesc": "Run any command, reach the network, read and write any file",

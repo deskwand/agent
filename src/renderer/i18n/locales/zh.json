@@ -3046,10 +3046,10 @@
     }
   },
   "persistentAgents": {
-    "title": "伙伴",
-    "expand": "展开伙伴",
-    "collapse": "收起伙伴",
-    "create": "新建伙伴",
+    "title": "Bot",
+    "expand": "展开 Bot",
+    "collapse": "收起 Bot",
+    "create": "新建 Bot",
     "status": {
       "running": "运行中",
       "paused": "已暂停",
@@ -3060,8 +3060,8 @@
       "sleepingReason": "休眠中 · 下次 {{time}} {{reason}}"
     },
     "form": {
-      "createTitle": "新建伙伴",
-      "editTitle": "编辑伙伴",
+      "createTitle": "新建 Bot",
+      "editTitle": "编辑 Bot",
       "name": "名称",
       "instructions": "角色与目标",
       "instructionsPlaceholder": "你负责运营 @your_account 推特号：每天发 1–2 条产品动态，回复技术相关的提及，语气友好专业。",
@@ -3070,7 +3070,7 @@
       "autoWorkspace": "自动创建专属工作区",
       "resetWorkspace": "恢复默认",
       "riskyTitle": "高危能力",
-      "riskyHint": "默认关闭。只在伙伴确实需要时开启。",
+      "riskyHint": "默认关闭。只在 Bot 确实需要时开启。",
       "risky": {
         "shell": "命令行",
         "shellDesc": "运行任意命令、联网、读写任意文件",

@@ -136,7 +136,7 @@ describe("AgentSidebarGroup", () => {
     act(() =>
       (
         container.querySelector(
-          'button[aria-label="展开伙伴"]',
+          'button[aria-label="展开 Bot"]',
         ) as HTMLButtonElement
       ).click(),
     );
@@ -157,7 +157,7 @@ describe("AgentSidebarGroup", () => {
     act(() =>
       (
         container.querySelector(
-          'button[aria-label="新建伙伴"]',
+          'button[aria-label="新建 Bot"]',
         ) as HTMLButtonElement
       ).click(),
     );

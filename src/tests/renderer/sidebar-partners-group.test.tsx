@@ -106,9 +106,9 @@ describe("Sidebar partners group", () => {
   it("collapses and expands from the header", async () => {
     await act(async () => root.render(<Sidebar />));
     expect(rows()).toBe(1);
-    act(() => header("收起伙伴").click());
+    act(() => header("收起 Bot").click());
     expect(rows()).toBe(0);
-    act(() => header("展开伙伴").click());
+    act(() => header("展开 Bot").click());
     expect(rows()).toBe(1);
   });
 
@@ -116,7 +116,7 @@ describe("Sidebar partners group", () => {
     useAppStore.setState({ activeSessionId: "s-agent" });
     await act(async () => root.render(<Sidebar />));
     expect(rows()).toBe(1);
-    act(() => header("收起伙伴").click());
+    act(() => header("收起 Bot").click());
     expect(rows()).toBe(0);
   });
 });
