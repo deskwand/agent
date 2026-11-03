@@ -5,8 +5,6 @@ import {
   FolderOpen,
   MessageSquare,
   MessageSquareText,
-  Users,
-  UsersRound,
 } from "lucide-react";
 
 const SECTION_DURATION_MS = 220;
@@ -281,6 +279,17 @@ export function SidebarAnimatedSection({
   );
 }
 
+/** 常驻智能体分组的图标：自绘的 HAL 9000 单眼透镜（24 格 / 2px 描边）。
+ *  除核心那一点是实心，其余全靠描边——零件只有三个，14px 下才不糊。
+ *  折叠 = 核心熄灭，展开 = 核心亮起 —— 两态只差一颗实心点，crossfade 退化成一次
+ *  极轻的呼吸，不必为图标改动画结构。同心圆是抗缩放最好的几何，14px 下仍读得出透镜。 */
+const BOT_LENS_RINGS = (
+  <>
+    <circle cx="12" cy="12" r="8.6" />
+    <circle cx="12" cy="12" r="5.6" />
+  </>
+);
+
 export function SidebarGroupIcon({
   expanded,
   motionVersion,
@@ -359,16 +368,33 @@ export function SidebarGroupIcon({
     >
       {kind === "partners" ? (
         <>
-          <Users
+          <svg
             ref={collapsedRef}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
             className={iconClassName}
             style={collapsedStyle}
-          />
-          <UsersRound
+          >
+            {BOT_LENS_RINGS}
+          </svg>
+          <svg
             ref={expandedRef}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
             className={iconClassName}
             style={expandedStyle}
-          />
+          >
+            {BOT_LENS_RINGS}
+            <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
+          </svg>
         </>
       ) : kind === "sessions" ? (
         <>
