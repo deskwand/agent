@@ -4,7 +4,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../../renderer/i18n/config";
 import i18n from "../../renderer/i18n/config";
-import { Sidebar } from "../../renderer/components/Sidebar";
+import {
+  Sidebar,
+  measureScrollGutter,
+} from "../../renderer/components/Sidebar";
 import { useAppStore } from "../../renderer/store";
 import { usePersistentAgentStore } from "../../renderer/store/persistent-agents";
 import type { Session } from "../../renderer/types";
@@ -118,5 +121,64 @@ describe("Sidebar partners group", () => {
     expect(rows()).toBe(1);
     act(() => header("收起 Bot").click());
     expect(rows()).toBe(0);
+  });
+
+  // 用户报障：「bot 的 + 没有和上面的搜索对齐」。
+  // 根因：列表容器 .sidebar-scroll 用 `scrollbar-gutter: stable` 恒留一条滚动条沟槽，
+  // 而头部那一行在它**外面** ⇒ 放大镜比列表内容右缘（Bot 行的「+」）多一条滚动条宽。
+  it("pads the header by the list's scrollbar gutter so both right edges line up", async () => {
+    // jsdom 不结算布局，自己给 .sidebar-scroll 报一个「300 宽 / 289 内容宽」（本机 thin 实测 11px）
+    const originals = (["offsetWidth", "clientWidth"] as const).map((name) => [
+      name,
+      Object.getOwnPropertyDescriptor(HTMLElement.prototype, name),
+    ]);
+    const stub = (name: "offsetWidth" | "clientWidth", value: number) =>
+      Object.defineProperty(HTMLElement.prototype, name, {
+        configurable: true,
+        get(this: HTMLElement) {
+          return this.classList.contains("sidebar-scroll") ? value : 0;
+        },
+      });
+    stub("offsetWidth", 300);
+    stub("clientWidth", 289);
+    try {
+      await act(async () => root.render(<Sidebar />));
+    } finally {
+      // 还原而非 delete：这两个是 jsdom 自己挂在 HTMLElement.prototype 上的访问器，
+      // 删掉会让本文件后续用例读到 undefined。
+      for (const [name, descriptor] of originals) {
+        if (descriptor) {
+          Object.defineProperty(HTMLElement.prototype, name, descriptor);
+        } else {
+          delete (HTMLElement.prototype as unknown as Record<string, unknown>)[
+            name as string
+          ];
+        }
+      }
+    }
+    const head = container.querySelector(
+      "[data-sidebar-header]",
+    ) as HTMLElement;
+    expect(head, "头部那一行需带 data-sidebar-header 才能定位").toBeTruthy();
+    // jsdom 会把 calc 里的项重排（实测得到 "calc(11px + 0.75rem)"），所以不钉顺序
+    expect(
+      head.style.paddingRight,
+      "头部的右内边距必须是 px-3 + 列表滚动条沟槽：少补这段，放大镜就比 Bot 行的「+」右出一条滚动条",
+    ).toMatch(/^calc\(/);
+    expect(head.style.paddingRight).toContain("0.75rem");
+    expect(head.style.paddingRight).toContain("11px");
+  });
+});
+
+describe("measureScrollGutter", () => {
+  it("returns the width the scroll container reserves for its scrollbar", () => {
+    expect(measureScrollGutter({ offsetWidth: 300, clientWidth: 289 })).toBe(
+      11,
+    );
+  });
+
+  it("never goes negative (overlay scrollbars / element not mounted yet)", () => {
+    expect(measureScrollGutter({ offsetWidth: 0, clientWidth: 0 })).toBe(0);
+    expect(measureScrollGutter({ offsetWidth: 289, clientWidth: 300 })).toBe(0);
   });
 });

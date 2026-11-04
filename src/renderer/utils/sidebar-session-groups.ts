@@ -10,6 +10,12 @@ export interface SidebarProjectGroup {
   name: string;
   sessions: Session[];
   earliestCreatedAt: number;
+  /**
+   * 组内最近一次活动（`sessionTime()` 的最大值）。项目组的排序键。
+   * 口径 = 该项目的**全部**会话（不受搜索过滤影响，已归档的在分组前就被跳过），
+   * 已「完成沉底」的会话照样参与 —— 它是真实活动。
+   */
+  latestActivityAt: number;
 }
 
 export interface SidebarSessionGroups {
@@ -125,13 +131,20 @@ export function buildSidebarSessionGroups(
         name,
         sessions: sortByActivity(visibleSessions, pinnedSessionRanks),
         earliestCreatedAt: Math.min(...projectSessions.map((s) => s.createdAt)),
+        latestActivityAt: Math.max(...projectSessions.map(sessionTime)),
       };
     },
   )
     .filter(({ sessions }) => sessions.length > 0)
     .sort((a, b) => {
       const pinnedOrder = comparePinned(a.key, b.key, pinnedProjectRanks);
-      return pinnedOrder ?? b.earliestCreatedAt - a.earliestCreatedAt;
+      if (pinnedOrder !== null) return pinnedOrder;
+      // 最近聊过的项目在上。平手用最早创建时间兜底，保证同一份输入次序稳定。
+      return (
+        b.latestActivityAt - a.latestActivityAt ||
+        b.earliestCreatedAt - a.earliestCreatedAt ||
+        a.key.localeCompare(b.key)
+      );
     });
 
   return {

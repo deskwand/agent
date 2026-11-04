@@ -76,16 +76,16 @@ describe("buildSidebarSessionGroups", () => {
     ]);
   });
 
-  it("sorts project groups by earliest createdAt (stable) and sessions by latest activity", () => {
+  it("sorts project groups by latest activity and sessions by latest activity", () => {
     const result = buildSidebarSessionGroups(
       [
-        session("old-project-first-session", {
+        session("old-project-recent-chat", {
           isProjectMode: true,
           cwd: "/work/old",
           createdAt: 1,
           updatedAt: 100,
         }),
-        session("new-project-session", {
+        session("new-project-stale-chat", {
           isProjectMode: true,
           cwd: "/work/new",
           createdAt: 50,
@@ -101,19 +101,65 @@ describe("buildSidebarSessionGroups", () => {
       "",
     );
 
-    // 项目组按 earliestCreatedAt 排序：new(min=30) > old(1)，新项目在上
+    // 项目组按组内最近活动排序：old(latest=100) > new(latest=20)。
+    // 「早就创建、刚聊过」的项目压过「新创建、很久没动」的项目。
     expect(result.projectGroups.map(({ name }) => name)).toEqual([
-      "new",
       "old",
+      "new",
     ]);
     // 组内会话仍按活跃时间排序
     expect(result.projectGroups[0].sessions.map(({ id }) => id)).toEqual([
-      "new-project-session",
-      "new-project-later-session",
+      "old-project-recent-chat",
     ]);
     expect(result.projectGroups[1].sessions.map(({ id }) => id)).toEqual([
-      "old-project-first-session",
+      "new-project-stale-chat",
+      "new-project-later-session",
     ]);
+  });
+
+  it("breaks latest-activity ties by earliest createdAt, then by key", () => {
+    const createdAtTie = buildSidebarSessionGroups(
+      [
+        session("alpha", {
+          isProjectMode: true,
+          cwd: "/work/alpha",
+          createdAt: 10,
+          updatedAt: 50,
+        }),
+        session("beta", {
+          isProjectMode: true,
+          cwd: "/work/beta",
+          createdAt: 5,
+          updatedAt: 50,
+        }),
+      ],
+      "",
+    );
+    // 最近活动打平 → 最早创建更晚的项目在上（alpha min=10 > beta min=5）
+    expect(createdAtTie.projectGroups.map(({ name }) => name)).toEqual([
+      "alpha",
+      "beta",
+    ]);
+
+    const keyTie = buildSidebarSessionGroups(
+      [
+        session("y", {
+          isProjectMode: true,
+          cwd: "/work/y",
+          createdAt: 10,
+          updatedAt: 50,
+        }),
+        session("x", {
+          isProjectMode: true,
+          cwd: "/work/x",
+          createdAt: 10,
+          updatedAt: 50,
+        }),
+      ],
+      "",
+    );
+    // 两个键都打平 → 按 key 开序，保证同一份输入次序稳定
+    expect(keyTie.projectGroups.map(({ name }) => name)).toEqual(["x", "y"]);
   });
 
   it("filters by title but expands a project-name match", () => {

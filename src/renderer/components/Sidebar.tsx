@@ -1,4 +1,11 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -178,6 +185,25 @@ export function Sidebar({
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [agentEditorOpen, setAgentEditorOpen] = useState(false);
   const scrollListRef = useRef<HTMLDivElement>(null);
+  // 头部那一行（「新聊天」+ 放大镜）和列表在**两层**：列表容器 `.sidebar-scroll` 恒留一条
+  // 滚动条沟槽（globals.css 的 `scrollbar-gutter: stable`，本机 thin 实测 11px），
+  // 头部在它**外面**、不吃这段宽度 ⇒ 放大镜比列表内容的右缘（Bot 行那颗「+」）
+  // 整整多出一条滚动条宽，两行右缘对不齐。
+  // 沟槽宽度随平台与滚动条样式变（overlay 0 / thin 11 / 经典 15），所以量出来再补，不写死数字。
+  const [scrollGutter, setScrollGutter] = useState(0);
+  useLayoutEffect(() => {
+    const el = scrollListRef.current;
+    if (!el) return;
+    const measure = () => {
+      const next = measureScrollGutter(el);
+      setScrollGutter((prev) => (prev === next ? prev : next));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [sidebarCollapsed]);
 
   // Exclude archived sessions from normal display
   const activeSessions = useMemo(
@@ -1260,8 +1286,15 @@ export function Sidebar({
           <>
             {/* 顶部一行：整行「新聊天」+ 行尾 hover 才浮出的 ▾（项目下拉）+ 常驻放大镜。
                 ▾ 绝对定位在整行右缘：平常用不到的三个入口不该占一行的地方，
-                但 hover / 行内聚焦时必须出现，否则它们就成了隐藏功能。 */}
-            <div className="px-3 pt-3 pb-1">
+                但 hover / 行内聚焦时必须出现，否则它们就成了隐藏功能。
+                ⚠️ 右内边距 = px-3 + 列表那条滚动条沟槽：列表容器 .sidebar-scroll 用
+                `scrollbar-gutter: stable` 恒留一条（本机 thin 实测 11px），这一行在它**外面**
+                ⇒ 不补这段宽度，放大镜就比 Bot 行的「+」整整右出一条滚动条（用户报障）。 */}
+            <div
+              data-sidebar-header
+              className="px-3 pt-3 pb-1"
+              style={{ paddingRight: `calc(0.75rem + ${scrollGutter}px)` }}
+            >
               <div className="flex items-center gap-1">
                 <div className="group/newchat relative min-w-0 flex-1">
                   <Button
@@ -1897,4 +1930,16 @@ function formatRelativeTime(
 
   const count = Math.max(1, Math.floor(elapsedMs / week));
   return t("sidebar.relativeTime.week", { count, lng: language });
+}
+
+/**
+ * 列表容器预留的滚动条沟槽宽度（`scrollbar-gutter: stable` 那段），单位 px。
+ * `clientWidth` 不含滚动条/沟槽、`offsetWidth` 含 —— 差值就是它。
+ * 量不出来时（元素未挂载、jsdom 不结算布局）返回 0，调用方据此退回纯 Tailwind 的内边距。
+ */
+export function measureScrollGutter(el: {
+  offsetWidth: number;
+  clientWidth: number;
+}): number {
+  return Math.max(0, el.offsetWidth - el.clientWidth);
 }

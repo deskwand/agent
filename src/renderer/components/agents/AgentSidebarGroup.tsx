@@ -50,8 +50,12 @@ export function AgentSidebarGroup({
 
   return (
     <section className="pb-1.5">
-      {/* 「+」放在标题按钮外面：不嵌套 button，点它也不会触发折叠 */}
-      <div className="flex items-center">
+      {/* 「+」放在标题按钮外面：不嵌套 button，点它也不会触发折叠。
+          hover-only：三个入口（新会话在项目里 / 新建项目 / 打开项目）不是常驻操作，
+          常驻会跟上面那行放大镜抢注意力，也让 Bot 一行看着比「最近」「项目」重。
+          `pointer-events-none` 只为挡住不可见的点击面；键盘 Tab 到它时靠
+          `group-focus-within` 浮出（否则就成了只对鼠标可见的功能 ✗）。 */}
+      <div className="group/bot flex items-center">
         <Button
           variant="ghost"
           type="button"
@@ -69,14 +73,16 @@ export function AgentSidebarGroup({
           />
           <span>{t("persistentAgents.title")}</span>
         </Button>
+        {/* 与上面那颗放大镜同档（32×32 命中区、同一条右缘）：右缘对齐 + 同宽，
+            图标中心才落在同一条竖线上。 */}
         <Button
           variant="ghost"
           type="button"
           aria-label={t("persistentAgents.create")}
           onClick={onCreate}
-          className="h-6 w-6 shrink-0 p-0 text-muted-foreground"
+          className="h-8 w-8 shrink-0 p-0 text-muted-foreground opacity-0 pointer-events-none transition-opacity group-hover/bot:opacity-100 group-hover/bot:pointer-events-auto group-focus-within/bot:opacity-100 group-focus-within/bot:pointer-events-auto hover:bg-hover-surface hover:text-foreground"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="h-4 w-4" />
         </Button>
       </div>
       <SidebarAnimatedSection expanded={expanded} motionVersion={motionVersion}>

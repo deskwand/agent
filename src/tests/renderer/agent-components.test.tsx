@@ -164,6 +164,25 @@ describe("AgentSidebarGroup", () => {
     expect(onCreate).toHaveBeenCalledTimes(1);
     expect(onToggle).not.toHaveBeenCalled();
   });
+
+  // 用户报障：「bot 的 + 号不要常驻」。它只是新建入口，不该跟上面的放大镜抢注意力。
+  // 判定看类名（jsdom 不结算 CSS）：opacity-0 不可见、pointer-events-none 不接点击，
+  // 行 hover 与键盘 focus 时再浮出 —— 后者不写就成了只对鼠标可见的功能。
+  it("keeps the create button hidden until the row is hovered or focused", async () => {
+    renderGroup(true);
+    await flush();
+    const create = container.querySelector(
+      'button[aria-label="新建 Bot"]',
+    ) as HTMLButtonElement;
+    expect(create.className).toContain("opacity-0");
+    expect(create.className).toContain("pointer-events-none");
+    expect(create.className).toContain("group-hover/bot:opacity-100");
+    expect(create.className).toContain("group-focus-within/bot:opacity-100");
+    expect(
+      create.parentElement?.className ?? "",
+      "hover-only 靠父级 group/bot 才能生效",
+    ).toContain("group/bot");
+  });
 });
 
 describe("AgentEditModal", () => {
