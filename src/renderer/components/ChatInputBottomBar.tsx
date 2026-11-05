@@ -23,7 +23,13 @@ export interface ContextStatusDetails {
   tokenSpeedLabel?: string;
 }
 
-/** 卡内右簇：发送 / 停止、麦克风。编辑区自行长高，不设展开按钮。 */
+/**
+ * 卡内右簇：发送 / 停止、麦克风。编辑区自行长高，不设展开按钮。
+ *
+ * 停止态与发送态共用同一副骨骼：36px 圆形热区、无底色，只在 hover 时显形。
+ * 停止只靠「实心方块」这个字形表达，不再套一层 `bg-primary` 实心圆 —— 圆底 + 方块
+ * 叠成两层实心，是输入卡里最亮的一块，与旁边的麦克风差了两级视觉重量。
+ */
 export interface ChatInputBottomBarProps {
   canStop: boolean;
   onStop: () => void;
@@ -66,14 +72,20 @@ export function ChatInputBottomBar({
             onClick={canStop ? onStop : undefined}
             disabled={!canStop && (isSubmitting || submitDisabled)}
             aria-label={submitLabel}
-            className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition-colors ${
+            className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition-colors text-foreground hover:bg-hover-surface ${
               canStop
-                ? "bg-primary text-background hover:bg-primary/90"
-                : `text-foreground hover:bg-hover-surface disabled:opacity-50 disabled:cursor-not-allowed ${hasInputContent ? "" : "invisible"}`
+                ? ""
+                : `disabled:opacity-50 disabled:cursor-not-allowed ${hasInputContent ? "" : "invisible"}`
             }`}
           >
             {canStop ? (
-              <Square className="w-4 h-4" />
+              // 实心圆角方块：`strokeWidth={0}` + `fill` 才是「一枚方块」，描边版
+              // 在 14px 下看着是空心的框，停止读不出来。
+              <Square
+                className="w-3.5 h-3.5"
+                fill="currentColor"
+                strokeWidth={0}
+              />
             ) : (
               <CornerDownLeft className="w-4 h-4" />
             )}
