@@ -43,12 +43,15 @@
   --magic-glow: color-mix(in srgb, var(--primary) 60%, #c4b5fd);
   --magic-spark: color-mix(in srgb, var(--primary) 30%, #ede9fe);
 
-  /* 窗口最外那圈（图标栏＋标题栏）：比它框住的面板更暗 */
   /* 强调色的文字档：官方 accent 的暗色 primary 对暗底只有 1.98–2.81，不能当文字用。
      与 foreground 混到 40% —— 238 个组合（7 底色 × 17 强调色 × 明暗）里对
      background/card/muted/accent 四个表面的最差对比 6.05（余量 1.55）。
      只声明一次：var(--primary) 在使用处按当前主题解析。 */
   --primary-text: color-mix(in srgb, var(--primary) 40%, var(--foreground));
+
+  /* 窗口最外那圈（图标栏＋标题栏）的**基准**：压画布 50%（亮色在 :root.light 覆盖成 12%）。
+     其余 6 套深色画布仍是近黑，这个比例给它们的台阶正好（1.027–1.035），保持原样。
+     默认深色槽位单独覆盖一次（见下方"默认深色槽位"块）—— 它画布已抬到 #191919。 */
   --app-chrome: color-mix(in srgb, #000000 50%, var(--background));
   /* Windows 原生关闭键悬停红，镜像系统配色 */
   --window-close-hover: #c42b1c;
@@ -104,16 +107,22 @@
   --selected-surface: color-mix(in srgb, var(--foreground) 10%, transparent);
 }
 
-/* 默认深色（zinc dark）把输入区抬到 --card（暖灰版为 #303030）。
+/* 默认深色（zinc dark）的外观覆盖 —— **只作用于这一套**，其余 6 套保持上面的基准：
+   1) 输入区抬到 --card（暖灰版 #303030），从画布上浮起一档；
+   2) 外圈从"压画布 50%"改成"压 --muted 25%" = #1d1d1b：画布抬亮后 50% 压黑会得到
+      #0d0d0d（比画布暗 12 个色阶），是一条黑边；改后比画布略亮（1.03）、比面板暗
+      （1.13），既不刺眼又保留分界。
    两个选择器都要：
    - `[data-theme-preset="zinc"]` —— React 挂载后 App.tsx 一定会写这个属性（选 zinc 也写）；
    - `:not([data-theme-preset])` —— 首帧属性还没写时，默认槽位就是 zinc 暗色，
      少了这条会先渲染成 --muted 再跳一档。
    `.light` 一律排除：亮色下 --card ≡ --background，抬起来等于没有面板。
-   注意：本块只声明 --composer、不声明 --background，所以不会被 themeBlocks() 当成第 15 个主题块。 */
+   注意：本块只声明 --composer / --app-chrome、不声明 --background，所以不会被 themeBlocks()
+   当成第 15 个主题块。 */
 :root[data-theme-preset="zinc"]:not(.light),
 :root:not([data-theme-preset]):not(.light) {
   --composer: var(--card);
+  --app-chrome: color-mix(in srgb, #000000 25%, var(--muted));
 }
 
 @layer base {

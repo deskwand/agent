@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   RENDERER,
+  blockBySelector,
   composerTokenOf,
   composite,
   rgbHex,
@@ -34,39 +35,63 @@ const tailwindSource = fs.readFileSync(
  * 解出某个主题块下 `--app-chrome`（外圈）的最终 hex。
  *
  * 与 `background-secondary` 不同：外圈**不是逐块声明的**，只在 globals.css 里声明两次
- * （顶层 `:root` 给暗色、`:root.light` 给亮色），值里的 `var(--background)` 由各主题块解析
+ * （顶层 `:root` 给暗色、`:root.light` 给亮色），值里的 `var(--…)` 由各主题块解析
  * ——与 `--overlay-hover` / `--highlight-removed` 同款（2026-09-29-outer-ring-depth-design.md §3）。
- * 所以这里按块的明暗取对应的那一条，再 composite 到本块的 background 上。
+ * 所以这里按块的明暗取对应的那一条，再 composite 到本块的**基准 token** 上。
+ *
+ * 2026-11-07 起外圈有**三档**，所以这里按块解析（比例与基准都从声明里读，不写死）：
+ * - 亮色（`:root.light`）：12% 压 `--background` —— 2026-09 外圈原口径；
+ * - 默认深色槽位（裸 `:root`）：25% 压 `--muted` —— 画布抬到 #191919 后，"压画布 50%"
+ *   会得到比画布暗 12 个色阶的黑边；
+ * - 其余 6 套深色：50% 压 `--background` —— 那 6 套的台阶（1.027–1.035）本来就是对的，
+ *   外圈是全局声明，只有默认槽位被单独覆盖。
  *
  * 不要退回 `tokenOf(block, "--app-chrome")`：各主题块里根本没有这条声明，
  * 那种写法解不出色值，NaN 参与的比较全为假（同文件 `backgroundSecondary()` 记过的坑）。
  */
 const CHROME_DECL =
-  /--app-chrome\s*:\s*color-mix\(\s*in srgb,\s*#000000\s+([\d.]+)%,\s*var\(--background\)\s*\)/;
+  /--app-chrome\s*:\s*color-mix\(\s*in srgb,\s*#000000\s+([\d.]+)%,\s*var\((--[\w-]+)\)\s*\)/;
 
-function chromePercent(isLight: boolean): number {
-  // 亮色那条只可能在 :root.light 里（(0,2,0) 特异性，不依赖源码顺序）；
-  // 暗色那条在顶层 :root 的控制叠层块里 —— 先把 :root.light 整块摘掉再找，免得命中它。
-  const lightBlock = /^:root\.light\s*\{[\s\S]*?\n\}/m.exec(css)?.[0];
-  if (!lightBlock) throw new Error("globals.css 里找不到 :root.light 块");
-  const source = (isLight ? lightBlock : css.replace(lightBlock, "")).replace(
-    /\s+/g,
-    " ",
-  );
+/** 固定语义层的顶层 `:root`（外圈基准）。 */
+function topRootBlock(): string {
+  const m = /^:root \{[\s\S]*?\n\}/m.exec(css)?.[0];
+  if (!m) throw new Error("globals.css 里找不到顶层 :root 块");
+  return m;
+}
+
+/** 默认深色槽位块（`:root[data-theme-preset="zinc"]:not(.light), …`）。 */
+function defaultDarkSlotBlock(): string {
+  const m =
+    /:root\[data-theme-preset="zinc"\]:not\(\.light\),[\s\S]*?\n\}/.exec(
+      css,
+    )?.[0];
+  if (!m) throw new Error("globals.css 里找不到默认深色槽位块");
+  return m;
+}
+
+type ChromeMix = { percent: number; base: string };
+
+/** 外圈的压黑比例与基准。三档见上方 doc comment；按块的明暗与选择器解析。 */
+function chromeMix(block: string): ChromeMix {
+  const selector = block.slice(0, block.indexOf("{")).trim();
+  const source = isLightBlock(block)
+    ? // 亮色那条只可能在 :root.light 里（(0,2,0) 特异性，不依赖源码顺序）
+      (/^:root\.light \{[\s\S]*?\n\}/m.exec(css)?.[0] ?? "")
+    : selector === ":root"
+      ? defaultDarkSlotBlock()
+      : topRootBlock();
   const m = CHROME_DECL.exec(source);
-  if (!m)
+  if (!m) {
     throw new Error(
-      `globals.css 里找不到${isLight ? "亮色" : "暗色"}的 --app-chrome 声明`,
+      `globals.css 里找不到这个块的 --app-chrome 声明：${selector}`,
     );
-  return Number(m[1]) / 100;
+  }
+  return { percent: Number(m[1]) / 100, base: m[2] };
 }
 
 function backgroundChrome(block: string): string {
-  return composite(
-    tokenOf(block, "--background"),
-    "#000000",
-    chromePercent(/^\s*\.light/.test(block)),
-  );
+  const { percent, base } = chromeMix(block);
+  return composite(tokenOf(block, base), "#000000", percent);
 }
 
 function isLightBlock(block: string): boolean {
@@ -243,9 +268,28 @@ describe("主题对比度不变量", () => {
     );
   });
 
-  it("§9-8 外圈（图标栏＋标题栏）：比内容区暗，三级台阶成立", () => {
-    expect(chromePercent(true), "亮色压黑比例").toBeCloseTo(0.12, 5);
-    expect(chromePercent(false), "暗色压黑比例").toBeCloseTo(0.5, 5);
+  it("§9-8 外圈（图标栏＋标题栏）：比面板暗、与画布同档，三级台阶成立", () => {
+    const lightBlock = blockBySelector(".light");
+    const defaultDark = blockBySelector(":root");
+    const otherDark = blockBySelector(':root[data-theme-preset="neutral"]');
+    for (const b of [lightBlock, defaultDark, otherDark]) {
+      expect(b, "主题块缺失").toBeTruthy();
+    }
+    // 亮色：压画布 12%（外圈比画布更暗，沿用 2026-09 外圈设计的原口径）。
+    expect(chromeMix(lightBlock!), "亮色压黑").toEqual({
+      percent: 0.12,
+      base: "--background",
+    });
+    // 默认深色：压侧栏 25%（2026-11 改）—— 画布抬亮后"压画布"会变成黑边。
+    expect(chromeMix(defaultDark!), "默认深色压黑").toEqual({
+      percent: 0.25,
+      base: "--muted",
+    });
+    // 其余 6 套深色必须回到原样：它们的画布仍是近黑，改基准会让外圈比画布亮 19 阶。
+    expect(chromeMix(otherDark!), "其余深色压黑").toEqual({
+      percent: 0.5,
+      base: "--background",
+    });
 
     // tailwind 里少了 app-chrome 键，bg-app-chrome 就是死类（不生成任何 CSS），外圈静默透明。
     expect(
@@ -268,9 +312,20 @@ describe("主题对比度不变量", () => {
       const icon = contrast(tokenOf(block, "--muted-foreground"), chrome);
       if (icon < 3) lowIcons.push(`${icon.toFixed(2)}  ${head}`);
 
+      // 方向：默认深色槽位的画布被抬亮过，外圈必须**不暗于**画布（否则就是那条黑边）；
+      // 其余块沿用近黑画布，外圈仍然更暗。对比度对方向不敏感，所以这里单锁方向。
+      const dL =
+        relativeLuminance(parseHex(chrome)) -
+        relativeLuminance(parseHex(background));
+      if (block.slice(0, block.indexOf("{")).trim() === ":root" && dL < 0) {
+        outOfBand.push(`${head} 外圈比画布暗 —— 又回到黑边`);
+      }
+
       const vsContent = contrast(chrome, background);
       const vsSecondary = contrast(chrome, secondary);
       // 台阶区间按 7 套官方 base 实测标定（spec §7 登记）；越界即红。
+      // `vsContent` 只锁"外圈与画布分得开"（对比度对方向不敏感）：暗色外圈现在略亮于
+      // 画布、亮色外圈更暗，两者都落在这个区间里。
       const ok =
         vsContent >= 1.02 &&
         vsContent <= 1.45 &&
