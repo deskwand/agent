@@ -183,6 +183,58 @@ describe("AgentSidebarGroup", () => {
       "hover-only 靠父级 group/bot 才能生效",
     ).toContain("group/bot");
   });
+
+  // 用户报障：「Bot 的亮度太抢眼了」。两个来源：名字原来继承正文色（比并肩的「最近」
+  // 会话行亮一整档），头像的白描线（#fff）在深底上是整块唯一的高亮度色块。
+  // 判定看类名（jsdom 不结算 CSS）：名字退到 muted-foreground、当前打开的那行回正文色
+  // （与「最近」同一条规则），头像压到 75%。状态文案与标题不动 —— 它们已经在
+  // muted-foreground 上，再叠 alpha 会让亮色主题里的 12px 小字掉到 2.2:1。
+  it("dims row text and avatar so the group sits behind 最近", async () => {
+    api.list.mockResolvedValue([view("1"), view("2")]);
+    act(() =>
+      root.render(
+        <AgentSidebarGroup
+          activeSessionId="s-1"
+          expanded
+          motionVersion={0}
+          onToggle={() => undefined}
+          onOpenSession={() => undefined}
+          onCreate={() => undefined}
+        />,
+      ),
+    );
+    await flush();
+    const [active, idle] = Array.from(
+      container.querySelectorAll("[data-agent-row]"),
+    );
+
+    const nameOf = (row: Element, name: string) =>
+      Array.from(row.querySelectorAll("span")).find(
+        (span) => span.textContent === name,
+      )!;
+    expect(nameOf(active, "agent-1").className).toContain("text-foreground");
+    expect(nameOf(active, "agent-1").className).not.toContain(
+      "text-muted-foreground",
+    );
+    expect(nameOf(idle, "agent-2").className).toContain(
+      "text-muted-foreground",
+    );
+    expect(nameOf(idle, "agent-2").className).not.toContain("text-foreground");
+
+    for (const row of [active, idle]) {
+      expect(
+        row.querySelector("img")?.className,
+        "白描线头像要压到 muted 那一档亮度",
+      ).toContain("opacity-75");
+    }
+
+    // 状态文案不许叠 alpha：亮色主题里 muted-foreground 已经只余 4.62:1，/70 会掉到 2.2:1。
+    const statusClasses = idle.querySelector(".text-xs")!.className.split(" ");
+    expect(statusClasses).toContain("text-muted-foreground");
+    expect(
+      statusClasses.filter((c) => c.includes("muted-foreground/")),
+    ).toEqual([]);
+  });
 });
 
 describe("AgentEditModal", () => {

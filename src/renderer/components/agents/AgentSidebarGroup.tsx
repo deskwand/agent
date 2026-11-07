@@ -90,6 +90,7 @@ export function AgentSidebarGroup({
           const running =
             sessions.find((s) => s.id === agent.sessionId)?.status ===
             "running";
+          const active = activeSessionId === agent.sessionId;
           const dot =
             agent.status === "error"
               ? "bg-destructive"
@@ -103,19 +104,36 @@ export function AgentSidebarGroup({
               data-agent-row={agent.id}
               onClick={() => onOpenSession(agent.sessionId)}
               className={`w-full rounded-lg px-3 py-1.5 flex items-center gap-2 text-left hover:bg-hover-surface transition-colors ${
-                activeSessionId === agent.sessionId ? "bg-hover-surface" : ""
+                active ? "bg-hover-surface" : ""
               }`}
             >
               <span className="relative shrink-0">
-                <PartnerAvatar seed={agent.avatarSeed} size={24} />
+                {/* 白描线头像（notionists 的 #fff）在深底上是这块唯一的高亮度色块，
+                    压到 75% 才落在 muted 那一档；alt="" 是装饰，不承担信息。 */}
+                <PartnerAvatar
+                  seed={agent.avatarSeed}
+                  size={24}
+                  className="opacity-75"
+                />
                 <span
                   data-agent-status-dot
                   className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-muted ${dot}`}
                   aria-hidden="true"
                 />
               </span>
+              {/* 用户报障：「Bot 的亮度太抢眼了」。名字原来是继承正文色的裸 `text-sm`，
+                  比并肩的「最近」会话行（`text-muted-foreground`，仅当前行回正文色）
+                  亮一整档 ⇒ 这里照抄同一条规则，把整块退到「最近」后面。 */}
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm">{agent.name}</span>
+                <span
+                  className={`block truncate text-sm ${
+                    active ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {agent.name}
+                </span>
+                {/* 状态文案保持原样：它已经在 muted-foreground 上，再叠 alpha 会在亮色主题里
+                    把 12px 小字压到 2.2:1（100% 时对侧栏底色才 4.62:1）。 */}
                 <span className="block truncate text-xs text-muted-foreground">
                   {formatAgentStatus(agent, running, t, now, false)}
                 </span>
