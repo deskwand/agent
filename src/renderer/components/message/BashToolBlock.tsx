@@ -7,6 +7,8 @@ import {
   Loader2,
   XCircle,
   CheckCircle2,
+  Copy,
+  Check,
 } from "lucide-react";
 import Convert from "ansi-to-html";
 import { useAppStore } from "../../store";
@@ -30,6 +32,8 @@ interface BashToolBlockProps {
   allBlocks?: ContentBlock[];
   message?: Message;
   showIcon?: boolean;
+  /** 只渲染展开后的详情，不渲染自己的折叠头和卡片外壳（工具组里一行一个调用时用）。 */
+  detailOnly?: boolean;
 }
 
 /** Build a single ansi-to-html converter using CSS custom properties for theme-aware colors */
@@ -58,6 +62,7 @@ export const BashToolBlock = memo(function BashToolBlock({
   allBlocks,
   message,
   showIcon = true,
+  detailOnly = false,
 }: BashToolBlockProps) {
   const traceSteps = useAppStore((s) =>
     message?.sessionId
@@ -81,6 +86,16 @@ export const BashToolBlock = memo(function BashToolBlock({
       : null,
   );
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copyCommand = async (command: string) => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // 剪贴板可能被拒（失焦 / 无权限）：静默失败，不打断阅读
+    }
+  };
   const { t } = useTranslation();
 
   // Extract command
@@ -148,68 +163,74 @@ export const BashToolBlock = memo(function BashToolBlock({
 
   return (
     <Collapsible
-      open={expanded}
-      onOpenChange={setExpanded}
-      className={`rounded-2xl overflow-hidden transition-colors ${
-        isError
-          ? "bg-destructive/5"
-          : isRunning
-            ? "bg-primary/5"
-            : "bg-background/40"
-      }`}
+      open={detailOnly || expanded}
+      onOpenChange={detailOnly ? undefined : setExpanded}
+      className={
+        detailOnly
+          ? ""
+          : `rounded-2xl overflow-hidden transition-colors ${
+              isError
+                ? "bg-destructive/5"
+                : isRunning
+                  ? "bg-primary/5"
+                  : "bg-background/40"
+            }`
+      }
     >
       {/* Collapsed header */}
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="ghost"
-          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
-        >
-          {/* Status icon */}
-          <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
-            {isRunning ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : isError ? (
-              <XCircle className="w-3.5 h-3.5" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            )}
-          </div>
-
-          {/* Tool icon */}
-          {showIcon ? (
+      {!detailOnly && (
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
+          >
+            {/* Status icon */}
             <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
-              {getToolIcon(block.name)}
-            </div>
-          ) : null}
-
-          {/* Label: $ command · exit N */}
-          <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-            <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
-              $ {cmd}
-            </span>
-            {isRunning ? (
-              <span className="whitespace-nowrap text-xs text-muted-foreground">
-                · {t("tool.bashRunning")}
-              </span>
-            ) : null}
-            <span
-              className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
-                expanded
-                  ? "opacity-100"
-                  : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-              }`}
-            >
-              {expanded ? (
-                <ChevronDown className="w-3.5 h-3.5" />
+              {isRunning ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isError ? (
+                <XCircle className="w-3.5 h-3.5" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5" />
+                <CheckCircle2 className="w-3.5 h-3.5" />
               )}
-            </span>
-          </div>
-        </Button>
-      </CollapsibleTrigger>
+            </div>
 
-      {expanded && (
+            {/* Tool icon */}
+            {showIcon ? (
+              <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
+                {getToolIcon(block.name)}
+              </div>
+            ) : null}
+
+            {/* Label: $ command · exit N */}
+            <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
+              <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
+                $ {cmd}
+              </span>
+              {isRunning ? (
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  · {t("tool.bashRunning")}
+                </span>
+              ) : null}
+              <span
+                className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
+                  expanded
+                    ? "opacity-100"
+                    : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+                }`}
+              >
+                {expanded ? (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5" />
+                )}
+              </span>
+            </div>
+          </Button>
+        </CollapsibleTrigger>
+      )}
+
+      {(detailOnly || expanded) && (
         <CollapsibleContent>
           {/* Expanded content — streaming during execution, terminal after */}
           {isRunning && partialToolResult && partialToolResult.content && (
@@ -230,7 +251,7 @@ export const BashToolBlock = memo(function BashToolBlock({
             <div className="animate-fade-in mx-3 mb-3 rounded-lg overflow-hidden border border-muted">
               {/* Command + output */}
               <div
-                className="px-3 py-2 font-mono text-xs leading-snug"
+                className="group/term px-3 py-2 font-mono text-xs leading-snug"
                 style={{ backgroundColor: "var(--terminal-bg)" }}
               >
                 {/* Shell + duration meta line (no macOS traffic lights) */}
@@ -248,15 +269,31 @@ export const BashToolBlock = memo(function BashToolBlock({
                 </div>
 
                 {/* Command line: $ cmd (green for success, red for error) */}
-                <div
-                  className="mb-1.5"
-                  style={{
-                    color: isError
-                      ? "var(--terminal-error)"
-                      : "var(--terminal-success)",
-                  }}
-                >
-                  $ {cmd}
+                <div className="mb-1.5 flex items-start gap-2">
+                  <span
+                    className="min-w-0 flex-1 whitespace-pre-wrap break-all"
+                    style={{
+                      color: isError
+                        ? "var(--terminal-error)"
+                        : "var(--terminal-success)",
+                    }}
+                  >
+                    $ {cmd}
+                  </span>
+                  <button
+                    type="button"
+                    data-copy-command
+                    aria-label={t("common.copy")}
+                    onClick={() => void copyCommand(cmd)}
+                    className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-hover-surface focus-visible:opacity-100 group-hover/term:opacity-100"
+                    style={{ color: "var(--terminal-dim)" }}
+                  >
+                    {copied ? (
+                      <Check className="h-3 w-3" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </button>
                 </div>
 
                 {/* Output with ANSI coloring (fg applied by ansi-to-html converter) */}

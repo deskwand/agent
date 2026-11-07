@@ -175,6 +175,16 @@ describe("ProcessSummaryBlock highlight and expand", () => {
         .querySelector<HTMLButtonElement>("button[aria-expanded]")
         ?.click();
     });
+    // 新结构：组展开后每个调用只是一行，清单内容要点开行才渲染
+    expect(container.textContent).not.toContain("建表");
+    expect(container.querySelector("[data-tool-group-card]")).not.toBeNull();
+    expect(container.querySelectorAll("[data-tool-step]").length).toBe(1);
+
+    act(() => {
+      container
+        .querySelectorAll<HTMLButtonElement>("button[aria-expanded]")[1]
+        ?.click();
+    });
     expect(container.textContent).toContain("建表");
   });
 
@@ -238,6 +248,54 @@ describe("ProcessSummaryBlock highlight and expand", () => {
     expect(useAppStore.getState().highlightedToolCallId).toBe("child");
     // 失败条目由 ref 滚进视野，而不是 querySelector 查业务 DOM。
     expect(scrollIntoViewSpy).toHaveBeenCalled();
+  });
+
+  it("组内每个调用是一行，行间分隔靠容器（不是一堆卡片）", () => {
+    const items = [
+      {
+        id: "c1",
+        type: "tool_use" as const,
+        name: "bash",
+        input: { command: "ls" },
+      },
+      {
+        id: "c2",
+        type: "tool_use" as const,
+        name: "read",
+        input: { file_path: "/tmp/b.ts" },
+      },
+    ];
+    const twoItemBlock = {
+      type: "process-summary",
+      items,
+      summary: {
+        ...block.summary,
+        subagentCount: 0,
+        subagents: [],
+        commandCount: 1,
+        readCount: 1,
+      },
+    } as unknown as ProcessSummaryDisplayBlock;
+
+    act(() =>
+      root.render(
+        createElement(ProcessSummaryBlock, {
+          block: twoItemBlock,
+          allBlocks: items,
+          message: { ...message, content: items },
+        }),
+      ),
+    );
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>("button[aria-expanded]")
+        ?.click();
+    });
+
+    expect(container.querySelectorAll("[data-tool-step]").length).toBe(2);
+    const card = container.querySelector("[data-tool-group-card]");
+    expect(card).not.toBeNull();
+    expect(card?.className).toContain("[&>*+*]:border-t");
   });
 
   it("命中被投影掉的父脚本 ID 时也展开脚本详情并高亮", () => {

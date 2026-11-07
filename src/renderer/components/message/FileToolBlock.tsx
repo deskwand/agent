@@ -31,6 +31,8 @@ interface FileToolBlockProps {
   message?: Message;
   action: "read" | "write";
   showIcon?: boolean;
+  /** 只渲染展开后的详情，不渲染自己的折叠头和卡片外壳（工具组里一行一个调用时用）。 */
+  detailOnly?: boolean;
 }
 
 const EXT_LANG_MAP: Record<string, string> = {
@@ -104,6 +106,7 @@ export const FileToolBlock = memo(function FileToolBlock({
   message,
   action,
   showIcon = true,
+  detailOnly = false,
 }: FileToolBlockProps) {
   const traceSteps = useAppStore((s) =>
     message?.sessionId
@@ -193,72 +196,78 @@ export const FileToolBlock = memo(function FileToolBlock({
 
   return (
     <Collapsible
-      open={expanded}
-      onOpenChange={setExpanded}
-      className={`rounded-2xl overflow-hidden transition-colors ${
-        isError
-          ? "bg-destructive/5"
-          : isRunning
-            ? "bg-primary/5"
-            : "bg-background/40"
-      }`}
+      open={detailOnly || expanded}
+      onOpenChange={detailOnly ? undefined : setExpanded}
+      className={
+        detailOnly
+          ? ""
+          : `rounded-2xl overflow-hidden transition-colors ${
+              isError
+                ? "bg-destructive/5"
+                : isRunning
+                  ? "bg-primary/5"
+                  : "bg-background/40"
+            }`
+      }
     >
       {/* Collapsed header */}
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="ghost"
-          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
-        >
-          {/* Status icon */}
-          <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
-            {isRunning ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : isError ? (
-              <XCircle className="w-3.5 h-3.5" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            )}
-          </div>
-
-          {/* Tool icon — uses actual tool name for correct icon */}
-          {showIcon ? (
+      {!detailOnly && (
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
+          >
+            {/* Status icon */}
             <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
-              {getToolIcon(block.name)}
-            </div>
-          ) : null}
-
-          {/* Label: action + path + stats */}
-          <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-            <span className="whitespace-nowrap text-xs text-muted-foreground">
-              {t(isWrite ? "tool.actionWrite" : "tool.actionRead")}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
-              · {shortenPath(path)}
-            </span>
-            {isRunning ? (
-              <span className="whitespace-nowrap text-xs text-muted-foreground">
-                · {isWrite ? t("tool.writeWriting") : t("tool.readReading")}
-              </span>
-            ) : null}
-            <span
-              className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
-                expanded
-                  ? "opacity-100"
-                  : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-              }`}
-            >
-              {expanded ? (
-                <ChevronDown className="w-3.5 h-3.5" />
+              {isRunning ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isError ? (
+                <XCircle className="w-3.5 h-3.5" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5" />
+                <CheckCircle2 className="w-3.5 h-3.5" />
               )}
-            </span>
-          </div>
-        </Button>
-      </CollapsibleTrigger>
+            </div>
+
+            {/* Tool icon — uses actual tool name for correct icon */}
+            {showIcon ? (
+              <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
+                {getToolIcon(block.name)}
+              </div>
+            ) : null}
+
+            {/* Label: action + path + stats */}
+            <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
+              <span className="whitespace-nowrap text-xs text-muted-foreground">
+                {t(isWrite ? "tool.actionWrite" : "tool.actionRead")}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
+                · {shortenPath(path)}
+              </span>
+              {isRunning ? (
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  · {isWrite ? t("tool.writeWriting") : t("tool.readReading")}
+                </span>
+              ) : null}
+              <span
+                className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
+                  expanded
+                    ? "opacity-100"
+                    : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+                }`}
+              >
+                {expanded ? (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5" />
+                )}
+              </span>
+            </div>
+          </Button>
+        </CollapsibleTrigger>
+      )}
 
       {/* Expanded content */}
-      {expanded && (
+      {(detailOnly || expanded) && (
         <CollapsibleContent>
           <div className="animate-fade-in bg-background/35">
             {/* Meta info bar */}

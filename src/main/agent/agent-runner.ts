@@ -28,6 +28,7 @@ import {
   type SessionEntry,
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
+import { withBashIntentParam } from "./bash-intent-param";
 import { createNestedToolCallTracker } from "./nested-tool-call-tracker";
 import { measureSessionPromptParts } from "./prompt-parts";
 import type { PromptParts } from "../../shared/prompt-parts";
@@ -3165,10 +3166,13 @@ Tool routing:\n
         codingTools as ToolDefinition[],
       );
 
+      // 给 bash 加可选 description（模型写的一句话意图），界面拿它当行标题
+      const withIntent = withBashIntentParam(withTimeout);
+
       // Wrap the bash tool to intercept sudo commands and request passwords
       // wrappedTools = all 4 tools with bash wrapped; we extract bash for customTools override below
       const wrappedTools = this.wrapBashToolForSudo(
-        withTimeout,
+        withIntent,
         session.id,
         effectiveCwd,
       );

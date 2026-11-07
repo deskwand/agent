@@ -1906,6 +1906,16 @@
       "scriptDetails": "脚本详情",
       "scriptOwner": "所属脚本：{{id}}"
     },
+    "step": {
+      "cmdGitStatus": "查看 git 工作区状态",
+      "cmdGitDiff": "查看改动差异",
+      "cmdGitLog": "查看提交历史",
+      "cmdRunTests": "运行测试",
+      "cmdBuild": "构建项目",
+      "cmdInstall": "安装依赖",
+      "cmdSearchCode": "在代码里搜索",
+      "statusUnavailable": "输出不可用"
+    },
     "askUser": {
       "title": "向你提问",
       "questionsCount_one": "{{count}} 个问题",

@@ -30,7 +30,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "../ui/collapsible";
-import { NestedToolDetails } from "./NestedToolDetails";
+import { ToolStepRow } from "./ToolStepRow";
 import { OutputClamp } from "./OutputClamp";
 import { useAppStore } from "../../store";
 import { Button } from "../app-button";
@@ -196,13 +196,17 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
       </div>
 
       {expanded && (
-        <CollapsibleContent className="mt-1 [scrollbar-gutter:stable] pl-5">
+        <CollapsibleContent className="mt-1 [scrollbar-gutter:stable]">
           <OutputClamp maxHeight={400}>
-            <div className="space-y-1">
+            <div
+              data-tool-group-card
+              className="overflow-hidden rounded-xl border border-border bg-card/20 [&>*+*]:border-t [&>*+*]:border-border/60"
+            >
               {block.scripts?.map((script) => (
                 <div
                   key={script.id}
                   ref={failedToolCallId === script.id ? failedItemRef : null}
+                  className="px-2.5 py-1.5"
                 >
                   <Collapsible>
                     <CollapsibleTrigger asChild>
@@ -233,22 +237,15 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
               {visibleItems.map((item) => (
                 <div
                   key={item.id}
+                  data-tool-step
                   ref={failedToolCallId === item.id ? failedItemRef : null}
                 >
-                  {item.trace ? (
-                    <NestedToolDetails
-                      item={item}
-                      allBlocks={allBlocks}
-                      message={message}
-                    />
-                  ) : (
-                    <ToolUseBlock
-                      block={item}
-                      allBlocks={allBlocks}
-                      message={message}
-                      showIcon={false}
-                    />
-                  )}
+                  <ToolStepRow
+                    item={item}
+                    allBlocks={allBlocks}
+                    message={message}
+                    highlighted={highlightedToolCallId === item.id}
+                  />
                 </div>
               ))}
             </div>

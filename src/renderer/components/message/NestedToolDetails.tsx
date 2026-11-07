@@ -17,6 +17,8 @@ interface NestedToolDetailsProps {
   item: ToolUseContent;
   allBlocks?: ContentBlock[];
   message?: Message;
+  /** 只渲染详情，不渲染自己的折叠头（工具组里一行一个调用时用）。 */
+  detailOnly?: boolean;
 }
 
 /**
@@ -27,6 +29,7 @@ export function NestedToolDetails({
   item,
   allBlocks,
   message,
+  detailOnly = false,
 }: NestedToolDetailsProps) {
   const { t } = useTranslation();
   const trace = item.trace;
@@ -37,6 +40,7 @@ export function NestedToolDetails({
         allBlocks={allBlocks}
         message={message}
         showIcon={false}
+        detailOnly={detailOnly}
       />
     );
   }
@@ -59,24 +63,30 @@ export function NestedToolDetails({
         </p>
       )}
       {needsOwnDetails ? (
-        <Collapsible>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost"
-              type="button"
-              className={`${
-                trace.status === "error" ? "text-destructive" : "text-muted-foreground"
-              }`}
-            >
-              {item.name} ·{" "}
-              {trace.cancelled
-                ? t("tool.grouped.cancelledOperation")
-                : trace.status === "unfinished"
-                  ? t("tool.grouped.unfinishedOperations")
-                  : trace.status === "error"
-                    ? t("tool.grouped.failedOperations")
-                    : t("tool.grouped.outputUnavailable")}
-            </Button>
-          </CollapsibleTrigger>
+        <Collapsible open={detailOnly || undefined}>
+          {/* detailOnly 时行头已经陈述了状态，这里不再套第二层折叠头 */}
+          {!detailOnly && (
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                type="button"
+                className={`${
+                  trace.status === "error"
+                    ? "text-destructive"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {item.name} ·{" "}
+                {trace.cancelled
+                  ? t("tool.grouped.cancelledOperation")
+                  : trace.status === "unfinished"
+                    ? t("tool.grouped.unfinishedOperations")
+                    : trace.status === "error"
+                      ? t("tool.grouped.failedOperations")
+                      : t("tool.grouped.outputUnavailable")}
+              </Button>
+            </CollapsibleTrigger>
+          )}
           <CollapsibleContent>
             {Object.keys(item.input).length > 0 && (
               <pre className="whitespace-pre-wrap break-all rounded-lg bg-muted p-2.5 text-xs font-mono text-muted-foreground">
@@ -103,6 +113,7 @@ export function NestedToolDetails({
           allBlocks={allBlocks}
           message={message}
           showIcon={false}
+          detailOnly={detailOnly}
         />
       )}
     </div>

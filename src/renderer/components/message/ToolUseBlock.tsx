@@ -75,6 +75,8 @@ interface ToolUseBlockProps {
   allBlocks?: ContentBlock[];
   message?: Message;
   showIcon?: boolean;
+  /** 只渲染展开后的详情，不渲染自己的折叠头和卡片外壳（工具组里一行一个调用时用）。 */
+  detailOnly?: boolean;
 }
 
 /**
@@ -101,6 +103,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   allBlocks,
   message,
   showIcon = true,
+  detailOnly = false,
 }: ToolUseBlockProps) {
   const traceSteps = useAppStore((s) =>
     message?.sessionId
@@ -183,6 +186,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           message={message}
           action="write"
           showIcon={showIcon}
+          detailOnly={detailOnly}
         />
       );
     }
@@ -198,6 +202,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           message={message}
           action="read"
           showIcon={showIcon}
+          detailOnly={detailOnly}
         />
       );
     }
@@ -212,6 +217,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           allBlocks={allBlocks}
           message={message}
           showIcon={showIcon}
+          detailOnly={detailOnly}
         />
       );
     }
@@ -337,88 +343,94 @@ export const ToolUseBlock = memo(function ToolUseBlock({
 
   return (
     <Collapsible
-      open={expanded}
-      onOpenChange={setExpanded}
-      className={`rounded-2xl overflow-hidden transition-colors ${
-        effectiveError
-          ? "bg-destructive/5"
-          : effectiveRunning
-            ? "bg-primary/5"
-            : "bg-background/40"
-      }`}
+      open={detailOnly || expanded}
+      onOpenChange={detailOnly ? undefined : setExpanded}
+      className={
+        detailOnly
+          ? ""
+          : `rounded-2xl overflow-hidden transition-colors ${
+              effectiveError
+                ? "bg-destructive/5"
+                : effectiveRunning
+                  ? "bg-primary/5"
+                  : "bg-background/40"
+            }`
+      }
     >
       {/* Header — always visible */}
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="ghost"
-          className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
-        >
-          {/* Status icon — goal tools are status queries, no execution indicator needed */}
-          {!isGoalTool && (
-            <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
-              {effectiveError ? (
-                <XCircle className="w-3.5 h-3.5" />
-              ) : effectiveRunning ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-3.5 h-3.5" />
-              )}
-            </div>
-          )}
-
-          {/* Tool icon */}
-          {showIcon ? (
-            <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
-              {getToolIcon(block.name)}
-            </div>
-          ) : null}
-
-          {/* Content cluster */}
-          <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-            <span className="min-w-0 truncate text-xs font-mono text-muted-foreground">
-              {displayLabel}
-            </span>
-            {!isRunning && collapsedSummary.kind === "diff" && (
-              <span className="whitespace-nowrap text-xs text-muted-foreground inline-flex items-center gap-1">
-                ·{" "}
-                <span className="diff-add rounded-sm px-0.5">
-                  +{collapsedSummary.added}
-                </span>
-                <span className="diff-del rounded-sm px-0.5">
-                  -{collapsedSummary.removed}
-                </span>
-              </span>
+      {!detailOnly && (
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
+          >
+            {/* Status icon — goal tools are status queries, no execution indicator needed */}
+            {!isGoalTool && (
+              <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
+                {effectiveError ? (
+                  <XCircle className="w-3.5 h-3.5" />
+                ) : effectiveRunning ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                )}
+              </div>
             )}
-            {(!isRunning || isAgentTool) &&
-              collapsedSummary.kind !== "diff" &&
-              collapsedSummaryText && (
-                <span
-                  className={`whitespace-nowrap text-xs ${
-                    isError ? "text-destructive" : "text-muted-foreground"
-                  }`}
-                >
-                  · {collapsedSummaryText}
+
+            {/* Tool icon */}
+            {showIcon ? (
+              <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
+                {getToolIcon(block.name)}
+              </div>
+            ) : null}
+
+            {/* Content cluster */}
+            <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
+              <span className="min-w-0 truncate text-xs font-mono text-muted-foreground">
+                {displayLabel}
+              </span>
+              {!isRunning && collapsedSummary.kind === "diff" && (
+                <span className="whitespace-nowrap text-xs text-muted-foreground inline-flex items-center gap-1">
+                  ·{" "}
+                  <span className="diff-add rounded-sm px-0.5">
+                    +{collapsedSummary.added}
+                  </span>
+                  <span className="diff-del rounded-sm px-0.5">
+                    -{collapsedSummary.removed}
+                  </span>
                 </span>
               )}
-            <span
-              className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
-                expanded
-                  ? "opacity-100"
-                  : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-              }`}
-            >
-              {expanded ? (
-                <ChevronDown className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronRight className="w-3.5 h-3.5" />
-              )}
-            </span>
-          </div>
-        </Button>
-      </CollapsibleTrigger>
+              {(!isRunning || isAgentTool) &&
+                collapsedSummary.kind !== "diff" &&
+                collapsedSummaryText && (
+                  <span
+                    className={`whitespace-nowrap text-xs ${
+                      isError ? "text-destructive" : "text-muted-foreground"
+                    }`}
+                  >
+                    · {collapsedSummaryText}
+                  </span>
+                )}
+              <span
+                className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
+                  expanded
+                    ? "opacity-100"
+                    : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+                }`}
+              >
+                {expanded ? (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5" />
+                )}
+              </span>
+            </div>
+          </Button>
+        </CollapsibleTrigger>
+      )}
 
       {/* Expanded content */}
-      {expanded && (
+      {(detailOnly || expanded) && (
         <CollapsibleContent>
           <div className="animate-fade-in bg-background/35">
             {expandedMetaItems.length > 0 && (

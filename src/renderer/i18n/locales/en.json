@@ -1907,6 +1907,16 @@
       "scriptDetails": "Script details",
       "scriptOwner": "Script: {{id}}"
     },
+    "step": {
+      "cmdGitStatus": "Checked git worktree status",
+      "cmdGitDiff": "Checked the diff",
+      "cmdGitLog": "Read commit history",
+      "cmdRunTests": "Ran tests",
+      "cmdBuild": "Built the project",
+      "cmdInstall": "Installed dependencies",
+      "cmdSearchCode": "Searched the code",
+      "statusUnavailable": "Output unavailable"
+    },
     "askUser": {
       "title": "Question for you",
       "questionsCount_one": "{{count}} question",
