@@ -63,6 +63,7 @@ const ALLOWED_NATIVE_TITLES: Record<string, number> = {
   // —— 截断文本 / 路径 / 选择器看全文 ——
   "components/attach/AttachmentTiles.tsx": 2, // 元素/文件磁贴的完整路径或密库标识
   "components/ChatInputQueueBar.tsx": 4, // 队列项全文、图片 chip、文件名、CSS selector
+  "components/ChatTaskDock.tsx": 1, // 清单行被单行省略时的全文
   "components/ChatView.tsx": 1, // 注入条目全文
   "components/FeedReaderPane.tsx": 1, // relevance 全文
   "components/FileBrowser.tsx": 1, // 文件树行的完整路径

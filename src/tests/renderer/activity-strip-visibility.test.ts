@@ -25,6 +25,9 @@ vi.mock("react-i18next", () => ({
     t: (key: string) => key,
     i18n: { language: "en" },
   }),
+  // i18n/config 在导入期就 use(initReactI18next)：缺了它整条 import 链直接抛错
+  // （这份 mock 先前只提供 useTranslation，测试文件在 HEAD 上就已经跑不起来）。
+  initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
 vi.mock("../../renderer/hooks/useIPC", () => ({
@@ -203,13 +206,14 @@ describe("activity strip end to end", () => {
     expect(container.textContent).toContain("activity.subagents");
   });
 
-  it("窗口被压缩（不再含 todo_write）后，计划条仍在", () => {
+  it("窗口被压缩（不再含 todo_write）后，消息区底部的清单仍在", () => {
     // 走真实链路，而不是直接往 store 里塞值：
     // ① 累积（addMessage）→ ② 压缩后的窗口（setMessagesTail）→ ③ 仍然渲染。
     // 破坏①或②任何一步，这条都会红。
+    // 会话必须是 running：坞只在运行中与 5s 收尾窗口内出现（与停止按钮同源）。
     act(() =>
       setState({
-        sessionStatus: "completed",
+        sessionStatus: "running",
         messages: [],
         currentTodos: null,
       }),
@@ -247,13 +251,16 @@ describe("activity strip end to end", () => {
     render();
 
     expect(container.textContent).toContain("1/2");
-    expect(container.querySelector("[role='progressbar']")).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]'),
+    ).not.toBeNull();
+    expect(container.textContent).toContain("写迁移");
   });
 
-  it("清单被清空后，输入框上方仍显示收尾态", () => {
+  it("清单被清空后，坞里仍显示收尾态", () => {
     act(() =>
       setState({
-        sessionStatus: "completed",
+        sessionStatus: "running",
         messages: [
           makeMessage("u1", "user", [{ type: "text", text: "跑完了" }]),
         ],
@@ -268,12 +275,15 @@ describe("activity strip end to end", () => {
 
     expect(container.textContent).toContain("2/2");
     expect(container.textContent).toContain("activity.statusCleared");
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]'),
+    ).not.toBeNull();
   });
 
   it("上一份清单声明过 done → 收尾态显示「已完成」", () => {
     act(() =>
       setState({
-        sessionStatus: "completed",
+        sessionStatus: "running",
         messages: [
           makeMessage("u1", "user", [{ type: "text", text: "跑完了" }]),
         ],
@@ -288,7 +298,48 @@ describe("activity strip end to end", () => {
     render();
 
     expect(container.textContent).toContain("2/2");
-    expect(container.textContent).toContain("✓");
     expect(container.textContent).toContain("activity.statusDone");
+  });
+
+  it("切到另一个会话后坞不残留（只看当前会话的清单与计时）", () => {
+    act(() =>
+      setState({
+        sessionStatus: "running",
+        messages: [
+          makeMessage("u1", "user", [{ type: "text", text: "做点事" }]),
+        ],
+        currentTodos: [{ content: "写迁移", status: "in_progress" }],
+      }),
+    );
+    render();
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]'),
+    ).not.toBeNull();
+
+    act(() => {
+      const state = useAppStore.getState();
+      useAppStore.setState({
+        sessions: [
+          ...state.sessions,
+          {
+            id: "s2",
+            title: "另一个会话",
+            status: "completed",
+            createdAt: 2,
+            updatedAt: 2,
+            cwd: "/tmp",
+            mountedPaths: [],
+            allowedTools: [],
+            memoryEnabled: false,
+            isProjectMode: false,
+          },
+        ],
+        activeSessionId: "s2",
+      } as never);
+    });
+
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]'),
+    ).toBeNull();
   });
 });

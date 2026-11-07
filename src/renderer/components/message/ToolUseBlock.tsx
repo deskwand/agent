@@ -173,7 +173,12 @@ export const ToolUseBlock = memo(function ToolUseBlock({
     );
   }
   if (block.name === "todo_write" || block.name === "TodoWrite") {
-    return <TodoWriteBlock block={block} />;
+    return (
+      <TodoWriteBlock
+        block={block}
+        rejectedByTool={toolResult?.isError === true}
+      />
+    );
   }
   if (block.name === "write" || block.name === "write_file") {
     if (

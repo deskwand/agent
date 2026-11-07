@@ -119,6 +119,7 @@ import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
 import { getCapabilityGate } from "../capabilities/capability-gate";
 import { ensureVoiceModeStart } from "../utils/voice/voice-mode-gate";
 import { ChatInputQueueBar } from "./ChatInputQueueBar";
+import { ChatTaskDock } from "./ChatTaskDock";
 import {
   ChatInputStatusBar,
   computeElapsedSeconds,
@@ -2189,130 +2190,143 @@ export function ChatView() {
         >
           <div
             ref={messagesContainerRef}
-            className={`selectable w-full max-w-[57.5rem] mx-auto py-8 ${PAGE_INSET_X} space-y-5`}
+            className={`selectable w-full max-w-[57.5rem] mx-auto py-8 ${PAGE_INSET_X} flex min-h-full flex-col`}
           >
-            {mergedTurnEntries.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-28 text-muted-foreground space-y-3 text-center">
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground/80">
-                  DeskWand
-                </p>
-                <p className="text-base text-muted-foreground">
-                  {t(
-                    isHydratingHistoryState
-                      ? "chat.loadingConversation"
-                      : "chat.startConversation",
-                  )}
-                </p>
-              </div>
-            ) : (
-              mergedTurnEntries.map((entry) =>
-                "message" in entry ? (
-                  (() => {
-                    const {
-                      message,
-                      isStreaming,
-                      isTurnEnd,
-                      isLatestRound,
-                      artifactFiles,
-                      videoReferences,
-                      turnProcessSummary,
-                      suppressProcessSummaries,
-                    } = entry;
-                    return (
-                      <div
-                        key={message.id}
-                        data-message-id={message.id}
-                        className="space-y-1.5"
-                      >
-                        {turnProcessSummary ? (
-                          <ProcessSummaryBlock
-                            block={turnProcessSummary}
-                            allBlocks={
+            <div className="space-y-5">
+              {mergedTurnEntries.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-28 text-muted-foreground space-y-3 text-center">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground/80">
+                    DeskWand
+                  </p>
+                  <p className="text-base text-muted-foreground">
+                    {t(
+                      isHydratingHistoryState
+                        ? "chat.loadingConversation"
+                        : "chat.startConversation",
+                    )}
+                  </p>
+                </div>
+              ) : (
+                mergedTurnEntries.map((entry) =>
+                  "message" in entry ? (
+                    (() => {
+                      const {
+                        message,
+                        isStreaming,
+                        isTurnEnd,
+                        isLatestRound,
+                        artifactFiles,
+                        videoReferences,
+                        turnProcessSummary,
+                        suppressProcessSummaries,
+                      } = entry;
+                      return (
+                        <div
+                          key={message.id}
+                          data-message-id={message.id}
+                          className="space-y-1.5"
+                        >
+                          {turnProcessSummary ? (
+                            <ProcessSummaryBlock
+                              block={turnProcessSummary}
+                              allBlocks={
+                                message.turnId
+                                  ? turnBlocksById.get(message.turnId)
+                                  : message.content
+                              }
+                              message={message}
+                            />
+                          ) : null}
+                          <MessageCard
+                            toolBlocksProjected={true}
+                            toolLookupBlocks={
                               message.turnId
                                 ? turnBlocksById.get(message.turnId)
                                 : message.content
                             }
                             message={message}
+                            isStreaming={isStreaming}
+                            isTurnEnd={isTurnEnd}
+                            isLatestRound={isLatestRound}
+                            artifactFiles={artifactFiles}
+                            videoReferences={videoReferences}
+                            suppressProcessSummaries={suppressProcessSummaries}
+                            onForkMessage={handleForkMessage}
+                            onRewindMessage={handleRewindMessage}
+                            // 历史不出环靠这一句：只有最新那条用户消息拿得到结果。
+                            readState={
+                              message.id === latestUserMessage?.id
+                                ? latestTurnReadState
+                                : null
+                            }
                           />
-                        ) : null}
-                        <MessageCard
-                          toolBlocksProjected={true}
-                          toolLookupBlocks={
-                            message.turnId
-                              ? turnBlocksById.get(message.turnId)
-                              : message.content
-                          }
-                          message={message}
-                          isStreaming={isStreaming}
-                          isTurnEnd={isTurnEnd}
-                          isLatestRound={isLatestRound}
-                          artifactFiles={artifactFiles}
-                          videoReferences={videoReferences}
-                          suppressProcessSummaries={suppressProcessSummaries}
-                          onForkMessage={handleForkMessage}
-                          onRewindMessage={handleRewindMessage}
-                          // 历史不出环靠这一句：只有最新那条用户消息拿得到结果。
-                          readState={
-                            message.id === latestUserMessage?.id
-                              ? latestTurnReadState
-                              : null
-                          }
-                        />
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <div
-                    key={entry.id}
-                    className="flex items-center gap-2 px-1 text-xs"
-                  >
-                    <Navigation
-                      className={`h-3.5 w-3.5 flex-shrink-0 ${
-                        entry.status === "failed"
-                          ? "text-destructive"
-                          : "text-muted-foreground"
-                      }`}
-                    />
-                    <span
-                      className="min-w-0 flex-1 truncate text-muted-foreground"
-                      title={entry.text}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div
+                      key={entry.id}
+                      className="flex items-center gap-2 px-1 text-xs"
                     >
-                      {entry.text}
-                    </span>
-                    <span
-                      className={`flex-shrink-0 ${
-                        entry.status === "failed"
-                          ? "text-destructive"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {entry.status === "injecting" && (
-                        <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
-                      )}
-                      {entry.status === "delivered" && (
-                        <CheckCircle2 className="mr-1 inline h-3 w-3" />
-                      )}
-                      {entry.status === "failed" && (
-                        <XCircle className="mr-1 inline h-3 w-3" />
-                      )}
-                      {entry.status === "injecting" && t("steer.injecting")}
-                      {entry.status === "delivered" && t("steer.delivered")}
-                      {entry.status === "failed" &&
-                        `${t("steer.failed")}: ${
-                          entry.reason === "no-active-session"
-                            ? t("steer.reasonNoActiveSession")
-                            : entry.reason === "sdk-error"
-                              ? t("steer.reasonSdkError")
-                              : t("steer.reasonSessionStopped")
+                      <Navigation
+                        className={`h-3.5 w-3.5 flex-shrink-0 ${
+                          entry.status === "failed"
+                            ? "text-destructive"
+                            : "text-muted-foreground"
                         }`}
-                    </span>
-                  </div>
-                ),
-              )
-            )}
+                      />
+                      <span
+                        className="min-w-0 flex-1 truncate text-muted-foreground"
+                        title={entry.text}
+                      >
+                        {entry.text}
+                      </span>
+                      <span
+                        className={`flex-shrink-0 ${
+                          entry.status === "failed"
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {entry.status === "injecting" && (
+                          <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+                        )}
+                        {entry.status === "delivered" && (
+                          <CheckCircle2 className="mr-1 inline h-3 w-3" />
+                        )}
+                        {entry.status === "failed" && (
+                          <XCircle className="mr-1 inline h-3 w-3" />
+                        )}
+                        {entry.status === "injecting" && t("steer.injecting")}
+                        {entry.status === "delivered" && t("steer.delivered")}
+                        {entry.status === "failed" &&
+                          `${t("steer.failed")}: ${
+                            entry.reason === "no-active-session"
+                              ? t("steer.reasonNoActiveSession")
+                              : entry.reason === "sdk-error"
+                                ? t("steer.reasonSdkError")
+                                : t("steer.reasonSessionStopped")
+                          }`}
+                      </span>
+                    </div>
+                  ),
+                )
+              )}
 
-            {retry.active && <RetryStatusRow attempt={retry.attempt} />}
+              {retry.active && <RetryStatusRow attempt={retry.attempt} />}
+            </div>
 
+            <ChatTaskDock
+              status={inputStatus}
+              running={canStop}
+              executionClock={activeExecutionClock}
+              currentTodos={sessionState?.currentTodos ?? null}
+              currentPlanDone={sessionState?.currentPlanDone ?? false}
+              lastNonEmptyTodos={sessionState?.lastNonEmptyTodos ?? null}
+              lastPlanDone={sessionState?.lastPlanDone ?? false}
+            />
+
+            {/* 滚动到底要把坞的高度算进去，所以 ref 留在最后 */}
             <div ref={messagesEndRef} />
           </div>
         </div>
@@ -2356,11 +2370,6 @@ export function ChatView() {
             backgroundAgentRows={backgroundRows}
             onSelectBackgroundAgent={handleSelectBackgroundAgent}
             onGoalCommand={handleCommand}
-            currentTodos={sessionState?.currentTodos ?? null}
-            lastNonEmptyTodos={sessionState?.lastNonEmptyTodos ?? null}
-            currentPlanDone={sessionState?.currentPlanDone ?? false}
-            lastPlanDone={sessionState?.lastPlanDone ?? false}
-            executionClock={activeExecutionClock}
           />
         </div>
         <div className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-0.5 pb-5`}>

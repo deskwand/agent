@@ -137,57 +137,6 @@ describe("ProcessSummaryBlock highlight and expand", () => {
     expect(useAppStore.getState().pendingExpandToolCallId).toBe("other");
   });
 
-  it("展开后仍渲染该次调用的清单卡", () => {
-    const items = [
-      {
-        id: "call-todo",
-        type: "tool_use" as const,
-        name: "todo_write",
-        input: { todos: [{ content: "建表", status: "in_progress" }] },
-      },
-    ];
-    const todoBlock = {
-      type: "process-summary",
-      items,
-      summary: {
-        ...block.summary,
-        subagentCount: 0,
-        subagents: [],
-        todoUpdateCount: 1,
-      },
-    } as unknown as ProcessSummaryDisplayBlock;
-
-    act(() =>
-      root.render(
-        createElement(ProcessSummaryBlock, {
-          block: todoBlock,
-          allBlocks: items,
-          message: { ...message, content: items },
-        }),
-      ),
-    );
-
-    // 折叠态：片段里只有“已更新 1 次任务清单”，看不到清单项内容
-    expect(container.textContent).not.toContain("建表");
-
-    act(() => {
-      container
-        .querySelector<HTMLButtonElement>("button[aria-expanded]")
-        ?.click();
-    });
-    // 新结构：组展开后每个调用只是一行，清单内容要点开行才渲染
-    expect(container.textContent).not.toContain("建表");
-    expect(container.querySelector("[data-tool-group-card]")).not.toBeNull();
-    expect(container.querySelectorAll("[data-tool-step]").length).toBe(1);
-
-    act(() => {
-      container
-        .querySelectorAll<HTMLButtonElement>("button[aria-expanded]")[1]
-        ?.click();
-    });
-    expect(container.textContent).toContain("建表");
-  });
-
   it("折叠态不再显示失败提示，外部高亮请求仍展开并定位首个失败子项", () => {
     const failedBlock = {
       ...block,

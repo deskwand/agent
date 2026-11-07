@@ -92,7 +92,6 @@ describe("orderAssistantDisplayBlocks", () => {
           subagentCount: 0,
           hasGoal: false,
           usedToolCount: 0,
-          todoUpdateCount: 0,
         },
       },
       {
@@ -331,43 +330,107 @@ describe("process summary fragments", () => {
       "tool.grouped.ranSubagentWorkflows_other": `Ran ${options?.count} subagent workflows`,
       "tool.grouped.usedTools_one": `used ${options?.count} tool`,
       "tool.grouped.usedTools_other": `used ${options?.count} tools`,
-      "tool.grouped.updatedTaskList_one": `updated the task list ${options?.count} time`,
-      "tool.grouped.updatedTaskList_other": `updated the task list ${options?.count} times`,
       "tool.grouped.joinAnd": " and ",
       "tool.grouped.joinComma": ", ",
     };
     return map[key] ?? key;
   }) as never;
 
-  it("lists todo updates as their own fragment, not the fallback bucket", () => {
+  it("drops an applied todo_write pair from the message stream", () => {
     const blocks = buildToolDisplayBlocks([
       toolUse("todo-1", "todo_write", {
         todos: [{ content: "建表", status: "in_progress" }],
       }),
       toolResult("todo-1", { content: "Task list updated: 0/1 completed." }),
     ]);
-
-    if (blocks[0]?.type !== "process-summary") {
-      throw new Error("expected process summary");
-    }
-    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
-      { text: "updated the task list 1 time", iconType: "tasklist" },
-    ]);
+    // 生效的清单只由消息区底部的任务坞承载：转录里一个字都不留，
+    // 过程摘要里也不再出现「已更新 N 次任务清单」。
+    expect(blocks).toEqual([]);
   });
 
-  it("treats the legacy camel-case TodoWrite the same way", () => {
+  it("drops the legacy camel-case TodoWrite too", () => {
     const blocks = buildToolDisplayBlocks([
-      toolUse("todo-2", "TodoWrite", { todos: [] }),
+      toolUse("todo-2", "TodoWrite", {
+        todos: [{ content: "建表", status: "pending" }],
+      }),
       toolResult("todo-2"),
     ]);
-
-    if (blocks[0]?.type !== "process-summary") {
-      throw new Error("expected process summary");
-    }
-    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
-      { text: "updated the task list 1 time", iconType: "tasklist" },
-    ]);
+    expect(blocks).toEqual([]);
   });
+
+  it("keeps a rejected todo_write so the warning can still render", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("todo-3", "todo_write", {
+        todos: [
+          { content: "A", status: "in_progress" },
+          { content: "B", status: "in_progress" },
+        ],
+      }),
+      toolResult("todo-3", { isError: true }),
+    ]);
+    // 被拒的清单没有生效 → 不丢：ToolUseBlock 会把它渲染成一行"未生效"警告。
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ type: "content" });
+  });
+
+  it("does not split a process group around a dropped todo_write", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("read-1", "read", { path: "src/a.ts" }),
+      toolResult("read-1"),
+      toolUse("todo-1", "todo_write", {
+        todos: [{ content: "建表", status: "in_progress" }],
+      }),
+      toolResult("todo-1"),
+      toolUse("read-2", "read", { path: "src/b.ts" }),
+      toolResult("read-2"),
+    ]);
+    // 被扔掉的那对不构成边界：相邻同类工具仍是一段摘要（否则一轮里几次 todo_write
+    // 会把"已读取 N 个文件"劈成好几行重复摘要）。
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.type).toBe("process-summary");
+    if (blocks[0]?.type !== "process-summary")
+      throw new Error("expected summary");
+    expect(blocks[0].summary.readCount).toBe(2);
+  });
+
+  it.each([
+    ["input 是 JSON 字符串", "not an object"],
+    ["todos 不是数组", { todos: "oops" }],
+    [
+      "条数超过上限",
+      {
+        todos: Array.from({ length: 51 }, (_, i) => ({
+          content: `第 ${i}`,
+          status: "pending",
+        })),
+      },
+    ],
+    [
+      "status 是非法值",
+      { todos: [{ content: "建表", status: "IN_PROGRESS" }] },
+    ],
+    [
+      "content 超长",
+      { todos: [{ content: "长".repeat(201), status: "pending" }] },
+    ],
+  ])(
+    "keeps a schema-rejected todo_write so the warning can render: %s",
+    (_label, input) => {
+      // schema 级拒绝（参数形状 / 上限 / 非法枚举）在渲染层的软规则里看不出来，
+      // 只有配对的 tool_result.isError 是权威信号 —— 不认它就会静默丢掉。
+      const blocks = buildToolDisplayBlocks([
+        {
+          type: "tool_use",
+          id: "todo-s",
+          name: "todo_write",
+          input: input as Record<string, unknown>,
+        } as ToolUseContent,
+        toolResult("todo-s", { isError: true }),
+      ]);
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({ type: "content" });
+    },
+  );
 
   it("includes subagent details in the icon-aware group fragment", () => {
     const blocks = buildToolDisplayBlocks([
@@ -798,7 +861,6 @@ describe("Goal tools in process summary", () => {
         subagentSteerCount: 0,
         hasGoal: true,
         usedToolCount: 0,
-        todoUpdateCount: 0,
       },
       t,
     );
@@ -822,7 +884,6 @@ describe("Goal tools in process summary", () => {
         subagentSteerCount: 0,
         hasGoal: false,
         usedToolCount: 0,
-        todoUpdateCount: 0,
       },
       t,
     );

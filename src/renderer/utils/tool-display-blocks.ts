@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next";
 import type { NestedToolStatus } from "../../shared/nested-tool-calls";
+import { normalizePlanDone, rejectTodoList } from "../../shared/todos";
 import type { ContentBlock, ToolResultContent, ToolUseContent } from "../types";
+import type { TodoItem } from "../components/message/types";
 import { extractFilePathFromToolInput } from "./tool-output-path";
 import { countDiffLines } from "./tool-result-summary";
 
@@ -11,7 +13,6 @@ export interface SubagentSummary {
 
 export interface ProcessSummary {
   readCount: number;
-  todoUpdateCount: number;
   browseDirCount?: number;
   hasSearch: boolean;
   hasWebSearch: boolean;
@@ -101,6 +102,13 @@ export type ProcessSummaryDisplayBlock = Extract<
  * 名字不认识也要归组，见 getToolKind。
  */
 const DEDICATED_CARD_TOOLS = new Set(["ask_user", "askuserquestion"]);
+
+/**
+ * 转录里**整对丢弃**的工具：生效的清单只由消息区底部的任务坞承载（2026-11-06，
+ * 对齐 eagent 方案 B）。被工具拒绝的那份不丢 —— 它必须留一行"未生效"警告，
+ * 否则工具拒了、界面一声不响。
+ */
+const DROPPED_TOOL_PAIRS = new Set(["todo_write", "todowrite"]);
 
 const SEARCH_TOOLS = new Set([
   // grep/glob = code search only; web/browser tools are BROWSE_TOOLS
@@ -205,6 +213,44 @@ function statusOf(
 
 const GOAL_TOOLS = new Set(["get_goal", "update_goal", "goal_complete"]);
 
+/** 配对的 tool_result 是否报错。跨消息配对时结果只落在 lookupBlocks 里，
+ *  所以两处都要找：schema 级拒绝（参数形状、条数/长度上限）在渲染层的软规则里
+ *  看不出来，只有结果是权威信号。 */
+function isToolResultError(
+  blocks: ContentBlock[],
+  lookupBlocks: ContentBlock[],
+  resultIndex: number,
+  toolUseId: string,
+): boolean {
+  const inMessage = resultIndex >= 0 ? blocks[resultIndex] : undefined;
+  const found =
+    inMessage ??
+    lookupBlocks.find(
+      (item) => isToolResultBlock(item) && item.toolUseId === toolUseId,
+    );
+  return Boolean(found && isToolResultBlock(found) && found.isError === true);
+}
+
+/** 这份清单会不会被工具侧拒绝（拒绝态必须留在转录里当警告）。
+ *  规则与工具、坞共用 src/shared/todos.ts 那一份，不另写判断。 */
+function isRejectedTodoWrite(block: ToolUseContent): boolean {
+  const input = block.input as Record<string, unknown> | undefined;
+  const raw = input?.todos;
+  if (!Array.isArray(raw)) return false;
+  const todos: TodoItem[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "object" || entry === null) return false;
+    const { content, status, activeForm } = entry as Record<string, unknown>;
+    if (typeof content !== "string" || typeof status !== "string") return false;
+    todos.push({
+      content,
+      status: status as TodoItem["status"],
+      ...(typeof activeForm === "string" ? { activeForm } : {}),
+    });
+  }
+  return rejectTodoList(todos, normalizePlanDone(todos, input?.done)) !== null;
+}
+
 function buildProcessSummary(
   items: ToolUseContent[],
   blocks: ContentBlock[] = [],
@@ -228,7 +274,6 @@ function buildProcessSummary(
   let ideaLookupCount = 0;
   let ideaAddedCount = 0;
   let wakeupCount = 0;
-  let todoUpdateCount = 0;
   let scriptCount = 0;
   let calledRead = false;
   let calledSearch = false;
@@ -333,10 +378,6 @@ function buildProcessSummary(
       hasGoal = true;
       countedAsSpecific = true;
     }
-    if (lower === "todo_write" || lower === "todowrite") {
-      todoUpdateCount += 1;
-      countedAsSpecific = true;
-    }
     // 想法三件套：查阅（search / read）与记录（add）分开计数 —— 动作不同（AGENTS.md §4）。
     if (lower === "idea_search" || lower === "idea_read") {
       ideaLookupCount += 1;
@@ -376,7 +417,6 @@ function buildProcessSummary(
     ttsCount,
     voiceChangeCount,
     usedToolCount,
-    todoUpdateCount,
     scriptCount,
     calledRead,
     calledSearch,
@@ -592,6 +632,23 @@ export function buildToolDisplayBlocks(
     }
 
     const resultIndex = findToolResultIndex(blocks, index, block.id);
+    if (DROPPED_TOOL_PAIRS.has(block.name.toLowerCase())) {
+      // 生效的清单只由消息区底部的任务坞承载：tool_use 与配对的 tool_result
+      // 一起不进转录。被拒的那份要留下，否则"工具拒了"在界面上完全无声。
+      // ⚠️ 只有被拒时才 flush：生效的那份没有任何东西要分隔，无条件 flush 会把
+      // 相邻同类工具的过程摘要劈成两半（一轮里几次 todo_write 就会多出几行重复摘要）。
+      const rejected =
+        isToolResultError(blocks, lookupBlocks, resultIndex, block.id) ||
+        isRejectedTodoWrite(block);
+      if (rejected) {
+        flush();
+        displayBlocks.push({ type: "content", block });
+      }
+      if (resultIndex >= 0) {
+        consumedToolResultIndexes.add(resultIndex);
+      }
+      continue;
+    }
     // 除专用卡片外一律归组；虚拟嵌套块连专用卡片名字也不豁免（它只能来自投影）。
     const kind = getToolKind(block.name) ?? (block.trace ? "process" : null);
 
@@ -675,7 +732,6 @@ export type ProcessSummaryFragment = {
     | "command"
     | "subagent"
     | "goal"
-    | "tasklist"
     | "tts"
     | "tool"
     | "ideas"
@@ -810,17 +866,6 @@ export function getProcessSummaryFragments(
     fragments.push({
       text: t("tool.grouped.managedGoal"),
       iconType: "goal",
-    });
-  }
-  if (summary.todoUpdateCount > 0) {
-    fragments.push({
-      text: t(
-        pluralKey("tool.grouped.updatedTaskList", summary.todoUpdateCount),
-        {
-          count: summary.todoUpdateCount,
-        },
-      ),
-      iconType: "tasklist",
     });
   }
   if ((summary.voiceChangeCount ?? 0) > 0) {

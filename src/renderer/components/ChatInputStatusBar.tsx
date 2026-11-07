@@ -16,18 +16,10 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  Square,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import type { BackgroundAgentRow } from "../utils/subagent-card";
-import type { CurrentTodos } from "../utils/current-todos";
 import type { SessionExecutionClock } from "../store";
-import {
-  TURN_CLOCK_SLOT_SENTINEL_SECONDS,
-  formatDurationShort,
-  isLingering,
-} from "../utils/execution-clock";
-import { AppProgress } from "./app-progress";
 import { Button } from "./app-button";
 
 export type ChatInputStatus =
@@ -97,20 +89,10 @@ interface ChatInputStatusBarProps {
   /** 面板行；为空时 chip 退回纯文本（行为与今天一致）。 */
   backgroundAgentRows?: BackgroundAgentRow[];
   onSelectBackgroundAgent?: (toolCallId: string) => void;
-  /** 当前生效的任务清单；null = 未知/没有，[] = 已清空。为空则右区不渲染计划部分。 */
-  currentTodos?: CurrentTodos | null;
-  /** 当前清单是否被声明结束（`done: true`）。 */
-  currentPlanDone?: boolean;
-  /** 最后一份非空清单，只服务收尾态（currentTodos 被清空后仍显示其最终状态）。 */
-  lastNonEmptyTodos?: CurrentTodos | null;
-  /** 被记住那份清单当时是否声明了结束。 */
-  lastPlanDone?: boolean;
-  /** 当前会话的回合计时；undefined = 不显示秒表（既有调用方与测试无需改动）。 */
-  executionClock?: SessionExecutionClock;
 }
 
 // Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
-const gradientStyles = `
+export const gradientStyles = `
 @keyframes gradient-flow {
   0%   { background-position: 200% 50%; }
   100% { background-position: -200% 50%; }
@@ -130,11 +112,6 @@ export function ChatInputStatusBar({
   onGoalCommand,
   backgroundAgentRows,
   onSelectBackgroundAgent,
-  currentTodos,
-  currentPlanDone,
-  lastNonEmptyTodos,
-  lastPlanDone,
-  executionClock,
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
   const rows = backgroundAgentRows ?? [];
@@ -168,16 +145,12 @@ export function ChatInputStatusBar({
     return () => window.removeEventListener("resize", updatePanelMaxHeight);
   }, [panelOpen, updatePanelMaxHeight]);
 
-  // 目标长跑、当前回合运行中、以及回合结束后短暂的收尾窗口内，每秒推进一次。
+  // 目标长跑期间每秒推进一次。
   // dep 是布尔量而不是 now，所以窗口内不会每秒重建 effect；
   // 窗口到期时它变 false，effect 自行清理。
   const [now, setNow] = useState(() => Date.now());
-  // 槽位哨兵：用最长且最宽的时间 token 生成一句不可见文案，把秒表的宽度撑死。
-  const slotToken = formatDurationShort(TURN_CLOCK_SLOT_SENTINEL_SECONDS);
-  const isTimeLive =
-    isGoalTimeLive(status) ||
-    isTurnClockLive(status, executionClock) ||
-    (executionClock !== undefined && isLingering(executionClock, now));
+  // 只有目标长跑需要走表（回合秒表已搬到消息区底部的任务坞）。
+  const isTimeLive = isGoalTimeLive(status);
   useEffect(() => {
     if (!isTimeLive) return;
     setNow(Date.now());
@@ -185,60 +158,13 @@ export function ChatInputStatusBar({
     return () => clearInterval(id);
   }, [isTimeLive]);
 
-  // ── 右区（活动库存）──────────────────────────────────────────────────
+  // ── 右区（子代理入口）────────────────────────────────────────────
   // 常驻、不参与上面的单槽位优先级链：模型回答中/目标长跑时也必须可见。
-  const activeTodos = currentTodos ?? [];
-  // 收尾态：清单被显式清空（[]），但上次有一份非空清单 → 展示那份的最终状态。
-  // 注意 currentTodos === null（从未有过 / 重启后无水合结果）**不**进收尾态。
-  // 必须用 Array.isArray 而不是 `activeTodos.length === 0`：后者会把 null
-  // （从未有过清单）也当成"被清空"，于是凭空显示一份收尾态。
-  const finishing =
-    Array.isArray(currentTodos) &&
-    currentTodos.length === 0 &&
-    (lastNonEmptyTodos?.length ?? 0) > 0;
-  const todos = finishing ? (lastNonEmptyTodos ?? []) : activeTodos;
-  const completedCount = todos.filter(
-    (item) => item.status === "completed",
-  ).length;
-  const allDone = todos.length > 0 && completedCount === todos.length;
-  // 展示的是哪一份清单：收尾态用被记住的那份，否则用当前的
-  const planDone = finishing
-    ? (lastPlanDone ?? false)
-    : (currentPlanDone ?? false);
-  const hasPlan = todos.length > 0;
-  const hasActivity = hasPlan || rows.length > 0;
-  // 子代理计数由谁承载：左区已经在说这件事时（只可能发生在没有更高优先级状态时）
-  // chip 不再重复一遍；模型回答中/目标长跑时左区在说别的，计数就落到 chip 上——
-  // 那正是本次要修的场景（此前它被单槽位优先级吃掉，整行都看不到）。
-  const countInChip = rows.length > 0 && status?.type !== "background-agent";
-
-  // pill 里的「当前步骤」：进行中那一项的文案。取值与原卡片头部一致
-  // （TodoWriteBlock.tsx:103 用的是 activeForm || content）。
-  const inProgressTodo = todos.find((item) => item.status === "in_progress");
-  // 收尾态必须**优先**判断：否则会沿用"进行中项"的 activeForm（"正在…"），
-  // 把已经停下来的过去状态渲染成现在进行时 —— 看起来就像状态没更新。
-  const stepText = finishing
-    ? // 显示清单数组的末项。数据里没有逐项完成时间戳，所以"最后完成的是哪一项"
-      // 无从得知——不要试图去猜。
-      (todos[todos.length - 1]?.content ?? null)
-    : inProgressTodo
-      ? inProgressTodo.activeForm || inProgressTodo.content
-      : null;
-  // 结束声明优先于"当前步骤"：声明了结束就说明是过去态，不再说"正在…"
-  // 声明结束时，比起"已结束"这种笼统措辞，用户更需要知道**有几项没完成**。
-  // done 要求每一项都已结算，所以"未全部完成"必然意味着有取消项。
-  const cancelledCount = todos.filter(
-    (item) => item.status === "cancelled",
-  ).length;
-  const statusLabel = !hasPlan
-    ? null
-    : planDone
-      ? allDone
-        ? t("activity.statusDone")
-        : t("activity.statusCancelled", { count: cancelledCount })
-      : finishing
-        ? t("activity.statusCleared")
-        : stepText;
+  // 任务清单不在这里：它由消息区底部的任务坞承载（2026-11-06）。
+  const hasActivity = rows.length > 0;
+  // 有失败行时整枚 chip 换成失败色：动作文案搬走后，这里不再有「N 个子代理结束，
+  // 其中 M 个失败」那句话，失败信号不能只剩打开面板才看得见。
+  const hasError = rows.some((row) => row.status === "error");
 
   // 类型只在面板内不统一时才值得占宽度（同类时逐行重复纯属噪音）
   const showType = new Set(rows.map((row) => row.type)).size > 1;
@@ -270,70 +196,14 @@ export function ChatInputStatusBar({
             // `p-1` 必须留着：vendored 自带 `p-4`，靠 cn()「调用方 className 在最后」压住。
             className="w-[32rem] max-w-full max-h-[min(70vh,32rem)] overflow-y-auto p-1 text-xs"
           >
-            {hasPlan ? (
-              <>
-                <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-muted-foreground uppercase">
-                  <span>{t("activity.planSection")}</span>
-                  <span className="ml-auto tracking-normal">
-                    {t("activity.planDone", {
-                      completed: completedCount,
-                      total: todos.length,
-                    })}
-                  </span>
-                </div>
-                {todos.map((todo, index) => {
-                  // 收尾态里没有任何东西在跑：把当时的 in_progress 按"没做完、已停止"
-                  // 渲染（方框 + 常规色），不要转圈也不要强调色 —— 那是实时态的说法。
-                  const shown =
-                    finishing && todo.status === "in_progress"
-                      ? "pending"
-                      : todo.status;
-                  return (
-                    <div
-                      key={`${index}-${todo.content}`}
-                      className={`flex items-start gap-2 rounded-lg px-2 py-1 ${
-                        shown === "completed" || shown === "cancelled"
-                          ? "opacity-60"
-                          : ""
-                      }`}
-                    >
-                      <span className="mt-0.5 flex-none">
-                        {shown === "completed" ? (
-                          // 完成态走中性色：绿标记的是「一次操作成功收尾 / 健康」（保存回执、
-                          // `.dot-connected`、diff 的 +N），而「这一项已完成」是持续状态，行里的
-                          // 删除线已经说过一次。本面板里 goal-complete 的 BadgeCheck 同样是中性色。
-                          <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : shown === "in_progress" ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary-text" />
-                        ) : shown === "cancelled" ? (
-                          <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : (
-                          <Square className="h-3.5 w-3.5 text-muted-foreground" />
-                        )}
-                      </span>
-                      <span
-                        className={`min-w-0 flex-1 ${
-                          shown === "completed" || shown === "cancelled"
-                            ? "text-muted-foreground line-through"
-                            : shown === "in_progress"
-                              ? "font-medium text-primary-text"
-                              : "text-foreground"
-                        }`}
-                      >
-                        {todo.content}
-                      </span>
-                    </div>
-                  );
-                })}
-              </>
-            ) : null}
             {rows.length > 0 ? (
               <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-muted-foreground uppercase">
                 <span>{t("activity.subagentsSection")}</span>
               </div>
             ) : null}
             {rows.map((row) => (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 key={row.toolCallId}
                 type="button"
                 onClick={() => {
@@ -400,13 +270,11 @@ export function ChatInputStatusBar({
           </PopoverContent>
         )}
         <PopoverTrigger asChild>
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             type="button"
-            // 有可见文案（步骤/计数）时不要设 aria-label —— 它会把内容整个盖掉，
-            // 读屏用户就听不到"3/5 · 正在写迁移"了。只在只剩一个 chevron 时兜底。
-            aria-label={
-              hasPlan || countInChip ? undefined : t("activity.panelTitle")
-            }
+            // chip 里恒有可见文案（子代理计数），不设 aria-label —— 它会把内容整个盖掉，
+            // 读屏用户就听不到「N 个子代理」了。
             // ⚠️ 这四条类必须显式写回（与面板行同一族的迁移回归）：`<Button>` base 的 `text-sm` /
             // `font-medium` / `[&_svg]:size-4` 与缺省档的 `h-9` 会盖掉这枚 chip 自己写的
             // `min-h-5`（min-height 顶不掉 36px 定高）和 chevron 的 `h-3 w-3`（`[&_svg]:size-4`
@@ -414,40 +282,13 @@ export function ChatInputStatusBar({
             // 2026-10-10）：chip 盒 32×36px、chevron 16px、字 14px/500，而同一行左侧的状态文案是
             // 12px/高 16px ⇒ 一枚 36px 圆钮杵在 12px 文案旁边（用户报障「子代理这个图标太高了」）；
             // 写回后实测 28×20px、chevron 12px、字 12px/400 == `min-h-5`。
-            // ⚠️ `[&_svg]:size-3` 的作用面是**这枚 chip 里所有 svg** —— 目前只有右侧那个 chevron
-            // （进度条是 div，面板走 portal 不在此列），往 chip 里再加图标的人要回读这句。
+            // ⚠️ `[&_svg]:size-3` 的作用面是**这枚 chip 里所有 svg** —— 目前只有右侧那个
+            // chevron（面板走 portal，不在此列），往 chip 里再加图标的人要回读这句。
             className="flex h-auto min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-left text-xs font-normal text-foreground transition-colors hover:bg-selected-surface [&_svg]:size-3"
           >
-            {hasPlan ? (
-              <>
-                {/* 进度条走 vendored shadcn `Progress`（经 `app-progress.tsx` 薄包装层，
-                    不再手搓 `role="progressbar"`）。包装层做的两件事 —— 把 2/9 换成
-                    百分比（vendored 的位移只认 0–100）、把区间语义写回 aria —— 理由
-                    在那边的文件头，两条都是实测。
-                    尺寸靠 className 压住 vendored 的 `h-2 w-full`（cn 去重，调用方赢）：
-                    这条 chip 里它是 34×4px 的窄条，不是整行进度条。 */}
-                <AppProgress
-                  value={completedCount}
-                  max={todos.length}
-                  className="h-1 w-[34px] flex-none"
-                />
-                <span className="flex-none">
-                  {planDone ? "✓ " : ""}
-                  {completedCount}/{todos.length}
-                </span>
-                {statusLabel ? (
-                  <span className="max-w-[12rem] min-w-0 truncate text-muted-foreground">
-                    · {statusLabel}
-                  </span>
-                ) : null}
-              </>
-            ) : null}
-            {countInChip ? (
-              <span className={`flex-none ${hasPlan ? "text-muted-foreground" : ""}`}>
-                {hasPlan ? "· " : ""}
-                {t("activity.subagents", { count: rows.length })}
-              </span>
-            ) : null}
+            <span className={`flex-none ${hasError ? "text-destructive" : ""}`}>
+              {t("activity.subagents", { count: rows.length })}
+            </span>
             <ChevronDown className="h-3 w-3 flex-none text-muted-foreground" />
           </Button>
         </PopoverTrigger>
@@ -536,7 +377,8 @@ export function ChatInputStatusBar({
             {infoText}
           </span>
           {status.type === "goal-active" && onGoalCommand && (
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               type="button"
               className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto font-normal"
               onClick={() => onGoalCommand("goal:pause")}
@@ -546,14 +388,16 @@ export function ChatInputStatusBar({
           )}
           {status.type === "goal-paused" && onGoalCommand && (
             <>
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto font-normal"
                 onClick={() => onGoalCommand("goal:resume")}
               >
                 {t("goal.resume")}
               </Button>
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent text-muted-foreground hover:bg-selected-surface transition-[transform,background-color,color] active:scale-[0.97] h-auto font-normal"
                 onClick={() => onGoalCommand("goal:clear")}
@@ -568,122 +412,17 @@ export function ChatInputStatusBar({
     );
   }
 
-  // ── Non-goal status rendering ──
-  // 回合秒表：运行中显示实时耗时，收尾窗口内显示冻结值，其余时候不渲染。
-  const elapsed = (() => {
-    if (!executionClock || executionClock.startAt === null) return null;
-    if (isTurnClockLive(status, executionClock)) {
-      return {
-        live: true,
-        seconds: (now - executionClock.startAt) / 1000,
-      };
-    }
-    const { endAt } = executionClock;
-    if (endAt !== null && isLingering(executionClock, now)) {
-      return { live: false, seconds: (endAt - executionClock.startAt) / 1000 };
-    }
-    return null;
-  })();
-  let text = "";
-  let toneClass = "text-muted-foreground";
-  let isRunning = false;
-
-  if (status) {
-    switch (status.type) {
-      case "sending":
-        text = t("chat.sending");
-        toneClass = "text-foreground";
-        isRunning = true;
-        break;
-      case "thinking":
-        text = t("chat.processing");
-        toneClass = "text-foreground";
-        isRunning = true;
-        break;
-      case "responding":
-        text = t("chat.responding");
-        toneClass = "text-foreground";
-        isRunning = true;
-        break;
-      case "compacting":
-        text = t("chat.compacting");
-        toneClass = "text-foreground";
-        isRunning = true;
-        break;
-      case "compaction-success":
-        text = t("chat.compacted");
-        toneClass = "text-muted-foreground";
-        break;
-      case "compaction-failed":
-        text = t("chat.compactFailed");
-        toneClass = "text-muted-foreground";
-        break;
-      case "compaction-aborted":
-        text = t("chat.compactAborted");
-        toneClass = "text-muted-foreground";
-        break;
-      case "background-agent":
-        if (status.done) {
-          text = status.hasError
-            ? t("subagent.statusFinishedWithErrors", { count: status.count })
-            : t("subagent.statusDone", { count: status.count });
-          toneClass = status.hasError ? "text-destructive" : "text-muted-foreground";
-        } else {
-          text = t("subagent.statusRunning", {
-            count: status.count,
-            detail: status.detail ? ` ${status.detail}` : "",
-          });
-          toneClass = "text-foreground";
-          isRunning = true;
-        }
-        break;
-      // goal-* handled by early return above
-    }
-  }
-
-  // Always render a fixed-height container to prevent layout jump
+  // ── 非目标态 ──
+  // 动作态（思考中/执行中/压缩中 + 秒表）已搬到消息区底部的任务坞；
+  // 这里只剩子代理入口。没有内容时整行不渲染，也不留固定高度占位。
+  if (!rightZone) return null;
 
   return (
     // 定位锚点放在这个容器上（而不是 chip 那个 span）：面板是它的绝对定位子元素，
     // 于是 max-w-full 就等于「聊天列可用宽度」——侧栏宽度、右侧面板、字号缩放全都自动计入。
     // panelRef 必须跟着放这里，否则外部点击关闭会把面板内的点击当成外部点击。
     <div ref={panelRef} className="relative min-h-5 px-1 pb-1">
-      <style>{gradientStyles}</style>
-      <div className={`flex items-center gap-1.5 text-xs ${toneClass}`}>
-        {text ? (
-          <span
-            className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}
-          >
-            {text}
-          </span>
-        ) : null}
-        {elapsed ? (
-          // flex-shrink-0 + 不参与 truncate：长文案先被截断，秒表始终可见。
-          <span className="flex-shrink-0 text-muted-foreground">
-            {text ? "· " : ""}
-            {/* 槽位：两格叠在同一个 grid 单元格，盒宽取两者最大值 ——
-                正常时长下 = 哨兵宽度（恒定），于是 chip 零位移。
-                为什么不写死 px、为什么只用一个哨兵：见
-                design-docs/2026-09-29-turn-timer-width-stability-design.md。 */}
-            <span className="inline-grid tabular-nums">
-              <span
-                aria-hidden="true"
-                data-testid="turn-elapsed-slot"
-                className="invisible col-start-1 row-start-1"
-              >
-                {t("chat.elapsedRunning", { time: slotToken })}
-              </span>
-              <span
-                data-testid="turn-elapsed-visible"
-                className="col-start-1 row-start-1"
-              >
-                {t(elapsed.live ? "chat.elapsedRunning" : "chat.elapsedDone", {
-                  time: formatDurationShort(elapsed.seconds),
-                })}
-              </span>
-            </span>
-          </span>
-        ) : null}
+      <div className="flex items-center gap-1.5 text-xs text-foreground">
         {rightZone}
       </div>
     </div>

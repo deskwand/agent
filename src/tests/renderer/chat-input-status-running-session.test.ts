@@ -18,6 +18,8 @@ import type { Message, MountedPath, Session } from "../../renderer/types";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
+  // i18n/config 在导入期就 use(initReactI18next)：缺了它整条 import 链直接抛错
+  initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
 vi.mock("../../renderer/hooks/useIPC", () => ({

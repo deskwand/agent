@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import i18n from "../../renderer/i18n/config";
 import { ToolUseBlock } from "../../renderer/components/message/ToolUseBlock";
+import { MessageCard } from "../../renderer/components/MessageCard";
 import { useAppStore, type SessionState } from "../../renderer/store";
 import type { Message, ToolUseContent } from "../../renderer/types";
 
@@ -59,7 +60,7 @@ function sessionState(): SessionState {
   };
 }
 
-describe("todo_write 卡片", () => {
+describe("todo_write 卡片（只负责未生效）", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -78,22 +79,61 @@ describe("todo_write 卡片", () => {
     container.remove();
   });
 
-  it("走专用清单卡片，而不是通用工具卡", async () => {
+  async function renderTodo(input: Record<string, unknown>): Promise<void> {
+    const current = { ...block, input } as ToolUseContent;
     await act(async () => {
       root.render(
-        createElement(ToolUseBlock, { block, allBlocks: [block], message }),
+        createElement(ToolUseBlock, {
+          block: current,
+          allBlocks: [current],
+          message,
+        }),
       );
     });
-    expect(container.textContent).toContain("正在写计划"); // activeForm
-    expect(container.textContent).toContain("写代码");
-    // 进度计数只在专用卡片里有：通用工具卡只会把 input 原样 dump 成 JSON
-    expect(container.textContent).toContain("1/3");
+  }
+
+  it("生效清单不再渲染任何卡片（清单只由消息区底部的任务坞承载）", async () => {
+    await renderTodo({ todos: [{ content: "建表", status: "in_progress" }] });
+    expect(container.textContent).toBe("");
   });
 
-  it("清单不合法时如实显示「未生效」，而不是冒充成已生效的清单", async () => {
-    const invalid: ToolUseContent = {
+  it("多条进行中 → 如实显示「未生效」", async () => {
+    await renderTodo({
+      todos: [
+        { content: "先做 A", status: "in_progress" },
+        { content: "先做 B", status: "in_progress" },
+      ],
+    });
+    expect(container.textContent).toContain("任务清单未生效");
+    expect(container.textContent).not.toContain("先做 A");
+  });
+
+  it("声明结束却留着未结算项 → 报「未生效」（与工具同一份规则）", async () => {
+    await renderTodo({
+      todos: [{ content: "只做了一半", status: "pending" }],
+      done: true,
+    });
+    expect(container.textContent).toContain("任务清单未生效");
+    expect(container.textContent).not.toContain("只做了一半");
+  });
+
+  it("空内容 → 报出第几项为空", async () => {
+    await renderTodo({
+      todos: [
+        { content: "A", status: "pending" },
+        { content: "  ", status: "pending" },
+      ],
+    });
+    expect(container.textContent).toContain("第 2 项内容为空");
+  });
+
+  it("端到端：被拒的清单对经过 MessageCard 仍渲染出警告", async () => {
+    // 上半段在 tool-display-blocks（保留成 content 块）、下半段在 ToolUseBlock（渲染警告），
+    // 各自绿着并不代表拼起来还有东西 —— 这条把两半接上：任何一层过滤掉 content 里的
+    // tool_use，这里就会空。
+    const rejected: ToolUseContent = {
       ...block,
-      id: "todo-2",
+      id: "todo-e2e",
       input: {
         todos: [
           { content: "先做 A", status: "in_progress" },
@@ -101,88 +141,78 @@ describe("todo_write 卡片", () => {
         ],
       },
     };
+    const result = {
+      type: "tool_result" as const,
+      toolUseId: "todo-e2e",
+      content: "rejected",
+      isError: true,
+    };
+    const whole: Message = {
+      ...message,
+      content: [rejected, result],
+    };
     await act(async () => {
       root.render(
-        createElement(ToolUseBlock, {
-          block: invalid,
-          allBlocks: [invalid],
-          message,
-        }),
+        createElement(MessageCard, {
+          message: whole,
+          allBlocks: whole.content,
+        } as never),
       );
     });
     expect(container.textContent).toContain("任务清单未生效");
-    // 工具侧拒绝了这份清单，状态没有生效 —— 清单本体不得显示
-    expect(container.textContent).not.toContain("先做 A");
-    expect(container.textContent).not.toContain("0/2");
   });
-  it("声明结束却留着未结算项 → 卡片也报「未生效」（与工具同一份规则）", async () => {
-    const unsettled: ToolUseContent = {
-      type: "tool_use",
-      id: "todo-2",
-      name: "todo_write",
+
+  it("schema 级拒绝（工具报错、软规则没意见）也给一句话", async () => {
+    const oversized: ToolUseContent = {
+      ...block,
+      id: "todo-schema",
       input: {
-        todos: [{ content: "只做了一半", status: "pending" }],
-        done: true,
+        todos: Array.from({ length: 51 }, (_, i) => ({
+          content: `第 ${i} 项`,
+          status: "pending",
+        })),
       },
     };
     await act(async () => {
       root.render(
         createElement(ToolUseBlock, {
-          block: unsettled,
-          allBlocks: [unsettled],
+          block: oversized,
+          allBlocks: [
+            oversized,
+            {
+              type: "tool_result",
+              toolUseId: "todo-schema",
+              content: "schema error",
+              isError: true,
+            },
+          ],
           message,
         }),
       );
     });
-    // 工具会把这次调用拒掉，所以卡片不能把它显示成已生效的清单
     expect(container.textContent).toContain("任务清单未生效");
-    expect(container.textContent).not.toContain("只做了一半");
   });
 
-  it("声明结束且已结算 → 卡片照常显示清单", async () => {
-    const settled: ToolUseContent = {
-      type: "tool_use",
-      id: "todo-3",
-      name: "todo_write",
+  it("驼峰 TodoWrite 同样只报未生效", async () => {
+    const legacy = {
+      ...block,
+      name: "TodoWrite",
       input: {
-        todos: [{ content: "全部做完了", status: "completed" }],
-        done: true,
+        todos: [
+          { content: "先做 A", status: "in_progress" },
+          { content: "先做 B", status: "in_progress" },
+        ],
       },
-    };
+    } as ToolUseContent;
     await act(async () => {
       root.render(
         createElement(ToolUseBlock, {
-          block: settled,
-          allBlocks: [settled],
+          block: legacy,
+          allBlocks: [legacy],
           message,
         }),
       );
     });
-    expect(container.textContent).toContain("全部做完了");
-    expect(container.textContent).not.toContain("任务清单未生效");
-  });
-
-  // 完成态用中性色：它原来是整张卡片最饱和的一笔（在非绿色强调色下尤其明显），
-  // 而完成与否已经由删除线＋图标形状表达，再叠一层色是重复编码。
-  it("完成态用中性色图标，不占用成功绿", async () => {
-    await act(async () => {
-      root.render(
-        createElement(ToolUseBlock, { block, allBlocks: [block], message }),
-      );
-    });
-    // CheckSquare 在 lucide-react v1.8.0 走 square-check-big（别名不改渲染出的类名）
-    const done = container.querySelector(".lucide-square-check-big");
-    expect(done).toBeTruthy();
-    // closest 而不是只查图标自己：写成 <span className="text-success"><svg/></span>
-    // 时图标照旧是绿的，只查 classList 的断言会全过。
-    expect(done?.closest(".text-success")).toBeNull();
-    expect(done?.closest(".text-muted-foreground")).toBeTruthy();
-    // 整张卡片不再出现任何成功色图标
-    expect(container.querySelector(".text-success")).toBeNull();
-    // 必须用 Loader2 自己的类名限定：卡片头部的 ListTodo 恒带 text-primary-text，
-    // 只写 svg.text-primary-text 的话，把进行中的强调色删掉这条断言照样绿。
-    expect(
-      container.querySelector(".lucide-loader-circle.text-primary-text"),
-    ).toBeTruthy();
+    expect(container.textContent).toContain("任务清单未生效");
   });
 });

@@ -15,7 +15,6 @@ import type { ContentBlock } from "../../renderer/types";
  */
 const empty: ProcessSummary = {
   readCount: 0,
-  todoUpdateCount: 0,
   hasSearch: false,
   hasWebSearch: false,
   hasBrowse: false,

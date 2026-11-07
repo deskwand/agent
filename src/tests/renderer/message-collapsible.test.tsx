@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// Thinking/Todo 折叠迁到 Radix Collapsible 后的行为契约（Task 8）。
+// Thinking 折叠迁到 Radix Collapsible 后的行为契约（Task 8）。
 // 断言只描述观感与语义：折叠不挂载正文、Trigger 是原生按钮可键盘激活、
 // 展开后 aria-controls 指向真实正文 id，以及既有预览截断/计数/摘要文案不变。
 import { act, createElement } from "react";
@@ -7,31 +7,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import i18n from "../../renderer/i18n/config";
 import { ThinkingBlock } from "../../renderer/components/message/ThinkingBlock";
-import { TodoWriteBlock } from "../../renderer/components/message/TodoWriteBlock";
-import type { TodoItem } from "../../renderer/components/message/types";
-import type { ToolUseContent } from "../../renderer/types";
 
 const PREVIEW_CHARS = 600;
 const THINKING_TAIL = "全文尾部-TAIL-标记";
 const LONG_THINKING = "思".repeat(PREVIEW_CHARS) + THINKING_TAIL;
 
-const TODOS: TodoItem[] = [
-  { content: "写 spec", status: "completed" },
-  { content: "写计划", status: "in_progress", activeForm: "正在写计划" },
-  { content: "被取消的项", status: "cancelled" },
-  { content: "待办项", status: "pending" },
-];
-
-function todoBlock(todos: TodoItem[]): ToolUseContent {
-  return {
-    type: "tool_use",
-    id: "todo-1",
-    name: "todo_write",
-    input: { todos },
-  };
-}
-
-describe("thinking / todo 折叠原语", () => {
+describe("thinking 折叠原语", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -53,13 +34,6 @@ describe("thinking / todo 折叠原语", () => {
       root.render(
         createElement(ThinkingBlock, { block: { type: "thinking", thinking } }),
       );
-    });
-  }
-
-  async function renderTodo(todos: TodoItem[]) {
-    const block = todoBlock(todos);
-    await act(async () => {
-      root.render(createElement(TodoWriteBlock, { block }));
     });
   }
 
@@ -169,76 +143,5 @@ describe("thinking / todo 折叠原语", () => {
     await renderThinking("第二轮思考 new-text");
     expect(trigger()!.getAttribute("aria-expanded")).toBe("true");
     expect(container.textContent).toContain("第二轮思考 new-text");
-  });
-
-  it("todo 默认展开：摘要行 activeForm、计数与清单同时可见", async () => {
-    await renderTodo(TODOS);
-    const el = trigger()!;
-    expect(el.getAttribute("aria-expanded")).toBe("true");
-    expect(el.getAttribute("data-state")).toBe("open");
-    expect(container.textContent).toContain(i18n.t("messageCard.taskProgress"));
-    expect(container.textContent).toContain("正在写计划");
-    // completed 计 1 项；cancelled 不进完成数但进总数。
-    expect(container.textContent).toContain("1/4");
-
-    const contentId = el.getAttribute("aria-controls");
-    expect(contentId).toBeTruthy();
-    const content = contentFor(el)!;
-    expect(content).toBeTruthy();
-    expect(content.textContent).toContain("写 spec");
-    expect(content.textContent).toContain("待办项");
-  });
-
-  it("todo 折叠后清单不可见、摘要行仍在", async () => {
-    await renderTodo(TODOS);
-    const el = trigger()!;
-    const contentId = el.getAttribute("aria-controls")!;
-
-    await act(async () => {
-      el.click();
-    });
-    expect(el.getAttribute("aria-expanded")).toBe("false");
-    expect(el.getAttribute("data-state")).toBe("closed");
-    // 同 thinking：折叠即卸载（`{expanded && …}` 的原有契约）。
-    expect(document.getElementById(contentId)).toBeNull();
-    expect(container.textContent).not.toContain("待办项");
-    expect(container.textContent).toContain("1/4");
-    expect(container.textContent).toContain("正在写计划");
-  });
-
-  it("todo 键盘 Enter/Space 可切换", async () => {
-    await renderTodo(TODOS);
-    const el = trigger()!;
-    expect(el instanceof HTMLButtonElement).toBe(true);
-    el.focus();
-    expect(document.activeElement).toBe(el);
-
-    await pressActivationKey(el, "Enter");
-    expect(el.getAttribute("aria-expanded")).toBe("false");
-    await pressActivationKey(el, " ");
-    expect(el.getAttribute("aria-expanded")).toBe("true");
-  });
-
-  it("todo 展开中追加条目保持展开且新条目可见", async () => {
-    await renderTodo([{ content: "第一步", status: "in_progress" }]);
-    expect(trigger()!.getAttribute("aria-expanded")).toBe("true");
-
-    await renderTodo([
-      { content: "第一步", status: "completed" },
-      { content: "新追加的第二步", status: "in_progress" },
-    ]);
-    expect(trigger()!.getAttribute("aria-expanded")).toBe("true");
-    expect(container.textContent).toContain("新追加的第二步");
-    expect(container.textContent).toContain("1/2");
-  });
-
-  it("todo 被拒绝时空态如实显示，不渲染清单与触发器", async () => {
-    await renderTodo([
-      { content: "先做 A", status: "in_progress" },
-      { content: "先做 B", status: "in_progress" },
-    ]);
-    expect(container.textContent).toContain("任务清单未生效");
-    expect(trigger()).toBeNull();
-    expect(container.textContent).not.toContain("先做 A");
   });
 });

@@ -7,7 +7,6 @@ import {
 } from "../../renderer/utils/tool-display-blocks";
 const empty: ProcessSummary = {
   readCount: 0,
-  todoUpdateCount: 0,
   hasSearch: false,
   hasWebSearch: false,
   hasBrowse: false,

@@ -91,14 +91,9 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
     vi.useRealTimers();
   });
 
-  async function render(
-    status: ChatInputStatus,
-    executionClock?: { startAt: number | null; endAt: number | null },
-  ): Promise<void> {
+  async function render(status: ChatInputStatus): Promise<void> {
     await act(async () =>
-      root.render(
-        React.createElement(ChatInputStatusBar, { status, executionClock }),
-      ),
+      root.render(React.createElement(ChatInputStatusBar, { status })),
     );
   }
 
@@ -257,138 +252,6 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
     expect(container.textContent).toContain("elapsed:2m"); // ~130s, not ~490s
   });
 
-  describe("turn elapsed timer", () => {
-    /** 只读可见的那一格：隐形哨兵也在 textContent 里，直接读 container 会把它们算进来。
-     *  返回 null 表示这一格整个不存在（秒表没渲染）—— 与「存在但文本为空」区分开，
-     *  否则 toBe("") 在元素缺失时会空过。 */
-    function visibleElapsed(): string | null {
-      return (
-        container.querySelector('[data-testid="turn-elapsed-visible"]')
-          ?.textContent ?? null
-      );
-    }
-
-    it("ticks the running time once per second", async () => {
-      const t0 = Date.now();
-      await render({ type: "thinking" }, { startAt: t0, endAt: null });
-      expect(visibleElapsed()).toBe("running:0s");
-      await act(async () => {
-        vi.advanceTimersByTime(12_000);
-      });
-      expect(visibleElapsed()).toBe("running:12s");
-    });
-
-    it("shows the frozen time for 5s after the run ends, then hides it", async () => {
-      const t0 = Date.now();
-      await render({ type: "thinking" }, { startAt: t0, endAt: null });
-      await act(async () => {
-        vi.advanceTimersByTime(12_000);
-      });
-      // 这一轮在第 12s 结束
-      await render({ type: "thinking" }, { startAt: t0, endAt: t0 + 12_000 });
-      expect(visibleElapsed()).toBe("done:12s");
-
-      await act(async () => {
-        vi.advanceTimersByTime(4_000);
-      });
-      expect(visibleElapsed()).toBe("done:12s");
-
-      // 第 5 秒起不再显示
-      await act(async () => {
-        vi.advanceTimersByTime(1_000);
-      });
-      expect(visibleElapsed()).toBeNull();
-    });
-
-    it("shows nothing without a clock or without an origin", async () => {
-      await render({ type: "thinking" });
-      expect(visibleElapsed()).toBeNull();
-
-      await render({ type: "thinking" }, { startAt: null, endAt: null });
-      expect(visibleElapsed()).toBeNull();
-
-      await render({ type: "thinking" }, { startAt: Date.now(), endAt: null });
-      expect(visibleElapsed()).toBe("running:0s");
-    });
-
-    it("shows the frozen time once the status has resolved to null", async () => {
-      const t0 = Date.now();
-      await render({ type: "thinking" }, { startAt: t0, endAt: null });
-      await act(async () => {
-        vi.advanceTimersByTime(8_000);
-      });
-      // 真实路径：回合结束后 canStop 转假 → resolveInputStatus 返回 null，
-      // 左区没有文案，只剩冻结的「本轮耗时」（不带 "· " 分隔符）。
-      await render(null, { startAt: t0, endAt: t0 + 8_000 });
-      expect(visibleElapsed()).toBe("done:8s");
-      expect(container.textContent).not.toContain("· done:");
-    });
-
-    it("does not add a second timer next to the goal clock", async () => {
-      await render(
-        {
-          type: "goal-active",
-          objective: "fix login",
-          iteration: 1,
-          timeUsedSeconds: 0,
-          activePeriodStartedAt: Date.now(),
-        },
-        { startAt: Date.now(), endAt: null },
-      );
-      expect(visibleElapsed()).toBeNull();
-      // goal 分支是提前 return 的，槽位也不应存在
-      expect(
-        container.querySelectorAll('[data-testid="turn-elapsed-slot"]'),
-      ).toHaveLength(0);
-    });
-
-    it("keeps the slot in the DOM so the chip never moves", async () => {
-      await render({ type: "thinking" }, { startAt: Date.now(), endAt: null });
-      const slots = container.querySelectorAll(
-        '[data-testid="turn-elapsed-slot"]',
-      );
-      // 只一个哨兵。第二个（用「本轮耗时」文案的）实测会让槽位从 85.297px
-      // 涨到 97.30px（叠格子格被 stretch 到列宽 = 最宽子格），留白永远贴不到 0；
-      // 而它买不到任何东西：运行期与收尾期的盒宽本来都是常量。详见设计文档。
-      expect(slots).toHaveLength(1);
-      expect(slots[0].getAttribute("aria-hidden")).toBe("true");
-      expect(slots[0].textContent).toBe("running:10h00m");
-      // 可见格只有一格，且不参与哨兵
-      expect(
-        container.querySelectorAll('[data-testid="turn-elapsed-visible"]'),
-      ).toHaveLength(1);
-    });
-
-    it("keeps the slot content constant across a band boundary", async () => {
-      const t0 = Date.now();
-      await render({ type: "thinking" }, { startAt: t0, endAt: null });
-
-      const slotText = () =>
-        container.querySelector('[data-testid="turn-elapsed-slot"]')
-          ?.textContent ?? null;
-
-      // 关键：断言槽位的「具体内容」，不是「前后相等」。
-      // 槽位内容与 elapsed 无关，写成 after === before 是套路的 ——
-      // 把整个槽位机制删掉后两边都是空串，照样通过。
-      expect(visibleElapsed()).toBe("running:0s");
-      expect(slotText()).toBe("running:10h00m");
-
-      await act(async () => {
-        vi.advanceTimersByTime(10_000);
-      });
-      // 9s → 10s 是 +7.20px 的跨档（比例宽度时代最疼的一次之一）
-      expect(visibleElapsed()).toBe("running:10s");
-      expect(slotText()).toBe("running:10h00m");
-    });
-
-    it("does not render the slot without a clock", async () => {
-      await render({ type: "thinking" });
-      expect(
-        container.querySelectorAll('[data-testid="turn-elapsed-slot"]'),
-      ).toHaveLength(0);
-    });
-  });
-
   // 迁移回归守卫：三个 goal 小按钮是 `<Button variant="ghost">`，base 的 `font-medium`（500）
   // 无条件盖掉了它们从 `body`（400，globals.css:746）继承来的字重 —— 迁移前它们是原生
   // `<button>`、className 里没有任何字重类。11px 的胶囊用 500、夹在 12px/400 的状态文字里
@@ -412,10 +275,6 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
         root.render(
           React.createElement(ChatInputStatusBar, {
             status,
-            currentTodos: null,
-            currentPlanDone: false,
-            lastNonEmptyTodos: null,
-            lastPlanDone: false,
             backgroundAgentRows: [],
             onGoalCommand: vi.fn(),
           }),
@@ -527,7 +386,10 @@ describe("background subagent entry", () => {
     expect(onSelect).toHaveBeenCalledWith("call-1");
   });
 
-  it("全部结束但有失败时，chip 文案不说「已完成」", () => {
+  it("全部结束但有失败时，chip 换成失败色", () => {
+    // 动作文案迁到消息区底部的任务坞之后，这里不再有「N 个子代理结束，其中 M 个失败」
+    // 那句话：失败信号改成 chip 上色，措辞与逐行状态留在面板里（原生 title 是本仓的
+    // 不变量测试禁止的）。
     act(() => {
       root.render(
         React.createElement(ChatInputStatusBar, {
@@ -542,10 +404,11 @@ describe("background subagent entry", () => {
         }),
       );
     });
-    expect(container.textContent).toContain(
-      "subagent.statusFinishedWithErrors",
-    );
-    expect(container.textContent).not.toContain("subagent.statusDone");
+    // 失败信号落在 chip 上：整枚计数换成失败色（具体哪一行失败由面板里的行状态承担 ——
+    // 原生 title 在本仓是不变量测试禁止的，操作/状态提示一律走面板）。
+    const count = container.querySelector("span.text-destructive");
+    expect(count, "计数应带失败色").toBeTruthy();
+    expect(count?.textContent).toContain("activity.subagents");
   });
 
   it("描述与当前动作同时可见（描述不再被动作顶掉）", async () => {
@@ -651,7 +514,7 @@ describe("background subagent entry", () => {
     };
     try {
       renderEntry(rows);
-    await openPanel(container);
+      await openPanel(container);
       const panel = findPanel();
       expect(panel?.style.maxHeight).toBe("252px");
     } finally {

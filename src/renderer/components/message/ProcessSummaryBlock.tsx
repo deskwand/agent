@@ -13,7 +13,6 @@ import {
   Target,
   Wrench,
   Folder,
-  ListTodo,
   Volume2,
   AlarmClock,
 } from "lucide-react";
@@ -65,9 +64,6 @@ const PROCESS_ICON_MAP: Record<
   subagent: <Bot className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
   tool: <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
   goal: <Target className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
-  tasklist: (
-    <ListTodo className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-  ),
   tts: <Volume2 className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
 };
 

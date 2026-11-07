@@ -37,7 +37,6 @@ const MAIN_SESSION_TOOLS = [
   "get_goal",
   "update_goal",
   "goal_complete",
-  "todo_write",
   "internal_browser_navigate",
   "internal_browser_screenshot",
   "internal_browser_click",
@@ -92,11 +91,28 @@ describe("tool group coverage", () => {
     }
   });
 
-  // 本次决定：清单不再独占卡片，折入过程摘要。两个名字都要管 ——
-  // 历史会话里是驼峰 TodoWrite，MAIN_SESSION_TOOLS 那个循环覆盖不到它。
-  it("folds todo_write into the process summary instead of a dedicated card", () => {
-    expect(isGrouped("todo_write")).toBe(true);
-    expect(isGrouped("TodoWrite")).toBe(true);
+  // 生效的清单只由消息区底部的任务坞承载 → 转录里整对丢弃（eagent 方案 B）。
+  // 两个名字都要管：历史会话里是驼峰 TodoWrite。
+  // ⚠️ 正因为它不进摘要分组，`todo_write` 刻意**不在** MAIN_SESSION_TOOLS 里 ——
+  // 那条循环断言的是"进了分组"，把它加回去会与下面这条互相打架。
+  // 丢弃名单的唯一实现是 `tool-display-blocks.ts` 的 DROPPED_TOOL_PAIRS；本用例是它的勒线。
+  it("drops todo_write from the transcript instead of grouping it", () => {
+    for (const name of ["todo_write", "TodoWrite"]) {
+      const blocks = buildToolDisplayBlocks([
+        {
+          type: "tool_use",
+          id: "t-1",
+          name,
+          input: { todos: [{ content: "建表", status: "pending" }] },
+        } as ContentBlock,
+        {
+          type: "tool_result",
+          toolUseId: "t-1",
+          content: "ok",
+        } as ContentBlock,
+      ]);
+      expect(blocks, `"${name}" must not render in the transcript`).toEqual([]);
+    }
   });
 
   // ask_user 需要独立可交互卡片，绝不折入摘要：折进去后要展开才能看见，

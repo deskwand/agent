@@ -1,0 +1,380 @@
+// @vitest-environment jsdom
+//
+// 任务坞的行为契约：清单卡（计数 / 进行中项 / 收尾态 / 长清单内滚动），
+// 动作行（文案 + 秒表），以及"只在运行中与 5s 收尾窗口内可见"这条显隐规则。
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ChatTaskDock,
+  resolveDockAction,
+} from "../../renderer/components/ChatTaskDock";
+import type { CurrentTodos } from "../../renderer/utils/current-todos";
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) =>
+      options?.count === undefined ? key : `${key}:${options.count}`,
+    i18n: { language: "en" },
+  }),
+}));
+
+const PLAN: CurrentTodos = [
+  { content: "建表", status: "completed" },
+  { content: "写迁移", status: "in_progress", activeForm: "正在写迁移" },
+];
+
+describe("chat task dock", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  function render(props: Parameters<typeof ChatTaskDock>[0]): void {
+    act(() => {
+      root.render(createElement(ChatTaskDock, props));
+    });
+  }
+
+  function dock(): HTMLElement | null {
+    return container.querySelector<HTMLElement>(
+      '[data-testid="chat-task-dock"]',
+    );
+  }
+
+  it("运行中渲染清单：计数、进行中项标记与动作文案", () => {
+    render({ status: { type: "thinking" }, running: true, currentTodos: PLAN });
+    expect(dock()).not.toBeNull();
+    expect(container.textContent).toContain("1/2");
+    expect(container.textContent).toContain("写迁移");
+    expect(container.textContent).toContain("chat.processing");
+    // 进行中项带 data-active（供内部滚动定位），旁边有旋转图标
+    expect(
+      container.querySelector('li[data-active="true"]')?.textContent,
+    ).toContain("写迁移");
+    expect(
+      container.querySelector('[data-testid="dock-status-glyph"]'),
+    ).not.toBeNull();
+  });
+
+  it("不在运行、也不在收尾窗口 → 整块不渲染", () => {
+    render({
+      status: null,
+      running: false,
+      executionClock: { startAt: 1_000, endAt: 2_000 },
+      currentTodos: PLAN,
+    });
+    expect(dock()).toBeNull();
+  });
+
+  it("收尾窗口内（endAt 刚过去 1 秒）仍然渲染，且显示压缩结果", () => {
+    render({
+      status: { type: "compaction-success" },
+      running: false,
+      executionClock: {
+        startAt: Date.now() - 5_000,
+        endAt: Date.now() - 1_000,
+      },
+      currentTodos: PLAN,
+    });
+    expect(dock()).not.toBeNull();
+    expect(container.textContent).toContain("chat.compacted");
+  });
+
+  it("没有清单也有动作态时只有动作行", () => {
+    render({
+      status: { type: "responding" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+    });
+    expect(container.textContent).toContain("chat.responding");
+    expect(container.querySelector("ul")).toBeNull();
+  });
+
+  it("finishing：清空后仍显示记住那份的计数与「已清空」，进行中项不再呈实时态", () => {
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: [
+        { content: "建表", status: "completed" },
+        { content: "写迁移", status: "in_progress" },
+      ],
+    });
+    expect(container.textContent).toContain("1/2");
+    expect(container.textContent).toContain("activity.statusCleared");
+    expect(container.querySelector('li[data-active="true"]')).toBeNull();
+  });
+
+  it("planDone 且全部完成 → 行尾显示已完成", () => {
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [{ content: "建表", status: "completed" }],
+      currentPlanDone: true,
+    });
+    expect(container.textContent).toContain("activity.statusDone");
+  });
+
+  it("planDone 但有取消项 → 报出取消数量", () => {
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [
+        { content: "建表", status: "completed" },
+        { content: "放弃", status: "cancelled" },
+      ],
+      currentPlanDone: true,
+    });
+    expect(container.textContent).toContain("activity.statusCancelled:1");
+  });
+
+  it("进行中项的文案优先取 activeForm", () => {
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: PLAN,
+    });
+    expect(container.textContent).toContain("正在写迁移");
+  });
+
+  it("currentTodos 为 null 时不进收尾态（没有依据就不能显示上一轮）", () => {
+    // Review Focus #2：`null` = 从未有过 / 重启未水合，与"被清空"是两件事。
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: null,
+      lastNonEmptyTodos: [
+        { content: "建表", status: "completed" },
+        { content: "补测试", status: "completed" },
+      ],
+      lastPlanDone: true,
+    });
+    expect(container.textContent).not.toContain("2/2");
+    expect(container.textContent).not.toContain("activity.statusCleared");
+    expect(container.textContent).not.toContain("activity.statusDone");
+    expect(container.querySelector("ul")).toBeNull();
+  });
+
+  it("全完成但未声明 done → 不说已完成（done 由模型声明负责）", () => {
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [{ content: "建表", status: "completed" }],
+      currentPlanDone: false,
+    });
+    expect(container.textContent).toContain("1/1");
+    expect(container.textContent).not.toContain("activity.statusDone");
+  });
+
+  it("目标长跑时不单独挂一只裸秒表（耗时归输入框上方的目标段）", () => {
+    render({
+      status: {
+        type: "goal-active",
+        objective: "跑一个长任务",
+        iteration: 1,
+        timeUsedSeconds: 5,
+        activePeriodStartedAt: Date.now(),
+      },
+      running: false,
+      executionClock: {
+        startAt: Date.now() - 9_000,
+        endAt: Date.now() - 1_000,
+      },
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+    });
+    // 收尾窗口内本来就该整块在；但没有动作文案时不该只剩一格耗时
+    expect(dock()).toBeNull();
+    expect(
+      container.querySelector('[data-testid="turn-elapsed-visible"]'),
+    ).toBeNull();
+  });
+
+  it("超长清单只在卡内滚动，不把消息区挤没", () => {
+    const many: CurrentTodos = Array.from({ length: 50 }, (_, i) => ({
+      content: `第 ${i + 1} 项`,
+      status: i === 0 ? ("in_progress" as const) : ("pending" as const),
+    }));
+    render({ status: { type: "thinking" }, running: true, currentTodos: many });
+    const list = container.querySelector("ul");
+    expect(list?.className).toContain("max-h-[44vh]");
+    expect(list?.className).toContain("overflow-y-auto");
+  });
+});
+
+describe("resolveDockAction", () => {
+  const t = ((key: string) => key) as never;
+
+  it("运行态与会话态文案各自对应", () => {
+    expect(resolveDockAction({ type: "sending" }, t)).toEqual({
+      text: "chat.sending",
+      toneClass: "text-foreground",
+      isRunning: true,
+    });
+    expect(resolveDockAction({ type: "compaction-failed" }, t)).toEqual({
+      text: "chat.compactFailed",
+      toneClass: "text-muted-foreground",
+      isRunning: false,
+    });
+  });
+
+  it("goal 与子代理状态不进坞（各有归属）", () => {
+    expect(
+      resolveDockAction(
+        { type: "goal-active", objective: "把活干完", iteration: 2 },
+        t,
+      ),
+    ).toBeNull();
+    expect(
+      resolveDockAction({ type: "background-agent", count: 2 }, t),
+    ).toBeNull();
+    expect(resolveDockAction(null, t)).toBeNull();
+  });
+});
+
+// 回合秒表的宽度稳定性与收尾窗口：从 ChatInputStatusBar 的旧测试整组搬来
+// （秒表随动作态一起迁进坞）。fake timers 下 Date.now() 也走假时钟。
+describe("dock turn clock", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.useFakeTimers();
+    container = document.createElement("div");
+    document.body.innerHTML = "";
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.useRealTimers();
+  });
+
+  async function render(
+    status: Parameters<typeof ChatTaskDock>[0]["status"],
+    executionClock?: { startAt: number | null; endAt: number | null },
+    running = true,
+  ): Promise<void> {
+    await act(async () =>
+      root.render(
+        createElement(ChatTaskDock, {
+          status,
+          running,
+          executionClock,
+          currentTodos: PLAN,
+        }),
+      ),
+    );
+  }
+
+  /** 只读可见的那一格：隐形哨兵也在 textContent 里，直接读 container 会把它算进来。
+   *  返回 null 表示这一格整个不存在（秒表没渲染）—— 与「存在但文本为空」区分开，
+   *  否则 toBe("") 在元素缺失时会空过。 */
+  function visibleElapsed(): string | null {
+    return (
+      container.querySelector('[data-testid="turn-elapsed-visible"]')
+        ?.textContent ?? null
+    );
+  }
+
+  it("ticks the running time once per second", async () => {
+    const t0 = Date.now();
+    await render({ type: "thinking" }, { startAt: t0, endAt: null });
+    expect(visibleElapsed()).toBe("chat.elapsedRunning");
+    await act(async () => {
+      vi.advanceTimersByTime(12_000);
+    });
+    expect(visibleElapsed()).toBe("chat.elapsedRunning");
+    // 具体秒数由格式化函数决定，这里只钉「挂的那一格仍在、且没变成收尾态」
+    expect(
+      container.querySelectorAll('[data-testid="turn-elapsed-visible"]'),
+    ).toHaveLength(1);
+  });
+
+  it("shows the frozen time for 5s after the run ends, then hides it", async () => {
+    const t0 = Date.now();
+    await render({ type: "thinking" }, { startAt: t0, endAt: null });
+    await act(async () => {
+      vi.advanceTimersByTime(12_000);
+    });
+    // 这一轮在第 12s 结束：状态已解析成 null，坞只剩收尾窗口撑着
+    await render(null, { startAt: t0, endAt: t0 + 12_000 }, false);
+    expect(visibleElapsed()).not.toBeNull();
+    expect(container.textContent).toContain("chat.elapsedDone");
+
+    await act(async () => {
+      vi.advanceTimersByTime(4_000);
+    });
+    expect(visibleElapsed()).not.toBeNull();
+
+    // 第 5 秒起整块消失（坞与秒表同一刻退场）
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(visibleElapsed()).toBeNull();
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]'),
+    ).toBeNull();
+  });
+
+  it("shows nothing without a clock or without an origin", async () => {
+    await render({ type: "thinking" });
+    expect(visibleElapsed()).toBeNull();
+
+    await render({ type: "thinking" }, { startAt: null, endAt: null });
+    expect(visibleElapsed()).toBeNull();
+
+    await render({ type: "thinking" }, { startAt: Date.now(), endAt: null });
+    expect(visibleElapsed()).not.toBeNull();
+  });
+
+  it("does not add a second timer next to the goal clock", async () => {
+    await render(
+      {
+        type: "goal-active",
+        objective: "fix login",
+        iteration: 1,
+        timeUsedSeconds: 0,
+        activePeriodStartedAt: Date.now(),
+      },
+      { startAt: Date.now(), endAt: null },
+    );
+    // 目标态的气归输入框上方的目标段，坞里不该再挂一只秒表
+    expect(visibleElapsed()).toBeNull();
+    expect(
+      container.querySelectorAll('[data-testid="turn-elapsed-slot"]'),
+    ).toHaveLength(0);
+  });
+
+  it("keeps the slot in the DOM so the row never shifts", async () => {
+    await render({ type: "thinking" }, { startAt: Date.now(), endAt: null });
+    const slots = container.querySelectorAll(
+      '[data-testid="turn-elapsed-slot"]',
+    );
+    // 只一个哨兵：第二个会让槽位被 stretch 到更宽的子格，留白贴不到 0。
+    expect(slots).toHaveLength(1);
+    expect(slots[0].getAttribute("aria-hidden")).toBe("true");
+    expect(
+      container.querySelectorAll('[data-testid="turn-elapsed-visible"]'),
+    ).toHaveLength(1);
+  });
+});
