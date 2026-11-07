@@ -230,10 +230,20 @@ describe("chat task dock", () => {
     expect(
       container.querySelector('[data-testid="turn-elapsed-visible"]'),
     ).not.toBeNull();
-    // 只有一行：坞内不含清单卡以外的第二个摘要壳
+    // 摘要与动作态同处**一行**：图标、摘要触发器、耗时都在同一个 flex 行里，
+    // 且全坞只有一个摘要触发器（多一层壳就会多一个折叠按钮）。
+    const actionRow = container.querySelector(
+      '[data-testid="dock-status-glyph"]',
+    )?.parentElement;
+    expect(actionRow).toBeTruthy();
+    expect(actionRow?.querySelectorAll("button[aria-expanded]")).toHaveLength(
+      1,
+    );
     expect(
-      container.querySelectorAll('[data-testid="chat-task-dock"]'),
-    ).toHaveLength(1);
+      actionRow?.contains(
+        container.querySelector('[data-testid="turn-elapsed-visible"]'),
+      ),
+    ).toBe(true);
   });
 
   it("一次性结果（压缩完成）不因摘要存在而被吞掉", () => {

@@ -3,7 +3,9 @@
 // 不 sticky、不占独立一行；内容少时被推到最底，内容一多就随消息一起滚走。
 // 只在运行中与结束后的 5s 收尾窗口内出现（与停止按钮 canStop 同源），其余时候整块收起。
 // 行为对齐 eagent 的 ChatTaskDock（~/src/eagent/eagent/frontend/src/components/ChatTaskDock.jsx）：
-// 参考实现还在坞里放了一块"尾部过程摘要"，那要动转录的摘要抑制逻辑，本次不做。
+// 本轮的工具活动摘要由 `summary` 传进来，与动作态合成一行（转录侧由 ChatView 按轮抑制）。
+// 已知取舍：`ProcessSummaryBlock` 的展开态是组件内部 state —— 回合结束时摘要从坞
+// 回到转录会重新挂载，用户中途展开的那一次会被收起。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -367,10 +369,10 @@ export function ChatTaskDock({
           <style>{gradientStyles}</style>
           {action?.isRunning ? <StatusGlyph /> : null}
           {summary ? (
-            /* 摘要行自带图标 + 折叠按钮，坞里不再套第二个图标；
-               ProcessSummaryBlock 自带 pl-3（给转录里的工具行缩进用），坞里没有那层语境，
-               这里用负边距把那 12px 收回，让图标与清单卡左缘对齐。 */
-            <div className="-ml-3 min-w-0">
+            /* 摘要行自带图标与折叠按钮，坞里不再套第二个图标。
+               ⚠️ 不要用负边距去"对齐"清单卡：ProcessSummaryBlock 的触发器是 `px-1`
+               （不是 pl-3），任何额外的负偏移都会把它推进左边旋转图标的范围里。 */
+            <div className="min-w-0">
               <ProcessSummaryBlock
                 block={summary.block}
                 allBlocks={summary.allBlocks}

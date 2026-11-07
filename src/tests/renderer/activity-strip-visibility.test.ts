@@ -95,6 +95,9 @@ function setState(opts: {
   currentPlanDone?: boolean;
   lastNonEmptyTodos?: CurrentTodos | null;
   lastPlanDone?: boolean;
+  /** 需要走"流式中折叠成 partial 消息"那条分支时传入。 */
+  activeTurn?: { turnId: string; userMessageId: string } | null;
+  partialMessage?: string;
 }): void {
   const session: Session = {
     id: "s1",
@@ -119,10 +122,10 @@ function setState(opts: {
         oldestMessageId: null,
         messages: opts.messages,
         partialByTurn: {},
-        partialMessage: "",
+        partialMessage: opts.partialMessage ?? "",
         partialThinking: "",
         pendingTurns: [],
-        activeTurn: null,
+        activeTurn: opts.activeTurn ?? null,
         executionClock: { startAt: null, endAt: null },
         traceSteps: [],
         contextWindow: 0,
@@ -360,6 +363,127 @@ describe("activity strip end to end", () => {
       (container.textContent ?? "").split("tool.grouped.executedCommands")
         .length - 1;
     expect(occurrences, `摘要应只出现一次：${container.textContent}`).toBe(1);
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]'),
+    ).toBeNull();
+  });
+
+  // 一轮里可能有好几条"带正文 + 带工具"的助手消息：坞按整轮聚合，所以转录侧
+  // 必须按轮抑制，只按最后一条消息抑制会让前一条的计数重复出现。
+  function twoTextTurns(): Message[] {
+    return [
+      makeMessage("u1", "user", [{ type: "text", text: "先看看再改" }]),
+      {
+        ...makeMessage("a1", "assistant", [
+          { type: "text", text: "先看一眼目录。" },
+          {
+            type: "tool_use",
+            id: "b1",
+            name: "bash",
+            input: { command: "ls" },
+          },
+        ]),
+        turnId: "t1",
+      },
+      {
+        ...makeMessage("a2", "assistant", [
+          { type: "text", text: "再跑一次测试。" },
+          {
+            type: "tool_use",
+            id: "b2",
+            name: "bash",
+            input: { command: "ls" },
+          },
+        ]),
+        turnId: "t1",
+      },
+    ];
+  }
+
+  it("一轮两条带正文的消息：摘要也只出现一次（按轮抑制）", () => {
+    act(() =>
+      setState({
+        sessionStatus: "running",
+        messages: twoTextTurns(),
+        currentTodos: null,
+      }),
+    );
+    render();
+
+    const text = container.textContent ?? "";
+    const occurrences = text.split("tool.grouped.executedCommands").length - 1;
+    expect(occurrences, `摘要应只出现一次：${text}`).toBe(1);
+    // 且那一次在坞里，而且是聚合后的口径（两条命令 → pluralKey 走 _other）
+    const dock = container.querySelector('[data-testid="chat-task-dock"]');
+    expect(dock?.textContent).toContain("tool.grouped.executedCommands_other");
+  });
+
+  it("流式中（activeTurn + partial）同样只出现一次", () => {
+    act(() =>
+      setState({
+        sessionStatus: "running",
+        messages: twoTextTurns(),
+        currentTodos: null,
+        activeTurn: { turnId: "t1", userMessageId: "u1" },
+        partialMessage: "正在收尾",
+      }),
+    );
+    render();
+
+    const occurrences =
+      (container.textContent ?? "").split("tool.grouped.executedCommands")
+        .length - 1;
+    expect(occurrences, `摘要应只出现一次：${container.textContent}`).toBe(1);
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]')?.textContent,
+    ).toContain("tool.grouped.executedCommands");
+  });
+
+  it("上提过的摘要：运行中进坞，回合结束后回到转录原位", () => {
+    // 纯工具消息会被并进前一条同轮助手消息 → 该轮走"上提"路径。
+    const messages: Message[] = [
+      makeMessage("u1", "user", [{ type: "text", text: "跑一下" }]),
+      {
+        ...makeMessage("a1", "assistant", [
+          { type: "text", text: "开始。" },
+          {
+            type: "tool_use",
+            id: "b1",
+            name: "bash",
+            input: { command: "ls" },
+          },
+        ]),
+        turnId: "t1",
+      },
+      {
+        ...makeMessage("a2", "assistant", [
+          {
+            type: "tool_use",
+            id: "b2",
+            name: "bash",
+            input: { command: "pwd" },
+          },
+        ]),
+        turnId: "t1",
+      },
+    ];
+
+    act(() =>
+      setState({ sessionStatus: "running", messages, currentTodos: null }),
+    );
+    render();
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]')?.textContent,
+    ).toContain("tool.grouped.executedCommands");
+
+    act(() =>
+      setState({ sessionStatus: "completed", messages, currentTodos: null }),
+    );
+    render();
+    const occurrences =
+      (container.textContent ?? "").split("tool.grouped.executedCommands")
+        .length - 1;
+    expect(occurrences, `回合结束后摘要应回到转录且只有一份`).toBe(1);
     expect(
       container.querySelector('[data-testid="chat-task-dock"]'),
     ).toBeNull();

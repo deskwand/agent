@@ -1235,12 +1235,19 @@ export function ChatView() {
   );
 
   // 运行中把「本轮的工具活动摘要」搬到消息区底部的坞里，与动作态合成一行：
-  // 那块摘要本来就紧贴坞上方，两行说的是同一件事。回合结束后 canStop 转假，
-  // 它回到转录原位（两边共用这一个布尔量，不靠两个计时器协调，所以不会同时出现）。
-  // 摘要按整轮聚合（与多消息轮次既有的上提口径一致），因此搬走的是"这一轮干了什么"
-  // 而不是某条消息的局部计数 —— 信息量不减，只是换了个位置。
+  // 那块摘要本来就紧贴坞上方，两行说的是同一件事。
+  // 三条判据，缺一条都会出事：
+  //  ① `turnLive`（真的在跑）而不是 `canStop` —— canStop 还包含"排队等发送"的空档，
+  //     那时上一轮已经结束，搬走只会让一行历史从视野里消失；
+  //  ② 只看「最新那一轮」：滚动回看时渲染窗口可能仍停在旧轮次上，而坞在可视区外，
+  //     把旧轮的摘要搬过去等于凭空删掉一行；
+  //  ③ 摘要按整轮聚合，所以转录侧的抑制也必须按轮（turnId）而不是按消息 ——
+  //     一轮里可能有好几条带正文的助手消息，按消息抑制会漏掉前一条、出现重复计数。
+  // 代价（有意接受）：轮内"正文 → 工具 → 正文"的先后顺序在运行期间被抹平成一条聚合行；
+  // 回合结束后摘要回到转录原位，顺序信息随之回来。
+  const turnLive = isSessionRunning || hasActiveTurn;
   const dockSummary = useMemo(() => {
-    if (!canStop) return null;
+    if (!turnLive) return null;
     let lastAssistant: Message | null = null;
     for (let i = mergedTurnEntries.length - 1; i >= 0; i -= 1) {
       const entry = mergedTurnEntries[i];
@@ -1249,21 +1256,30 @@ export function ChatView() {
         break;
       }
     }
-    if (!lastAssistant) return null;
-    const blocks =
-      (lastAssistant.turnId && turnBlocksById.get(lastAssistant.turnId)) ||
-      lastAssistant.content;
+    if (!lastAssistant?.turnId) return null;
+    // 最新一轮的 turnId 取自全量已加载消息（displayedMessages），与渲染窗口无关。
+    let newestTurnId: string | null = null;
+    for (let i = displayedMessages.length - 1; i >= 0; i -= 1) {
+      const message = displayedMessages[i];
+      if (message?.role === "assistant" && message.turnId) {
+        newestTurnId = message.turnId;
+        break;
+      }
+    }
+    if (lastAssistant.turnId !== newestTurnId) return null;
+    const turnId = lastAssistant.turnId;
+    const blocks = turnBlocksById.get(turnId) ?? lastAssistant.content;
     const items = blocks
       .filter((block): block is ToolUseContent => block.type === "tool_use")
       .filter(isProcessToolUse);
     if (items.length === 0) return null;
     return {
-      messageId: lastAssistant.id,
+      turnId,
       block: buildProcessSummaryDisplayBlock(items, blocks),
       allBlocks: blocks,
       message: lastAssistant,
     };
-  }, [canStop, mergedTurnEntries, turnBlocksById]);
+  }, [turnLive, mergedTurnEntries, displayedMessages, turnBlocksById]);
 
   const handleForkMessage = useCallback(
     async (message: Message) => {
@@ -2258,7 +2274,7 @@ export function ChatView() {
                           className="space-y-1.5"
                         >
                           {turnProcessSummary &&
-                          dockSummary?.messageId !== message.id ? (
+                          dockSummary?.turnId !== message.turnId ? (
                             <ProcessSummaryBlock
                               block={turnProcessSummary}
                               allBlocks={
@@ -2282,11 +2298,13 @@ export function ChatView() {
                             isLatestRound={isLatestRound}
                             artifactFiles={artifactFiles}
                             videoReferences={videoReferences}
-                            // 坞接管的这一条消息不再自己渲染摘要行：整轮的
-                            // 工具活动已经合成坞里那一行，否则同一件事会出现两次。
+                            // 坞接管的这一**轮**不再自己渲染摘要行：整轮的工具
+                            // 活动已经合成坞里那一行，否则同一件事会出现两次
+                            // （按轮抑制：一轮可能有好几条带正文的助手消息）。
                             suppressProcessSummaries={
                               suppressProcessSummaries ||
-                              dockSummary?.messageId === message.id
+                              (dockSummary !== null &&
+                                message.turnId === dockSummary.turnId)
                             }
                             onForkMessage={handleForkMessage}
                             onRewindMessage={handleRewindMessage}
