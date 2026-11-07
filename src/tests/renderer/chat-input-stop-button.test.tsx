@@ -65,8 +65,15 @@ describe("ChatInputBottomBar 停止键", () => {
 
     const glyph = button!.querySelector("svg");
     expect(glyph?.getAttribute("fill")).toBe("currentColor");
-    // 手画的 rect 带自己的圆角：lucide Square 的 rx 盖不掉，14px 下看着是直角块。
+    // 手画的 rect 带自己的圆角：lucide Square 的 rx 盖不掉，12px 下看着是直角块。
     expect(glyph?.querySelector("rect")?.getAttribute("rx")).toBe("6");
+    // 尺寸只能写在这一行：svg 自己写的 `w-3`（0,1,0）赢不过 Button base 的
+    // `[&_svg]:size-4`（`.cls svg` = 0,1,1），会静默地顶回 16px ——
+    // 那正是这个方块比旁边麦克风大一圈的真因。
+    expect(button!.className).toContain("[&_svg]:size-3");
+    // 两档同时存在时胜负取决于产物 CSS 的顺序，等于没修 —— base 那档必须已经被 cn
+    // 合掉。这条比上面那条更能拦住「特异性陷阱又回来了」。
+    expect(button!.className).not.toContain("[&_svg]:size-4");
   });
 
   it("停止态点击触发 onStop，且不是提交按钮", () => {
@@ -89,5 +96,7 @@ describe("ChatInputBottomBar 停止键", () => {
     expect(button.querySelector("svg")?.getAttribute("fill")).not.toBe(
       "currentColor",
     );
+    // 12px 只属于停止那颗方块：发送态的返回箭头仍沿用 base 的 16px。
+    expect(button.className).not.toContain("[&_svg]:size-3");
   });
 });

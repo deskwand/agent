@@ -89,6 +89,14 @@ describe("VoiceMicButton", () => {
     // 断言字符串是这里唯一能拦住那次静默降级的手段。
     expect(ring.className).toContain("animate-voice-polish-ring");
     expect(ring.className).toContain("border-destructive");
+
+    // 停止方块与输入卡里那颗停止键是**同一枚字形**（stop-glyph）：同一个「停止」
+    // 在同一张卡里长得不一样过。实心 rect ✓、12px 只能写在 Button 上 ✓。
+    const glyph = stop.querySelector("svg");
+    expect(glyph?.getAttribute("fill")).toBe("currentColor");
+    expect(glyph?.querySelector("rect")?.getAttribute("rx")).toBe("6");
+    expect(stop.className).toContain("[&_svg]:size-3");
+    expect(stop.className).not.toContain("[&_svg]:size-4");
   });
 
   it("录音态不在按钮里显示计时或波形", () => {

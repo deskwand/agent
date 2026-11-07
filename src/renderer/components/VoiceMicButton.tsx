@@ -1,4 +1,4 @@
-import { Loader2, Mic, Square, TriangleAlert } from "lucide-react";
+import { Loader2, Mic, TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { VoiceInstallState } from "../../shared/ipc-types";
@@ -7,6 +7,7 @@ import type { VoiceInputController, VoiceStatus } from "../hooks/useVoiceInput";
 import type { VoiceEngineConfig } from "../types";
 import { holdKeyNameKey, shortcutPlatform } from "../voice-shortcut-labels";
 import { Button } from "./app-button";
+import { StopGlyph } from "./stop-glyph";
 
 /**
  * 那一格的全部输入。**没有 level / seconds**：电平与计时由卡片内的
@@ -151,9 +152,13 @@ export function VoiceMicButton({
   // 焦点不能丢：键盘用户用空格开始录音后，按钮一旦换成另一个元素，焦点就掉到 body，
   // 故事就停了（既没被告知录上了，也无法再按空格停下）。所以只换图标与颜色。
   // 计时与波形在卡片内的 VoiceRecordingStrip：36px 装不下它们，撑宽会抢编辑区。
+  // 这一格里的方块只该有一种：停止（录音中 / 收尾中）用与输入卡停止键**同一枚**
+  // `StopGlyph`，尺寸也只能写在 Button 上（与那边同样是 `size-3`）。先判 stopping：
+  // 它才是这一格当下真正画出来的东西（安装中不会同时录音；真撞上了，渲染分支
+  // 也是 stopping 赢），尺寸档也得跟着同一个赢家。
   const buttonClassName = `${MIC_SLOT_CLASS} ${
     stopping || installFailed ? "text-destructive hover:text-destructive" : ""
-  } ${installing ? "[&_svg]:size-7" : ""}`;
+  } ${stopping ? "[&_svg]:size-3" : installing ? "[&_svg]:size-7" : ""}`;
 
   return (
     <div className="flex shrink-0 items-center gap-1">
@@ -175,7 +180,7 @@ export function VoiceMicButton({
                   data-testid="voice-recording-ring"
                   className="pointer-events-none absolute -inset-[3px] rounded-full border-2 border-destructive opacity-[0.55] animate-voice-polish-ring"
                 />
-                <Square className="h-4 w-4" />
+                <StopGlyph />
               </>
             ) : (
               <>
