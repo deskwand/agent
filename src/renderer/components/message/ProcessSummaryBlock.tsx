@@ -76,6 +76,11 @@ interface ProcessSummaryBlockProps {
    * 任务坞用它放「已运行 5m03s」：这一列原来占在按钮外面，展开后整列都是空的。
    */
   trailing?: React.ReactNode;
+  /**
+   * 紧凑头部：触发器与片段按内容宽排（箭头、耗时紧贴文案），右侧留白。
+   * 只在坞里开 —— 转录里的摘要行必须保持整行可点、hover 满宽。
+   */
+  compactHeader?: boolean;
 }
 
 export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
@@ -83,6 +88,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
   allBlocks,
   message,
   trailing,
+  compactHeader = false,
 }: ProcessSummaryBlockProps) {
   const { t } = useTranslation();
   const failureSuffix = formatFailureSuffix(block.status?.failedCount ?? 0, t);
@@ -150,11 +156,15 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
           <Button
             variant="ghost"
             type="button"
-            className={`group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] text-muted-foreground transition-colors hover:bg-hover-surface ${
-              highlighted ? "ring-2 ring-primary/40" : ""
-            }`}
+            className={`group flex min-w-0 items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] text-muted-foreground transition-colors hover:bg-hover-surface ${
+              compactHeader ? "" : "flex-1"
+            } ${highlighted ? "ring-2 ring-primary/40" : ""}`}
           >
-            <span className="flex flex-1 items-center gap-1.5 min-w-0 overflow-hidden flex-nowrap">
+            <span
+              className={`flex items-center gap-1.5 min-w-0 overflow-hidden flex-nowrap ${
+                compactHeader ? "" : "flex-1"
+              }`}
+            >
               {fragments.map((frag, fi) => (
                 <span
                   key={fi}
@@ -209,7 +219,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 <div
                   key={script.id}
                   ref={failedToolCallId === script.id ? failedItemRef : null}
-                  className="px-2.5 py-1.5"
+                  className="px-4 py-2"
                 >
                   <Collapsible>
                     <CollapsibleTrigger asChild>

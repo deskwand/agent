@@ -424,6 +424,8 @@ export function ChatTaskDock({
                 message={summary.message}
                 // 耗时进触发器行内：那一列不再占在摘要块外面，展开后卡片铺满整行
                 trailing={elapsedNode}
+                // 头部紧凑（按内容宽）：转录里的摘要行仍整行可点，所以开关只在坞里给
+                compactHeader
               />
             </div>
           ) : null}

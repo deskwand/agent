@@ -78,6 +78,80 @@ afterEach(() => {
 });
 
 describe("ToolStepRow", () => {
+  const mount = () =>
+    act(() =>
+      root.render(
+        createElement(ToolStepRow, {
+          item: readItem,
+          allBlocks: [readItem, readResult],
+          message,
+        }),
+      ),
+    );
+
+  it("展开详情是与行标签对齐的内嵌块（不再深缩进）", async () => {
+    mount();
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>("button[aria-expanded]")
+        ?.click();
+    });
+    const body = container.querySelector("[data-step-body]");
+    expect(body?.className).toContain("px-4");
+    expect(body?.className).not.toContain("pl-9");
+    const detail = container.querySelector("[data-step-detail]");
+    expect(detail).not.toBeNull();
+    for (const cls of ["rounded-lg", "border", "bg-background/70", "p-3"]) {
+      expect(detail?.classList.contains(cls), cls).toBe(true);
+    }
+  });
+
+  // ⚠️ 垂直档位是**暂定值**（spec §8.1：真机同宽对照后允许在 py-1.5 / py-2 /
+  // py-2.5 三档里浮动）。所以这里不把某一档写死 —— 否则测试会反过来禁止 spec
+  // 明确允许的取值。定档后改下面那个白名单即可。
+  it("行按参考图档位排版：14px 字、水平 16px、垂直用 py-* 档", () => {
+    mount();
+    const row = container.querySelector<HTMLButtonElement>(
+      "button[aria-expanded]",
+    )!;
+    for (const cls of ["text-sm", "px-4"]) {
+      expect(row.classList.contains(cls), cls).toBe(true);
+    }
+    // 旧档位必须消失（否则等于没改）：12px 字与 10px 水平内缩
+    for (const cls of ["text-xs", "px-2.5"]) {
+      expect(row.classList.contains(cls), cls).toBe(false);
+    }
+    const vertical = Array.from(row.classList).filter((cls) =>
+      /^py-(?:\d|\[)/.test(cls),
+    );
+    expect(vertical, "垂直内缩应恰好是一个 py-* 档").toHaveLength(1);
+    expect(["py-1.5", "py-2", "py-2.5"]).toContain(vertical[0]);
+  });
+
+  it("箭头在行末：占位在它之前，箭头是行内最后一个可见元素", () => {
+    mount();
+    const row = container.querySelector<HTMLButtonElement>(
+      "button[aria-expanded]",
+    )!;
+    const children = Array.from(row.children);
+    expect(children.at(-2)?.className).toContain("flex-1");
+    expect(children.at(-1)?.tagName.toLowerCase()).toBe("svg");
+  });
+
+  // 卡内两类行（脚本折叠行 / 工具行）左缘必须同一档内缩 —— 这条在坞与转录里
+  // 都生效（同一个卡片组件），改的时候别只改一半。
+  it("展开后的详情与行标签同位（内缩 16px，不再 pl-9 深缩进）", () => {
+    mount();
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>("button[aria-expanded]")
+        ?.click();
+    });
+    const body = container.querySelector("[data-step-body]");
+    expect(body?.className).toContain("px-4");
+    expect(body?.className).not.toContain("pl-9");
+  });
+
   it("行头显示标签与摘要，默认收起", () => {
     act(() =>
       root.render(

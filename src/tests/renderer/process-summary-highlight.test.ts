@@ -110,6 +110,16 @@ describe("ProcessSummaryBlock highlight and expand", () => {
     );
   }
 
+  it("转录里的摘要行仍整行可点（触发器与片段保持 flex-1）", () => {
+    // 不传 compactHeader —— 与 MessageCard / ChatView 的用法一致。
+    // 坞里为了紧凑把头改成按内容宽，这条钉的是"别顺手把转录也改了"：
+    // 一旦转录的触发按钮不再拉伸，整行 hover 与点击热区就只剩文字那么宽。
+    render();
+    const trigger = container.querySelector("button[aria-expanded]");
+    expect(trigger?.className).toContain("flex-1");
+    expect(trigger?.firstElementChild?.className).toContain("flex-1");
+  });
+
   it("命中待展开时自动展开并消费掉，高亮时摘要行带 ring", () => {
     useAppStore.setState({ pendingExpandToolCallId: "call-1" });
     render();
@@ -275,6 +285,10 @@ describe("ProcessSummaryBlock highlight and expand", () => {
     expect(container.textContent).toContain(
       i18n.t("tool.grouped.scriptDetails"),
     );
+    // 脚本折叠行与工具行同一档内缩（坞与转录共用这张卡片，改一半会错位）
+    expect(
+      container.querySelector("[data-tool-group-card] > div")?.className,
+    ).toContain("px-4");
 
     act(() => {
       useAppStore.setState({ highlightedToolCallId: "script-1" });

@@ -354,6 +354,29 @@ describe("chat task dock", () => {
     expect(row?.className).not.toContain("text-xs");
   });
 
+  it("坞头紧凑：摘要片段不再吸收空白，箭头与耗时紧贴文案", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      executionClock: { startAt: Date.now(), endAt: null },
+      summary: { block },
+    });
+    const trigger = container.querySelector("button[aria-expanded]");
+    const fragments = trigger?.firstElementChild;
+    // 坞里：片段不再吸走空白（否则箭头与耗时被推到行末，头部成一条长杠）
+    expect(fragments?.className).not.toContain("flex-1");
+    // 但必须保留单行省略能力
+    expect(fragments?.className).toContain("min-w-0");
+    expect(fragments?.className).toContain("overflow-hidden");
+    // 触发按钮本身也不再拉伸
+    expect(trigger?.className).not.toContain("flex-1");
+  });
+
   it("耗时进触发器行内：不再在摘要块外面占一列（展开时卡片铺满整行）", () => {
     const block = buildProcessSummaryDisplayBlock([
       { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },

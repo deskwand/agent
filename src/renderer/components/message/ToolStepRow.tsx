@@ -91,12 +91,12 @@ export const ToolStepRow = memo(function ToolStepRow({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="group flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-hover-surface focus-visible:bg-hover-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/60"
+        className="group flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors hover:bg-hover-surface focus-visible:bg-hover-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary/60"
       >
         {isError ? (
           <span
             data-step-status="error"
-            className="h-[5px] w-[5px] shrink-0 rounded-full bg-destructive"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-destructive"
           />
         ) : isRunning ? (
           <span data-step-status="running" className="shrink-0">
@@ -128,32 +128,41 @@ export const ToolStepRow = memo(function ToolStepRow({
             · {metaText}
           </span>
         ) : null}
+        {/* 占位在箭头**之前**：箭头因此贴在行末（参考图的行右缘），
+            而不是紧跟文字、后面留一段空白。 */}
+        <span className="flex-1" />
         <ChevronRight
-          className={`h-3 w-3 shrink-0 text-muted-foreground/50 transition-transform group-hover:text-muted-foreground ${
+          className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition-transform group-hover:text-muted-foreground ${
             open ? "rotate-90" : ""
           }`}
         />
-        <span className="flex-1" />
       </button>
 
       {open && (
-        <div data-step-body className="px-2.5 pb-2.5 pl-9">
-          {item.trace ? (
-            <NestedToolDetails
-              item={item}
-              allBlocks={allBlocks}
-              message={message}
-              detailOnly
-            />
-          ) : (
-            <ToolUseBlock
-              block={item}
-              allBlocks={allBlocks}
-              message={message}
-              showIcon={false}
-              detailOnly
-            />
-          )}
+        // 详情与行标签左缘对齐（不再 pl-9 深缩进），并用一层内嵌块跟行头区分层级：
+        // 层级提示从"缩进"改成"底色 + 描边"，命令/输出本身仍由各自的工具卡渲染。
+        <div data-step-body className="px-4 pb-3">
+          <div
+            data-step-detail
+            className="overflow-hidden rounded-lg border border-border/60 bg-background/70 p-3"
+          >
+            {item.trace ? (
+              <NestedToolDetails
+                item={item}
+                allBlocks={allBlocks}
+                message={message}
+                detailOnly
+              />
+            ) : (
+              <ToolUseBlock
+                block={item}
+                allBlocks={allBlocks}
+                message={message}
+                showIcon={false}
+                detailOnly
+              />
+            )}
+          </div>
         </div>
       )}
     </div>
