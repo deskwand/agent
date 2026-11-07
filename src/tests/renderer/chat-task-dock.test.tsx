@@ -10,6 +10,7 @@ import {
   resolveDockAction,
 } from "../../renderer/components/ChatTaskDock";
 import type { CurrentTodos } from "../../renderer/utils/current-todos";
+import { buildProcessSummaryDisplayBlock } from "../../renderer/utils/tool-display-blocks";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -17,6 +18,8 @@ vi.mock("react-i18next", () => ({
       options?.count === undefined ? key : `${key}:${options.count}`,
     i18n: { language: "en" },
   }),
+  // 坞内嵌 ProcessSummaryBlock，它的依赖链在导入期就会 use(initReactI18next)
+  initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
 const PLAN: CurrentTodos = [
@@ -202,6 +205,50 @@ describe("chat task dock", () => {
     expect(
       container.querySelector('[data-testid="turn-elapsed-visible"]'),
     ).toBeNull();
+  });
+
+  it("运行中把过程摘要与动作态合成一行，不再重复「思考中」", () => {
+    // 两块原来各占一行（转录里一块、坞里一块），说的是同一件事。
+    const block = buildProcessSummaryDisplayBlock([
+      { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: PLAN,
+      executionClock: { startAt: Date.now(), endAt: null },
+      summary: { block },
+    });
+    // 摘要进来了
+    expect(container.textContent).toContain("tool.grouped.executedCommands");
+    // 进行态措辞不再重复（摘要说的已经是这件事）
+    expect(container.textContent).not.toContain("chat.processing");
+    // 旋转图标与回合耗时都还在这一行里
+    expect(
+      container.querySelector('[data-testid="dock-status-glyph"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="turn-elapsed-visible"]'),
+    ).not.toBeNull();
+    // 只有一行：坞内不含清单卡以外的第二个摘要壳
+    expect(
+      container.querySelectorAll('[data-testid="chat-task-dock"]'),
+    ).toHaveLength(1);
+  });
+
+  it("一次性结果（压缩完成）不因摘要存在而被吞掉", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
+    ]);
+    render({
+      status: { type: "compaction-success" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      summary: { block },
+    });
+    expect(container.textContent).toContain("tool.grouped.executedCommands");
+    expect(container.textContent).toContain("chat.compacted");
   });
 
   it("超长清单只在卡内滚动，不把消息区挤没", () => {

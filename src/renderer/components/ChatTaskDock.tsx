@@ -8,6 +8,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { CurrentTodos } from "../utils/current-todos";
+import type { DisplayBlock } from "../utils/tool-display-blocks";
+import type { ContentBlock, Message } from "../types";
+import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import {
   TURN_CLOCK_SLOT_SENTINEL_SECONDS,
   formatDurationShort,
@@ -266,8 +269,17 @@ export function resolveDockAction(
   }
 }
 
+/** 本轮最后一块过程摘要：运行中由 ChatView 交给坞，与动作态合成一行。 */
+export interface DockSummary {
+  block: Extract<DisplayBlock, { type: "process-summary" }>;
+  allBlocks?: ContentBlock[];
+  message?: Message;
+}
+
 export interface ChatTaskDockProps {
   status: ChatInputStatus;
+  /** 运行中搬下来的过程摘要行；回合结束后它回到转录里（由 ChatView 决定）。 */
+  summary?: DockSummary | null;
   /** = ChatView 的 canStop：与停止按钮同源，保证"还能按停止"时坞一定在。 */
   running: boolean;
   executionClock?: SessionExecutionClock;
@@ -279,6 +291,7 @@ export interface ChatTaskDockProps {
 
 export function ChatTaskDock({
   status,
+  summary = null,
   running,
   executionClock,
   currentTodos,
@@ -326,12 +339,16 @@ export function ChatTaskDock({
   })();
 
   const hasPlan = display.todos.length > 0;
-  // 动作行只要还有东西可说就渲染：动作文案，或回合结束后 5s 内那格冻结的耗时
-  // （旧状态栏的既有保证 —— 状态解析成 null 之后仍要看得到本轮花了多久）。
+  // 有摘要行时不再重复"思考中/执行中"这类进行态措辞 —— 摘要说的已经是这件事，
+  // 同一件事不说两遍（eagent 坞的同一条规则）。压缩完成/失败这类一次性结果照旧说。
+  const showActionText = action !== null && !(summary && action.isRunning);
+  // 动作行只要还有东西可说就渲染：摘要、动作文案，或回合结束后 5s 内那格冻结的
+  // 耗时（旧状态栏的既有保证 —— 状态解析成 null 之后仍要看得到本轮花了多久）。
   // ⚠️ 冻结耗时只在状态**确实解析成 null** 时单独成行：目标长跑的耗时归输入框上方
   // 的目标段，坞里再挂一只裸秒表就是同一件事说两遍。
+  const hasSummary = summary !== null;
   const showActionRow =
-    action !== null || (status === null && elapsed !== null);
+    hasSummary || showActionText || (status === null && elapsed !== null);
   // 显隐先收口，"有没有东西可显示"再收口：两者都为假时不留空壳。
   if (!running && !lingering) return null;
   if (!hasPlan && !showActionRow) return null;
@@ -349,7 +366,19 @@ export function ChatTaskDock({
         >
           <style>{gradientStyles}</style>
           {action?.isRunning ? <StatusGlyph /> : null}
-          {action?.text ? (
+          {summary ? (
+            /* 摘要行自带图标 + 折叠按钮，坞里不再套第二个图标；
+               ProcessSummaryBlock 自带 pl-3（给转录里的工具行缩进用），坞里没有那层语境，
+               这里用负边距把那 12px 收回，让图标与清单卡左缘对齐。 */
+            <div className="-ml-3 min-w-0">
+              <ProcessSummaryBlock
+                block={summary.block}
+                allBlocks={summary.allBlocks}
+                message={summary.message}
+              />
+            </div>
+          ) : null}
+          {showActionText && action ? (
             <span
               className={`min-w-0 truncate ${action.toneClass} ${
                 action.isRunning ? "gradient-text" : ""
@@ -360,7 +389,7 @@ export function ChatTaskDock({
           ) : null}
           {elapsed ? (
             <span className="flex-none text-muted-foreground">
-              {action?.text ? "· " : ""}
+              {hasSummary || showActionText ? "· " : ""}
               {/* 槽位：两格叠在同一个 grid 单元格，盒宽取两者最大值 ——
                   正常时长下 = 哨兵宽度（恒定），于是行内零位移。做法与取值同
                   ChatInputStatusBar（design-docs/2026-09-29-turn-timer-width-stability-design.md）。 */}

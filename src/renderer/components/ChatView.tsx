@@ -1234,6 +1234,37 @@ export function ChatView() {
     [visibleTurnEntries, steerRecords],
   );
 
+  // 运行中把「本轮的工具活动摘要」搬到消息区底部的坞里，与动作态合成一行：
+  // 那块摘要本来就紧贴坞上方，两行说的是同一件事。回合结束后 canStop 转假，
+  // 它回到转录原位（两边共用这一个布尔量，不靠两个计时器协调，所以不会同时出现）。
+  // 摘要按整轮聚合（与多消息轮次既有的上提口径一致），因此搬走的是"这一轮干了什么"
+  // 而不是某条消息的局部计数 —— 信息量不减，只是换了个位置。
+  const dockSummary = useMemo(() => {
+    if (!canStop) return null;
+    let lastAssistant: Message | null = null;
+    for (let i = mergedTurnEntries.length - 1; i >= 0; i -= 1) {
+      const entry = mergedTurnEntries[i];
+      if (entry && "message" in entry && entry.message.role === "assistant") {
+        lastAssistant = entry.message;
+        break;
+      }
+    }
+    if (!lastAssistant) return null;
+    const blocks =
+      (lastAssistant.turnId && turnBlocksById.get(lastAssistant.turnId)) ||
+      lastAssistant.content;
+    const items = blocks
+      .filter((block): block is ToolUseContent => block.type === "tool_use")
+      .filter(isProcessToolUse);
+    if (items.length === 0) return null;
+    return {
+      messageId: lastAssistant.id,
+      block: buildProcessSummaryDisplayBlock(items, blocks),
+      allBlocks: blocks,
+      message: lastAssistant,
+    };
+  }, [canStop, mergedTurnEntries, turnBlocksById]);
+
   const handleForkMessage = useCallback(
     async (message: Message) => {
       if (!activeSession) return;
@@ -2226,7 +2257,8 @@ export function ChatView() {
                           data-message-id={message.id}
                           className="space-y-1.5"
                         >
-                          {turnProcessSummary ? (
+                          {turnProcessSummary &&
+                          dockSummary?.messageId !== message.id ? (
                             <ProcessSummaryBlock
                               block={turnProcessSummary}
                               allBlocks={
@@ -2250,7 +2282,12 @@ export function ChatView() {
                             isLatestRound={isLatestRound}
                             artifactFiles={artifactFiles}
                             videoReferences={videoReferences}
-                            suppressProcessSummaries={suppressProcessSummaries}
+                            // 坞接管的这一条消息不再自己渲染摘要行：整轮的
+                            // 工具活动已经合成坞里那一行，否则同一件事会出现两次。
+                            suppressProcessSummaries={
+                              suppressProcessSummaries ||
+                              dockSummary?.messageId === message.id
+                            }
                             onForkMessage={handleForkMessage}
                             onRewindMessage={handleRewindMessage}
                             // 历史不出环靠这一句：只有最新那条用户消息拿得到结果。
@@ -2318,6 +2355,15 @@ export function ChatView() {
 
             <ChatTaskDock
               status={inputStatus}
+              summary={
+                dockSummary
+                  ? {
+                      block: dockSummary.block,
+                      allBlocks: dockSummary.allBlocks,
+                      message: dockSummary.message,
+                    }
+                  : null
+              }
               running={canStop}
               executionClock={activeExecutionClock}
               currentTodos={sessionState?.currentTodos ?? null}

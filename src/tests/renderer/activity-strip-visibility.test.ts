@@ -301,6 +301,70 @@ describe("activity strip end to end", () => {
     expect(container.textContent).toContain("activity.statusDone");
   });
 
+  it("运行中：过程摘要只在坞里出现一次（不和新位置重复）", () => {
+    act(() =>
+      setState({
+        sessionStatus: "running",
+        messages: [
+          makeMessage("u1", "user", [{ type: "text", text: "列一下目录" }]),
+          {
+            ...makeMessage("a1", "assistant", [
+              {
+                type: "tool_use",
+                id: "b1",
+                name: "bash",
+                input: { command: "ls" },
+              },
+            ]),
+            turnId: "t1",
+          },
+        ],
+        currentTodos: null,
+      }),
+    );
+    render();
+
+    const text = container.textContent ?? "";
+    const occurrences = text.split("tool.grouped.executedCommands").length - 1;
+    expect(occurrences, `摘要应只出现一次：${text}`).toBe(1);
+    // 那一次在坞里
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]')?.textContent,
+    ).toContain("tool.grouped.executedCommands");
+  });
+
+  it("回合结束后：摘要回到转录原位，坞里不再重复", () => {
+    act(() =>
+      setState({
+        sessionStatus: "completed",
+        messages: [
+          makeMessage("u1", "user", [{ type: "text", text: "列一下目录" }]),
+          {
+            ...makeMessage("a1", "assistant", [
+              {
+                type: "tool_use",
+                id: "b1",
+                name: "bash",
+                input: { command: "ls" },
+              },
+            ]),
+            turnId: "t1",
+          },
+        ],
+        currentTodos: null,
+      }),
+    );
+    render();
+
+    const occurrences =
+      (container.textContent ?? "").split("tool.grouped.executedCommands")
+        .length - 1;
+    expect(occurrences, `摘要应只出现一次：${container.textContent}`).toBe(1);
+    expect(
+      container.querySelector('[data-testid="chat-task-dock"]'),
+    ).toBeNull();
+  });
+
   it("切到另一个会话后坞不残留（只看当前会话的清单与计时）", () => {
     act(() =>
       setState({
