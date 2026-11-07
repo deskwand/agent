@@ -231,6 +231,15 @@ describe("MergedInputChip (single-panel)", () => {
     });
   }
 
+  // 分组标题按钮：文本就是组名（chevron 是 svg，不贡献 textContent）
+  function groupHeader(label: string): HTMLButtonElement {
+    const found = Array.from(panel().querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === label,
+    );
+    if (!found) throw new Error(`group header not found: ${label}`);
+    return found as HTMLButtonElement;
+  }
+
   it("renders one trigger chip with model and thinking level", async () => {
     render();
     expect(trigger().textContent).toContain("Model One");
@@ -349,13 +358,15 @@ describe("MergedInputChip (single-panel)", () => {
 
   it("shows the cloud group for BYOK providers too", async () => {
     loginCloud();
-    render(); // activeProviderProfileKey = "profile-a"（BYOK）
+    render(); // activeProviderProfileKey = "profile-a"（BYOK）→ 云分组默认收起
     await openPanel();
-    const text = panel().textContent ?? "";
-    expect(text).toContain("DeskWand");
-    expect(text).toContain("deepseek-flash");
-    expect(text).toContain("deepseek-v4-pro");
-    expect(text).toContain("Provider A");
+    expect(panel().textContent).toContain("DeskWand");
+    expect(panel().textContent).not.toContain("deepseek-flash");
+
+    click(groupHeader("DeskWand"));
+    expect(panel().textContent).toContain("deepseek-flash");
+    expect(panel().textContent).toContain("deepseek-v4-pro");
+    expect(panel().textContent).toContain("Provider A");
   });
 
   it("puts the cloud group first regardless of config order", async () => {
@@ -447,6 +458,146 @@ describe("MergedInputChip (single-panel)", () => {
     await openPanel();
     expect(panel().querySelector("input")).toBeNull();
     expect(panel().textContent).toContain("Model 7");
+  });
+
+  // 思考行必须是滚动区之外的兄弟节点：它跟着列表一起滚过，就等于没有常驻。
+  it("pins the thinking row below the scrolling model list", async () => {
+    render({ modelOptions: singleGroupOptions(9) }); // 9 个模型 → 一定出现滚动区与搜索框
+    await openPanel();
+
+    const scroller = panel().querySelector('[data-testid="model-menu-list"]')!;
+    expect(scroller).not.toBeNull();
+    expect(scroller.contains(panel().querySelector("input"))).toBe(false);
+
+    const thinkRow = Array.from(panel().querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("modelMenu.thinkingWithValue"),
+    )!;
+    expect(thinkRow).toBeDefined();
+    // 思考行不在滚动容器内 —— 这是「常驻底部」的唯一结构性证据
+    expect(scroller.contains(thinkRow)).toBe(false);
+    expect(scroller.textContent).not.toContain("modelMenu.thinkingWithValue");
+
+    // 面板自己不再是滚动容器：滚动条只属于中间那段列表
+    expect(panel().className).toContain("flex-col");
+    expect(panel().className).not.toContain("overflow-y-auto");
+  });
+
+  // 默认策略：只展开当前 provider，其余收成一行标题 —— 长列表不该一屏铺满。
+  it("expands only the active provider group by default", async () => {
+    render(); // activeProviderProfileKey = "profile-a"
+    await openPanel();
+    const text = panel().textContent ?? "";
+    expect(text).toContain("Model One");
+    // 其它分组的标题在（提供导航），但模型项不渲染
+    expect(text).toContain("Provider B");
+    expect(text).not.toContain("Model Three");
+  });
+
+  // 标题是用 Button 渲染的，与页脚 chip 同一个陷阱：base 的 font-medium 与
+  // [&_svg]:size-4 不写回就会被顶回 14px/500 与 16px 图标。
+  it("分组标题不继承 Button 的字重与图标尺寸", async () => {
+    render();
+    await openPanel();
+
+    const tokens = groupHeader("Provider A").className.split(/\s+/);
+    expect(tokens).toContain("font-normal");
+    expect(tokens).toContain("[&_svg]:size-3");
+    expect(tokens).not.toContain("font-medium");
+    expect(tokens).not.toContain("[&_svg]:size-4");
+    // size="xs" 的紧凑高度档，不能被缺省档的 h-9 顶掉
+    expect(tokens).toContain("h-6");
+  });
+
+  it("toggles a provider group from its header", async () => {
+    render();
+    await openPanel();
+    expect(groupHeader("Provider B").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+
+    click(groupHeader("Provider B"));
+    expect(groupHeader("Provider B").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    expect(panel().textContent).toContain("Model Three");
+
+    click(groupHeader("Provider B"));
+    expect(panel().textContent).not.toContain("Model Three");
+  });
+
+  // 当前 provider 不可见时（未登录 → 云分组被剔除，active 还指着云 provider），
+  // 必须退到第一个可见分组；否则面板打开只剩标题，用户会以为模型列表挂了。
+  it("falls back to the first visible group when the active one is hidden", async () => {
+    render({
+      model: "deepseek-flash",
+      activeProviderProfileKey: "custom:deskwand",
+    }); // 未登录
+    await openPanel();
+    const text = panel().textContent ?? "";
+    expect(text).toContain("Model One");
+    expect(text).not.toContain("deepseek-flash");
+  });
+
+  // 折叠引入的新失败模式：命中项落在被折叠的分组里，不能被吞掉。
+  it("expands collapsed groups while searching", async () => {
+    render({
+      modelOptions: [
+        {
+          profileKey: "profile-a" as never,
+          groupLabel: "Provider A",
+          items: Array.from({ length: 9 }, (_, i) => ({
+            id: `a-${i}`,
+            name: `A Model ${i}`,
+          })),
+        },
+        {
+          profileKey: "profile-b" as never,
+          groupLabel: "Provider B",
+          items: [{ id: "needle", name: "Needle Model" }],
+        },
+      ],
+    }); // 10 个可见模型 → 有搜索框
+    await openPanel();
+    expect(panel().textContent).not.toContain("Needle Model");
+    expect(groupHeader("Provider B").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+
+    setSearchValue("needle");
+    expect(panel().textContent).toContain("Needle Model");
+    expect(panel().textContent).not.toContain("chat.noModelMatch");
+    // 搜索态下标题退回静态标签：不留一个点了没反应的 chevron（见计划 Step 5）
+    expect(
+      Array.from(panel().querySelectorAll("button")).filter(
+        (b) => b.getAttribute("aria-expanded") !== null,
+      ),
+    ).toHaveLength(0);
+  });
+
+  // 折叠状态是「这一眼」的临时取舍，不跨次记忆。
+  it("resets group expansion when the panel reopens", async () => {
+    render();
+    await openPanel();
+    click(groupHeader("Provider B"));
+    expect(panel().textContent).toContain("Model Three");
+
+    await clickOutside();
+    await openPanel();
+    expect(panel().textContent).not.toContain("Model Three");
+    expect(panel().textContent).toContain("Model One");
+  });
+
+  // 选中模型后 activeProviderProfileKey 会变；刚点开的那组不能因为 props 变化自己收起。
+  it("keeps the clicked group open after picking a model from it", async () => {
+    render({ model: "model-3", activeProviderProfileKey: "profile-b" });
+    await openPanel();
+    click(groupHeader("Provider A"));
+    expect(panel().textContent).toContain("Model One");
+
+    // 模拟选完模型后调用方回传新 props（同一组件实例，不重新挂载）
+    render({ model: "model-1", activeProviderProfileKey: "profile-a" });
+    expect(panel().textContent).toContain("Model One");
+    expect(panel().textContent).toContain("Model Three");
   });
 
   it("shows the search input once the visible models exceed the threshold", async () => {

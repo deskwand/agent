@@ -61,6 +61,14 @@ export function MergedInputChip({
   const [menuOpen, setMenuOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
   const [panelView, setPanelView] = useState<"list" | "thinking">("list");
+  // 分组默认只展开当前 provider：长列表一屏铺满时，找当前 provider 的模型不该需要滚动。
+  // null = 仍按默认策略；数组 = 用户手动点过之后的显式集合（每次打开面板重置）。
+  // ⚠️ 显式集合不剔除失效 key，也不加「至少展开一组」的守卫：面板开着时后台 401 把云
+  // 分组整组抽走，残留 key 会让每一组都判成收起（面板只剩一排标题，点一下标题即恢复）。
+  // 守卫能盖住这个边角，但代价是「收起最后一组」的点击会看起来没反应 —— 那个更常见。
+  const [expandedGroups, setExpandedGroups] = useState<
+    ProviderProfileKey[] | null
+  >(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
   const [panelMaxWidth, setPanelMaxWidth] = useState<number | null>(null);
@@ -132,6 +140,35 @@ export function MergedInputChip({
   // 随着打字增删。
   const showGroupLabel = visibleModelOptions.length > 1;
 
+  // 默认展开哪一个：当前使用的 provider 在可见列表里就展开它；不在（未登录时云分组被
+  // 剔除、active 还指着云 provider）就退到第一个可见分组 —— 否则打开面板只剩一排标题。
+  const defaultExpandedKey: ProviderProfileKey | null =
+    visibleModelOptions.find((g) => g.profileKey === activeProviderProfileKey)
+      ?.profileKey ??
+    visibleModelOptions[0]?.profileKey ??
+    null;
+
+  // 搜索时必须全部展开：否则命中项会被折叠吞掉，用户看到的是空列表或「无匹配模型」。
+  // 只有一个分组时标题不渲染（showGroupLabel === false）、没有折叠入口 ⇒ 恒展开。
+  const isGroupExpanded = (profileKey: ProviderProfileKey): boolean => {
+    if (activeSearch || !showGroupLabel) return true;
+    if (expandedGroups === null) return profileKey === defaultExpandedKey;
+    return expandedGroups.includes(profileKey);
+  };
+
+  // 从「当前生效的集合」起算，而不是从空集合起算：null 只代表默认策略，
+  // 用户第一次展开第二家时应当是「当前 provider + 这一家」，不是「只剩这一家」。
+  const toggleGroup = (profileKey: ProviderProfileKey) => {
+    const current =
+      expandedGroups ??
+      (defaultExpandedKey === null ? [] : [defaultExpandedKey]);
+    setExpandedGroups(
+      current.includes(profileKey)
+        ? current.filter((key) => key !== profileKey)
+        : [...current, profileKey],
+    );
+  };
+
   const filteredModelOptions = useMemo(() => {
     const query = activeSearch.trim().toLowerCase();
     if (!query) return visibleModelOptions;
@@ -154,6 +191,8 @@ export function MergedInputChip({
   const handleOpenChange = useCallback((open: boolean) => {
     setMenuOpen(open);
     setPanelView("list");
+    // 折叠状态是「这一眼」的临时取舍，不跨次记忆：关掉再打开回到默认策略。
+    setExpandedGroups(null);
     if (!open) setModelSearch("");
   }, []);
 
@@ -198,7 +237,7 @@ export function MergedInputChip({
       onChange={(event) => setModelSearch(event.target.value)}
       onClick={(event) => event.stopPropagation()}
       placeholder={t("chat.searchModel")}
-      className="mb-1.5 h-auto w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground shadow-none placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+      className="mb-1.5 h-auto w-full shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground shadow-none placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
     />
   );
 
@@ -207,7 +246,7 @@ export function MergedInputChip({
       variant="ghost"
       type="button"
       onClick={() => setPanelView("list")}
-      className={`${MENU_ITEM_CLASS} text-muted-foreground hover:bg-hover-surface`}
+      className={`${MENU_ITEM_CLASS} shrink-0 text-muted-foreground hover:bg-hover-surface`}
     >
       <ChevronRight className="h-4 w-4 rotate-180" />
       {t("modelMenu.back")}
@@ -231,6 +270,35 @@ export function MergedInputChip({
     </>
   );
 
+  // 搜索态下标题退回原来的静态标签：此时列表已按 query 筛短、分组也强制全展开，
+  // 折叠没有意义 —— 留一个点了没反应的 chevron 比没有更糟。用户点过的折叠仍在
+  // expandedGroups 里，清空搜索后照旧生效。
+  // 尺寸/字重/对齐/图标必须显式写回 —— Button base 带 text-sm font-medium
+  // justify-center 与 [&_svg]:size-4，size="xs" 换掉 h-9 px-4 py-2（见 app-button.tsx 文件头）。
+  const renderGroupHeader = (group: ModelOptionGroup) => {
+    if (activeSearch) {
+      return <div className={MENU_LABEL_CLASS}>{group.groupLabel}</div>;
+    }
+    const expanded = isGroupExpanded(group.profileKey);
+    return (
+      <Button
+        variant="ghost"
+        size="xs"
+        type="button"
+        onClick={() => toggleGroup(group.profileKey)}
+        aria-expanded={expanded}
+        className={`${MENU_LABEL_CLASS} flex w-full items-center justify-between font-normal [&_svg]:size-3`}
+      >
+        <span className="truncate">{group.groupLabel}</span>
+        <ChevronDown
+          className={`h-3 w-3 shrink-0 transition-transform ${
+            expanded ? "" : "-rotate-90"
+          }`}
+        />
+      </Button>
+    );
+  };
+
   const renderGroupList = () => {
     if (filteredModelOptions.length === 0) {
       // 判据用 activeSearch 而不是 showSearch：前者天然覆盖「有搜索框但用户还没输入」
@@ -243,10 +311,8 @@ export function MergedInputChip({
     }
     return filteredModelOptions.map((group) => (
       <div key={group.profileKey} className="mb-1 last:mb-0">
-        {showGroupLabel && (
-          <div className={MENU_LABEL_CLASS}>{group.groupLabel}</div>
-        )}
-        {renderGroupItems(group)}
+        {showGroupLabel && renderGroupHeader(group)}
+        {isGroupExpanded(group.profileKey) && renderGroupItems(group)}
       </div>
     ));
   };
@@ -292,44 +358,55 @@ export function MergedInputChip({
               maxWidth:
                 panelMaxWidth === null ? undefined : `${panelMaxWidth}px`,
             }}
-            className={`${MENU_PANEL_PADDED_CLASS} ${
+            className={`${MENU_PANEL_PADDED_CLASS} flex flex-col ${
               panelView === "thinking" ? "w-[12rem]" : "w-[20rem]"
-            } max-h-[min(32rem,calc(100vh_+_-12rem))] overflow-y-auto`}
+            } max-h-[min(32rem,calc(100vh_+_-12rem))]`}
           >
             {panelView === "thinking" ? (
               <>
                 {renderBackRow()}
-                {thinkingLevelOptions.map((level) => (
-                  <Button
-                    variant="ghost"
-                    key={level}
-                    type="button"
-                    onClick={() => {
-                      onSelectThinkingLevel(level);
-                      setPanelView("list");
-                    }}
-                    className={`${MENU_ITEM_CLASS} justify-between ${
-                      level === thinkingLevel
-                        ? MENU_ITEM_SELECTED_CLASS
-                        : MENU_ITEM_DEFAULT_CLASS
-                    }`}
-                    role="option"
-                    aria-selected={level === thinkingLevel}
-                  >
-                    <span className="truncate">
-                      {t(`chat.thinkingLevel.${level}`)}
-                    </span>
-                    {level === thinkingLevel && (
-                      <Check className="h-4 w-4 shrink-0" />
-                    )}
-                  </Button>
-                ))}
+                <div className="min-h-0 overflow-y-auto">
+                  {thinkingLevelOptions.map((level) => (
+                    <Button
+                      variant="ghost"
+                      key={level}
+                      type="button"
+                      onClick={() => {
+                        onSelectThinkingLevel(level);
+                        setPanelView("list");
+                      }}
+                      className={`${MENU_ITEM_CLASS} justify-between ${
+                        level === thinkingLevel
+                          ? MENU_ITEM_SELECTED_CLASS
+                          : MENU_ITEM_DEFAULT_CLASS
+                      }`}
+                      role="option"
+                      aria-selected={level === thinkingLevel}
+                    >
+                      <span className="truncate">
+                        {t(`chat.thinkingLevel.${level}`)}
+                      </span>
+                      {level === thinkingLevel && (
+                        <Check className="h-4 w-4 shrink-0" />
+                      )}
+                    </Button>
+                  ))}
+                </div>
               </>
             ) : (
               <>
                 {showSearch && renderSearchInput()}
-                {renderGroupList()}
-                {renderThinkingRow()}
+                {/* 只有这段滚：面板高度是 auto + max-height，这里要的是 shrink + 自己的
+                    滚动条，不是 grow —— 写 flex-1 会把 flex-basis 的百分比解析拉进来。 */}
+                <div
+                  data-testid="model-menu-list"
+                  className="min-h-0 overflow-y-auto"
+                >
+                  {renderGroupList()}
+                </div>
+                {/* renderThinkingRow() 返回的是隔线 + 按钮两个兄弟节点，Fragment 本身
+                    当不了 flex 子项，所以这层 shrink-0 容器不能省。 */}
+                <div className="shrink-0">{renderThinkingRow()}</div>
               </>
             )}
           </PopoverContent>
