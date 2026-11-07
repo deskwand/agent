@@ -362,12 +362,19 @@ export function ChatTaskDock({
       {hasPlan ? <TaskCard display={display} /> : null}
       {showActionRow ? (
         <div
-          className={`flex items-center gap-1.5 pr-1 text-xs ${
+          // ⚠️ 必须是 items-start：摘要展开后这一行会变高，items-center 会把图标和
+          // 耗时一起拉到整块的垂直中间（看着像飘在工具卡列表旁边）。首行对齐靠下面
+          // 两个 h-[21px] 的盒子（14px 正文 × 1.5 行高）。
+          className={`flex items-start gap-1.5 pr-1 text-sm ${
             hasPlan ? "mt-2" : ""
           }`}
         >
           <style>{gradientStyles}</style>
-          {action?.isRunning ? <StatusGlyph /> : null}
+          {action?.isRunning ? (
+            <span className="flex h-[21px] flex-none items-center">
+              <StatusGlyph />
+            </span>
+          ) : null}
           {summary ? (
             /* 摘要行自带图标与折叠按钮，坞里不再套第二个图标。
                ⚠️ 不要用负边距去"对齐"清单卡：ProcessSummaryBlock 的触发器是 `px-1`
@@ -390,7 +397,7 @@ export function ChatTaskDock({
             </span>
           ) : null}
           {elapsed ? (
-            <span className="flex-none text-muted-foreground">
+            <span className="flex h-[21px] flex-none items-center text-muted-foreground">
               {hasSummary || showActionText ? "· " : ""}
               {/* 槽位：两格叠在同一个 grid 单元格，盒宽取两者最大值 ——
                   正常时长下 = 哨兵宽度（恒定），于是行内零位移。做法与取值同

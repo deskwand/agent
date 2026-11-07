@@ -234,7 +234,7 @@ describe("chat task dock", () => {
     // 且全坞只有一个摘要触发器（多一层壳就会多一个折叠按钮）。
     const actionRow = container.querySelector(
       '[data-testid="dock-status-glyph"]',
-    )?.parentElement;
+    )?.parentElement?.parentElement;
     expect(actionRow).toBeTruthy();
     expect(actionRow?.querySelectorAll("button[aria-expanded]")).toHaveLength(
       1,
@@ -244,6 +244,50 @@ describe("chat task dock", () => {
         container.querySelector('[data-testid="turn-elapsed-visible"]'),
       ),
     ).toBe(true);
+  });
+
+  it("展开时图标与耗时都贴着第一行，不跟着整块垂直居中", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      executionClock: { startAt: Date.now(), endAt: null },
+      summary: { block },
+    });
+    // 摘要展开后整块会变高；行容器若仍 items-center，图标与耗时会被拉到中间
+    const glyph = container.querySelector('[data-testid="dock-status-glyph"]');
+    const row = glyph?.parentElement?.parentElement;
+    expect(row?.className).toContain("items-start");
+    // 图标与耗时各自套一个首行高度的盒子（14px 正文 × 1.5 行高 = 21px）
+    expect(glyph?.parentElement?.className).toContain("h-[21px]");
+    const elapsed = container.querySelector(
+      '[data-testid="turn-elapsed-visible"]',
+    );
+    expect(elapsed?.parentElement?.parentElement?.className).toContain(
+      "h-[21px]",
+    );
+  });
+
+  it("耗时与摘要同号（14px），不再小一号", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      executionClock: { startAt: Date.now(), endAt: null },
+      summary: { block },
+    });
+    const glyph = container.querySelector('[data-testid="dock-status-glyph"]');
+    const row = glyph?.parentElement?.parentElement;
+    expect(row?.className).toContain("text-sm");
+    expect(row?.className).not.toContain("text-xs");
   });
 
   it("一次性结果（压缩完成）不因摘要存在而被吞掉", () => {

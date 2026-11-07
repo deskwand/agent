@@ -73,10 +73,12 @@ import { mergeSteerEntries, resolveAnchorMessageId } from "../steer-entries";
 import { buildForkAnchor } from "../../shared/fork-anchor";
 import {
   buildProcessSummaryDisplayBlock,
+  buildToolDisplayBlocks,
   collectResultFiles,
   isProcessToolUse,
 } from "../utils/tool-display-blocks";
 import type {
+  DisplayBlock,
   ProcessSummaryDisplayBlock,
   ResultFileEntry,
 } from "../utils/tool-display-blocks";
@@ -646,6 +648,9 @@ export function ChatView() {
   const pendingCount = pendingTurns.length;
   const isSessionRunning = activeSession?.status === "running";
   const canStop = isSessionRunning || hasActiveTurn || pendingCount > 0;
+  // 这一轮是否**真的在跑**（不含"排队等发送"的空档）。坞接管摘要、以及"上提整轮摘要"
+  // 都只认它：空档里搬动摘要只会让历史从视野里消失。
+  const turnLive = isSessionRunning || hasActiveTurn;
 
   const inputStatus = useMemo(() => {
     // Mirror the stop button: whenever canStop is true the status bar
@@ -1138,7 +1143,10 @@ export function ChatView() {
           if (
             processItems.length > 0 &&
             typeof msg.turnId === "string" &&
-            hoistedProcessSummaryTurnIds.has(msg.turnId)
+            hoistedProcessSummaryTurnIds.has(msg.turnId) &&
+            // 运行中不上提：上提出来的是"整轮聚合"，坞就没法只接尾部一组了
+            // （已跑完的组会跟着挂在坞里，而不是在转录里往上滚）。
+            !turnLive
           ) {
             turnProcessSummaries.set(
               msgId,
@@ -1238,52 +1246,53 @@ export function ChatView() {
     [visibleTurnEntries, steerRecords],
   );
 
-  // 运行中把「本轮的工具活动摘要」搬到消息区底部的坞里，与动作态合成一行：
-  // 那块摘要本来就紧贴坞上方，两行说的是同一件事。
-  // 三条判据，缺一条都会出事：
-  //  ① `turnLive`（真的在跑）而不是 `canStop` —— canStop 还包含"排队等发送"的空档，
-  //     那时上一轮已经结束，搬走只会让一行历史从视野里消失；
-  //  ② 只看「最新那一轮」：滚动回看时渲染窗口可能仍停在旧轮次上，而坞在可视区外，
-  //     把旧轮的摘要搬过去等于凭空删掉一行；
-  //  ③ 摘要按整轮聚合，所以转录侧的抑制也必须按轮（turnId）而不是按消息 ——
-  //     一轮里可能有好几条带正文的助手消息，按消息抑制会漏掉前一条、出现重复计数。
-  // 代价（有意接受）：轮内"正文 → 工具 → 正文"的先后顺序在运行期间被抹平成一条聚合行；
-  // 回合结束后摘要回到转录原位，顺序信息随之回来。
-  const turnLive = isSessionRunning || hasActiveTurn;
+  // 坞里接走的是「本轮尾部那一组工具活动」，不是整轮聚合（参考实现 pickDockTail 的口径）：
+  //   · 只取**尾部一组** —— 先前跑完的组留在转录里往上滚，坞只贴住眼前这一组；
+  //   · 起点在**最后一条 user 消息之后** —— 用户已发出下一条消息、新一轮还没产出时，
+  //     坞里绝不能挂着上一轮的"执行了 N 条命令"（那是状态残留的来源）；
+  //   · 只在真的在跑时接管（turnLive，而不是 canStop —— 后者含"排队等发送"的空档）；
+  //   · "整轮摘要上提"只在轮次结束后生效（见 visibleTurnEntries 里的 !turnLive），
+  //     所以运行中的转录一定是逐组的 —— 坞接尾部一组才有意义。
+  // 代价（有意接受）：坞里看不到"正文 → 工具 → 正文"的先后顺序；回合结束后整段回到转录。
   const dockSummary = useMemo(() => {
     if (!turnLive) return null;
-    let lastAssistant: Message | null = null;
+    let roundStart = 0;
     for (let i = mergedTurnEntries.length - 1; i >= 0; i -= 1) {
       const entry = mergedTurnEntries[i];
-      if (entry && "message" in entry && entry.message.role === "assistant") {
-        lastAssistant = entry.message;
+      if (entry && "message" in entry && entry.message.role === "user") {
+        roundStart = i + 1;
         break;
       }
     }
-    if (!lastAssistant?.turnId) return null;
-    // 最新一轮的 turnId 取自全量已加载消息（displayedMessages），与渲染窗口无关。
-    let newestTurnId: string | null = null;
-    for (let i = displayedMessages.length - 1; i >= 0; i -= 1) {
-      const message = displayedMessages[i];
-      if (message?.role === "assistant" && message.turnId) {
-        newestTurnId = message.turnId;
-        break;
+    for (let i = mergedTurnEntries.length - 1; i >= roundStart; i -= 1) {
+      const entry = mergedTurnEntries[i];
+      if (!entry || !("message" in entry)) continue;
+      const message = entry.message;
+      if (message.role !== "assistant" || !message.turnId) continue;
+      const blocks = turnBlocksById.get(message.turnId) ?? message.content;
+      const display = buildToolDisplayBlocks(blocks, blocks);
+      let tail: Extract<DisplayBlock, { type: "process-summary" }> | null =
+        null;
+      for (let j = display.length - 1; j >= 0; j -= 1) {
+        const item = display[j];
+        // items 为空的块两边都不渲染 —— 让它"上移"只会在坞里凭空消失一格。
+        if (item?.type === "process-summary" && item.items.length > 0) {
+          tail = item;
+          break;
+        }
       }
+      if (!tail) return null;
+      return {
+        messageId: message.id,
+        // 尾部那一块的身份：第一个工具调用的 id，转录侧据此只掐掉这一块
+        summaryItemId: tail.items[0]?.id ?? "",
+        block: tail,
+        allBlocks: blocks,
+        message,
+      };
     }
-    if (lastAssistant.turnId !== newestTurnId) return null;
-    const turnId = lastAssistant.turnId;
-    const blocks = turnBlocksById.get(turnId) ?? lastAssistant.content;
-    const items = blocks
-      .filter((block): block is ToolUseContent => block.type === "tool_use")
-      .filter(isProcessToolUse);
-    if (items.length === 0) return null;
-    return {
-      turnId,
-      block: buildProcessSummaryDisplayBlock(items, blocks),
-      allBlocks: blocks,
-      message: lastAssistant,
-    };
-  }, [turnLive, mergedTurnEntries, displayedMessages, turnBlocksById]);
+    return null;
+  }, [turnLive, mergedTurnEntries, turnBlocksById]);
 
   const handleForkMessage = useCallback(
     async (message: Message) => {
@@ -2277,8 +2286,7 @@ export function ChatView() {
                           data-message-id={message.id}
                           className="space-y-1.5"
                         >
-                          {turnProcessSummary &&
-                          dockSummary?.turnId !== message.turnId ? (
+                          {turnProcessSummary ? (
                             <ProcessSummaryBlock
                               block={turnProcessSummary}
                               allBlocks={
@@ -2302,13 +2310,13 @@ export function ChatView() {
                             isLatestRound={isLatestRound}
                             artifactFiles={artifactFiles}
                             videoReferences={videoReferences}
-                            // 坞接管的这一**轮**不再自己渲染摘要行：整轮的工具
-                            // 活动已经合成坞里那一行，否则同一件事会出现两次
-                            // （按轮抑制：一轮可能有好几条带正文的助手消息）。
-                            suppressProcessSummaries={
-                              suppressProcessSummaries ||
-                              (dockSummary !== null &&
-                                message.turnId === dockSummary.turnId)
+                            suppressProcessSummaries={suppressProcessSummaries}
+                            // 坞接走的那一组不再在自己的位置渲染：只掐这一块，
+                            // 本轮其它组照旧留在转录里（它们会随消息往上滚）。
+                            suppressSummaryItemId={
+                              dockSummary?.messageId === message.id
+                                ? dockSummary.summaryItemId
+                                : undefined
                             }
                             onForkMessage={handleForkMessage}
                             onRewindMessage={handleRewindMessage}

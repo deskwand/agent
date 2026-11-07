@@ -382,6 +382,13 @@ describe("activity strip end to end", () => {
             name: "bash",
             input: { command: "ls" },
           },
+          // 第一组两条命令：与尾部那组（1 条）用 pluralKey 就能区分开
+          {
+            type: "tool_use",
+            id: "c1",
+            name: "bash",
+            input: { command: "pwd" },
+          },
         ]),
         turnId: "t1",
       },
@@ -400,6 +407,12 @@ describe("activity strip end to end", () => {
     ];
   }
 
+  /** 坞里的那份文本（从整页文本里扣除，用来断言"剩下的是转录里的"）。 */
+  function outsideDockText(): string {
+    const dock = container.querySelector('[data-testid="chat-task-dock"]');
+    return (container.textContent ?? "").replace(dock?.textContent ?? "", "");
+  }
+
   it("一轮两条带正文的消息：摘要也只出现一次（按轮抑制）", () => {
     act(() =>
       setState({
@@ -410,12 +423,13 @@ describe("activity strip end to end", () => {
     );
     render();
 
-    const text = container.textContent ?? "";
-    const occurrences = text.split("tool.grouped.executedCommands").length - 1;
-    expect(occurrences, `摘要应只出现一次：${text}`).toBe(1);
-    // 且那一次在坞里，而且是聚合后的口径（两条命令 → pluralKey 走 _other）
+    // 坞里只有尾部那一组（1 条 → pluralKey 走 one）；
+    // 先前那组（2 条 → other）留在转录里，全页各出现一次。
     const dock = container.querySelector('[data-testid="chat-task-dock"]');
-    expect(dock?.textContent).toContain("tool.grouped.executedCommands_other");
+    expect(dock?.textContent).toContain("tool.grouped.executedCommands_one");
+    expect(dock?.textContent).not.toContain("executedCommands_other");
+    expect(outsideDockText()).toContain("tool.grouped.executedCommands_other");
+    expect(outsideDockText()).not.toContain("executedCommands_one");
   });
 
   it("流式中（activeTurn + partial）同样只出现一次", () => {
@@ -430,13 +444,11 @@ describe("activity strip end to end", () => {
     );
     render();
 
-    const occurrences =
-      (container.textContent ?? "").split("tool.grouped.executedCommands")
-        .length - 1;
-    expect(occurrences, `摘要应只出现一次：${container.textContent}`).toBe(1);
     expect(
       container.querySelector('[data-testid="chat-task-dock"]')?.textContent,
-    ).toContain("tool.grouped.executedCommands");
+    ).toContain("tool.grouped.executedCommands_one");
+    expect(outsideDockText()).toContain("tool.grouped.executedCommands_other");
+    expect(outsideDockText()).not.toContain("executedCommands_one");
   });
 
   it("上提过的摘要：运行中进坞，回合结束后回到转录原位", () => {
@@ -487,6 +499,81 @@ describe("activity strip end to end", () => {
     expect(
       container.querySelector('[data-testid="chat-task-dock"]'),
     ).toBeNull();
+  });
+
+  it("只把尾部那一组搬进坞：先前跑完的组留在转录里往上滚", () => {
+    // 一轮两段工具活动（中间夹一段正文）→ 转录里两组摘要，坞只该接走最后一组。
+    const blocks = (id: string, command: string) => ({
+      type: "tool_use" as const,
+      id,
+      name: "bash",
+      input: { command },
+    });
+    act(() =>
+      setState({
+        sessionStatus: "running",
+        messages: [
+          makeMessage("u1", "user", [{ type: "text", text: "跑一下" }]),
+          {
+            ...makeMessage("a1", "assistant", [
+              { type: "text", text: "先看目录。" },
+              blocks("b1", "ls"),
+              blocks("c1", "pwd"),
+              { type: "text", text: "再跑一次。" },
+              blocks("b2", "whoami"),
+            ]),
+            turnId: "t1",
+          },
+        ],
+        currentTodos: null,
+      }),
+    );
+    render();
+
+    const dock = container.querySelector('[data-testid="chat-task-dock"]');
+    // 坞里只有尾部一组（1 条命令），不是整轮聚合（3 条）
+    expect(dock?.textContent).toContain("tool.grouped.executedCommands_one");
+    expect(dock?.textContent).not.toContain("executedCommands_other");
+    // 先前那组（2 条）留在转录里
+    const outsideDock = (container.textContent ?? "").replace(
+      dock?.textContent ?? "",
+      "",
+    );
+    expect(outsideDock).toContain("tool.grouped.executedCommands_other");
+  });
+
+  it("发出新一轮消息后，坞不再挂着上一轮的摘要", () => {
+    // eagent pickDockTail 的口径：起点是最后一条 user 行之后 ——
+    // 用户已发新消息、新轮还没产出时，坞里不能显示上一轮的活动。
+    act(() =>
+      setState({
+        sessionStatus: "running",
+        messages: [
+          makeMessage("u1", "user", [{ type: "text", text: "第一轮" }]),
+          {
+            ...makeMessage("a1", "assistant", [
+              {
+                type: "tool_use",
+                id: "b1",
+                name: "bash",
+                input: { command: "ls" },
+              },
+            ]),
+            turnId: "t1",
+          },
+          makeMessage("u2", "user", [{ type: "text", text: "第二轮" }]),
+        ],
+        currentTodos: null,
+      }),
+    );
+    render();
+
+    const dock = container.querySelector('[data-testid="chat-task-dock"]');
+    expect(dock?.textContent ?? "").not.toContain(
+      "tool.grouped.executedCommands",
+    );
+    // 上一轮那行仍在转录里（没有被搬走、也没有被藏掉）
+    expect(container.textContent).toContain("tool.grouped.executedCommands");
   });
 
   it("切到另一个会话后坞不残留（只看当前会话的清单与计时）", () => {

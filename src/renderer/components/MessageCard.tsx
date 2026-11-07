@@ -71,6 +71,9 @@ interface MessageCardProps {
   videoReferences?: VideoReference[];
   /** Hide process summaries when ChatView renders a turn-level summary. */
   suppressProcessSummaries?: boolean;
+  /** 只掐掉这一块过程摘要（按第一个工具调用 id 认）—— 坞把尾部那一组接走了，
+   *  转录里这一块就不该再出现；本轮其它组照旧渲染。 */
+  suppressSummaryItemId?: string;
   /** 分叉入口：仅助手消息显示（tool_result 行/流式中/排队中/已取消除外） */
   onForkMessage?: (message: Message) => void;
   /** 回滚入口：user 消息与回合末尾的助手消息，流式中/排队中/已取消除外 */
@@ -125,6 +128,7 @@ export const MessageCard = memo(function MessageCard({
   artifactFiles = [],
   videoReferences = [],
   suppressProcessSummaries = false,
+  suppressSummaryItemId,
   toolBlocksProjected = false,
   toolLookupBlocks,
   onForkMessage,
@@ -267,7 +271,14 @@ export const MessageCard = memo(function MessageCard({
       visibleBlocks,
       allDisplayBlocks,
     ).filter(
-      (block) => !suppressProcessSummaries || block.type !== "process-summary",
+      (block) =>
+        (!suppressProcessSummaries || block.type !== "process-summary") &&
+        // 坞接走的那一组不再在自己的位置渲染；其余组照旧
+        !(
+          suppressSummaryItemId &&
+          block.type === "process-summary" &&
+          block.items[0]?.id === suppressSummaryItemId
+        ),
     );
     // Keep natural block order for the latest round so process summaries appear
     // in context. Reorder historical (completed) messages to group content first,
@@ -278,6 +289,7 @@ export const MessageCard = memo(function MessageCard({
     isUser,
     isLatestRound,
     suppressProcessSummaries,
+    suppressSummaryItemId,
     visibleBlocks,
     allDisplayBlocks,
   ]);
