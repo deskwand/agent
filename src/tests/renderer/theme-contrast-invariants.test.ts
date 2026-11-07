@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   RENDERER,
+  composerTokenOf,
   composite,
   rgbHex,
   contrast,
@@ -106,10 +107,7 @@ describe("主题对比度不变量", () => {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
       for (const token of TEXT_ROLE_TOKENS) {
         const value = tokenOf(block, token);
-        for (const surface of [
-          "--background",
-          "--card",
-        ] as const) {
+        for (const surface of ["--background", "--card"] as const) {
           const r = contrast(value, tokenOf(block, surface));
           const preset = /data-theme-preset="(\w+)"/.exec(block)?.[1] ?? "zinc";
           const floor = isLightBlock(block) ? (TEXT_FLOOR[preset] ?? 4.5) : 4.5;
@@ -144,15 +142,26 @@ describe("主题对比度不变量", () => {
       const bg = tokenOf(block, "--background");
       const muted = tokenOf(block, "--muted");
 
-      expect(b(card), `${head} border/card=${b(card).toFixed(2)}`).toBeGreaterThanOrEqual(1.2);
-      expect(b(muted), `${head} border/muted=${b(muted).toFixed(2)}`).toBeGreaterThanOrEqual(1.1);
-      expect(b(bg), `${head} border/background=${b(bg).toFixed(2)}`).toBeLessThanOrEqual(2.2);
+      expect(
+        b(card),
+        `${head} border/card=${b(card).toFixed(2)}`,
+      ).toBeGreaterThanOrEqual(1.2);
+      expect(
+        b(muted),
+        `${head} border/muted=${b(muted).toFixed(2)}`,
+      ).toBeGreaterThanOrEqual(1.1);
+      expect(
+        b(bg),
+        `${head} border/background=${b(bg).toFixed(2)}`,
+      ).toBeLessThanOrEqual(2.2);
 
       // 方向：暗色描边更亮、亮色描边更暗（用亮度符号，不用 contrast() >= 1 —— 那恒成立）
       const lum = (v: string) => relativeLuminance(parseHex(v));
       for (const surface of ["--card", "--muted", "--accent"] as const) {
         const sVal = tokenOf(block, surface);
-        const ok = isLight ? lum(borderOver(sVal)) < lum(sVal) : lum(borderOver(sVal)) > lum(sVal);
+        const ok = isLight
+          ? lum(borderOver(sVal)) < lum(sVal)
+          : lum(borderOver(sVal)) > lum(sVal);
         expect(ok, `${head} ${surface} 的描边方向不对`).toBe(true);
       }
     }
@@ -161,14 +170,20 @@ describe("主题对比度不变量", () => {
   /**
    * 次级表面分界：官方 `--muted` 对 `--background` 的底色差。
    *
-   * 官方取值下**方向判据必须取消**：暗色里 `--muted`(#27272a) 比 `--card`(#18181b) 亮，
-   * 与本仓旧的「抬升面必须比次级表面亮」相反。所以只锁"看得见"（≥1.05）。
+   * 方向判据必须取消：14 块里 --muted 与 --card 互有高低（默认深色被本仓改写后
+   * --card #303030 反而比 --muted #272624 亮，其余块则相反）。所以只锁"看得见"（≥1.05）。
    */
   it("§9-4 次级表面（--muted）与 --background 的底色差成立", () => {
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
-      const step = contrast(tokenOf(block, "--muted"), tokenOf(block, "--background"));
-      expect(step, `${head} muted/background = ${step.toFixed(3)}`).toBeGreaterThanOrEqual(1.05);
+      const step = contrast(
+        tokenOf(block, "--muted"),
+        tokenOf(block, "--background"),
+      );
+      expect(
+        step,
+        `${head} muted/background = ${step.toFixed(3)}`,
+      ).toBeGreaterThanOrEqual(1.05);
     }
   });
 
@@ -178,7 +193,10 @@ describe("主题对比度不变量", () => {
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
       expect(
-        contrast(tokenOf(block, "--accent-foreground"), tokenOf(block, "--accent")),
+        contrast(
+          tokenOf(block, "--accent-foreground"),
+          tokenOf(block, "--accent"),
+        ),
         `${head} accent-foreground/accent`,
       ).toBeGreaterThanOrEqual(4.5);
     }
@@ -191,13 +209,19 @@ describe("主题对比度不变量", () => {
       ? ""
       : (/::selection\s*\{[\s\S]*?\}/.exec(css)?.[0] ?? "");
     expect(body, "globals.css 里找不到 ::selection 规则").not.toBe("");
-    const backgroundValue = (/background-color:\s*([^;]+);/.exec(body)?.[1] ?? "")
+    const backgroundValue = (
+      /background-color:\s*([^;]+);/.exec(body)?.[1] ?? ""
+    )
       .replace(/\s+/g, " ")
       .trim();
-    const mix = /^color-mix\(\s*in srgb,\s*var\((--[\w-]+)\)\s+([\d.]+)%,\s*var\((--[\w-]+)\)\s*\)$/.exec(
-      backgroundValue,
-    );
-    expect(mix, `选中背景必须由官方 token 派生：${backgroundValue}`).not.toBeNull();
+    const mix =
+      /^color-mix\(\s*in srgb,\s*var\((--[\w-]+)\)\s+([\d.]+)%,\s*var\((--[\w-]+)\)\s*\)$/.exec(
+        backgroundValue,
+      );
+    expect(
+      mix,
+      `选中背景必须由官方 token 派生：${backgroundValue}`,
+    ).not.toBeNull();
     const [, aTok, pct, bTok] = mix!;
     const alpha = Number(pct) / 100;
 
@@ -214,7 +238,9 @@ describe("主题对比度不变量", () => {
       if (visible < 1.5) invisible.push(`${visible.toFixed(2)}  ${head}`);
     }
     expect(lowText, `选中后文字低于 4.5：\n${lowText.join("\n")}`).toEqual([]);
-    expect(invisible, `高亮对底色不到 1.5：\n${invisible.join("\n")}`).toEqual([]);
+    expect(invisible, `高亮对底色不到 1.5：\n${invisible.join("\n")}`).toEqual(
+      [],
+    );
   });
 
   it("§9-8 外圈（图标栏＋标题栏）：比内容区暗，三级台阶成立", () => {
@@ -245,11 +271,21 @@ describe("主题对比度不变量", () => {
       const vsContent = contrast(chrome, background);
       const vsSecondary = contrast(chrome, secondary);
       // 台阶区间按 7 套官方 base 实测标定（spec §7 登记）；越界即红。
-      const ok = vsContent >= 1.02 && vsContent <= 1.45 && vsSecondary >= 1.1 && vsSecondary <= 1.45;
-      if (!ok) outOfBand.push(`${head} 外圈/内容=${vsContent.toFixed(3)} 外圈/muted=${vsSecondary.toFixed(3)}`);
+      const ok =
+        vsContent >= 1.02 &&
+        vsContent <= 1.45 &&
+        vsSecondary >= 1.1 &&
+        vsSecondary <= 1.45;
+      if (!ok)
+        outOfBand.push(
+          `${head} 外圈/内容=${vsContent.toFixed(3)} 外圈/muted=${vsSecondary.toFixed(3)}`,
+        );
     }
     expect(outOfBand, `外圈台阶出界：\n${outOfBand.join("\n")}`).toEqual([]);
-    expect(lowIcons, `muted 图标在外圈上低于 3.0：\n${lowIcons.join("\n")}`).toEqual([]);
+    expect(
+      lowIcons,
+      `muted 图标在外圈上低于 3.0：\n${lowIcons.join("\n")}`,
+    ).toEqual([]);
   });
 
   /** 规则体里某条声明的值（压平空白后取第一段）。 */
@@ -284,7 +320,10 @@ describe("主题对比度不变量", () => {
     string,
     { light: Record<string, string>; dark: Record<string, string> }
   > = JSON.parse(
-    fs.readFileSync(path.join(RENDERER, "styles/official-accents.json"), "utf8"),
+    fs.readFileSync(
+      path.join(RENDERER, "styles/official-accents.json"),
+      "utf8",
+    ),
   ) as never;
 
   /**
@@ -387,9 +426,7 @@ describe("主题对比度不变量", () => {
       ] as const) {
         const r = contrast(ink, tokenOf(block, surface));
         if (r < floor) {
-          violations.push(
-            `${r.toFixed(2)}  ${label}  ${token} / ${surface}`,
-          );
+          violations.push(`${r.toFixed(2)}  ${label}  ${token} / ${surface}`);
         }
       }
     }
@@ -403,9 +440,7 @@ describe("主题对比度不变量", () => {
   // 翻转后 14 块实测对底色只有 1.05（等于没有高亮）。
   // 三个判据：不透明 + 高亮上的字 ≥ 4.5 + 对 background / card / muted 都看得见 ≥ 1.5。
   it("§9-10 朗读高亮可见且其上文字可读（含强调色维度）", () => {
-    expect(Object.keys(accents).length).toBe(
-      VALID_THEME_ACCENTS.length - 1,
-    );
+    expect(Object.keys(accents).length).toBe(VALID_THEME_ACCENTS.length - 1);
     const rule = /::highlight\(tts\)\s*\{([\s\S]*?)\}/.exec(css)?.[1];
     expect(rule, "globals.css 里找不到 ::highlight(tts)").toBeTruthy();
     const value = declarationOf(rule!, "background-color").replace(/\s+/g, " ");
@@ -437,20 +472,21 @@ describe("主题对比度不变量", () => {
           invisible.push(`${visible.toFixed(2)}  ${label} / ${surface}`);
       }
     }
-    expect(lowText, `高亮上的文字低于 4.5：\n${lowText.join("\n")}`).toEqual([]);
-    expect(
-      invisible,
-      `高亮对底色不到 1.5：\n${invisible.join("\n")}`,
-    ).toEqual([]);
+    expect(lowText, `高亮上的文字低于 4.5：\n${lowText.join("\n")}`).toEqual(
+      [],
+    );
+    expect(invisible, `高亮对底色不到 1.5：\n${invisible.join("\n")}`).toEqual(
+      [],
+    );
   });
 
   // 用户反馈：聊天输入框的占位提示在深色主题下「看不清」。
   // 量下来真因不在字的亮度：旧输入框是 `bg-background/60`（透明到与页面同色），
   // 字实际上是飘在纯黑上 —— 而参考实现里占位符对面板只有 3.7 就能看清，
   // 因为它那块面板比页面亮一档。所以两件事一起锁：
-  //   1）面板必须是抬升面（bg-muted），不能退回与页面同色的 bg-background；
+  //   1）面板必须是抬升面（bg-composer），不能退回与页面同色的 bg-background；
   //      「抬升面确实比页面亮」由 §9-4 按 token 管，这里只盯着输入框用的是哪个类。
-  //   2）占位符从正文色往面板上混，对 **--muted** 算：14 块落在 6.5–9.5 这个带里。
+  //   2）占位符从正文色往面板上混，对 **--composer** 算：14 块落在 6.5–9.5 这个带里。
   //      混色的底写回 --background（面板上偏暗）、或者退回单档 --muted-foreground，都红。
   it("§9-11 聊天输入框的面板看得见、占位提示读得清", () => {
     // 会话内 / 欢迎页空态两个入口共用同一套卡面类名，必须同步。
@@ -466,18 +502,21 @@ describe("主题对比度不变量", () => {
       ...cardLinesOf("components/ChatView.tsx"),
       ...cardLinesOf("components/WelcomeView.tsx"),
     ];
-    expect(cardLines.length, "找不到任何 cardClassName 定义").toBeGreaterThan(0);
+    expect(cardLines.length, "找不到任何 cardClassName 定义").toBeGreaterThan(
+      0,
+    );
     for (const cls of cardLines) {
       // 逐字匹配：`bg-muted/60`（半透明面板 = 原来的毛病）与 `bg-muted-foreground`
       // 都包含 "bg-muted"，用 toContain 会漏判。
-      expect(cls, "输入框面板要用抬升面 bg-muted").toMatch(/(^|\s)bg-muted(\s|$)/);
-      expect(cls, "输入框面板不能是半透明的 bg-muted/NN").not.toMatch(
-        /(^|\s)bg-muted\/\d+/,
+      expect(cls, "输入框面板要用抬升面 bg-composer").toMatch(
+        /(^|\s)bg-composer(\s|$)/,
       );
-      expect(
-        cls,
-        "输入框不能退回与页面同色的 bg-background",
-      ).not.toMatch(/(^|\s)bg-background(\s|$)/);
+      expect(cls, "输入框面板不能是半透明的 bg-composer/NN").not.toMatch(
+        /(^|\s)bg-composer\/\d+/,
+      );
+      expect(cls, "输入框不能退回与页面同色的 bg-background").not.toMatch(
+        /(^|\s)bg-background(\s|$)/,
+      );
     }
 
     const rule = /\.chat-editor:empty::before\s*\{([\s\S]*?)\}/.exec(css)?.[1];
@@ -497,14 +536,14 @@ describe("主题对比度不变量", () => {
     const [, aTok, pct, bTok] = mix!;
     expect(aTok, "占位符要从 --foreground 推导").toBe("--foreground");
     // 混色底必须是面板色：混到 --background 上在抬升面里会偏暗。
-    expect(bTok, "占位符要混回面板色 --muted").toBe("--muted");
+    expect(bTok, "占位符要混回面板色 --composer").toBe("--composer");
 
     const alpha = Number(pct) / 100;
     // 绝对比值带，不用「正文对比度的百分之几」：对比度是倍率，取百分比没有感知意义，
-    // 而且和下面的下限会互相打架（正文 13.78 时 65% 只剩 8.96）。
+    // 而且和下面的下限会互相打架（正文 11.79 时 65% 只剩 7.66）。
     const FLOOR = 6.5;
     const CEILING = 9.5;
-    // 正文得明显高于上限，带子才有意义（当前实测 13.78–18.10）。
+    // 正文得明显高于上限，带子才有意义（当前实测 11.79–17.18 深 / 19.59–19.90 亮）。
     const MIN_TYPED = 10;
     const tooDim: string[] = [];
     const tooBright: string[] = [];
@@ -512,7 +551,8 @@ describe("主题对比度不变量", () => {
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
       const fg = tokenOf(block, "--foreground");
-      const panel = tokenOf(block, "--muted");
+      // --composer 不写在主题块里：按 CSS 规则解出它指向哪个 token。
+      const panel = tokenOf(block, composerTokenOf(block));
       const typed = contrast(fg, panel);
       if (typed < MIN_TYPED) {
         weakTyped.push(`${typed.toFixed(2)}  ${head}`);

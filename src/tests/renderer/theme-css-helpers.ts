@@ -51,6 +51,34 @@ export function globalToken(name: string): string {
   return m[1].trim();
 }
 
+/**
+ * 解析某个主题块下 `--composer` 最终指向哪个 token（返回 `--muted` / `--card` 这类名字）。
+ *
+ * `--composer` 不在主题块里声明 —— 主题块只许出现官方 31 个变量（official-vocabulary
+ * 逐键比对）。它在固定语义层声明为 `var(--muted)`，再由"默认深色槽位"那条规则抬到
+ * `var(--card)`。所以这里从 CSS 里读两个目标 token，而不是在测试里硬写：
+ * 规则改了，测试跟着走；规则被删了，第二条 `throw` 会红（否则会静默退回默认档，
+ * 而默认档在默认深色下恰好也能过一部分门槛）。
+ *
+ * 映射依据与 CSS 一致：主题块选择器为 `:root` 的就是默认深色槽位（zinc dark）。
+ */
+export function composerTokenOf(block: string): string {
+  const defaultTok = /--composer:\s*var\((--[\w-]+)\)\s*;/.exec(css)?.[1];
+  if (!defaultTok) {
+    throw new Error("globals.css 里找不到 --composer 的默认声明");
+  }
+  const selector = block.slice(0, block.indexOf("{")).trim();
+  if (selector !== ":root") return defaultTok;
+  const raised =
+    /:root\[data-theme-preset="zinc"\]:not\(\.light\)[^{]*\{[^}]*--composer:\s*var\((--[\w-]+)\)/.exec(
+      css,
+    )?.[1];
+  if (!raised) {
+    throw new Error("globals.css 里找不到默认深色槽位的 --composer 抬起规则");
+  }
+  return raised;
+}
+
 /** 按选择器取一个主题块（`:root` / `.light` / `:root[data-theme-preset="paper"]` …）。 */
 export function blockBySelector(
   selector: string,

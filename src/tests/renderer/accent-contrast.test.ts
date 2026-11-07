@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { withPaletteOverrides } from "../../shared/theme-overrides";
 import { RENDERER, composite, contrast, css } from "./theme-css-helpers";
 
 const bases = JSON.parse(
@@ -57,14 +58,17 @@ function combinations(): Combo[] {
   const out: Combo[] = [];
   for (const [baseName, base] of Object.entries(bases)) {
     for (const mode of ["dark", "light"] as const) {
+      // 底色取值必须走合成：本仓对 zinc/dark 有登记式改写，直接用官方快照会让矩阵
+      // 算的是一个界面上并不存在的底色。
+      const tokens = withPaletteOverrides(baseName, mode, base[mode]);
       const surfaces = Object.fromEntries(
-        [...SURFACES, "foreground"].map((s) => [s, base[mode][s]]),
+        [...SURFACES, "foreground"].map((s) => [s, tokens[s]]),
       ) as Combo["surfaces"];
       out.push({
         label: `${baseName}/default/${mode}`,
         surfaces,
-        primary: base[mode].primary,
-        primaryForeground: base[mode]["primary-foreground"],
+        primary: tokens.primary,
+        primaryForeground: tokens["primary-foreground"],
       });
       for (const [accentName, accent] of Object.entries(accents)) {
         out.push({

@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { ZINC_DARK_OVERRIDES } from "../src/shared/theme-overrides";
 
 const stylesPath = path.resolve(
   process.cwd(),
@@ -16,10 +17,13 @@ const sharedThemePath = path.resolve(process.cwd(), "src/shared/theme.ts");
 describe("default theme wiring", () => {
   it("zinc 占默认槽位：暗色在 :root、亮色在 .light", () => {
     const source = fs.readFileSync(stylesPath, "utf8");
-    // 官方 zinc 的暗色背景（oklch(0.141 0.005 285.823)）必须出现在默认槽位块里
+    // zinc 暗色的 background 已被本仓登记式改写（暖灰护眼版），所以默认槽位只守"接对了"：
+    // 这里断言登记值，取值本身由 official-vocabulary.test.ts 按"快照 + 登记"合成比对。
     const darkBlock = /^ {2}:root \{[\s\S]*?^ {2}\}/m.exec(source)?.[0] ?? "";
     expect(darkBlock, "找不到默认暗色块").not.toBe("");
-    expect(darkBlock).toContain("--background: oklch(0.141 0.005 285.823);");
+    expect(darkBlock).toContain(
+      `--background: ${ZINC_DARK_OVERRIDES.background};`,
+    );
     expect(darkBlock).not.toMatch(/data-theme-preset/);
 
     const lightBlock =

@@ -508,17 +508,22 @@ if (!hasSingleInstanceLock) {
 let tray: Tray | null = null;
 
 /**
- * 各套官方底色的 `--background`，值 = 官方 oklch 的 sRGB 等值（hex）。
+ * 各套底色的 `--background`，值 = 官方 oklch 的 sRGB 等值（hex）；zinc 暗色例外，
+ * 它是本仓登记式改写后的 `#191919`（见 shared/theme-overrides.ts）。
  *
  * 为什么不直接用 globals.css 的值：这里是**主进程**，Electron 的
  * `setBackgroundColor` / `titleBarOverlay` 只吃常规色值，`oklch()` 不在其列。
- * 回归测试 src/tests/main/theme-preset-bg.test.ts 用仓库自己的解析器复算，防止手抄漂移。
+ * 回归测试 src/tests/main/theme-preset-bg.test.ts 用仓库自己的解析器复算（官方快照 +
+ * 登记式改写），防止手抄漂移。
  *
  * ⚠️ 2026-10-10：这张表曾是自造调色板的 7 个 id（graphite/paper/…），而三处查找已改成
  * `|| "zinc"` ⇒ 永远落到 fallback 的旧 hex，原生窗口底色与所选底色脱钩。keyed 成官方 id 修好。
  */
 const THEME_PRESET_BG: Record<ThemePreset, { dark: string; light: string }> = {
-  zinc: { dark: "#09090b", light: "#ffffff" },
+  // 默认深色是本仓登记式改写过的（暖灰），必须写成字面量：theme-preset-bg.test.ts 用正则
+  // 从源码里读这张表，`dark: ZINC_DARK_OVERRIDES.background` 这种写法解析不到（写成字面量
+  // 与那份登记的一致性，正是那条测试在守）。
+  zinc: { dark: "#191919", light: "#ffffff" },
   neutral: { dark: "#0a0a0a", light: "#ffffff" },
   stone: { dark: "#0c0a09", light: "#ffffff" },
   mauve: { dark: "#0c090c", light: "#ffffff" },

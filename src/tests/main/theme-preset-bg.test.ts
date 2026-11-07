@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { withPaletteOverrides } from "../../shared/theme-overrides";
 import {
   RENDERER,
   oklchToRgb,
@@ -63,13 +64,17 @@ describe("主进程的 preset 背景色表", () => {
     }
   });
 
-  it("每个 hex 与官方快照的 --background 复算结果一致", () => {
+  it("每个 hex 与「官方快照 + 登记式改写」的 --background 复算结果一致", () => {
     const bad: string[] = [];
     for (const [id, dark, light] of tableEntries()) {
       const theme = themes[id];
       expect(theme, `官方快照里没有 ${id}`).toBeTruthy();
-      const wantDark = officialHex(theme.dark["background"]);
-      const wantLight = officialHex(theme.light["background"]);
+      const wantDark = officialHex(
+        withPaletteOverrides(id, "dark", theme.dark).background,
+      );
+      const wantLight = officialHex(
+        withPaletteOverrides(id, "light", theme.light).background,
+      );
       if (dark !== wantDark) bad.push(`${id} dark: ${dark} ≠ ${wantDark}`);
       if (light !== wantLight) bad.push(`${id} light: ${light} ≠ ${wantLight}`);
     }

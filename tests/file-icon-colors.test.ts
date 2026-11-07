@@ -66,8 +66,12 @@ const baseBlocks = BLOCKS.filter(
 );
 const darkBase = baseBlocks.find((block) => !block.selector.includes(".light"));
 const lightBase = baseBlocks.find((block) => block.selector.includes(".light"));
-const presetBlocks = BLOCKS.filter((block) =>
-  block.selector.includes("data-theme-preset="),
+// 主题块的判据是"声明了 --background"：`--composer` 的抬起规则选择器里也带
+// data-theme-preset（`:root[data-theme-preset="zinc"]:not(.light)`），但它不是主题块。
+const presetBlocks = BLOCKS.filter(
+  (block) =>
+    block.selector.includes("data-theme-preset=") &&
+    readVar(block.body, "--background"),
 );
 
 /** 14 档 = 2 个基础档 + 6 预设 × 浅深。浅色档的选择器一律带 `.light`。 */

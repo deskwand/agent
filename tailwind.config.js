@@ -77,6 +77,7 @@ module.exports = {
         // 键路径 === 变量名，由 token-alpha.test.ts 锁定。
         "hover-surface": token("hover-surface"),
         "selected-surface": token("selected-surface"),
+        composer: token("composer"),
       },
       fontFamily: {
         sans: [

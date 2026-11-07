@@ -66,6 +66,13 @@
      亮色 6% 在三种底上都给出 1.135（见 hover-surface-tokens.test.ts）。 */
   --hover-surface: color-mix(in srgb, var(--foreground) 11%, transparent);
   --selected-surface: color-mix(in srgb, var(--foreground) 18%, transparent);
+
+  /* 输入区表面。默认跟随面板色 --muted（与 2026-11 之前的观感一致）；
+     只有默认深色（zinc dark）抬到 --card，让它从画布上浮起一档 —— 见下面那条规则。
+     为什么不直接在组件里写 bg-card：那个类名跨 14 个主题块共享，而官方的亮色
+     --card ≡ --background（白），亮色下输入区会与画布同色（1.00:1），
+     其余 6 套深色的 --card 又比 --muted 暗，输入区会沉下去。 */
+  --composer: var(--muted);
 }
 
 /* 亮色：只有这几个固定语义值不同（主题变量在 @layer base 的 .light 块里） */
@@ -97,11 +104,24 @@
   --selected-surface: color-mix(in srgb, var(--foreground) 10%, transparent);
 }
 
+/* 默认深色（zinc dark）把输入区抬到 --card（暖灰版为 #303030）。
+   两个选择器都要：
+   - `[data-theme-preset="zinc"]` —— React 挂载后 App.tsx 一定会写这个属性（选 zinc 也写）；
+   - `:not([data-theme-preset])` —— 首帧属性还没写时，默认槽位就是 zinc 暗色，
+     少了这条会先渲染成 --muted 再跳一档。
+   `.light` 一律排除：亮色下 --card ≡ --background，抬起来等于没有面板。
+   注意：本块只声明 --composer、不声明 --background，所以不会被 themeBlocks() 当成第 15 个主题块。 */
+:root[data-theme-preset="zinc"]:not(.light),
+:root:not([data-theme-preset]):not(.light) {
+  --composer: var(--card);
+}
+
 @layer base {
   /* ================================================================
-     官方主题层：7 套 shadcn base colour × 明暗 = 14 块，每块 31 个官方变量。
-     取值逐字来自 registry（src/renderer/styles/official-themes.json），
-     回归测试 src/tests/renderer/official-vocabulary.test.ts 逐值比对。
+     官方主题层：7 套 shadcn base colour × 明暗 = 14 块，每块 31 个变量。
+     取值来自 registry（src/renderer/styles/official-themes.json），
+     其中 zinc/dark 的 12 项由本仓登记式改写（src/shared/theme-overrides.ts，写字面 hex）。
+     回归测试 src/tests/renderer/official-vocabulary.test.ts 按"快照 + 登记"合成比对。
 
      zinc 占默认槽位：:root（暗）/ .light（亮）；其余 6 套带 data-theme-preset。
      ⚠️ 选择器形状不要改：themeBlocks() 只认 :root / .light 开头。
@@ -241,20 +261,22 @@
     --sidebar-ring: oklch(0.709 0.01 56.259);
   }
   :root {
-    --background: oklch(0.141 0.005 285.823);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.21 0.006 285.885);
-    --popover-foreground: oklch(0.985 0 0);
+    /* 本仓登记式改写的 12 项（暖灰护眼版）：值必须与 src/shared/theme-overrides.ts 逐字相同。
+       守卫 official-vocabulary.test.ts 做字符串相等比对，所以这里写字面 hex，不写 oklch。 */
+    --background: #191919;
+    --foreground: #f2f2f2;
+    --card: #303030;
+    --card-foreground: #f2f2f2;
+    --popover: #303030;
+    --popover-foreground: #f2f2f2;
     --primary: oklch(0.92 0.004 286.32);
     --primary-foreground: oklch(0.21 0.006 285.885);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 286.033);
-    --muted-foreground: oklch(0.705 0.015 286.067);
-    --accent: oklch(0.274 0.006 286.033);
-    --accent-foreground: oklch(0.985 0 0);
+    --secondary: #272624;
+    --secondary-foreground: #f2f2f2;
+    --muted: #272624;
+    --muted-foreground: #9c9b99;
+    --accent: #272624;
+    --accent-foreground: #f2f2f2;
     --destructive: oklch(0.704 0.191 22.216);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
@@ -973,15 +995,16 @@
         bg-background/60（透明到背景同色），字实际上飘在黑底上，用户反馈「看不清」；
         对比参考实现（Cursor）：它把面板抬到比页面亮一档（1.33），占位符对面板
         只有 3.7 就能看 —— 看得清靠的是**面板**，不是字更亮。
-     2）面板改成 --muted 后（见 ChatView / WelcomeView 的 cardClassName），
-        这里的对比度**必须对 --muted 算**，不能再写 var(--background)：
-        混到背景色上在抬升面板里会偏暗。
-     70% 的标定：全 14 块实测对面板 7.57–8.00（深）/ 7.12–7.33（亮），
-     而正文在同面板上是 13.78–18.16 —— 读得清，又一眼分得出「这是提示」。
-     门槛由 theme-contrast-invariants.test.ts 的 §9-11 守着，别改回单档灰。 */
+     2）混色底必须是输入框**真正所在**的那个面：现在写 var(--composer)
+        （ChatView / WelcomeView 的 cardClassName 用 bg-composer）。它默认等于 --muted，
+        只有默认深色抬到 --card —— 写死任何一边都会在一部分主题里偏暗。
+     70% 的标定：全 14 块实测对输入区表面 6.65–8.00（深）/ 7.12–7.70（亮），
+     而正文在同表面上是 11.79–17.18（深）/ 19.59–19.90（亮）—— 读得清，又一眼分得出
+     「这是提示」。门槛由 theme-contrast-invariants.test.ts 的 §9-11 守着（6.5–9.5 带），
+     别改回单档灰。 */
   .chat-editor:empty::before {
     content: attr(data-placeholder);
-    color: color-mix(in srgb, var(--foreground) 70%, var(--muted));
+    color: color-mix(in srgb, var(--foreground) 70%, var(--composer));
     pointer-events: none;
   }
 

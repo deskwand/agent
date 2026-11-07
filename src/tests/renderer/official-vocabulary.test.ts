@@ -1,17 +1,24 @@
 // 官方主题"可直接用"的可执行判据。
 //
 // 两条：
-//   1) 每个主题块的每个官方变量与 registry 快照**逐值相等**（不是"差不多像"）
+//   1) 每个主题块的每个官方变量与「registry 快照 + 本仓登记式改写」合成值**逐值相等**
+//      （不是"差不多像"）
 //   2) 旧 vocabulary 在源码里归零（漏改一处会静默退回继承色，不报错）
 //
 // drop-in 演练（人工，等价于第 1 条）：
 //   把官方 neutral 的 `:root` 段粘贴进 .light[data-theme-preset="neutral"]、
 //   官方 `.dark` 段粘贴进 :root[data-theme-preset="neutral"] → 本文件仍应全绿。
+//   ⚠️ zinc/dark 不适用：它的 12 项在本仓被登记式改写（shared/theme-overrides.ts），
+//   贴回官方值会让"与合成值相等"那条红 —— 这是预期行为，不是回归。
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import resolveConfig from "tailwindcss/resolveConfig";
+import {
+  PALETTE_OVERRIDES,
+  withPaletteOverrides,
+} from "../../shared/theme-overrides";
 import {
   RENDERER,
   blockBySelector,
@@ -34,6 +41,10 @@ describe("官方主题逐字可用", () => {
   const themes = officialThemes();
   const bases = Object.keys(themes);
 
+  /** 这个块**应该**的取值：官方快照 + 本仓登记（见 shared/theme-overrides.ts）。 */
+  const expected = (base: string, mode: "dark" | "light") =>
+    withPaletteOverrides(base, mode, themes[base][mode]);
+
   it("快照里有 7 套官方 base", () => {
     expect(bases.sort()).toEqual(
       ["mauve", "mist", "neutral", "olive", "stone", "taupe", "zinc"].sort(),
@@ -48,7 +59,7 @@ describe("官方主题逐字可用", () => {
         expect(block, `globals.css 里缺块 ${sel}`).toBeTruthy();
         const got = tokensOf(block!);
         const mismatched: string[] = [];
-        for (const [key, value] of Object.entries(themes[base][mode])) {
+        for (const [key, value] of Object.entries(expected(base, mode))) {
           if (got[`--${key}`] !== value) {
             mismatched.push(
               `--${key}: ${got[`--${key}`] ?? "(缺)"} ≠ ${value}`,
@@ -66,13 +77,40 @@ describe("官方主题逐字可用", () => {
           Object.keys(got).sort(),
           `${base}/${mode} 的变量集合与官方快照不一致`,
         ).toEqual(
-          Object.keys(themes[base][mode])
+          Object.keys(expected(base, mode))
             .map((k) => `--${k}`)
             .sort(),
         );
       });
     }
   }
+
+  it("登记式改写只覆盖 spec §3 那 12 项", () => {
+    // 精确清单：本仓改了哪些 token 必须一眼可见。多改一项（比如有人顺手把 --primary
+    // 也暖化了）会在这里红，而不是悄悄改变 252 组对比度矩阵的输入。
+    const declared = Object.entries(PALETTE_OVERRIDES).flatMap(
+      ([preset, modes]) =>
+        Object.entries(modes).flatMap(([mode, tokens]) =>
+          Object.keys(tokens ?? {}).map(
+            (token) => `${preset}/${mode}/${token}`,
+          ),
+        ),
+    );
+    expect(declared.sort()).toEqual([
+      "zinc/dark/accent",
+      "zinc/dark/accent-foreground",
+      "zinc/dark/background",
+      "zinc/dark/card",
+      "zinc/dark/card-foreground",
+      "zinc/dark/foreground",
+      "zinc/dark/muted",
+      "zinc/dark/muted-foreground",
+      "zinc/dark/popover",
+      "zinc/dark/popover-foreground",
+      "zinc/dark/secondary",
+      "zinc/dark/secondary-foreground",
+    ]);
+  });
 });
 
 describe("旧 vocabulary 已归零", () => {
