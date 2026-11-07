@@ -1935,7 +1935,8 @@
       "cancelled": "已取消",
       "userReplied": "已跳过 · 你在对话里直接回复",
       "interrupted": "会话已中断"
-    }
+    },
+    "openInOverview": "在概览中查看"
   },
   "imageLightbox": {
     "close": "关闭",
@@ -2417,13 +2418,12 @@
     "resetAt": "重置 {{time}}"
   },
   "activity": {
-    "panelTitle": "活动",
-    "subagentsSection": "子代理",
     "subagents_one": "{{count}} 个子代理",
     "subagents_other": "{{count}} 个子代理",
     "statusCancelled_one": "{{count}} 项取消",
     "statusCancelled_other": "{{count}} 项取消",
-    "statusCleared": "清单已清空"
+    "statusCleared": "清单已清空",
+    "openOverview": "打开会话概览查看后台任务"
   },
   "connect": {
     "cloudTitle": "DeskWand",

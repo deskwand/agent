@@ -142,66 +142,6 @@ export interface JumpMessageLike {
 }
 
 /**
- * 找 toolCallId **所属**的那条消息 —— 也就是这组工具卡片在界面上**开始**的位置。
- *
- * 为什么不是"回合末那条"：一次 spawn 之后的回合往往还会继续好几段（同一回合里继续说话、
- * 再取结果…），而卡片画在**发起这次调用**的那条消息里。取回合末会落在 spawn 的**下一条**
- * 甚至更靠后，实测表现为"跳过去差一点点、还得再往上拖一下"。
- *
- * 必须**复刻渲染层的合并**（`ChatView.tsx:700-746`）：纯工具 assistant 消息（没有 text 块）
- * 若在同 turnId 内**前面**已有 assistant，渲染前会被并进那条、自己没有 DOM 节点。所以返回的
- * id 必须在合并后仍然存在 —— 否则 `handleDockTickSelect` 找不到 `data-message-id`，点击静默失效。
- * 判据用 `turnId` 相等，与渲染层的 `prev.turnId === msg.turnId` 一致（`entries-to-messages` 里
- * 每条消息都带 turnId）。
- */
-export function findToolCallOwnerMessageId(
-  messages: ReadonlyArray<JumpMessageLike> | undefined,
-  toolCallId: string,
-): string | null {
-  const list = messages ?? [];
-  if (!toolCallId) return null;
-
-  const index = list.findIndex(
-    (message) =>
-      Array.isArray(message.content) &&
-      (message.content as Array<{ type?: string; id?: string }>).some(
-        (block) => block?.type === "tool_use" && block.id === toolCallId,
-      ),
-  );
-  if (index === -1) return null;
-
-  const owner = list[index];
-  const blocksOf = (message: JumpMessageLike) =>
-    Array.isArray(message.content)
-      ? (message.content as Array<{ type?: string }>)
-      : [];
-  /** 纯工具消息（没有 text 块）——渲染前会被并进同 turnId 的前一条 assistant。 */
-  const isPureToolMessage = (message: JumpMessageLike) => {
-    const blocks = blocksOf(message);
-    return (
-      message.role === "assistant" &&
-      blocks.length > 0 &&
-      !blocks.some((block) => block?.type === "text")
-    );
-  };
-
-  const sameTurnId = (message: JumpMessageLike) =>
-    message.turnId === owner.turnId;
-  let rangeStart = index;
-  while (rangeStart > 0 && sameTurnId(list[rangeStart - 1])) rangeStart--;
-
-  // 从回合头走到 owner，重放合并：只保留"会留下自己节点"的那些。
-  let survivorId: string | null = null;
-  for (let i = rangeStart; i <= index; i++) {
-    const message = list[i];
-    if (message.role !== "assistant") continue;
-    if (isPureToolMessage(message) && survivorId) continue; // 被并走
-    survivorId = message.id;
-  }
-  return survivorId;
-}
-
-/**
  * 算「本轮」的 tool_use id 集合 = 最后一条**真实用户消息**之后的所有工具调用。
  *
  * 返回 `null` 表示"判不了"（消息里一条真实用户消息都没有，例如历史还没 hydrate）——
@@ -281,4 +221,26 @@ export function buildOverviewBackgroundTasks(
     running: rows.filter((row) => row.status === "running"),
     finished: rows.filter((row) => row.status !== "running"),
   };
+}
+
+/**
+ * 子代理显示名：tap 送来的插件别名（含兜底名）优先；
+ * 模型自填的名字能在会话里读到，但我们注入的兜底名不在（就地改参数发生在消息落盘之后）；
+ * 两者都没有时回落子代理类型。中文界面查表，表外名字原样显示。
+ *
+ * 消息区的回执行与概览面板的行共用这一份，避免两处对同一个代理叫不同的名字。
+ */
+export function agentDisplayName(
+  input: Record<string, unknown> | undefined,
+  alias: string | undefined,
+  language: string,
+): string {
+  const fromInput =
+    input && typeof input.name === "string" ? input.name : undefined;
+  const name = alias ?? fromInput;
+  if (!name) return String(input?.subagent_type ?? "Agent");
+  const zhLabel = language.startsWith("zh")
+    ? agentNameZhLabel(name)
+    : undefined;
+  return zhLabel ?? name;
 }

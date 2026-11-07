@@ -53,12 +53,22 @@ describe("overview 右栏模式", () => {
   });
 });
 
-describe("pendingFocusToolCallId", () => {
-  it("stores the request and clears it after consumption", () => {
-    useAppStore.getState().requestFocusToolCall("call-1");
-    expect(useAppStore.getState().pendingFocusToolCallId).toBe("call-1");
+describe("overviewTaskFocusId", () => {
+  it("opens the overview panel and selects the task", () => {
+    useAppStore.getState().focusOverviewTask("call-1");
+    expect(useAppStore.getState().rightPanelMode).toBe("overview");
+    expect(useAppStore.getState().overviewTaskFocusId).toBe("call-1");
 
-    useAppStore.getState().clearPendingFocusToolCall();
-    expect(useAppStore.getState().pendingFocusToolCallId).toBeNull();
+    useAppStore.getState().clearOverviewTaskFocus();
+    expect(useAppStore.getState().overviewTaskFocusId).toBeNull();
+  });
+
+  it("opens the panel from another panel mode without dropping the selection", () => {
+    useAppStore.getState().toggleFileBrowser();
+    expect(useAppStore.getState().rightPanelMode).toBe("files");
+
+    useAppStore.getState().focusOverviewTask("call-2");
+    expect(useAppStore.getState().rightPanelMode).toBe("overview");
+    expect(useAppStore.getState().overviewTaskFocusId).toBe("call-2");
   });
 });

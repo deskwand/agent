@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 //
-// 活动区右区（chip）的组件级测试：任务清单已搬到消息区底部的任务坞（2026-11-06），
-// 这里只剩子代理入口。注意：vitest 的 include 只收 `{js,ts}` —— 所以一律用
+// 活动区右区（chip）的组件级测试：任务清单在消息区底部的任务坞，子代理**列表与明细**
+// 在右侧会话概览（2026-11-07 把 popover 从输入框上方撤掉了 —— 那份列表与概览面板
+// 内容完全重复，点行也只是跳回消息区）。所以这里只剩两件事：计数（+失败色）与
+// 「点一下打开概览」。注意：vitest 的 include 只收 `{js,ts}` —— 一律用
 // React.createElement，不要写 JSX（本仓库既有渲染测试同样如此）。
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatInputStatusBar } from "../../renderer/components/ChatInputStatusBar";
 import type { ChatInputStatus } from "../../renderer/components/ChatInputStatusBar";
+import { useAppStore } from "../../renderer/store";
 import type { BackgroundAgentRow } from "../../renderer/utils/subagent-card";
 
 vi.mock("react-i18next", () => ({
@@ -49,6 +52,7 @@ describe("activity chip", () => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    useAppStore.setState(useAppStore.getInitialState(), true);
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -63,18 +67,12 @@ describe("activity chip", () => {
     act(() => root.render(element));
   }
 
-  // 面板经 portal 挂到 document.body（触发器仍在 container 里）—— 面板与触发器
-  // 分开查。Radix 在 setTimeout(0) 里挂 document 级监听、Presence 也延后一帧，
-  // 所以打开面板后先推一个宏任务再断言（做法同 merged-input-chip.test.ts）。
-  async function flushMacrotask() {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-  }
+  /** chip 是右区唯一的元素，不需要按 aria 属性挑（它已经不带弹层了）。 */
+  const chip = () => container.querySelector("button");
 
   it("没有子代理时整行不渲染（也不留固定高度占位）", () => {
     render(strip());
-    expect(container.querySelector("button")).toBeNull();
+    expect(chip()).toBeNull();
     expect((container.textContent ?? "").trim()).toBe("");
   });
 
@@ -87,9 +85,7 @@ describe("activity chip", () => {
       }),
     );
     expect(container.textContent).toContain("activity.subagents:1");
-    expect(
-      container.querySelector("button[aria-haspopup='dialog']"),
-    ).not.toBeNull();
+    expect(chip()).not.toBeNull();
   });
 
   it("目标长跑中右区仍然存在（本次要修的典型场景）", () => {
@@ -106,12 +102,10 @@ describe("activity chip", () => {
       }),
     );
     expect(container.textContent).toContain("activity.subagents:1");
-    expect(
-      container.querySelector("button[aria-haspopup='dialog']"),
-    ).not.toBeNull();
+    expect(chip()).not.toBeNull();
   });
 
-  // 面板入口的退路：无论会话处在哪个状态，chip 都必须可达（面板里能看到明细）。
+  // 入口的退路：无论会话处在哪个状态，chip 都必须可达（点开就是明细）。
   const STATUS_VARIANTS: ChatInputStatus[] = [
     { type: "sending" },
     { type: "thinking" },
@@ -129,25 +123,43 @@ describe("activity chip", () => {
     { type: "background-agent", count: 1, done: true },
   ];
 
-  it.each(STATUS_VARIANTS)("计数与面板入口在 $type 下始终可达", (status) => {
+  it.each(STATUS_VARIANTS)("计数与入口在 $type 下始终可达", (status) => {
     render(strip({ status, backgroundAgentRows: [row("running")] }));
     expect(container.textContent).toContain("activity.subagents:1");
-    expect(
-      container.querySelector("button[aria-haspopup='dialog']"),
-    ).not.toBeNull();
+    expect(chip()).not.toBeNull();
   });
 
-  it("活动归零后重开，面板不会自己弹开", async () => {
+  it("点击打开会话概览并选中在跑的那条（不再就地弹列表）", async () => {
+    render(
+      strip({
+        backgroundAgentRows: [
+          row("completed"),
+          { ...row("running"), toolCallId: "c2" },
+        ],
+      }),
+    );
+
+    await act(async () => {
+      chip()?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const state = useAppStore.getState();
+    expect(state.rightPanelMode).toBe("overview");
+    // 落点优先给还在跑的那条，而不是列表第一条
+    expect(state.overviewTaskFocusId).toBe("c2");
+    // 旧的面板（portal + role=dialog）不该再出现
+    expect(document.body.querySelector("[role='dialog']")).toBeNull();
+  });
+
+  it("活动归零后 chip 消失，再出现时不会自己弹出任何面板", async () => {
     const withActivity = strip({ backgroundAgentRows: [row("running")] });
     render(withActivity);
     await act(async () => {
-      container.querySelector("button")?.click();
+      chip()?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    await flushMacrotask();
-    expect(document.body.querySelector("[role='dialog']")).toBeTruthy();
 
     render(strip());
-    expect(document.body.querySelector("[role='dialog']")).toBeNull();
+    expect(chip()).toBeNull();
 
     render(withActivity);
     expect(document.body.querySelector("[role='dialog']")).toBeNull();
@@ -167,57 +179,26 @@ describe("activity chip", () => {
     expect(occurrences).toBe(1);
   });
 
-  // 迁移回归守卫：子代理行是 `<Button variant="ghost">`，base 的 `text-sm`（14px）/ `font-medium`
-  // 与 `[&_svg]:size-4`（把 `h-3 w-3` 的状态图标顶回 16px）、缺省档的 `h-9`（36px 定高）
-  // 会盖掉面板容器的 `text-xs`（元素上的类胜过继承值）—— 面板出生时这里是原生 `<button>`，
-  // 四者都是继承来的。真机（Chromium + 构建 CSS）实测：行内 14px/500、图标 16px；
-  // 且 `h-9` 把三行内容（64px）压进 36px 的盒子 ⇒ 第三行溢出、被面板底边裁掉 9px
-  // （2026-10-10 用户截图报障「子代理面板字体大小不对」）。
-  // ⚠️ jsdom 没有布局引擎 ⇒ 这一条钉的是「泄漏的类不在 + 写回的类都在」，几何归真机目视。
-  it("子代理行不继承 Button 的高度 / 字号 / 字重 / 图标尺寸", async () => {
-    render(strip({ backgroundAgentRows: [row("running")] }));
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>("button")?.click();
-    });
-    await flushMacrotask();
-    const panel = document.body.querySelector("[role='dialog']");
-    // ⚠️ 按内容定位，不用 `panel.querySelector("button")` —— 那是 popover 里的**第一个** button，
-    // 面板将来随便加个控件（可折叠区块头 / 行内跳转箭头）都会让断言打到别的元素上。
-    const rowButton = Array.from(panel?.querySelectorAll("button") ?? []).find(
-      (button) => button.textContent?.includes("curie"),
-    );
-    expect(rowButton, "面板里应有子代理行").toBeTruthy();
-    // 写回的：`cn` 会把四条冲突类整条删掉（同族后来者胜），所以这里只断言「在场」
-    for (const cls of ["h-auto", "text-xs", "font-normal", "[&_svg]:size-3"]) {
-      expect(rowButton?.classList.contains(cls), cls).toBe(true);
-    }
-    // 泄漏的：缺省档 / base 的四个，一条都不许留下
-    for (const cls of ["h-9", "text-sm", "font-medium", "[&_svg]:size-4"]) {
-      expect(rowButton?.classList.contains(cls), cls).toBe(false);
-    }
-  });
-
-  // 迁移回归守卫，与上面那条面板行同族：chip 是 `PopoverTrigger asChild` 里的
-  // `<Button variant="ghost">`，于是 base 的 `text-sm`(14px) / `font-medium` / `[&_svg]:size-4`
-  // 和缺省档的 `h-9`(36px 定高) 一起泄漏进来 —— chip 自己写的 `min-h-5`(20px) 是 min-height，
-  // 顶不掉定高；chevron 的 `h-3 w-3` 也顶不掉 `[&_svg]:size-4`（它的选择器是 `.cls svg`，
-  // 比 `.h-3` 高一级 ⇒ 16px）。真机实测（Chromium + 构建 CSS，2026-10-10）：chip 盒 32×36px、
-  // chevron 16px、字 14px/500（用户报障「子代理这个图标太高了」）；写回四条后实测 28×20px、
-  // chevron 12px、字 12px/400 == `min-h-5`。
+  // 迁移回归守卫：chip 是 `<Button variant="ghost">`，base 的 `text-sm`(14px) /
+  // `font-medium` / `[&_svg]:size-4` 和缺省档的 `h-9`(36px 定高) 会一起泄漏进来 ——
+  // chip 自己写的 `min-h-5`(20px) 是 min-height，顶不掉定高；状态图标的 `h-3 w-3` 也顶不掉
+  // `[&_svg]:size-4`（选择器是 `.cls svg`，比 `.h-3` 高一级 ⇒ 16px）。真机实测
+  // （Chromium + 构建 CSS，2026-10-10）：chip 盒 32×36px、图标 16px、字 14px/500
+  // （用户报障「子代理这个图标太高了」）；写回四条后 28×20px、图标 12px、字 12px/400。
   // ⚠️ jsdom 没有布局引擎 ⇒ 这一条钉的是「泄漏的类不在 + 写回的类都在」，几何归真机目视。
   it("chip 不继承 Button 的高度 / 字号 / 字重 / 图标尺寸", () => {
     render(strip({ backgroundAgentRows: [row("completed")] }));
-    const chip = container.querySelector("button[aria-haspopup='dialog']");
-    expect(chip, "chip 应存在").toBeTruthy();
+    const button = chip();
+    expect(button, "chip 应存在").toBeTruthy();
     for (const cls of ["h-auto", "text-xs", "font-normal", "[&_svg]:size-3"]) {
-      expect(chip?.classList.contains(cls), cls).toBe(true);
+      expect(button?.classList.contains(cls), cls).toBe(true);
     }
     for (const cls of ["h-9", "text-sm", "font-medium", "[&_svg]:size-4"]) {
-      expect(chip?.classList.contains(cls), cls).toBe(false);
+      expect(button?.classList.contains(cls), cls).toBe(false);
     }
     // ⚠️ 高度再按**族**兜一道：上面写死的是今天的缺省档 `h-9`，档位哪天从 `h-9` 调成
     // `h-8`，那条会静默转绿（`h-auto` 是 chip 自己写回的白名单，不属于任何数字档）。
-    const tokens = (chip?.className ?? "").split(/\s+/);
+    const tokens = (button?.className ?? "").split(/\s+/);
     expect(
       tokens.filter((cls) => /^h-(?:\d|\[)/.test(cls)),
       "chip 不该带上任何数字高度档",

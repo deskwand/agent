@@ -1936,7 +1936,8 @@
       "cancelled": "Cancelled",
       "userReplied": "Skipped · you replied in chat",
       "interrupted": "Session interrupted"
-    }
+    },
+    "openInOverview": "View in overview"
   },
   "imageLightbox": {
     "close": "Close",
@@ -2420,13 +2421,12 @@
     "resetAt": "Resets {{time}}"
   },
   "activity": {
-    "panelTitle": "Activity",
-    "subagentsSection": "Subagents",
     "subagents_one": "{{count}} subagent",
     "subagents_other": "{{count}} subagents",
     "statusCancelled_one": "{{count}} item cancelled",
     "statusCancelled_other": "{{count}} items cancelled",
-    "statusCleared": "List cleared"
+    "statusCleared": "List cleared",
+    "openOverview": "Open the overview to see background tasks"
   },
   "connect": {
     "cloudTitle": "DeskWand",

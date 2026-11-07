@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Target,
@@ -12,15 +6,14 @@ import {
   BadgeCheck,
   Ban,
   CircleDollarSign,
-  ChevronDown,
   Loader2,
-  CheckCircle2,
   XCircle,
 } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import type { BackgroundAgentRow } from "../utils/subagent-card";
+import { useAppStore } from "../store";
 import type { SessionExecutionClock } from "../store";
 import { Button } from "./app-button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 
 export type ChatInputStatus =
   | { type: "sending" }
@@ -78,17 +71,11 @@ export type ChatInputStatus =
     }
   | null;
 
-/** 面板上方的安全留白；与 MergedInputChip 同一套做法与取值。 */
-const SUBAGENT_PANEL_TOP_SAFE_AREA_PX = 48;
-/** 面板高度上限；与 MergedInputChip 的 MODEL_MENU_MAX_HEIGHT_PX 同值（512px）。 */
-const SUBAGENT_PANEL_MAX_HEIGHT_PX = 512;
-
 interface ChatInputStatusBarProps {
   status: ChatInputStatus;
   onGoalCommand?: (action: string) => void;
-  /** 面板行；为空时 chip 退回纯文本（行为与今天一致）。 */
+  /** 后台任务行（只用来算计数与失败态）；列表本身在右侧概览面板里。 */
   backgroundAgentRows?: BackgroundAgentRow[];
-  onSelectBackgroundAgent?: (toolCallId: string) => void;
 }
 
 // Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
@@ -111,39 +98,9 @@ export function ChatInputStatusBar({
   status,
   onGoalCommand,
   backgroundAgentRows,
-  onSelectBackgroundAgent,
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
   const rows = backgroundAgentRows ?? [];
-  const [panelOpen, setPanelOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
-
-  // 面板贴着状态栏往上长，而祖先链上有 overflow-hidden：矮窗口 / 放大字号时
-  // 70vh 会超过实际可用高度、顶部被裁且点不到。按锚点上方实测可用高度取上限
-  // （做法与取值同 MergedInputChip.tsx:77-85）。
-  const updatePanelMaxHeight = useCallback(() => {
-    const anchor = panelRef.current;
-    if (!anchor) return;
-    const { top } = anchor.getBoundingClientRect();
-    // 无布局信息（jsdom 等）时保留 className 上的默认上限
-    if (top <= 0) return;
-    setPanelMaxHeight(
-      Math.min(
-        SUBAGENT_PANEL_MAX_HEIGHT_PX,
-        Math.max(0, Math.floor(top - SUBAGENT_PANEL_TOP_SAFE_AREA_PX)),
-      ),
-    );
-  }, []);
-
-  // 打开时先量一次（layout 阶段，避免首帧闪烁），窗口尺寸变化时重量。
-  useLayoutEffect(() => {
-    if (!panelOpen) return;
-    updatePanelMaxHeight();
-    window.addEventListener("resize", updatePanelMaxHeight);
-    return () => window.removeEventListener("resize", updatePanelMaxHeight);
-  }, [panelOpen, updatePanelMaxHeight]);
 
   // 目标长跑期间每秒推进一次。
   // dep 是布尔量而不是 now，所以窗口内不会每秒重建 effect；
@@ -158,142 +115,49 @@ export function ChatInputStatusBar({
     return () => clearInterval(id);
   }, [isTimeLive]);
 
-  // ── 右区（子代理入口）────────────────────────────────────────────
-  // 常驻、不参与上面的单槽位优先级链：模型回答中/目标长跑时也必须可见。
-  // 任务清单不在这里：它由消息区底部的任务坞承载（2026-11-06）。
+  // ── 右区（子代理指示）────────────────────────────────────────────
+  // 只当"外面还有活在跑"的常驻信号用：右面板关着时，回合结束后消息区与任务坞
+  // 都会安静下来，这枚 chip 是唯一还亮着的灯 —— 所以它常驻、不参与上面的优先级链。
+  // 列表与细节都不在这里：一份列表只留在右面板，两份必然漂移（原来那份 popover
+  // 与概览面板的内容完全重复，点行也只是跳回消息区）。
   const hasActivity = rows.length > 0;
-  // 有失败行时整枚 chip 换成失败色：动作文案搬走后，这里不再有「N 个子代理结束，
-  // 其中 M 个失败」那句话，失败信号不能只剩打开面板才看得见。
+  // 有失败行时整枚 chip 换成失败色：失败信号不能只剩打开面板才看得见。
   const hasError = rows.some((row) => row.status === "error");
+  const runningCount = rows.filter((row) => row.status === "running").length;
+  // 落点优先给还在跑的那条；都结束了就取最近一条（rows 本身按最近更新排序）。
+  const focusTarget = rows.find((row) => row.status === "running") ?? rows[0];
+  const focusOverviewTask = useAppStore((s) => s.focusOverviewTask);
 
-  // 类型只在面板内不统一时才值得占宽度（同类时逐行重复纯属噪音）
-  const showType = new Set(rows.map((row) => row.type)).size > 1;
-
-  // 活动归零时把展开态一并关掉：面板渲染在 `hasActivity` 里面，不重置的话
-  // panelOpen 会残留为 true，下次一有活动面板会自己弹开。
-  useEffect(() => {
-    if (!hasActivity) setPanelOpen(false);
-  }, [hasActivity]);
-
-  // 右区（活动库存）：面板 + chip。目标态与普通态共用同一个元素——
-  // 目标长跑是本次要修的典型场景，不共用的话它在目标态下会整块消失。
-  // 开关 / 外部点击关闭 / Escape 三样全交给 Radix 的 Popover —— 手写的 document
-  // mousedown/keydown 监听会让面板「刚打开就被关掉」（原实现正是如此，随本次迁移删掉）。
   const rightZone = hasActivity ? (
-    <Popover open={panelOpen} onOpenChange={setPanelOpen}>
-      <span className="flex min-w-0 items-center">
-        {panelOpen && (
-          <PopoverContent
-            side="top"
-            align="start"
-            sideOffset={8}
-            // role="dialog" 由 Radix 的 PopoverContent 提供，不手写（写了会重复）
-            aria-label={t("activity.panelTitle")}
-            style={{ maxHeight: panelMaxHeight ?? undefined }}
-            // 外壳用 vendored `PopoverContent` 自己的契约（`bg-popover` + `rounded-md`
-            // + `shadow-md` + 入场动画），不再盖 `MENU_PANEL_CLASS` —— 与同族的
-            // `StatusPopover` 面板一致（那边 2026-10-09 迁移时就是这么定的）。
-            // `p-1` 必须留着：vendored 自带 `p-4`，靠 cn()「调用方 className 在最后」压住。
-            className="w-[32rem] max-w-full max-h-[min(70vh,32rem)] overflow-y-auto p-1 text-xs"
-          >
-            {rows.length > 0 ? (
-              <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-muted-foreground uppercase">
-                <span>{t("activity.subagentsSection")}</span>
-              </div>
-            ) : null}
-            {rows.map((row) => (
-              <Button
-                variant="ghost"
-                key={row.toolCallId}
-                type="button"
-                onClick={() => {
-                  setPanelOpen(false);
-                  onSelectBackgroundAgent?.(row.toolCallId);
-                }}
-                // ⚠️ 这四条类必须显式写回：`<Button>` base 的 `text-sm` / `font-medium` /
-                // `[&_svg]:size-4` 与缺省档的 `h-9` 会盖掉面板容器的 `text-xs`（元素上的类胜过
-                // 继承值）⇒ 行内字号 14px、图标 16px，比同一面板里的计划行（12px）还大
-                // （2026-10-10 用户报障「子代理面板字体大小不对」的根因；面板出生时这里是原生
-                // `<button>`，四者都是继承来的）。`cn` 会把四条冲突类**整条删掉**（同族后来者胜）
-                // ⇒ 不必操心样式表里的先后顺序。
-                // ⚠️ `[&_svg]:size-3` 的作用面是**行内所有 svg**，不只是右侧那个状态图标 ——
-                // 往这一行里再加图标的人要回读这句，否则新图标会被静默压成 12px。
-                className={`flex h-auto w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-normal [&_svg]:size-3 hover:bg-hover-surface ${
-                  // 已完成的行降一档：面板里可能同时有"上一轮还在跑的"和"本轮已完成的"。
-                  // `error` 刻意不降 —— 失败是应该被注意到的信号。
-                  row.status === "completed" ? "opacity-60" : ""
-                }`}
-              >
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  {/* ① 名字（只有面板内类型不统一时才带后缀） */}
-                  <span className="truncate text-foreground">
-                    {row.name ?? row.type ?? row.toolCallId}
-                    {showType && row.name && row.type ? (
-                      <span className="text-muted-foreground">
-                        {" · "}
-                        {row.type}
-                      </span>
-                    ) : null}
-                  </span>
-                  {/* ② 任务描述：始终显示（之前只在没有步骤时才出现） */}
-                  {row.description ? (
-                    <span className="truncate text-muted-foreground">
-                      {row.description}
-                    </span>
-                  ) : null}
-                  {/* ③ 当前动作 / 最后一步：没有就不渲染，避免与描述重复同一句话 */}
-                  {row.currentLabel ? (
-                    <span className="truncate font-mono text-muted-foreground">
-                      {row.currentLabel}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="flex flex-shrink-0 items-center gap-1 text-muted-foreground">
-                  {row.stepCount > 0 && <span>{row.stepCount}</span>}
-                  {row.durationMs > 0 && (
-                    <span>
-                      {row.durationMs < 1000
-                        ? `${row.durationMs}ms`
-                        : `${(row.durationMs / 1000).toFixed(1)}s`}
-                    </span>
-                  )}
-                  {row.status === "running" ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-primary-text" />
-                  ) : row.status === "error" ? (
-                    <XCircle className="h-3 w-3 text-destructive" />
-                  ) : (
-                    <CheckCircle2 className="h-3 w-3" />
-                  )}
-                </span>
-              </Button>
-            ))}
-          </PopoverContent>
-        )}
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            type="button"
-            // chip 里恒有可见文案（子代理计数），不设 aria-label —— 它会把内容整个盖掉，
-            // 读屏用户就听不到「N 个子代理」了。
-            // ⚠️ 这四条类必须显式写回（与面板行同一族的迁移回归）：`<Button>` base 的 `text-sm` /
-            // `font-medium` / `[&_svg]:size-4` 与缺省档的 `h-9` 会盖掉这枚 chip 自己写的
-            // `min-h-5`（min-height 顶不掉 36px 定高）和 chevron 的 `h-3 w-3`（`[&_svg]:size-4`
-            // 的选择器是 `.cls svg`，比 `.h-3` 高一级 ⇒ 16px）。真机实测（Chromium + 构建 CSS，
-            // 2026-10-10）：chip 盒 32×36px、chevron 16px、字 14px/500，而同一行左侧的状态文案是
-            // 12px/高 16px ⇒ 一枚 36px 圆钮杵在 12px 文案旁边（用户报障「子代理这个图标太高了」）；
-            // 写回后实测 28×20px、chevron 12px、字 12px/400 == `min-h-5`。
-            // ⚠️ `[&_svg]:size-3` 的作用面是**这枚 chip 里所有 svg** —— 目前只有右侧那个
-            // chevron（面板走 portal，不在此列），往 chip 里再加图标的人要回读这句。
-            className="flex h-auto min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-left text-xs font-normal text-foreground transition-colors hover:bg-selected-surface [&_svg]:size-3"
-          >
-            <span className={`flex-none ${hasError ? "text-destructive" : ""}`}>
-              {t("activity.subagents", { count: rows.length })}
-            </span>
-            <ChevronDown className="h-3 w-3 flex-none text-muted-foreground" />
-          </Button>
-        </PopoverTrigger>
-      </span>
-    </Popover>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          type="button"
+          onClick={() => focusOverviewTask(focusTarget.toolCallId)}
+          // ⚠️ 这四条类必须显式写回：`<Button>` base 的 `text-sm` / `font-medium` /
+          // `[&_svg]:size-4` 与缺省档的 `h-9` 会盖掉这枚 chip 自己写的 `min-h-5`
+          // （min-height 顶不掉 36px 定高）和图标尺寸（`[&_svg]:size-4` 的选择器是
+          // `.cls svg`，比 `.h-3` 高一级 ⇒ 16px）。真机实测（Chromium + 构建 CSS，
+          // 2026-10-10）：chip 盒 32×36px、图标 16px、字 14px/500，而同一行左侧的状态
+          // 文案是 12px/高 16px（用户报障「子代理这个图标太高了」）；写回后实测
+          // 28×20px、图标 12px、字 12px/400 == `min-h-5`。
+          // ⚠️ `[&_svg]:size-3` 的作用面是**这枚 chip 里所有 svg**，往 chip 里再加图标的
+          // 人要回读这句。
+          className="flex h-auto min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-left text-xs font-normal text-foreground transition-colors hover:bg-selected-surface [&_svg]:size-3"
+        >
+          <span className={`flex-none ${hasError ? "text-destructive" : ""}`}>
+            {t("activity.subagents", { count: rows.length })}
+          </span>
+          {runningCount > 0 ? (
+            <Loader2 className="h-3 w-3 flex-none animate-spin text-primary-text" />
+          ) : hasError ? (
+            <XCircle className="h-3 w-3 flex-none text-destructive" />
+          ) : null}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{t("activity.openOverview")}</TooltipContent>
+    </Tooltip>
   ) : null;
 
   // ── Goal status rendering ──
@@ -362,7 +226,7 @@ export function ChatInputStatusBar({
     }
 
     return (
-      <div ref={panelRef} className="relative min-h-5 px-1 pb-1">
+      <div className="min-h-5 px-1 pb-1">
         <style>{gradientStyles}</style>
         <div className="flex items-center gap-1.5 text-xs text-foreground">
           {renderGoalIcon(status.type)}
@@ -418,10 +282,7 @@ export function ChatInputStatusBar({
   if (!rightZone) return null;
 
   return (
-    // 定位锚点放在这个容器上（而不是 chip 那个 span）：面板是它的绝对定位子元素，
-    // 于是 max-w-full 就等于「聊天列可用宽度」——侧栏宽度、右侧面板、字号缩放全都自动计入。
-    // panelRef 必须跟着放这里，否则外部点击关闭会把面板内的点击当成外部点击。
-    <div ref={panelRef} className="relative min-h-5 px-1 pb-1">
+    <div className="min-h-5 px-1 pb-1">
       <div className="flex items-center gap-1.5 text-xs text-foreground">
         {rightZone}
       </div>

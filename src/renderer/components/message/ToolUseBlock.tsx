@@ -26,9 +26,10 @@ import { TodoWriteBlock } from "./TodoWriteBlock";
 import { FileToolBlock, canHandleFileInput } from "./FileToolBlock";
 import { BashToolBlock, canHandleBashInput } from "./BashToolBlock";
 import { getToolIcon, getToolLabel } from "./toolHelpers";
+import { BackgroundAgentRow } from "./BackgroundAgentRow";
 import { SubagentSteps } from "./SubagentSteps";
-import { agentNameZhLabel } from "../../../shared/agent-names";
 import {
+  agentDisplayName,
   resolveSubagentName,
   splitSubagentOutput,
   stripUpstreamAgentStats,
@@ -79,24 +80,8 @@ interface ToolUseBlockProps {
   detailOnly?: boolean;
 }
 
-/**
- * 子代理显示名：tap 送来的插件别名（含兜底名）优先；
- * 模型自填的名字能在会话里读到，但我们注入的兜底名不在（就地改参数发生在消息落盘之后）；
- * 两者都没有时回落子代理类型。中文界面查表，表外名字原样显示。
- */
-function agentDisplayName(
-  input: Record<string, unknown>,
-  alias: string | undefined,
-  language: string,
-): string {
-  const fromInput = typeof input.name === "string" ? input.name : undefined;
-  const name = alias ?? fromInput;
-  if (!name) return String(input.subagent_type ?? "Agent");
-  const zhLabel = language.startsWith("zh")
-    ? agentNameZhLabel(name)
-    : undefined;
-  return zhLabel ?? name;
-}
+// 子代理显示名搬到 utils/subagent-card 的 agentDisplayName：概览面板的行
+// 与这里必须用同一份，否则同一个代理在两处会被叫成不同的名字。
 
 export const ToolUseBlock = memo(function ToolUseBlock({
   block,
@@ -158,6 +143,22 @@ export const ToolUseBlock = memo(function ToolUseBlock({
     const match = text.match(/^\[Image description of .+?\]\n\n/);
     return match ? text.slice(match[0].length) : text;
   }, [isVisionDescribe, toolResult?.content]);
+
+  // 后台型子代理：细节在右侧会话概览的「后台任务」里，消息区只留一行可点的回执。
+  // 它的工具结果只是「已在后台启动」的回执（`Agent started in background…`），
+  // 不是结果本身，所以这一行也不展开输出。
+  // 前台阻塞型不进这个分支（background 未声明），展开照旧看 SubagentSteps。
+  if (subagentActivity?.background === true) {
+    return (
+      <BackgroundAgentRow
+        activity={subagentActivity}
+        toolCallId={block.id}
+        input={block.input as Record<string, unknown> | undefined}
+        showIcon={showIcon}
+        detailOnly={detailOnly}
+      />
+    );
+  }
 
   // Special-case tool UIs
   if (block.name === "AskUserQuestion") {

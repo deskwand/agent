@@ -35,7 +35,6 @@ import {
   isVoiceHeldElsewhere,
 } from "../utils/voice/voice-owner";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
-import { usePendingFocusToolCall } from "../hooks/use-pending-focus-tool-call";
 import {
   computeContextUsage,
   contextUsageLevel,
@@ -49,7 +48,6 @@ import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import {
   buildBackgroundAgentRows,
   collectCurrentRoundToolCallIds,
-  findToolCallOwnerMessageId,
 } from "../utils/subagent-card";
 import { getToolLabel } from "./message/toolHelpers";
 import { RetryStatusRow } from "./message/RetryStatusRow";
@@ -335,7 +333,6 @@ export function ChatView() {
       currentRoundToolCallIds,
     ],
   );
-  const highlightToolCallId = useAppStore((s) => s.highlightToolCallId);
   const hasMoreOlder = sessionState?.hasMoreOlder ?? false;
   const oldestMessageId = sessionState?.oldestMessageId ?? null;
   const prependOlderMessages = useAppStore((s) => s.prependOlderMessages);
@@ -1406,25 +1403,6 @@ export function ChatView() {
       ?.scrollIntoView({ block: "start", behavior: "instant" });
   }, [visibleMessageStartIndex]);
 
-  const handleSelectBackgroundAgent = useCallback(
-    (toolCallId: string) => {
-      // 用整个 displayedMessages（不是渲染窗口）：目标常在窗口外，
-      // handleDockTickSelect 自己会把窗口滑过去。
-      // 目标是「该工具调用所属的那条消息」（这组卡片的起始位置），不是回合末那条。
-      const messageId = findToolCallOwnerMessageId(
-        displayedMessages,
-        toolCallId,
-      );
-      if (!messageId) return; // 跳不到就什么都不做（也避免高亮/待展开残留）
-      highlightToolCallId(toolCallId);
-      handleDockTickSelect(messageId);
-    },
-    [displayedMessages, highlightToolCallId, handleDockTickSelect],
-  );
-
-  // 类别 2：只有聚焦区域消费「跳到某张卡片」请求（请求是一次性的，未聚焦区域不能抢先清掉）。
-  usePendingFocusToolCall(handleSelectBackgroundAgent, isFocusedPane);
-
   const isHydratingHistoryState = shouldShowHydratingHistoryState(
     activeSessionId,
     Boolean(activeSession),
@@ -2444,7 +2422,6 @@ export function ChatView() {
           <ChatInputStatusBar
             status={inputStatus}
             backgroundAgentRows={backgroundRows}
-            onSelectBackgroundAgent={handleSelectBackgroundAgent}
             onGoalCommand={handleCommand}
           />
         </div>

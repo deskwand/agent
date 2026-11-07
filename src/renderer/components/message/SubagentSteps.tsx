@@ -13,6 +13,9 @@ import { useAppStore } from "../../store";
 
 interface SubagentStepsProps {
   activity: SubagentActivity;
+  /** 是否自带内边距。工具卡片里要（默认）；嵌进概览那一行下方时不要，
+   *  自己的 `px-3` 会让它比同级行多缩进 12px。 */
+  inset?: boolean;
 }
 
 type Translate = ReturnType<typeof useTranslation>["t"];
@@ -27,6 +30,7 @@ function durationText(ms: number): string {
 
 export const SubagentSteps = memo(function SubagentSteps({
   activity,
+  inset = true,
 }: SubagentStepsProps) {
   const { t } = useTranslation();
   // provider 显示名要经 modelDisplay 实时本地化（与设置页同一套），所以得拿 provider 配置。
@@ -63,7 +67,7 @@ export const SubagentSteps = memo(function SubagentSteps({
   }
 
   return (
-    <div className="px-3 py-2">
+    <div className={inset ? "px-3 py-2" : "py-1"}>
       <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {activity.status === "running" ? (
           <Loader2 className="w-3 h-3 animate-spin text-primary-text" />

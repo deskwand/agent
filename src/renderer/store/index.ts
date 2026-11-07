@@ -347,8 +347,12 @@ interface AppState {
   highlightedToolCallId: string | null;
   /** 跳转时要求展开的那条 process summary；被消费后清回 null（只生效一次）。 */
   pendingExpandToolCallId: string | null;
-  /** 概览「后台任务」行点击后的跳转请求；ChatView 消费后清空。 */
-  pendingFocusToolCallId: string | null;
+  /** 概览「后台任务」里被选中的那条（消息区那行 / 输入框 chip 点过来）。
+   *  只在一张面板内消费：面板据此展开该行并滚到位，不再回跳消息区。 */
+  overviewTaskFocusId: string | null;
+  /** 每次点名自增。只靠 id 判"变了没有"的话，同一条被重复点名（面板里已经收起、
+   *  消息区又点了一次）不会触发任何 effect —— 那一次点击就成了死路。 */
+  overviewTaskFocusNonce: number;
   isConfigured: boolean;
   showConfigModal: boolean;
   setShowLoginModal: (show: boolean) => void;
@@ -581,8 +585,9 @@ interface AppState {
   setAppConfig: (config: AppConfig | null) => void;
   highlightToolCallId: (toolCallId: string) => void;
   clearPendingExpandToolCallId: () => void;
-  requestFocusToolCall: (toolCallId: string) => void;
-  clearPendingFocusToolCall: () => void;
+  /** 打开概览面板并选中一条后台任务（消息区那行、输入框 chip 的落点）。 */
+  focusOverviewTask: (toolCallId: string) => void;
+  clearOverviewTaskFocus: () => void;
   setIsConfigured: (configured: boolean) => void;
   setShowConfigModal: (show: boolean) => void;
   markInitialConfigStatusSeen: () => void;
@@ -832,7 +837,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   appConfig: null,
   highlightedToolCallId: null,
   pendingExpandToolCallId: null,
-  pendingFocusToolCallId: null,
+  overviewTaskFocusId: null,
+  overviewTaskFocusNonce: 0,
   isConfigured: false,
   cloudConfig: null,
   topUpOpen: false,
@@ -1994,9 +2000,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   clearPendingExpandToolCallId: () => set({ pendingExpandToolCallId: null }),
-  requestFocusToolCall: (toolCallId) =>
-    set({ pendingFocusToolCallId: toolCallId }),
-  clearPendingFocusToolCall: () => set({ pendingFocusToolCallId: null }),
+  focusOverviewTask: (toolCallId) =>
+    set((state) => ({
+      ...sidebarSyncForMode(state, "overview"),
+      rightPanelMode: "overview",
+      overviewTaskFocusId: toolCallId,
+      overviewTaskFocusNonce: state.overviewTaskFocusNonce + 1,
+      // 概览不属于「上下文面板」家族，进去时把快照还回去（同 toggleOverview）。
+      lastVisibleContext: null,
+    })),
+  clearOverviewTaskFocus: () => set({ overviewTaskFocusId: null }),
   setIsConfigured: (configured) => set({ isConfigured: configured }),
   setActiveTeamId: (id) => set({ activeTeamId: id }),
   setActiveTeamName: (name) => set({ activeTeamName: name }),
