@@ -10,6 +10,8 @@ import {
   resolveDockAction,
 } from "../../renderer/components/ChatTaskDock";
 import type { CurrentTodos } from "../../renderer/utils/current-todos";
+import { useAppStore } from "../../renderer/store";
+import type { Message } from "../../renderer/types";
 import { buildProcessSummaryDisplayBlock } from "../../renderer/utils/tool-display-blocks";
 
 vi.mock("react-i18next", () => ({
@@ -21,6 +23,20 @@ vi.mock("react-i18next", () => ({
   // 坞内嵌 ProcessSummaryBlock，它的依赖链在导入期就会 use(initReactI18next)
   initReactI18next: { type: "3rdParty", init: () => {} },
 }));
+
+// 展开摘要会渲染 ToolStepRow，它的 store 选择器是
+// `sessionStates[id]?.messages ?? []` —— 缺会话状态时每帧都返回新数组，
+// 触发 zustand 的 "getSnapshot should be cached" 无限重渲染。
+// ⇒ 这里给一个稳定的空数组兜住（同 todo-write-card.test.ts 的做法）。
+const TEST_SESSION_ID = "dock-session";
+const NO_MESSAGES: Message[] = [];
+const TEST_MESSAGE: Message = {
+  id: "m1",
+  sessionId: TEST_SESSION_ID,
+  role: "assistant",
+  timestamp: 0,
+  content: [],
+};
 
 const PLAN: CurrentTodos = [
   { content: "建表", status: "completed" },
@@ -35,6 +51,11 @@ describe("chat task dock", () => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
+    useAppStore.setState({
+      sessionStates: {
+        [TEST_SESSION_ID]: { messages: NO_MESSAGES },
+      },
+    } as never);
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -246,7 +267,7 @@ describe("chat task dock", () => {
     ).toBe(true);
   });
 
-  it("展开时图标与耗时都贴着第一行，不跟着整块垂直居中", () => {
+  it("展开时图标与耗时都贴着第一行，不跟着整块垂直居中", async () => {
     const block = buildProcessSummaryDisplayBlock([
       { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
     ]);
@@ -256,19 +277,62 @@ describe("chat task dock", () => {
       currentTodos: [],
       lastNonEmptyTodos: null,
       executionClock: { startAt: Date.now(), endAt: null },
-      summary: { block },
+      summary: { block, message: TEST_MESSAGE },
     });
     // 摘要展开后整块会变高；行容器若仍 items-center，图标与耗时会被拉到中间
     const glyph = container.querySelector('[data-testid="dock-status-glyph"]');
     const row = glyph?.parentElement?.parentElement;
     expect(row?.className).toContain("items-start");
-    // 图标与耗时各自套一个首行高度的盒子（14px 正文 × 1.5 行高 = 21px）
-    expect(glyph?.parentElement?.className).toContain("h-[21px]");
+
+    // 关键：图标/耗时必须与「摘要触发器」同高。
+    // ⚠️ 触发器的实际高度来自 <Button> 的默认档（h-9），不是行盒 —— 按文字行高
+    // 去猜会高估/低估，这就是"图标看起来偏高"的根因。这里直接比两边的 h-* 档位：
+    // 哪天按钮默认档改了，这条会先红，提醒同步改坞里的盒子。
+    const heights = (cls: string | undefined) =>
+      (cls ?? "").split(/\s+/).filter((c) => /^h-(?:\d|\[)/.test(c));
+    const trigger = container.querySelector<HTMLButtonElement>(
+      "button[aria-expanded]",
+    );
+    // 先钉死档位：只比"两边相等"会在一侧为空数组时绿得没道理
+    expect(heights(trigger?.className)).toEqual(["h-9"]);
     const elapsed = container.querySelector(
       '[data-testid="turn-elapsed-visible"]',
     );
-    expect(elapsed?.parentElement?.parentElement?.className).toContain(
-      "h-[21px]",
+    const assertAligned = () => {
+      const expected = heights(trigger?.className);
+      expect(heights(glyph?.parentElement?.className)).toEqual(expected);
+      expect(heights(elapsed?.parentElement?.parentElement?.className)).toEqual(
+        expected,
+      );
+    };
+    assertAligned();
+
+    // 真展开一次再验：展开让整块变高，首行那几个盒子的高度不该跟着变
+    await act(async () => {
+      trigger?.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(
+      container.querySelector("button[aria-expanded='true']"),
+    ).not.toBeNull();
+    expect(row?.className).toContain("items-start");
+    assertAligned();
+  });
+
+  it("动作文案的省略号还在（truncate 在内层 span 上）", () => {
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+    });
+    const box = container.querySelector('[data-testid="dock-action-text"]');
+    expect(box).toBeTruthy();
+    // 盒子是 flex（靠它垂直居中），truncate 必须在里面的 span 上 ——
+    // 挂在 flex 容器上时 text-overflow 不生效，文字会被硬裁掉、没有省略号。
+    expect(box?.className).not.toContain("truncate");
+    expect(box?.querySelector("span.truncate")?.textContent).toBe(
+      "chat.processing",
     );
   });
 

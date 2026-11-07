@@ -363,15 +363,19 @@ export function ChatTaskDock({
       {showActionRow ? (
         <div
           // ⚠️ 必须是 items-start：摘要展开后这一行会变高，items-center 会把图标和
-          // 耗时一起拉到整块的垂直中间（看着像飘在工具卡列表旁边）。首行对齐靠下面
-          // 两个 h-[21px] 的盒子（14px 正文 × 1.5 行高）。
+          // 耗时一起拉到整块的垂直中间（看着像飘在工具卡列表旁边）。
+          // 首行对齐靠下面几个 **与摘要触发器同高** 的盒子：触发器的实际高度来自
+          // <Button> 的默认档（h-9 = 36px），不是 14px 文字的行盒 —— 按行高猜出来的
+          // 21px 会让图标**偏高** 7.5px（真机截图踩过）。
+          // 没有摘要时这几行也保持 36px：第一次工具调用落到坞里时行高不跳。`h-9` 与按钮默认档是**耦合**的，
+          // chat-task-dock.test.tsx 里有一条用例比两边的 h-* 档位，改按钮档时会先红。
           className={`flex items-start gap-1.5 pr-1 text-sm ${
             hasPlan ? "mt-2" : ""
           }`}
         >
           <style>{gradientStyles}</style>
           {action?.isRunning ? (
-            <span className="flex h-[21px] flex-none items-center">
+            <span className="flex h-9 flex-none items-center">
               <StatusGlyph />
             </span>
           ) : null}
@@ -388,16 +392,21 @@ export function ChatTaskDock({
             </div>
           ) : null}
           {showActionText && action ? (
+            // ⚠️ truncate 必须挂在**内层 span** 上：CSS textOverflow 只对"有行盒的
+            // 块容器"生效，把 span 变成 flex 容器后文字进了匿名 flex item，
+            // 容器上的 truncate 只剩裁切、省略号会静默消失（测量过：
+            // display:flex 时显示到半个字，display:block 时才是 "…"）。
             <span
-              className={`min-w-0 truncate ${action.toneClass} ${
+              data-testid="dock-action-text"
+              className={`flex h-9 min-w-0 items-center ${action.toneClass} ${
                 action.isRunning ? "gradient-text" : ""
               }`}
             >
-              {action.text}
+              <span className="truncate">{action.text}</span>
             </span>
           ) : null}
           {elapsed ? (
-            <span className="flex h-[21px] flex-none items-center text-muted-foreground">
+            <span className="flex h-9 flex-none items-center text-muted-foreground">
               {hasSummary || showActionText ? "· " : ""}
               {/* 槽位：两格叠在同一个 grid 单元格，盒宽取两者最大值 ——
                   正常时长下 = 哨兵宽度（恒定），于是行内零位移。做法与取值同
