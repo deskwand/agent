@@ -128,10 +128,13 @@ describe("Sidebar partners group", () => {
   // 而头部那一行在它**外面** ⇒ 放大镜比列表内容右缘（Bot 行的「+」）多一条滚动条宽。
   it("pads the header by the list's scrollbar gutter so both right edges line up", async () => {
     // jsdom 不结算布局，自己给 .sidebar-scroll 报一个「300 宽 / 289 内容宽」（本机 thin 实测 11px）
-    const originals = (["offsetWidth", "clientWidth"] as const).map((name) => [
-      name,
-      Object.getOwnPropertyDescriptor(HTMLElement.prototype, name),
-    ]);
+    const originals = (["offsetWidth", "clientWidth"] as const).map(
+      (name) =>
+        [
+          name,
+          Object.getOwnPropertyDescriptor(HTMLElement.prototype, name),
+        ] as const,
+    );
     const stub = (name: "offsetWidth" | "clientWidth", value: number) =>
       Object.defineProperty(HTMLElement.prototype, name, {
         configurable: true,
