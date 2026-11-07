@@ -289,6 +289,11 @@ export interface ChatTaskDockProps {
   currentPlanDone?: boolean;
   lastNonEmptyTodos?: CurrentTodos | null;
   lastPlanDone?: boolean;
+  /**
+   * 生成速度标签（"38 tok/s" / "约 42 tok/s"），已格式化好的成品串。
+   * 缺省 = 本宿主没有该数据（欢迎页）或这一轮还没出 token。
+   */
+  tokenSpeedLabel?: string;
 }
 
 export function ChatTaskDock({
@@ -300,6 +305,7 @@ export function ChatTaskDock({
   currentPlanDone,
   lastNonEmptyTodos,
   lastPlanDone,
+  tokenSpeedLabel,
 }: ChatTaskDockProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
@@ -388,6 +394,18 @@ export function ChatTaskDock({
           })}
         </span>
       </span>
+      {tokenSpeedLabel ? (
+        <span
+          data-testid="turn-speed-visible"
+          // 空格 + `·` 一起放模板串：空值时整段不渲染，不留裸分隔符；
+          // 不套哨兵槽位 —— 速率的抖动是真实信息，锁宽等于把抖动藏起来。
+          // 窄窗下先被压的是隔壁的动作文案（它自己 truncate）；两者都到底时
+          // 这一行由祖先的 overflow-x-hidden 裁切，不换行 —— 窗宽下限 800px 够用。
+          className="whitespace-nowrap tabular-nums"
+        >
+          {` · ${tokenSpeedLabel}`}
+        </span>
+      ) : null}
     </span>
   ) : null;
 

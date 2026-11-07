@@ -198,27 +198,13 @@ export function StatusPopover({
           ) : null,
         )}
 
-        {(contextStatusDetails.cacheHitRate !== "--" ||
-          contextStatusDetails.tokenSpeedLabel) && (
-          <div className="mt-2 flex flex-wrap items-center gap-x-1.5 border-t border-border/40 pt-2 text-[11px] tabular-nums text-muted-foreground">
-            {contextStatusDetails.cacheHitRate !== "--" && (
-              <span>
-                {t("statusPopover.cacheHitRate", {
-                  rate: contextStatusDetails.cacheHitRate,
-                })}
-              </span>
-            )}
-            {contextStatusDetails.cacheHitRate !== "--" &&
-              contextStatusDetails.tokenSpeedLabel && (
-                <span aria-hidden="true" className="opacity-45">
-                  ·
-                </span>
-              )}
-            {contextStatusDetails.tokenSpeedLabel && (
-              <span className="font-medium text-foreground">
-                {contextStatusDetails.tokenSpeedLabel}
-              </span>
-            )}
+        {contextStatusDetails.cacheHitRate !== "--" && (
+          <div className="mt-2 flex items-center border-t border-border/40 pt-2 text-[11px] tabular-nums text-muted-foreground">
+            <span>
+              {t("statusPopover.cacheHitRate", {
+                rate: contextStatusDetails.cacheHitRate,
+              })}
+            </span>
           </div>
         )}
       </PopoverContent>

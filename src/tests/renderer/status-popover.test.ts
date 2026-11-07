@@ -91,50 +91,15 @@ describe("StatusPopover", () => {
     expect(panel.textContent).toContain("258K");
   });
 
-  it("有缓存命中率时渲染脚注", () => {
+  it("脚注只留缓存命中率，不再有 token 速度", () => {
     render();
-    act(() => trigger().click());
-
-    expect(dialog()!.textContent).toContain("statusPopover.cacheHitRate");
-    expect(dialog()!.textContent).toContain("91.3%");
-  });
-
-  it("把 token 速度放在缓存命中率的同一行", () => {
-    render({
-      contextStatusDetails: { ...details, tokenSpeedLabel: "38 tok/s" },
-    });
     act(() => trigger().click());
 
     const panel = dialog()!;
     expect(panel.textContent).toContain("statusPopover.cacheHitRate");
-    expect(panel.textContent).toContain("38 tok/s");
-  });
-
-  it("只有速度时不留分隔符", () => {
-    render({
-      contextStatusDetails: {
-        ...details,
-        cacheHitRate: "--",
-        tokenSpeedLabel: "约 42 tok/s",
-      },
-    });
-    act(() => trigger().click());
-
-    const panel = dialog()!;
-    expect(panel.textContent).not.toContain("statusPopover.cacheHitRate");
-    expect(panel.textContent).toContain("约 42 tok/s");
-    expect(panel.textContent).not.toContain("·");
-  });
-
-  it("两者都没有时整块脚注不渲染", () => {
-    render({
-      contextStatusDetails: { ...details, cacheHitRate: "--" },
-    });
-    act(() => trigger().click());
-
-    const panel = dialog()!;
+    expect(panel.textContent).toContain("91.3%");
+    // 速度已搬到任务坞：面板里再出现速率即回归
     expect(panel.textContent).not.toContain("tok/s");
-    expect(panel.textContent).not.toContain("·");
   });
 
   it("缓存命中率为 -- 时整条脚注不渲染", () => {

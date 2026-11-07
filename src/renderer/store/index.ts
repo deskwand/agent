@@ -1140,22 +1140,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   startExecutionClock: (sessionId, startAt) =>
     set((state) => {
-      const { executionClock, tokenSpeed } = getSession(
-        state.sessionStates,
-        sessionId,
-      );
+      const { executionClock } = getSession(state.sessionStates, sessionId);
       // 正在跑：排队发送不能把当前这一轮的起点往后推。
       // live 的定义是 endAt === null —— 与 isTurnClockLive 保持一致。
       if (executionClock.startAt !== null && executionClock.endAt === null) {
         return {};
       }
-      // 上一轮的估算值（中止的回合没有 message_end）不得跨进新回合；
-      // 精确值保留，作为「上一轮速度」继续显示。
-      const clearedSpeed = tokenSpeed?.estimated ? { tokenSpeed: null } : {};
+      // 上一轮的速度不得跨进新回合 —— 估算值和精确值一样清。
+      // 精确值也会残留（上一轮 message_end 之后仍在 state 里），而速度现在贴在
+      // 坞里那枚秒表后面：`已运行 0s · 38 tok/s` 里的 38 若来自上一轮，就是一句
+      // 看得见的谎（首 token 还没到，新的采样更晚才有）。
+      // 收尾窗口不受影响：回合结束后不会调本 action，5s 内仍显示上一轮的值。
       return {
         sessionStates: patchSession(state.sessionStates, sessionId, {
           executionClock: { startAt, endAt: null },
-          ...clearedSpeed,
+          tokenSpeed: null,
         }),
       };
     }),

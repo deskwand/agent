@@ -99,7 +99,7 @@ describe("stream.speed → SessionState.tokenSpeed", () => {
     expect(speedOf("s1")).toEqual({ tokensPerSecond: 38, estimated: false });
   });
 
-  it("drops a stale estimate when a new turn starts, keeps the exact value", () => {
+  it("drops the previous turn's speed on both kinds of sample", () => {
     emit({
       type: "stream.speed",
       payload: { sessionId: "s1", tokensPerSecond: 42.3, estimated: true },
@@ -107,12 +107,24 @@ describe("stream.speed → SessionState.tokenSpeed", () => {
     useAppStore.getState().startExecutionClock("s1", Date.now());
     expect(speedOf("s1")).toBeNull();
 
+    // 精确值同样不得跨回合：它贴在坞里秒表后面显示，留着就是「已运行 0s · 38 tok/s」
     emit({
       type: "stream.speed",
       payload: { sessionId: "s1", tokensPerSecond: 38, estimated: false },
     });
     useAppStore.getState().finishExecutionClock("s1");
     useAppStore.getState().startExecutionClock("s1", Date.now());
+    expect(speedOf("s1")).toBeNull();
+  });
+
+  it("keeps the finished turn's exact speed through the linger window", () => {
+    emit({
+      type: "stream.speed",
+      payload: { sessionId: "s1", tokensPerSecond: 38, estimated: false },
+    });
+    // 回合结束不清速度（只有下一轮开始才清）：5s 收尾窗口里坞显示的
+    // 「本轮耗时 12s · 38 tok/s」靠的就是这条。
+    useAppStore.getState().finishExecutionClock("s1");
     expect(speedOf("s1")).toEqual({ tokensPerSecond: 38, estimated: false });
   });
 

@@ -734,7 +734,6 @@ export function ChatView() {
         : formattedUsed,
     totalLabel: formatTokenCount(contextWindow || 0),
     cacheHitRate,
-    tokenSpeedLabel,
   };
   const thinkingLevel = (activeSession?.thinkingLevel ||
     "medium") as ThinkingLevel;
@@ -2374,6 +2373,7 @@ export function ChatView() {
               }
               running={canStop}
               executionClock={activeExecutionClock}
+              tokenSpeedLabel={tokenSpeedLabel}
               currentTodos={sessionState?.currentTodos ?? null}
               currentPlanDone={sessionState?.currentPlanDone ?? false}
               lastNonEmptyTodos={sessionState?.lastNonEmptyTodos ?? null}

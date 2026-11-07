@@ -405,6 +405,116 @@ describe("chat task dock", () => {
     ).toHaveLength(1);
   });
 
+  it("速度挂在秒表后面，同一个 h-9 行盒里、排在耗时之后", () => {
+    render({
+      status: { type: "responding" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      executionClock: { startAt: Date.now() - 12_000, endAt: null },
+      tokenSpeedLabel: "38 tok/s",
+    });
+
+    const elapsed = container.querySelector(
+      '[data-testid="turn-elapsed-visible"]',
+    );
+    const speed = container.querySelector('[data-testid="turn-speed-visible"]');
+    expect(speed?.textContent).toContain("38 tok/s");
+    // 与耗时同处那个 h-9 盒子（不去数 DOM 层级：哨兵 grid 的位置可变，
+    // 真正要守的是「同一个行盒」和「速率在后」）
+    expect(speed?.closest(".h-9")).toBe(elapsed?.closest(".h-9"));
+    expect(speed?.closest(".h-9")).not.toBeNull();
+    // 顺序：耗时在前，速率在后
+    expect(
+      elapsed!.compareDocumentPosition(speed!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("收尾窗口里与冻结的耗时同排，且不多出一个前缀分隔符", () => {
+    const endAt = Date.now() - 1_000;
+    render({
+      status: null,
+      running: false,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      executionClock: { startAt: endAt - 12_000, endAt },
+      tokenSpeedLabel: "38 tok/s",
+    });
+
+    const text = dock()?.textContent ?? "";
+    expect(text).toContain("chat.elapsedDone");
+    expect(text).toContain("38 tok/s");
+    // 没有动作文案/摘要时不应多出开头的「· 」：整行只有一个分隔符
+    expect(text.split("·")).toHaveLength(2);
+  });
+
+  it("目标长跑时不挂速率（整块不渲染，耗时归输入框上方的目标段）", () => {
+    render({
+      status: {
+        type: "goal-active",
+        objective: "跑一个长任务",
+        iteration: 1,
+        timeUsedSeconds: 5,
+        activePeriodStartedAt: Date.now(),
+      },
+      running: false,
+      executionClock: {
+        startAt: Date.now() - 9_000,
+        endAt: Date.now() - 1_000,
+      },
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      tokenSpeedLabel: "38 tok/s",
+    });
+
+    expect(dock()).toBeNull();
+    expect(
+      container.querySelector('[data-testid="turn-speed-visible"]'),
+    ).toBeNull();
+  });
+
+  it("没有速度数据时不渲染速度段（不留占位、不留裸分隔符）", () => {
+    render({
+      status: { type: "responding" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      executionClock: { startAt: Date.now() - 12_000, endAt: null },
+    });
+
+    expect(
+      container.querySelector('[data-testid="turn-speed-visible"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-testid="turn-elapsed-visible"]'),
+    ).not.toBeNull();
+  });
+
+  it("有过程摘要时速度跟着耗时进触发器行内，不另起一列", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      executionClock: { startAt: Date.now(), endAt: null },
+      summary: { block, message: TEST_MESSAGE },
+      tokenSpeedLabel: "约 42 tok/s",
+    });
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      "button[aria-expanded]",
+    );
+    const speed = container.querySelector('[data-testid="turn-speed-visible"]');
+    // 估算值的「约」前缀原样透传，坞内不再加工
+    expect(speed?.textContent).toContain("约 42 tok/s");
+    // 与耗时同处触发器行内（既有的 trailing 位置），没有多出一列
+    expect(speed?.closest("button")).toBe(trigger);
+  });
+
   it("没有摘要时耗时仍是行内兄弟（不进按钮）", () => {
     render({
       status: { type: "thinking" },
