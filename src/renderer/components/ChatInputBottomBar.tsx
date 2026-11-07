@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ProviderProfileKey } from "../types";
-import { CornerDownLeft, Square } from "lucide-react";
+import { CornerDownLeft } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { Button } from "./app-button";
 import { VoiceMicButton, type VoiceMicButtonProps } from "./VoiceMicButton";
@@ -27,8 +27,11 @@ export interface ContextStatusDetails {
  * 卡内右簇：发送 / 停止、麦克风。编辑区自行长高，不设展开按钮。
  *
  * 停止态与发送态共用同一副骨骼：36px 圆形热区、无底色，只在 hover 时显形。
- * 停止只靠「实心方块」这个字形表达，不再套一层 `bg-primary` 实心圆 —— 圆底 + 方块
+ * 停止只靠「实心圆角方块」这个字形表达，不再套一层 `bg-primary` 实心圆 —— 圆底 + 方块
  * 叠成两层实心，是输入卡里最亮的一块，与旁边的麦克风差了两级视觉重量。
+ *
+ * 方块是手画的 `rect`（rx 6/24 = 3.5px），不是 lucide 的 `Square`：后者的圆角写死在
+ * 自己的 path 里、盖不掉，缩到 14px 只剩 1.2px，看着就是一枚直角块。
  */
 export interface ChatInputBottomBarProps {
   canStop: boolean;
@@ -79,13 +82,16 @@ export function ChatInputBottomBar({
             }`}
           >
             {canStop ? (
-              // 实心圆角方块：`strokeWidth={0}` + `fill` 才是「一枚方块」，描边版
-              // 在 14px 下看着是空心的框，停止读不出来。
-              <Square
+              // 只填不描：描边版在 14px 下看着是空心的框，停止读不出来。
+              <svg
                 className="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
                 fill="currentColor"
-                strokeWidth={0}
-              />
+                stroke="none"
+              >
+                <rect width="24" height="24" rx="6" />
+              </svg>
             ) : (
               <CornerDownLeft className="w-4 h-4" />
             )}

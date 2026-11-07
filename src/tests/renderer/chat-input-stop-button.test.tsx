@@ -65,7 +65,8 @@ describe("ChatInputBottomBar 停止键", () => {
 
     const glyph = button!.querySelector("svg");
     expect(glyph?.getAttribute("fill")).toBe("currentColor");
-    expect(glyph?.getAttribute("stroke-width")).toBe("0");
+    // 手画的 rect 带自己的圆角：lucide Square 的 rx 盖不掉，14px 下看着是直角块。
+    expect(glyph?.querySelector("rect")?.getAttribute("rx")).toBe("6");
   });
 
   it("停止态点击触发 onStop，且不是提交按钮", () => {
