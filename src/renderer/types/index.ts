@@ -1,5 +1,6 @@
 import type { EmotionSignal } from "../../shared/voice-emotion";
 import type { ThemePreset, ThemeAccent } from "../../shared/theme";
+import type { ChatWidth } from "../../shared/chat-width";
 import type { CodemodeConfig } from "../../shared/codemode-config";
 import type { VoiceModeConfig, TurnProfileName } from "../../shared/voice-mode";
 import type {
@@ -922,6 +923,7 @@ export interface Settings {
   themePreset: ThemePreset;
   themeAccent: ThemeAccent;
   uiFontSize: number;
+  chatWidth: ChatWidth;
   petEnabled: boolean;
   apiKey?: string;
   defaultTools: string[];
@@ -1098,6 +1100,7 @@ export interface AppConfig {
   themePreset?: ThemePreset;
   themeAccent?: ThemeAccent;
   uiFontSize?: number;
+  chatWidth?: ChatWidth;
   petEnabled?: boolean;
   sandboxEnabled?: boolean;
   memoryEnabled?: boolean;

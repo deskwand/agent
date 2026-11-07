@@ -75,6 +75,7 @@ import {
 } from "../services/connect-provider";
 import { Button } from "./app-button";
 import { PAGE_INSET_X } from "./page-styles";
+import { chatColumnMaxWidth } from "../../shared/chat-width";
 
 function hasUsableProviderConfig(
   profileKey: ProviderProfileKey,
@@ -100,6 +101,11 @@ export function WelcomeView() {
   const voiceModeOpen = useAppStore((state) => state.voiceModeOpen);
   const ideaCaptureOpen = useAppStore((state) => state.ideaCaptureOpen);
   const isConfigured = useAppStore((state) => state.isConfigured);
+  // 首屏这一列就是「还没消息的消息区」：宽度跟随同一个档位，
+  // 否则选了窄档、首屏输入框仍按旧宽度排，发出第一条消息时列会跳一下。
+  const chatColumnClass = chatColumnMaxWidth(
+    useAppStore((state) => state.settings.chatWidth),
+  );
   const workingDir = useAppStore((state) => state.workingDir);
   const sessions = useAppStore((state) => state.sessions);
   const setWorkingDir = useAppStore((state) => state.setWorkingDir);
@@ -613,7 +619,7 @@ export function WelcomeView() {
     <div
       className={`flex-1 min-h-0 flex flex-col items-center overflow-y-auto ${PAGE_INSET_X} py-10 md:py-14`}
     >
-      <div className="my-auto max-w-[52.5rem] w-full shrink-0 space-y-7">
+      <div className={`my-auto ${chatColumnClass} w-full shrink-0 space-y-7`}>
         {/* 标题只说「做什么」；「落在哪个项目」由输入框上方的项目 chip 交代一次。
             从前标题也重复了项目名，同一个词在一屏里出现两次。 */}
         <p className="text-base font-medium tracking-[-0.02em] text-muted-foreground text-center">

@@ -42,12 +42,16 @@ function seedStore(): void {
   });
 }
 
-const group = () =>
-  container.querySelector<HTMLElement>('[role="radiogroup"]')!;
-const radios = () =>
-  Array.from(container.querySelectorAll<HTMLElement>('[role="radio"]'));
-const segment = (label: string) =>
-  radios().find((node) => node.textContent === label)!;
+// 按 aria-label 定位分组：设置页现在有两组分段控件（主题 / 消息区宽度），
+// 裸 `[role="radiogroup"]` 会拿到第一组，断言就会串到别人身上。
+const group = (label = "general.theme") =>
+  container.querySelector<HTMLElement>(
+    `[role="radiogroup"][aria-label="${label}"]`,
+  )!;
+const radios = (label = "general.theme") =>
+  Array.from(group(label).querySelectorAll<HTMLElement>('[role="radio"]'));
+const segment = (label: string, groupLabel = "general.theme") =>
+  radios(groupLabel).find((node) => node.textContent === label)!;
 
 async function render(): Promise<void> {
   await act(async () => {
@@ -91,8 +95,12 @@ afterEach(() => {
 describe("设置页主题分段选择", () => {
   it("是一个有名且唯一的 radiogroup，档位顺序与选中态跟当前值一致", async () => {
     await render();
-    expect(container.querySelectorAll('[role="radiogroup"]')).toHaveLength(1);
-    expect(group().getAttribute("aria-label")).toBe("general.theme");
+    // 「唯一」的判据是**按名字**唯一：同页还有消息区宽度那组，不能靠数总数。
+    expect(
+      container.querySelectorAll(
+        '[role="radiogroup"][aria-label="general.theme"]',
+      ),
+    ).toHaveLength(1);
     expect(radios().map((node) => node.textContent)).toEqual([
       "general.themeLight",
       "general.themeDark",
@@ -212,5 +220,48 @@ describe("设置页主题分段选择", () => {
     await tap("emit-empty");
     await tap("emit-unknown");
     expect(isolatedUpdate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("设置页消息区宽度分段选择", () => {
+  const WIDTH_GROUP = "general.chatWidth";
+  const widths = () => radios(WIDTH_GROUP);
+  const width = (label: string) => segment(label, WIDTH_GROUP);
+
+  it("三档按窄/标准/宽排列，选中态跟当前值（默认标准）", async () => {
+    await render();
+    expect(widths().map((node) => node.textContent)).toEqual([
+      "general.chatWidthNarrow",
+      "general.chatWidthStandard",
+      "general.chatWidthWide",
+    ]);
+    expect(widths().map((node) => node.getAttribute("aria-checked"))).toEqual([
+      "false",
+      "true",
+      "false",
+    ]);
+  });
+
+  it("点未选中档位写回一次，选中态跟着走", async () => {
+    await render();
+    await click(width("general.chatWidthNarrow"));
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy).toHaveBeenCalledWith({ chatWidth: "narrow" });
+    expect(width("general.chatWidthNarrow").getAttribute("aria-checked")).toBe(
+      "true",
+    );
+    expect(
+      width("general.chatWidthStandard").getAttribute("aria-checked"),
+    ).toBe("false");
+  });
+
+  it("再点当前档位回传的空串不写回（宽度是必选项）", async () => {
+    // 空串若被写进 settings，列宽类名就查不到值 —— 消息会铺满整屏。
+    await render();
+    await click(width("general.chatWidthStandard"));
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(
+      width("general.chatWidthStandard").getAttribute("aria-checked"),
+    ).toBe("true");
   });
 });

@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { normalizeThemeAccent, normalizeThemePreset } from "../../shared/theme";
+import { normalizeChatWidth } from "../../shared/chat-width";
 import type { EmotionSignal } from "../../shared/voice-emotion";
 import { useAppStore } from "../store";
 import type {
@@ -167,6 +168,8 @@ function registerSharedIpcListener(): () => void {
       themeAccent: normalizeThemeAccent(config.themeAccent),
     });
     store.setSettings({ uiFontSize: config.uiFontSize ?? 14 });
+    // 老配置里没有 chatWidth ⇒ 归一到「标准」，与主进程默认值同一处真源。
+    store.setSettings({ chatWidth: normalizeChatWidth(config.chatWidth) });
     store.setSettings({ petEnabled: config.petEnabled ?? false });
     store.setSettings({
       autoSkillLearning: config.autoSkillLearning ?? false,

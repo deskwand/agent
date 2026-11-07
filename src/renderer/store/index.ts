@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { DEFAULT_THEME_ACCENT, DEFAULT_THEME_PRESET } from "../../shared/theme";
+import { DEFAULT_CHAT_WIDTH } from "../../shared/chat-width";
 import type { NestedToolRuntimeUi } from "../../shared/nested-tool-calls";
 import type { PromptParts } from "../../shared/prompt-parts";
 import type { IdeaSummary } from "../../shared/ideas";
@@ -706,6 +707,7 @@ const defaultSettings: Settings = {
   themePreset: DEFAULT_THEME_PRESET,
   themeAccent: DEFAULT_THEME_ACCENT,
   uiFontSize: 14,
+  chatWidth: DEFAULT_CHAT_WIDTH,
   petEnabled: false,
   defaultTools: [
     "askuserquestion",

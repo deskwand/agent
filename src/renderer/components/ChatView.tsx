@@ -133,6 +133,7 @@ import {
 } from "./MessageNavRail";
 import { Button } from "./app-button";
 import { PAGE_INSET_X } from "./page-styles";
+import { chatColumnMaxWidth } from "../../shared/chat-width";
 
 function hasUsableProviderConfig(
   profileKey: ProviderProfileKey,
@@ -296,6 +297,9 @@ export function ChatView() {
   const activeExecutionClock = useSessionExecutionClock(activeSessionId);
 
   const appConfig = useAppConfig();
+  // 消息列与输入框共用同一条列宽：五处容器都引用它，改档位时不会一半宽一半窄。
+  const chatWidthSetting = useAppStore((s) => s.settings.chatWidth);
+  const chatColumnClass = chatColumnMaxWidth(chatWidthSetting);
   const contextWindow = useAppStore((s) =>
     activeSessionId
       ? s.sessionStates[activeSessionId]?.contextWindow
@@ -2237,7 +2241,7 @@ export function ChatView() {
         >
           <div
             ref={messagesContainerRef}
-            className={`selectable w-full max-w-[57.5rem] mx-auto py-8 ${PAGE_INSET_X} flex min-h-full flex-col`}
+            className={`selectable w-full ${chatColumnClass} mx-auto py-8 ${PAGE_INSET_X} flex min-h-full flex-col`}
           >
             <div className="space-y-5">
               {mergedTurnEntries.length === 0 ? (
@@ -2414,10 +2418,10 @@ export function ChatView() {
       <div className="bg-transparent">
         <GuardApprovalCards
           sessionId={activeSessionId}
-          className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-1`}
+          className={`${chatColumnClass} mx-auto ${PAGE_INSET_X} pt-1`}
         />
         {inputQueue.length > 0 && (
-          <div className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-1`}>
+          <div className={`${chatColumnClass} mx-auto ${PAGE_INSET_X} pt-1`}>
             <ChatInputQueueBar
               items={inputQueue}
               isRunning={canStop}
@@ -2428,7 +2432,7 @@ export function ChatView() {
             />
           </div>
         )}
-        <div className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-1`}>
+        <div className={`${chatColumnClass} mx-auto ${PAGE_INSET_X} pt-1`}>
           <ChatInputStatusBar
             status={inputStatus}
             backgroundAgentRows={backgroundRows}
@@ -2436,7 +2440,9 @@ export function ChatView() {
             onGoalCommand={handleCommand}
           />
         </div>
-        <div className={`max-w-[57.5rem] mx-auto ${PAGE_INSET_X} pt-0.5 pb-5`}>
+        <div
+          className={`${chatColumnClass} mx-auto ${PAGE_INSET_X} pt-0.5 pb-5`}
+        >
           {activeSession?.kind === "voice" && activeSessionId ? (
             <div className="flex items-center justify-center gap-3 py-3">
               {/* 主色胶囊：走 default 变体，别用 ghost —— ghost 自带 `hover:bg-hover-surface`

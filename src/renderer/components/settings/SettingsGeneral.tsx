@@ -6,6 +6,7 @@ import type { AppTheme, ThemePreset } from "../../types";
 import { VALID_THEME_ACCENTS, type ThemeAccent } from "../../../shared/theme";
 import { VALID_THEME_PRESETS } from "../../../shared/theme";
 import type { CodemodeMode } from "../../../shared/codemode-config";
+import { isChatWidth, type ChatWidth } from "../../../shared/chat-width";
 import { CODEMODE_MODES } from "../../../shared/codemode-config";
 import {
   SettingsCard,
@@ -70,6 +71,13 @@ export function SettingsGeneral() {
     { value: "light", label: t("general.themeLight") },
     { value: "dark", label: t("general.themeDark") },
     { value: "system", label: t("general.themeSystem", "System") },
+  ];
+
+  // 三档消息区宽度：值来自共享模块，标签各语言自己翻。
+  const chatWidthOptions: Array<{ value: ChatWidth; label: string }> = [
+    { value: "narrow", label: t("general.chatWidthNarrow") },
+    { value: "standard", label: t("general.chatWidthStandard") },
+    { value: "wide", label: t("general.chatWidthWide") },
   ];
 
   // 色卡取色见 utils/theme-swatch.ts。强调色跟随当前生效主题（"跟随系统"在这里已经解析完）；
@@ -217,6 +225,34 @@ export function SettingsGeneral() {
                   {t("general.uiFontSizeUnit", "PX")}
                 </span>
               </>
+            }
+          />
+
+          <SettingsRow
+            title={t("general.chatWidth")}
+            description={t("general.chatWidthDesc")}
+            control={
+              // 与主题同款单选组。⚠️ 再点当前档位时 Radix 回传 `""`，
+              // 必选项必须丢掉空串，其余值用 isChatWidth 收窄回联合再写回。
+              <ToggleGroup
+                type="single"
+                value={settings.chatWidth}
+                onValueChange={(next) => {
+                  if (isChatWidth(next)) updateSettings({ chatWidth: next });
+                }}
+                aria-label={t("general.chatWidth")}
+                className="flex gap-0 overflow-hidden rounded-control border border-border"
+              >
+                {chatWidthOptions.map((option) => (
+                  <ToggleGroupItem
+                    key={option.value}
+                    value={option.value}
+                    className="h-auto min-w-0 rounded-none px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover-surface hover:text-foreground data-[state=on]:bg-selected-surface data-[state=on]:text-foreground"
+                  >
+                    {option.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
             }
           />
         </SettingsCard>

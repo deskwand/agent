@@ -18,6 +18,7 @@ import {
   VALID_THEME_PRESETS,
   type ThemeAccent,
 } from "../shared/theme";
+import { isChatWidth } from "../shared/chat-width";
 import { renderOfficePreview } from "./office/office-preview";
 import { findFileByName } from "./utils/find-file-by-name";
 import { resolveFileReference } from "./files/resolve-reference";
@@ -5432,6 +5433,18 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       }
       if (typeof event.payload.uiFontSize === "number") {
         configStore.update({ uiFontSize: event.payload.uiFontSize });
+        sendToRenderer({
+          type: "config.status",
+          payload: {
+            isConfigured: configStore.isConfigured(),
+            config: configStore.getAll(),
+          },
+        });
+      }
+      // 消息区宽度：与 uiFontSize 同构。这个 case 是**逐字段白名单**、没有 catch-all，
+      // 少这一段就是「界面上点得动、磁盘上落不了盘」。
+      if (isChatWidth(event.payload.chatWidth)) {
+        configStore.update({ chatWidth: event.payload.chatWidth });
         sendToRenderer({
           type: "config.status",
           payload: {

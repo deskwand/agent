@@ -6,6 +6,12 @@ import {
   type ThemeAccent,
 } from "../../shared/theme";
 import {
+  DEFAULT_CHAT_WIDTH,
+  isChatWidth,
+  normalizeChatWidth,
+  type ChatWidth,
+} from "../../shared/chat-width";
+import {
   API_PROVIDER_PRESETS,
   PI_AI_CURATED_PRESETS,
 } from "../../shared/api-model-presets";
@@ -183,6 +189,8 @@ export interface AppConfig {
   themePreset: ThemePreset;
   themeAccent?: ThemeAccent;
   uiFontSize?: number;
+  /** 消息区列宽档位；老配置没有这个字段 ⇒ 读路径归一到标准档。 */
+  chatWidth?: ChatWidth;
   petEnabled?: boolean;
   petCharacter?: PetCharacter;
   /** 主进程使用；主窗口的 config snapshot 会带上它，但渲染层不消费。 */
@@ -225,6 +233,7 @@ export interface StoredConfig {
   theme: AppTheme;
   themePreset: ThemePreset;
   uiFontSize?: number;
+  chatWidth?: ChatWidth;
   petEnabled?: boolean;
   petCharacter?: PetCharacter;
   petCustomImage?: PetCustomImageConfig | null;
@@ -352,6 +361,7 @@ export function defaultStoredConfig(): StoredConfig {
     themePreset: DEFAULT_THEME_PRESET,
     themeAccent: DEFAULT_THEME_ACCENT,
     uiFontSize: UI_FONT_SIZE_DEFAULT,
+    chatWidth: DEFAULT_CHAT_WIDTH,
     petEnabled: false,
     petCharacter: DEFAULT_PET_CHARACTER,
     petCustomImage: null,
@@ -1102,6 +1112,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     themePreset: stored.themePreset,
     themeAccent: stored.themeAccent,
     uiFontSize: stored.uiFontSize,
+    chatWidth: normalizeChatWidth(stored.chatWidth),
     petEnabled: stored.petEnabled ?? false,
     // 配置被外部改坏时回退默认，不抛错：桌宠是装饰功能，不能拖垮主窗口启动。
     petCharacter: isPetCharacter(stored.petCharacter)
@@ -1286,6 +1297,9 @@ export class ConfigStore {
       stored.telemetryEnabled = updates.telemetryEnabled;
     if (updates.uiFontSize !== undefined)
       stored.uiFontSize = clampUiFontSize(updates.uiFontSize);
+    // 与 themeAccent 同口径：非法值**不写回**（保持原值），而不是重置成默认 ——
+    // 手改坏一个字段不该让用户的选择被悄悄清掉。
+    if (isChatWidth(updates.chatWidth)) stored.chatWidth = updates.chatWidth;
     if (updates.petEnabled !== undefined)
       stored.petEnabled = updates.petEnabled;
     if (isPetCharacter(updates.petCharacter))
