@@ -71,12 +71,18 @@ interface ProcessSummaryBlockProps {
   block: Extract<DisplayBlock, { type: "process-summary" }>;
   allBlocks?: ContentBlock[];
   message?: Message;
+  /**
+   * 触发器行末的附加内容（渲染在 chevron 之后、按钮内部）。
+   * 任务坞用它放「已运行 5m03s」：这一列原来占在按钮外面，展开后整列都是空的。
+   */
+  trailing?: React.ReactNode;
 }
 
 export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
   block,
   allBlocks,
   message,
+  trailing,
 }: ProcessSummaryBlockProps) {
   const { t } = useTranslation();
   const failureSuffix = formatFailureSuffix(block.status?.failedCount ?? 0, t);
@@ -187,6 +193,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 <ChevronRight className="h-3.5 w-3.5" />
               )}
             </span>
+            {trailing}
           </Button>
         </CollapsibleTrigger>
       </div>

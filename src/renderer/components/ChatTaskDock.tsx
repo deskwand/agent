@@ -357,6 +357,40 @@ export function ChatTaskDock({
 
   const slotToken = formatDurationShort(TURN_CLOCK_SLOT_SENTINEL_SECONDS);
 
+  // 「已运行 5m03s」这份标记只写一次、两处复用：
+  //  · 有摘要时作为 ProcessSummaryBlock 的 `trailing` 放进**触发器行内**（行末），
+  //    这样那一列不再占在摘要块外面 —— 展开后卡片才能铺满整行；
+  //  · 没摘要（只有动作态/冻结耗时）时仍是行内兄弟。
+  const elapsedNode = elapsed ? (
+    <span
+      className={`flex h-9 flex-none items-center text-muted-foreground${
+        hasSummary ? " ml-2" : ""
+      }`}
+    >
+      {hasSummary || showActionText ? "· " : ""}
+      {/* 槽位：两格叠在同一个 grid 单元格，盒宽取两者最大值 ——
+          正常时长下 = 哨兵宽度（恒定），于是行内零位移。做法与取值同
+          ChatInputStatusBar（design-docs/2026-09-29-turn-timer-width-stability-design.md）。 */}
+      <span className="inline-grid tabular-nums">
+        <span
+          aria-hidden="true"
+          data-testid="turn-elapsed-slot"
+          className="invisible col-start-1 row-start-1"
+        >
+          {t("chat.elapsedRunning", { time: slotToken })}
+        </span>
+        <span
+          data-testid="turn-elapsed-visible"
+          className="col-start-1 row-start-1"
+        >
+          {t(elapsed.live ? "chat.elapsedRunning" : "chat.elapsedDone", {
+            time: formatDurationShort(elapsed.seconds),
+          })}
+        </span>
+      </span>
+    </span>
+  ) : null;
+
   return (
     <div data-testid="chat-task-dock" className="mt-auto pt-4">
       {hasPlan ? <TaskCard display={display} /> : null}
@@ -383,11 +417,13 @@ export function ChatTaskDock({
             /* 摘要行自带图标与折叠按钮，坞里不再套第二个图标。
                ⚠️ 不要用负边距去"对齐"清单卡：ProcessSummaryBlock 的触发器是 `px-1`
                （不是 pl-3），任何额外的负偏移都会把它推进左边旋转图标的范围里。 */
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <ProcessSummaryBlock
                 block={summary.block}
                 allBlocks={summary.allBlocks}
                 message={summary.message}
+                // 耗时进触发器行内：那一列不再占在摘要块外面，展开后卡片铺满整行
+                trailing={elapsedNode}
               />
             </div>
           ) : null}
@@ -405,34 +441,7 @@ export function ChatTaskDock({
               <span className="truncate">{action.text}</span>
             </span>
           ) : null}
-          {elapsed ? (
-            <span className="flex h-9 flex-none items-center text-muted-foreground">
-              {hasSummary || showActionText ? "· " : ""}
-              {/* 槽位：两格叠在同一个 grid 单元格，盒宽取两者最大值 ——
-                  正常时长下 = 哨兵宽度（恒定），于是行内零位移。做法与取值同
-                  ChatInputStatusBar（design-docs/2026-09-29-turn-timer-width-stability-design.md）。 */}
-              <span className="inline-grid tabular-nums">
-                <span
-                  aria-hidden="true"
-                  data-testid="turn-elapsed-slot"
-                  className="invisible col-start-1 row-start-1"
-                >
-                  {t("chat.elapsedRunning", { time: slotToken })}
-                </span>
-                <span
-                  data-testid="turn-elapsed-visible"
-                  className="col-start-1 row-start-1"
-                >
-                  {t(
-                    elapsed.live ? "chat.elapsedRunning" : "chat.elapsedDone",
-                    {
-                      time: formatDurationShort(elapsed.seconds),
-                    },
-                  )}
-                </span>
-              </span>
-            </span>
-          ) : null}
+          {hasSummary ? null : elapsedNode}
         </div>
       ) : null}
     </div>

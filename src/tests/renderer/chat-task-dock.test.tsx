@@ -354,6 +354,49 @@ describe("chat task dock", () => {
     expect(row?.className).not.toContain("text-xs");
   });
 
+  it("耗时进触发器行内：不再在摘要块外面占一列（展开时卡片铺满整行）", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      executionClock: { startAt: Date.now(), endAt: null },
+      summary: { block },
+    });
+    const trigger = container.querySelector("button[aria-expanded]");
+    const elapsed = container.querySelector(
+      '[data-testid="turn-elapsed-visible"]',
+    );
+    // ① 耗时归触发按钮所有（它是行内一段文本，不再是一列兄弟元素）
+    expect(elapsed?.closest("button")).toBe(trigger);
+    // ② 摘要容器因此能占满剩余宽度 → 展开的卡片铺满整行
+    const summaryWrapper = trigger?.closest(".flex-1");
+    expect(summaryWrapper, "摘要容器应带 flex-1").not.toBeNull();
+    expect(summaryWrapper?.contains(elapsed ?? null)).toBe(true);
+    // ③ 全坞只有一个「已运行」，不会两边各渲染一份
+    expect(
+      container.querySelectorAll('[data-testid="turn-elapsed-visible"]'),
+    ).toHaveLength(1);
+  });
+
+  it("没有摘要时耗时仍是行内兄弟（不进按钮）", () => {
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      lastNonEmptyTodos: null,
+      executionClock: { startAt: Date.now(), endAt: null },
+    });
+    const elapsed = container.querySelector(
+      '[data-testid="turn-elapsed-visible"]',
+    );
+    expect(elapsed).not.toBeNull();
+    expect(elapsed?.closest("button")).toBeNull();
+  });
+
   it("一次性结果（压缩完成）不因摘要存在而被吞掉", () => {
     const block = buildProcessSummaryDisplayBlock([
       { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
