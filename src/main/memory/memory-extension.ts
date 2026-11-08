@@ -12,6 +12,8 @@ import type { TeammateMemoryRegistry } from "./teammate-memory-registry";
 export interface TeammateMemoryRouting {
   registry: Pick<TeammateMemoryRegistry, "getForAgent">;
   resolveAgentId(sessionId: string): string | null;
+  /** 项目 Bot 用全局记忆（作用域由 cwd 派生），不进伙伴的私有存储根。 */
+  isProjectAgent?(agentId: string): boolean;
 }
 
 export class MemoryExtension implements AgentRuntimeExtension {
@@ -33,7 +35,9 @@ export class MemoryExtension implements AgentRuntimeExtension {
       return session.memoryEnabled ? this.memoryService : null;
     }
     const agentId = this.teammates?.resolveAgentId(session.id);
-    return agentId ? this.teammates!.registry.getForAgent(agentId) : null;
+    if (!agentId) return null;
+    if (this.teammates?.isProjectAgent?.(agentId)) return this.memoryService;
+    return this.teammates!.registry.getForAgent(agentId);
   }
 
   async beforeSessionRun({

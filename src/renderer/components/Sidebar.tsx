@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import { usePersistentAgentStore } from "../store/persistent-agents";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { OccludingDialog } from "./ui/occluding-dialog";
 import { DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
@@ -37,6 +38,7 @@ import {
 import { panelWidthTransitionClass } from "../utils/panel-width";
 import {
   SidebarAnimatedSection,
+  BotGlyph,
   SidebarGroupIcon,
 } from "./sidebar-disclosure-motion";
 import type { Session } from "../types";
@@ -44,9 +46,11 @@ import {
   DEFAULT_WORKDIR_DIRNAME,
   toWorkspaceKey,
 } from "../../shared/workspace-path";
+import { parseWorkspaceCwd } from "../../shared/workspace-cwd";
 import {
   buildSidebarSessionGroups,
   isSessionBusy,
+  projectGroupSessions,
   splitSunkSessions,
   type SidebarPins,
   type SidebarProjectGroup,
@@ -76,6 +80,7 @@ import { Input } from "./ui/input";
 import { Button } from "./app-button";
 import { AgentSidebarGroup } from "./agents/AgentSidebarGroup";
 import { AgentEditModal } from "./agents/AgentEditModal";
+import { PartnerAvatar } from "./agents/PartnerAvatar";
 
 const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
@@ -143,6 +148,10 @@ export function Sidebar({
   const [sidebarPins, setSidebarPins] = useState<SidebarPins>(loadSidebarPins);
   const [showProjectActions, setShowProjectActions] = useState(false);
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
+  /** 正在为哪个项目目录新建 Bot。 */
+  const [projectBotCwd, setProjectBotCwd] = useState<string | null>(null);
+  /** 打开着「更多」菜单的项目 key。 */
+  const [projectMenuKey, setProjectMenuKey] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionTitle, setEditingSessionTitle] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
@@ -210,9 +219,20 @@ export function Sidebar({
     () => sessions.filter((s) => !s.archived),
     [sessions],
   );
+  const projectAgents = usePersistentAgentStore((state) => state.agents);
   const sessionGroups = useMemo(
-    () => buildSidebarSessionGroups(sessions, "", sidebarPins),
-    [sessions, sidebarPins],
+    () =>
+      buildSidebarSessionGroups(
+        sessions,
+        "",
+        sidebarPins,
+        Object.values(projectAgents),
+      ),
+    [sessions, sidebarPins, projectAgents],
+  );
+  const sessionsById = useMemo(
+    () => new Map(sessions.map((session) => [session.id, session])),
+    [sessions],
   );
   // 「等待回答」含 ask_user 与待处理的授权 / sudo 请求（分屏下授权不再弹全局模态窗）。
   const sessionHasPendingAskUser = useCallback(
@@ -241,7 +261,7 @@ export function Sidebar({
     }
     for (const group of sessionGroups.projectGroups) {
       if (
-        group.sessions.some((s) =>
+        projectGroupSessions(group, sessionsById).some((s) =>
           isSessionBusy(
             s,
             sessionStates[s.id]?.backgroundAgents,
@@ -253,7 +273,7 @@ export function Sidebar({
       }
     }
     return keys;
-  }, [sessionGroups, sessionStates, sessionHasPendingAskUser]);
+  }, [sessionGroups, sessionStates, sessionsById, sessionHasPendingAskUser]);
 
   // 组内有待答提问 → 该组角标走 asking。只读 pending 这个事实，
   // 不动 runningGroupKeys 的算法。
@@ -265,12 +285,16 @@ export function Sidebar({
       keys.add(ORDINARY_SESSION_GROUP_KEY);
     }
     for (const group of sessionGroups.projectGroups) {
-      if (group.sessions.some((s) => sessionHasPendingAskUser(s.id))) {
+      if (
+        projectGroupSessions(group, sessionsById).some((s) =>
+          sessionHasPendingAskUser(s.id),
+        )
+      ) {
         keys.add(group.key);
       }
     }
     return keys;
-  }, [sessionGroups, sessionHasPendingAskUser]);
+  }, [sessionGroups, sessionsById, sessionHasPendingAskUser]);
 
   // 角标种类：组内有一条在等回答就 asking，否则才轮到 running。
   // 与下面的 resolveProjectExpanded 一样是 render 期普通函数，不包 useCallback。
@@ -426,10 +450,17 @@ export function Sidebar({
       const name = getWorkspaceName(s.cwd);
       if (!map.has(name)) map.set(name, s.cwd);
     }
+    // 只有 Bot、没有普通会话的项目也要能从这里进
+    for (const agent of Object.values(projectAgents)) {
+      const cwd = agent.projectKey;
+      if (!cwd || isDefaultWorkspacePath(cwd)) continue;
+      const name = getWorkspaceName(cwd);
+      if (!map.has(name)) map.set(name, cwd);
+    }
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([name, cwd]) => ({ name, cwd }));
-  }, [activeSessions]);
+  }, [activeSessions, projectAgents]);
 
   const handleSessionClick = useCallback(
     async (sessionId: string) => {
@@ -727,10 +758,16 @@ export function Sidebar({
         message: t("sidebar.deleteProjectConfirmWithName", {
           name: group.name,
         }),
-        detail:
+        detail: [
           activeCount > 0
             ? t("sidebar.deleteProjectRunningHint", { count: activeCount })
-            : undefined,
+            : null,
+          group.botAgentIds.length > 0
+            ? t("sidebar.deleteProjectBotsHint")
+            : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
         onConfirm: async () => {
           try {
             const result = await deleteProject(group.cwd);
@@ -1552,9 +1589,19 @@ export function Sidebar({
                           const isProjectPinned = pinnedProjectKeys.has(
                             group.key,
                           );
+                          // 菜单开着时保持操作区可见：菜单是 Portal 出去的，
+                          // 鼠标移进去后 group-hover 会失效，按钮当场消失。
+                          const actionsVisible =
+                            projectMenuKey === group.key
+                              ? "opacity-100 pointer-events-auto"
+                              : "opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto group-focus-within/project:opacity-100";
 
                           return (
-                            <section key={group.key} className="pt-1.5">
+                            <section
+                              key={group.key}
+                              data-project-group={group.key}
+                              className="pt-1.5"
+                            >
                               {/* pr-0.5：会话行尾部那个 16px 图标格的中心距行右缘 18px，
                                   而 32px 按钮的图标中心距右缘 16px；尾部动作整体内缩 2px，
                                   hover / 聚焦时浮出的 pin 才和会话行的时间 / 状态点落在同一条竖线上。 */}
@@ -1618,63 +1665,151 @@ export function Sidebar({
                                     {t("sidebar.newSessionForProject")}
                                   </TooltipContent>
                                 </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      type="button"
+                                {canHostProjectBot(group.cwd) && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        type="button"
+                                        data-project-add-bot={group.key}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setProjectBotCwd(group.cwd);
+                                        }}
+                                        className={`h-8 w-8 flex-shrink-0 rounded-lg text-muted-foreground hover:bg-hover-surface hover:text-foreground transition-colors flex items-center justify-center ${actionsVisible}`}
+                                        aria-label={t("projectBot.create")}
+                                      >
+                                        <BotGlyph />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">
+                                      {t("projectBot.create")}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <div
+                                  aria-hidden="true"
+                                  className={`mx-0.5 h-3.5 w-px flex-shrink-0 self-center bg-border ${
+                                    projectMenuKey === group.key
+                                      ? ""
+                                      : "opacity-0 group-hover/project:opacity-100 group-focus-within/project:opacity-100"
+                                  }`}
+                                />
+                                <DropdownMenu
+                                  open={projectMenuKey === group.key}
+                                  onOpenChange={(next: boolean) =>
+                                    setProjectMenuKey(next ? group.key : null)
+                                  }
+                                >
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          type="button"
+                                          className={`h-8 w-8 flex-shrink-0 rounded-lg text-muted-foreground hover:bg-hover-surface hover:text-foreground transition-colors flex items-center justify-center ${actionsVisible}`}
+                                          aria-label={t("sidebar.moreActions")}
+                                        >
+                                          <MoreHorizontal className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">
+                                      {t("sidebar.moreActions")}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="w-44"
+                                    // 菜单项里有「删除项目」→ 它开 ConfirmDialog，
+                                    // Radix 关菜单时会把焦点抢回触发器（同 :1025 的坑）
+                                    onCloseAutoFocus={(event) =>
+                                      event.preventDefault()
+                                    }
+                                  >
+                                    <DropdownMenuItem
+                                      className="h-7 gap-2"
                                       onClick={(event) => {
-                                        event.stopPropagation();
+                                        handleToggleProjectPin(
+                                          event,
+                                          group.key,
+                                        );
+                                        setProjectMenuKey(null);
+                                      }}
+                                    >
+                                      {isProjectPinned ? (
+                                        <PinOff className="h-4 w-4 text-muted-foreground" />
+                                      ) : (
+                                        <Pin className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                      <span>
+                                        {t(
+                                          isProjectPinned
+                                            ? "sidebar.unpin"
+                                            : "sidebar.pin",
+                                        )}
+                                      </span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="h-7 gap-2 text-destructive focus:text-destructive"
+                                      onClick={() => {
+                                        setProjectMenuKey(null);
                                         handleDeleteProject(group);
                                       }}
-                                      className="h-8 w-8 flex-shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
-                                      aria-label={t("common.delete")}
                                     >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="bottom">
-                                    {t("common.delete")}
-                                  </TooltipContent>
-                                </Tooltip>
-                                {/* pin 放最后一个、静止时和「新建 / 删除」一样藏着：hover
-                                    浮出，另外多一条 focus-within，键盘 Tab 进来时才看得见它
-                                    （`opacity-0` 会把焦点环一起吃成透明）。图标中心与会话行的
-                                    状态点/时间同一条右边线，新建/删除从它左边展开，pin 自己
-                                    不会挪位。置顶不再常显 —— 排在置顶区首位本身就是标记。 */}
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      type="button"
-                                      onClick={(event) =>
-                                        handleToggleProjectPin(event, group.key)
-                                      }
-                                      className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto group-focus-within/project:opacity-100 hover:bg-primary/10 ${
-                                        isProjectPinned
-                                          ? "text-primary-text"
-                                          : "text-muted-foreground hover:text-primary-text"
-                                      }`}
-                                      aria-label={t(
-                                        isProjectPinned
-                                          ? "sidebar.unpin"
-                                          : "sidebar.pin",
-                                      )}
-                                    >
-                                      <Pin
-                                        className={`h-3.5 w-3.5 ${isProjectPinned ? "fill-current" : ""}`}
-                                      />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="bottom">
-                                    {t(
-                                      isProjectPinned
-                                        ? "sidebar.unpin"
-                                        : "sidebar.pin",
-                                    )}
-                                  </TooltipContent>
-                                </Tooltip>
+                                      <Trash2 className="h-4 w-4" />
+                                      <span>{t("common.delete")}</span>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
+                              {group.botAgentIds.map((botId) => {
+                                const bot = projectAgents[botId];
+                                if (!bot) return null;
+                                const botRunning =
+                                  sessionsById.get(bot.sessionId)?.status ===
+                                  "running";
+                                const botDot = bot.lastError
+                                  ? "bg-destructive"
+                                  : bot.enabled === false
+                                    ? "bg-muted-foreground"
+                                    : botRunning
+                                      ? "bg-primary"
+                                      : "bg-success";
+                                return (
+                                  <button
+                                    key={botId}
+                                    type="button"
+                                    data-project-bot={botId}
+                                    onClick={() =>
+                                      void handleSessionClick(bot.sessionId)
+                                    }
+                                    className={`w-full rounded-lg px-3 py-1.5 flex items-center gap-2 text-left hover:bg-hover-surface transition-colors ${
+                                      activeSessionId === bot.sessionId
+                                        ? "bg-hover-surface"
+                                        : ""
+                                    }`}
+                                  >
+                                    <span className="relative shrink-0">
+                                      <PartnerAvatar
+                                        seed={bot.avatarSeed}
+                                        size={24}
+                                        className="opacity-75"
+                                      />
+                                      <span
+                                        className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-muted ${botDot}`}
+                                      />
+                                    </span>
+                                    <span className="truncate text-sm">
+                                      {bot.name}
+                                    </span>
+                                    <span className="rounded border border-border px-1 text-[9.5px] uppercase tracking-wide text-muted-foreground">
+                                      {t("projectBot.badge")}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                               <SidebarAnimatedSection
                                 expanded={isProjectExpanded}
                                 motionVersion={
@@ -1813,6 +1948,12 @@ export function Sidebar({
       {agentEditorOpen && (
         <AgentEditModal onClose={() => setAgentEditorOpen(false)} />
       )}
+      {projectBotCwd && (
+        <AgentEditModal
+          projectCwd={projectBotCwd}
+          onClose={() => setProjectBotCwd(null)}
+        />
+      )}
     </>
   );
 }
@@ -1896,6 +2037,12 @@ function getWorkspaceName(cwd: string): string {
 function normalizeWorkspacePath(cwd: string | null | undefined): string {
   if (!cwd) return "";
   return cwd.trim().replace(/[\\/]+$/, "");
+}
+
+/** 只有本地真实目录能挂 Bot：默认工作区不是项目，远程目录的工具链另说。 */
+function canHostProjectBot(cwd: string): boolean {
+  if (isDefaultWorkspacePath(cwd)) return false;
+  return parseWorkspaceCwd(cwd).kind === "local";
 }
 
 function isDefaultWorkspacePath(cwd: string): boolean {

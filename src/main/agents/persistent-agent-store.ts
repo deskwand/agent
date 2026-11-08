@@ -24,6 +24,8 @@ export interface PersistentAgentStore {
   list(): PersistentAgent[];
   get(id: string): PersistentAgent | null;
   getBySessionId(sessionId: string): PersistentAgent | null;
+  /** 同一项目可挂多个 Bot；私有伙伴（projectKey 为 null）不会出现在这里。 */
+  listByProjectKey(projectKey: string): PersistentAgent[];
   insert(agent: PersistentAgent): void;
   update(
     id: string,
@@ -57,6 +59,7 @@ interface AgentRow {
   check_in_note: string | null;
   trusted_recipients: string | null;
   risky_capabilities: string | null;
+  project_key: string | null;
 }
 
 interface WakeupRow {
@@ -130,6 +133,14 @@ function ensureSchema(raw: DatabaseSync): void {
       "ALTER TABLE persistent_agents ADD COLUMN risky_capabilities TEXT",
     );
   }
+  // 项目 Bot 的归属键：同一项目可多条，所以不是唯一索引
+  if (!columns.some((column) => column.name === "project_key")) {
+    raw.exec("ALTER TABLE persistent_agents ADD COLUMN project_key TEXT");
+  }
+  raw.exec(`
+    CREATE INDEX IF NOT EXISTS idx_persistent_agents_project_key
+      ON persistent_agents(project_key)
+  `);
 }
 
 function parseTrustedRecipients(value: string | null): string[] {
@@ -197,6 +208,7 @@ function toAgent(row: AgentRow): PersistentAgent {
     checkInNote: row.check_in_note ?? null,
     trustedRecipients: parseTrustedRecipients(row.trusted_recipients),
     riskyCapabilities: parseRiskyCapabilities(row.risky_capabilities),
+    projectKey: row.project_key ?? null,
   };
 }
 
@@ -220,6 +232,7 @@ function toRow(agent: PersistentAgent): AgentRow {
     check_in_note: agent.checkInNote,
     trusted_recipients: JSON.stringify(agent.trustedRecipients),
     risky_capabilities: JSON.stringify(agent.riskyCapabilities),
+    project_key: agent.projectKey,
   };
 }
 
@@ -248,17 +261,20 @@ export function createPersistentAgentStore(
   const selectBySession = raw.prepare(
     "SELECT * FROM persistent_agents WHERE session_id = ?",
   );
+  const selectByProject = raw.prepare(
+    "SELECT * FROM persistent_agents WHERE project_key = ? ORDER BY created_at ASC",
+  );
   const insertAgent = raw.prepare(`
     INSERT INTO persistent_agents (
       id, name, instructions, cwd, session_id, schedule_config, enabled,
       next_periodic_at, consecutive_failures, last_wakeup_at, last_error,
       avatar_seed, created_at, updated_at, next_check_in_at, check_in_note,
-      trusted_recipients, risky_capabilities
+      trusted_recipients, risky_capabilities, project_key
     ) VALUES (
       :id, :name, :instructions, :cwd, :session_id, :schedule_config, :enabled,
       :next_periodic_at, :consecutive_failures, :last_wakeup_at, :last_error,
       :avatar_seed, :created_at, :updated_at, :next_check_in_at, :check_in_note,
-      :trusted_recipients, :risky_capabilities
+      :trusted_recipients, :risky_capabilities, :project_key
     )
   `);
   const updateAgent = raw.prepare(`
@@ -271,7 +287,7 @@ export function createPersistentAgentStore(
       avatar_seed = :avatar_seed, updated_at = :updated_at,
       next_check_in_at = :next_check_in_at, check_in_note = :check_in_note,
       trusted_recipients = :trusted_recipients,
-      risky_capabilities = :risky_capabilities
+      risky_capabilities = :risky_capabilities, project_key = :project_key
     WHERE id = :id
   `);
   const deleteAgent = raw.prepare("DELETE FROM persistent_agents WHERE id = ?");
@@ -306,6 +322,8 @@ export function createPersistentAgentStore(
       const row = selectBySession.get(sessionId) as AgentRow | undefined;
       return row ? toAgent(row) : null;
     },
+    listByProjectKey: (projectKey) =>
+      (selectByProject.all(projectKey) as unknown as AgentRow[]).map(toAgent),
     insert: (agent) => {
       insertAgent.run({ ...toRow(agent) });
     },

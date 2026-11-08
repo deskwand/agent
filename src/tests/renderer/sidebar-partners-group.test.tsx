@@ -12,6 +12,7 @@ import { useAppStore } from "../../renderer/store";
 import { usePersistentAgentStore } from "../../renderer/store/persistent-agents";
 import type { Session } from "../../renderer/types";
 import type { PersistentAgentView } from "../../shared/persistent-agent";
+import { AgentSidebarGroup } from "../../renderer/components/agents/AgentSidebarGroup";
 
 const ipc = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -57,6 +58,7 @@ const agent = {
   cwd: "/tmp",
   sessionId: "s-agent",
   avatarSeed: "seed",
+  projectKey: null,
   schedule: { kind: "interval", every: 30, unit: "minute" },
   enabled: true,
   nextPeriodicAt: null,
@@ -183,5 +185,40 @@ describe("measureScrollGutter", () => {
   it("never goes negative (overlay scrollbars / element not mounted yet)", () => {
     expect(measureScrollGutter({ offsetWidth: 0, clientWidth: 0 })).toBe(0);
     expect(measureScrollGutter({ offsetWidth: 289, clientWidth: 300 })).toBe(0);
+  });
+});
+
+describe("partners group · project bots", () => {
+  it("hides project bots from the partners group", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const local = createRoot(host);
+    usePersistentAgentStore.setState({
+      agents: {
+        "bot-1": {
+          ...agent,
+          id: "bot-1",
+          name: "项目 Bot",
+          projectKey: "/w/proj",
+        } as unknown as PersistentAgentView,
+      },
+    });
+    await act(async () => {
+      local.render(
+        <AgentSidebarGroup
+          activeSessionId={null}
+          expanded
+          motionVersion={1}
+          onToggle={() => undefined}
+          onOpenSession={() => undefined}
+          onCreate={() => undefined}
+        />,
+      );
+    });
+    expect(host.textContent).not.toContain("项目 Bot");
+    await act(async () => {
+      local.unmount();
+    });
+    host.remove();
   });
 });

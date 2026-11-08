@@ -24,6 +24,7 @@ import type {
   PersistentAgentUpdateInput,
   PersistentAgentView,
   PersistentAgentWakeup,
+  ProjectAgentCreateInput,
 } from "../shared/persistent-agent";
 import type {
   IdeaCreateInput,
@@ -849,6 +850,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("persistentAgents.list"),
     create: (input: PersistentAgentCreateInput): Promise<PersistentAgentView> =>
       ipcRenderer.invoke("persistentAgents.create", input),
+    addToProject: (
+      input: ProjectAgentCreateInput,
+    ): Promise<PersistentAgentView> =>
+      ipcRenderer.invoke("persistentAgents.addToProject", input),
     update: (
       id: string,
       patch: PersistentAgentUpdateInput,
@@ -1584,6 +1589,9 @@ declare global {
         list: () => Promise<PersistentAgentView[]>;
         create: (
           input: PersistentAgentCreateInput,
+        ) => Promise<PersistentAgentView>;
+        addToProject: (
+          input: ProjectAgentCreateInput,
         ) => Promise<PersistentAgentView>;
         update: (
           id: string,

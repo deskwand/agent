@@ -3,6 +3,7 @@ import type { Session } from "../../renderer/types";
 import {
   buildSidebarSessionGroups,
   isSessionBusy,
+  projectGroupSessions,
   isSunkSession,
   listWorkspaceProjects,
   splitSunkSessions,
@@ -504,5 +505,115 @@ describe("persistent agent sessions", () => {
       ...groups.projectGroups.flatMap((group) => group.sessions),
     ].map((s) => s.id);
     expect(ids).toEqual(["plain"]);
+  });
+});
+
+describe("buildSidebarSessionGroups · project bots", () => {
+  function bot(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "bot-1",
+      projectKey: "/w/proj",
+      sessionId: "bot-session",
+      cwd: "/w/proj",
+      createdAt: 10,
+      updatedAt: 20,
+      ...overrides,
+    };
+  }
+
+  it("collects several bots for the same project in creation order", () => {
+    const result = buildSidebarSessionGroups([], "", undefined, [
+      bot({ id: "bot-1", sessionId: "bot-session-1", createdAt: 10 }),
+      bot({ id: "bot-2", sessionId: "bot-session-2", createdAt: 20 }),
+    ]);
+    expect(result.projectGroups).toHaveLength(1);
+    expect(result.projectGroups[0].botAgentIds).toEqual(["bot-1", "bot-2"]);
+    expect(result.projectGroups[0].botSessionIds).toEqual([
+      "bot-session-1",
+      "bot-session-2",
+    ]);
+  });
+
+  it("creates a group for a project with only a bot", () => {
+    const result = buildSidebarSessionGroups([], "", undefined, [bot()]);
+    expect(result.projectGroups).toHaveLength(1);
+    expect(result.projectGroups[0].sessions).toEqual([]);
+    expect(result.projectGroups[0].earliestCreatedAt).toBe(10);
+    expect(result.projectGroups[0].latestActivityAt).toBe(20);
+  });
+
+  it("ignores private partners", () => {
+    const result = buildSidebarSessionGroups([], "", undefined, [
+      bot({ projectKey: null }),
+    ]);
+    expect(result.projectGroups).toHaveLength(0);
+  });
+
+  it("groups path variants of the same project into one group", () => {
+    const result = buildSidebarSessionGroups([], "", undefined, [
+      bot({ id: "bot-1", sessionId: "bot-session-1", projectKey: "/w/proj" }),
+      bot({
+        id: "bot-2",
+        sessionId: "bot-session-2",
+        projectKey: "/w/proj/",
+        createdAt: 20,
+      }),
+    ]);
+    expect(result.projectGroups).toHaveLength(1);
+    expect(result.projectGroups[0].botAgentIds).toEqual(["bot-1", "bot-2"]);
+  });
+
+  it("folds Windows drive-path variants into one project", () => {
+    const result = buildSidebarSessionGroups([], "", undefined, [
+      bot({ id: "bot-1", sessionId: "bot-session-1", projectKey: "C:\\proj" }),
+      bot({
+        id: "bot-2",
+        sessionId: "bot-session-2",
+        projectKey: "c:/proj/",
+        createdAt: 20,
+      }),
+    ]);
+    expect(result.projectGroups).toHaveLength(1);
+    expect(result.projectGroups[0].botAgentIds).toEqual(["bot-1", "bot-2"]);
+  });
+
+  it("attaches the bot to an existing project group", () => {
+    const result = buildSidebarSessionGroups(
+      [session("s1", { cwd: "/w/proj", isProjectMode: true })],
+      "",
+      undefined,
+      [bot()],
+    );
+    expect(result.projectGroups).toHaveLength(1);
+    expect(result.projectGroups[0].botAgentIds).toEqual(["bot-1"]);
+    expect(result.projectGroups[0].sessions).toHaveLength(1);
+  });
+});
+
+describe("projectGroupSessions", () => {
+  it("includes the bot session among group members", () => {
+    const botSession = session("bot-session");
+    const result = buildSidebarSessionGroups([], "", undefined, [
+      {
+        id: "bot-1",
+        projectKey: "/w/proj",
+        sessionId: "bot-session",
+        cwd: "/w/proj",
+        createdAt: 10,
+        updatedAt: 20,
+      },
+    ]);
+    const members = projectGroupSessions(
+      result.projectGroups[0],
+      new Map([["bot-session", botSession]]),
+    );
+    expect(members).toEqual([botSession]);
+  });
+
+  it("returns only real sessions when there is no bot", () => {
+    const only = session("s1");
+    expect(
+      projectGroupSessions({ sessions: [only], botSessionIds: [] }, new Map()),
+    ).toEqual([only]);
   });
 });

@@ -33,6 +33,7 @@ function agent(overrides: Partial<PersistentAgent> = {}): PersistentAgent {
     checkInNote: null,
     trustedRecipients: [],
     riskyCapabilities: { shell: false, browser: false, computer: false },
+    projectKey: null,
     ...overrides,
   };
 }
@@ -219,5 +220,58 @@ describe("persistent agent store check-in", () => {
       browser: false,
       computer: false,
     });
+  });
+});
+
+describe("persistent agent store · project bots", () => {
+  it("round-trips projectKey", () => {
+    store.insert(agent({ id: "p1", sessionId: "ps1", projectKey: "/w/proj" }));
+    expect(store.get("p1")?.projectKey).toBe("/w/proj");
+    expect(store.listByProjectKey("/w/proj").map((a) => a.id)).toEqual(["p1"]);
+  });
+
+  it("treats legacy rows as private partners", () => {
+    store.insert(agent());
+    expect(store.get("a1")?.projectKey).toBeNull();
+    expect(store.listByProjectKey("/w/proj")).toEqual([]);
+  });
+
+  it("allows several bots in one project", () => {
+    store.insert(agent({ id: "p1", sessionId: "ps1", projectKey: "/w/proj" }));
+    expect(() =>
+      store.insert(
+        agent({ id: "p2", sessionId: "ps2", projectKey: "/w/proj" }),
+      ),
+    ).not.toThrow();
+    expect(store.listByProjectKey("/w/proj")).toHaveLength(2);
+  });
+
+  it("allows many private partners with null projectKey", () => {
+    store.insert(agent({ id: "a1", sessionId: "s1" }));
+    expect(() =>
+      store.insert(agent({ id: "a2", sessionId: "s2" })),
+    ).not.toThrow();
+  });
+});
+
+describe("persistent agent store migration · project_key", () => {
+  it("adds project_key to an existing table", () => {
+    closeDatabase();
+    const path = join(dir, "legacy-project.db");
+    const legacy = new DatabaseSync(path);
+    legacy.exec(`
+      CREATE TABLE persistent_agents (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, instructions TEXT NOT NULL,
+        cwd TEXT NOT NULL, session_id TEXT NOT NULL, schedule_config TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1, next_periodic_at INTEGER,
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        last_wakeup_at INTEGER, last_error TEXT,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+    `);
+    legacy.close();
+    const migrated = createPersistentAgentStore(initDatabase(path));
+    migrated.insert(agent({ id: "p9", sessionId: "ps9", projectKey: "/w/x" }));
+    expect(migrated.listByProjectKey("/w/x").map((a) => a.id)).toEqual(["p9"]);
   });
 });

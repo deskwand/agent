@@ -2515,7 +2515,11 @@ export class SessionManager {
     const sessionIds = this.listSessions()
       .sessions.filter((session) => {
         const sessionCwd = session.cwd;
-        return sessionCwd ? toWorkspaceKey(sessionCwd) === projectKey : false;
+        // 常驻会话（kind === "agent"）不随项目批量删除：它由智能体管理器负责
+        return sessionCwd
+          ? toWorkspaceKey(sessionCwd) === projectKey &&
+              session.kind !== "agent"
+          : false;
       })
       .map((session) => session.id);
 

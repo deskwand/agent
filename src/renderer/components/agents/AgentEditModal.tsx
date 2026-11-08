@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Folder, Shuffle, X } from "lucide-react";
 import {
   DEFAULT_AGENT_HEARTBEAT,
+  isProjectAgent,
   type PersistentAgentView,
 } from "../../../shared/persistent-agent";
 import {
@@ -23,21 +24,35 @@ import { Textarea } from "../ui/textarea";
 interface AgentEditModalProps {
   /** 不传 = 新建。 */
   agent?: PersistentAgentView;
+  /** 传了 = 给这个项目目录新建 Bot：目录只读。 */
+  projectCwd?: string;
   onClose: () => void;
 }
 
 const FIELD_LABEL = "text-xs font-medium text-muted-foreground";
 
-export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
+export function AgentEditModal({
+  agent,
+  projectCwd,
+  onClose,
+}: AgentEditModalProps) {
   const { t } = useTranslation();
   const removeSession = useAppStore((s) => s.removeSession);
   const upsert = usePersistentAgentStore((s) => s.upsert);
-  const [name, setName] = useState(agent?.name ?? "");
+  const projectName = projectCwd
+    ? (projectCwd.split(/[\\/]/).filter(Boolean).pop() ?? projectCwd)
+    : "";
+  const [name, setName] = useState(
+    agent?.name ??
+      (projectCwd
+        ? t("projectBot.nameTemplate", { project: projectName })
+        : ""),
+  );
   const [avatarSeed, setAvatarSeed] = useState(
     () => agent?.avatarSeed ?? crypto.randomUUID(),
   );
   const [instructions, setInstructions] = useState(agent?.instructions ?? "");
-  const [cwd, setCwd] = useState(agent?.cwd ?? "");
+  const [cwd, setCwd] = useState(agent?.cwd ?? projectCwd ?? "");
   const [risky, setRisky] = useState<RiskyCapabilities>(
     agent?.riskyCapabilities ?? ALL_RISKY_DISABLED,
   );
@@ -81,15 +96,25 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
               ? { trustedRecipients: trusted }
               : {}),
           })
-        : await window.electronAPI.persistentAgents.create({
-            name,
-            instructions,
-            ...(cwd ? { cwd } : {}),
-            schedule: DEFAULT_AGENT_HEARTBEAT,
-            wakeImmediately: true,
-            avatarSeed,
-            riskyCapabilities: risky,
-          });
+        : projectCwd
+          ? await window.electronAPI.persistentAgents.addToProject({
+              cwd: projectCwd,
+              name,
+              instructions,
+              schedule: DEFAULT_AGENT_HEARTBEAT,
+              wakeImmediately: true,
+              avatarSeed,
+              riskyCapabilities: risky,
+            })
+          : await window.electronAPI.persistentAgents.create({
+              name,
+              instructions,
+              ...(cwd ? { cwd } : {}),
+              schedule: DEFAULT_AGENT_HEARTBEAT,
+              wakeImmediately: true,
+              avatarSeed,
+              riskyCapabilities: risky,
+            });
       if (saved) upsert(saved);
       onClose();
     } catch (err) {
@@ -154,7 +179,11 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
                 checked={deleteSession}
                 onChange={(e) => setDeleteSession(e.target.checked)}
               />
-              {t("persistentAgents.delete.alsoSession")}
+              {t(
+                agent && isProjectAgent(agent)
+                  ? "persistentAgents.delete.alsoSessionProject"
+                  : "persistentAgents.delete.alsoSession",
+              )}
             </label>
           </div>
         ) : (
@@ -204,8 +233,8 @@ export function AgentEditModal({ agent, onClose }: AgentEditModalProps) {
                     {cwd || t("persistentAgents.form.autoWorkspace")}
                   </span>
                 </div>
-                {/* 工作目录绑定在会话上，建好后不能改 */}
-                {!agent && (
+                {/* 工作目录绑定在会话上，建好后不能改；项目 Bot 的目录来自项目 */}
+                {!agent && !projectCwd && (
                   <>
                     <Button
                       variant="outline"

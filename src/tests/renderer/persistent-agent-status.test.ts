@@ -15,6 +15,7 @@ function view(
     cwd: "/tmp",
     sessionId: "s1",
     avatarSeed: "seed",
+    projectKey: null,
     schedule: { kind: "interval", every: 30, unit: "minute" },
     enabled: true,
     nextPeriodicAt: null,

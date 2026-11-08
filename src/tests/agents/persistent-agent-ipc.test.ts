@@ -26,6 +26,7 @@ describe("registerPersistentAgentIpc", () => {
   it("registers every channel", () => {
     expect([...register(null).keys()].sort()).toEqual(
       [
+        "persistentAgents.addToProject",
         "persistentAgents.cancelWakeup",
         "persistentAgents.create",
         "persistentAgents.delete",
@@ -127,5 +128,54 @@ describe("registerPersistentAgentIpc", () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({ riskyCapabilities: caps }),
     );
+  });
+});
+
+describe("persistentAgents.addToProject", () => {
+  function managerStub() {
+    return {
+      createForProject: vi.fn(async (input: unknown) => input),
+    } as unknown as PersistentAgentManager;
+  }
+
+  const input = {
+    cwd: " /tmp/proj ",
+    name: " 瓦力 ",
+    instructions: " 盯构建 ",
+    schedule: { kind: "interval", every: 30, unit: "minute" },
+    wakeImmediately: false,
+  };
+
+  it("trims and forwards to createForProject", () => {
+    const manager = managerStub();
+    const handlers = register(manager);
+    handlers.get("persistentAgents.addToProject")!(null, input);
+    const calls = (
+      manager.createForProject as unknown as {
+        mock: { calls: unknown[][] };
+      }
+    ).mock.calls;
+    const passed = calls[0][0] as Record<string, unknown>;
+    expect(passed.cwd).toBe("/tmp/proj");
+    expect(passed.name).toBe("瓦力");
+    expect(passed.instructions).toBe("盯构建");
+    expect(passed.wakeImmediately).toBe(false);
+  });
+
+  it("rejects an unusable directory", () => {
+    const handlers = register(managerStub(), "workspace-missing");
+    expect(() =>
+      handlers.get("persistentAgents.addToProject")!(null, input),
+    ).toThrow("workspace-missing");
+  });
+
+  it("rejects an empty workspace", () => {
+    const handlers = register(managerStub());
+    expect(() =>
+      handlers.get("persistentAgents.addToProject")!(null, {
+        ...input,
+        cwd: "  ",
+      }),
+    ).toThrow("Workspace is required");
   });
 });

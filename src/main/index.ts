@@ -1272,6 +1272,8 @@ app
         registry: teammateMemory,
         resolveAgentId: (sessionId) =>
           persistentAgentManager?.findBySessionId(sessionId)?.id ?? null,
+        isProjectAgent: (agentId) =>
+          Boolean(persistentAgentManager?.get(agentId)?.projectKey),
       }),
       new GoalExtension(db),
       new IdeasExtension(ideaService),
@@ -5327,9 +5329,24 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         };
       }
 
+      // 项目 Bot 跟着项目一起删：否则会话被批量删掉、agent 记录变孤儿
+      const botSessionIds: string[] = [];
+      const deletedKey = toWorkspaceKey(normalizedCwd);
+      for (const bot of persistentAgentManager?.listByProjectKey(deletedKey) ??
+        []) {
+        botSessionIds.push(bot.sessionId);
+        try {
+          await persistentAgentManager!.delete(bot.id, { deleteSession: true });
+        } catch (error) {
+          // 一个 Bot 删失败不该拦住整个项目：留着它会显示成目录失效的红点
+          void logError("[project.delete] bot delete failed:", error);
+        }
+      }
       const deletedSessionIds = sessionManager
         ? await sessionManager.deleteProjectByCwd(normalizedCwd)
         : [];
+      // 机器人会话也要报给渲染层：否则「正在看的会话被删了」时侧栏不回欢迎页
+      deletedSessionIds.push(...botSessionIds);
       const currentWorkspaceKey = toWorkspaceKey(getWorkingDir() ?? "");
       if (
         currentWorkspaceKey &&

@@ -434,3 +434,22 @@ export function SidebarGroupIcon({
     </span>
   );
 }
+
+/** 常驻智能体的统一字形：与「伙伴」分组图标同一套同心圆，核心常亮。 */
+export function BotGlyph({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className ?? "h-3.5 w-3.5"}
+      aria-hidden="true"
+    >
+      {BOT_LENS_RINGS}
+      <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

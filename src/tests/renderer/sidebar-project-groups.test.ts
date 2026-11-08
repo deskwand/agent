@@ -206,12 +206,83 @@ describe("Sidebar project groups", () => {
     return row as HTMLElement;
   }
 
-  function pinButtonWithin(element: Element): HTMLButtonElement {
-    const button = element.querySelector(
-      `button[aria-label="${i18n.t("sidebar.pin")}"], button[aria-label="${i18n.t("sidebar.unpin")}"]`,
+  function projectMoreButton(cwd: string): HTMLButtonElement {
+    const header = projectHeader(cwd);
+    expect(header).toBeTruthy();
+    const button = Array.from(
+      header!.querySelectorAll("button[aria-label]"),
+    ).find(
+      (candidate) =>
+        candidate.getAttribute("aria-label") === i18n.t("sidebar.moreActions"),
     );
     expect(button).toBeTruthy();
     return button as HTMLButtonElement;
+  }
+
+  function projectMenuItems(): HTMLElement[] {
+    const menu = document.body.querySelector('[role="menu"]');
+    expect(menu).toBeTruthy();
+    return Array.from(menu!.querySelectorAll('[role="menuitem"]'));
+  }
+
+  async function openProjectMenu(cwd: string): Promise<void> {
+    // Radix 的 Trigger 只挂 pointerdown；补一发 click 会被 DismissableLayer 立刻关掉
+    //（与会话菜单同一条坑，见 openSessionMenu）。
+    await act(async () => {
+      projectMoreButton(cwd).dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        }),
+      );
+    });
+    await flush();
+  }
+
+  async function projectMenuAction(
+    cwd: string,
+    labels: string[],
+  ): Promise<string> {
+    await openProjectMenu(cwd);
+    const item = projectMenuItems().find((element) =>
+      labels.includes((element.textContent ?? "").trim()),
+    );
+    expect(item).toBeTruthy();
+    const label = (item!.textContent ?? "").trim();
+    await act(async () => item!.click());
+    await flush();
+    return label;
+  }
+
+  /** 打开菜单读「置顶 / 取消置顶」的当前文案，读完 Esc 关掉。 */
+  async function projectPinLabel(cwd: string): Promise<string> {
+    await openProjectMenu(cwd);
+    const item = projectMenuItems().find((element) =>
+      [i18n.t("sidebar.pin"), i18n.t("sidebar.unpin")].includes(
+        (element.textContent ?? "").trim(),
+      ),
+    );
+    expect(item).toBeTruthy();
+    const label = (item!.textContent ?? "").trim();
+    await act(async () => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    await flush();
+    return label;
+  }
+
+  async function toggleProjectPin(cwd: string): Promise<void> {
+    await projectMenuAction(cwd, [
+      i18n.t("sidebar.pin"),
+      i18n.t("sidebar.unpin"),
+    ]);
+  }
+
+  async function deleteProjectFromMenu(cwd: string): Promise<void> {
+    await projectMenuAction(cwd, [i18n.t("common.delete")]);
   }
 
   function findActionRow(button: HTMLElement): HTMLElement | null {
@@ -586,7 +657,7 @@ describe("Sidebar project groups", () => {
     const oldExpanded =
       projectToggle("/work/old").getAttribute("aria-expanded");
 
-    await act(async () => pinButtonWithin(projectHeader("/work/old")!).click());
+    await toggleProjectPin("/work/old");
 
     expect(projectToggle("/work/old").getAttribute("aria-expanded")).toBe(
       oldExpanded,
@@ -600,11 +671,9 @@ describe("Sidebar project groups", () => {
       sessionIds: [],
       projectKeys: ["/work/old"],
     });
-    expect(
-      pinButtonWithin(projectHeader("/work/old")!).getAttribute("aria-label"),
-    ).toBe(i18n.t("sidebar.unpin"));
+    expect(await projectPinLabel("/work/old")).toBe(i18n.t("sidebar.unpin"));
 
-    await act(async () => pinButtonWithin(projectHeader("/work/old")!).click());
+    await toggleProjectPin("/work/old");
     expect((container.textContent ?? "").indexOf("new")).toBeLessThan(
       (container.textContent ?? "").indexOf("old"),
     );
@@ -1429,14 +1498,7 @@ describe("Sidebar project groups", () => {
       session("p2", { isProjectMode: true, cwd: "/work/deskwand" }),
     ]);
 
-    const trash = projectHeader("/work/deskwand")?.querySelector(
-      `button[aria-label="${i18n.t("common.delete")}"]`,
-    ) as HTMLButtonElement;
-    expect(trash).toBeTruthy();
-    expect(trash.className).toContain("opacity-0");
-    expect(trash.className).toContain("pointer-events-none");
-
-    await act(async () => trash.click());
+    await deleteProjectFromMenu("/work/deskwand");
     expect(ipc.deleteProject).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain(
       i18n.t("sidebar.deleteProjectConfirmWithName", { name: "deskwand" }),
@@ -1466,11 +1528,7 @@ describe("Sidebar project groups", () => {
       }),
     ]);
 
-    const trash = projectHeader("/work/deskwand")?.querySelector(
-      `button[aria-label="${i18n.t("common.delete")}"]`,
-    ) as HTMLButtonElement;
-    expect(trash).toBeTruthy();
-    await act(async () => trash.click());
+    await deleteProjectFromMenu("/work/deskwand");
 
     expect(document.body.textContent).toContain(
       i18n.t("sidebar.deleteProjectRunningHint", { count: 1 }),
@@ -1503,11 +1561,7 @@ describe("Sidebar project groups", () => {
       session("p1", { isProjectMode: true, cwd: "/work/deskwand" }),
     ]);
 
-    const trash = projectHeader("/work/deskwand")?.querySelector(
-      `button[aria-label="${i18n.t("common.delete")}"]`,
-    ) as HTMLButtonElement;
-    expect(trash).toBeTruthy();
-    await act(async () => trash.click());
+    await deleteProjectFromMenu("/work/deskwand");
     await act(async () => findButton(i18n.t("sidebar.confirmDelete"))?.click());
     await flush();
 
@@ -1535,10 +1589,7 @@ describe("Sidebar project groups", () => {
       session("p1", { isProjectMode: true, cwd: "/work/deskwand" }),
     ]);
 
-    const trash = projectHeader("/work/deskwand")?.querySelector(
-      `button[aria-label="${i18n.t("common.delete")}"]`,
-    ) as HTMLButtonElement;
-    await act(async () => trash.click());
+    await deleteProjectFromMenu("/work/deskwand");
     await act(async () => findButton(i18n.t("sidebar.confirmDelete"))?.click());
     await flush();
 
@@ -1561,10 +1612,7 @@ describe("Sidebar project groups", () => {
       session("p1", { isProjectMode: true, cwd: "/work/deskwand" }),
     ]);
 
-    const trash = projectHeader("/work/deskwand")?.querySelector(
-      `button[aria-label="${i18n.t("common.delete")}"]`,
-    ) as HTMLButtonElement;
-    await act(async () => trash.click());
+    await deleteProjectFromMenu("/work/deskwand");
     await act(async () => findButton(i18n.t("sidebar.confirmDelete"))?.click());
     await flush();
 
@@ -1593,10 +1641,9 @@ describe("Sidebar project groups", () => {
     ]);
 
     const header = projectHeader("/work/pinned")!;
-    const pin = pinButtonWithin(header);
-    // pin 必须是尾部动作里的最后一个：同样只在 hover / 聚焦时浮出的「新建 / 删除」
-    // 只能落在它左边，否则 pin 的图标中心会停在这一行的中段，
-    // 和会话行的相对时间 / 状态点错开两列。
+    const pin = projectMoreButton("/work/pinned");
+    // 「更多」必须是尾部动作里的最后一个：新建会话 / 新建 Bot 只能落在它左边，
+    // 否则 ⋯ 的图标中心会停在这一行的中段，和会话行的时间 / 状态点错开两列。
     const trailing = Array.from(header.querySelectorAll("button[aria-label]"));
     expect(trailing[trailing.length - 1]).toBe(pin);
     expect(header.lastElementChild?.contains(pin)).toBe(true);
@@ -1737,7 +1784,7 @@ describe("Sidebar project groups", () => {
       }),
     ]);
 
-    const pin = pinButtonWithin(projectHeader("/work/pinned")!);
+    const pin = projectMoreButton("/work/pinned");
     // 置顶状态不再有常驻标记：静止时它和「新建 / 删除」一样是藏着的。
     // 逐 token 比对：`toContain("opacity-100")` 会被 `group-hover/project:opacity-100`
     // 这类带前缀的 token 骗过，所以先 split 再比。
@@ -1749,11 +1796,8 @@ describe("Sidebar project groups", () => {
     // 一起吃掉，少了 focus-within 这条，键盘用户就撞在一个看不见的按钮上。
     expect(tokens).toContain("group-hover/project:opacity-100");
     expect(tokens).toContain("group-focus-within/project:opacity-100");
-    // 藏起来的是标记，不是能力：已置顶时仍是「取消置顶」，实心图标保留。
-    expect(pin.getAttribute("aria-label")).toBe(i18n.t("sidebar.unpin"));
-    expect(pin.querySelector("svg")?.getAttribute("class")).toContain(
-      "fill-current",
-    );
+    // 藏起来的是标记，不是能力：已置顶时菜单里仍是「取消置顶」。
+    expect(await projectPinLabel("/work/pinned")).toBe(i18n.t("sidebar.unpin"));
   });
 
   it("后置顶的项目排到最上面（新置顶进数组头）", async () => {
@@ -1768,11 +1812,11 @@ describe("Sidebar project groups", () => {
     // 未置顶时按最早创建时间倒序：新的在前
     expect(projectOrder()).toEqual(["/work/new", "/work/old"]);
 
-    await act(async () => pinButtonWithin(projectHeader("/work/old")!).click());
+    await toggleProjectPin("/work/old");
     // 置顶区按在未置顶区前面，所以 old 上来
     expect(projectOrder()).toEqual(["/work/old", "/work/new"]);
     // 后置顶的进数组头 = 排在先置顶的那颗前面
-    await act(async () => pinButtonWithin(projectHeader("/work/new")!).click());
+    await toggleProjectPin("/work/new");
     expect(projectOrder()).toEqual(["/work/new", "/work/old"]);
     expect(
       JSON.parse(localStorage.getItem("deskwand.sidebarPins") ?? "{}"),

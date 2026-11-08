@@ -211,3 +211,61 @@ describe("MemoryExtension", () => {
     });
   });
 });
+
+describe("MemoryExtension · project bot routing", () => {
+  function fakeService(label: string) {
+    return {
+      label,
+      isEnabled: () => true,
+      getTools: vi.fn(() => []),
+      enqueueIngestion: vi.fn(async () => undefined),
+      deleteSession: vi.fn(async () => undefined),
+    };
+  }
+
+  function agentSession() {
+    return {
+      ...createSession(),
+      id: "s-agent-1",
+      kind: "agent" as const,
+      memoryEnabled: false,
+      isProjectMode: true,
+      cwd: "/repo/proj",
+    };
+  }
+
+  function run(
+    global: ReturnType<typeof fakeService>,
+    teammate: ReturnType<typeof fakeService>,
+    isProject: boolean,
+  ) {
+    const extension = new MemoryExtension(global as unknown as MemoryService, {
+      registry: { getForAgent: () => teammate as unknown as MemoryService },
+      resolveAgentId: () => "agent-1",
+      isProjectAgent: () => isProject,
+    });
+    return extension.beforeSessionRun!({
+      session: agentSession(),
+      prompt: "x",
+      existingMessages: [],
+      isColdStart: true,
+    });
+  }
+
+  it("routes a project bot to the global service", async () => {
+    const global = fakeService("global");
+    const teammate = fakeService("teammate");
+    const result = await run(global, teammate, true);
+    expect(result?.systemPromptSuffix).toContain("<memory-policy>");
+    expect(global.getTools).toHaveBeenCalledWith("/repo/proj");
+    expect(teammate.getTools).not.toHaveBeenCalled();
+  });
+
+  it("keeps routing private partners to the teammate registry", async () => {
+    const global = fakeService("global");
+    const teammate = fakeService("teammate");
+    await run(global, teammate, false);
+    expect(teammate.getTools).toHaveBeenCalledWith("/repo/proj");
+    expect(global.getTools).not.toHaveBeenCalled();
+  });
+});

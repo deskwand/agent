@@ -12,6 +12,7 @@ import type { PersistentAgentView } from "../../shared/persistent-agent";
 const api = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
+  addToProject: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
 }));
@@ -22,6 +23,7 @@ function view(id: string, overrides: Partial<PersistentAgentView> = {}) {
     name: `agent-${id}`,
     instructions: "do things",
     cwd: "/tmp/work",
+    projectKey: null,
     sessionId: `s-${id}`,
     avatarSeed: "seed",
     schedule: { kind: "interval", every: 30, unit: "minute" },
@@ -513,5 +515,43 @@ describe("AgentEditModal hides the wake schedule", () => {
         schedule: { kind: "interval", every: 30, unit: "minute" },
       }),
     );
+  });
+});
+
+describe("AgentEditModal · project cwd", () => {
+  it("keeps the project directory read-only and submits through addToProject", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const local = createRoot(host);
+    api.addToProject.mockResolvedValue(view("7"));
+    act(() =>
+      local.render(
+        <AgentEditModal projectCwd="/repo/proj" onClose={() => undefined} />,
+      ),
+    );
+    await flush();
+
+    expect(document.body.textContent).toContain("/repo/proj");
+    expect(document.body.textContent).not.toContain("选择文件夹");
+
+    act(() => {
+      setInput(document.querySelector("#agent-name")!, "瓦力");
+      setInput(document.querySelector("#agent-instructions")!, "盯构建");
+    });
+    const createButton = [...document.querySelectorAll("button")].find(
+      (element) => element.textContent?.trim() === "创建",
+    )!;
+    act(() => createButton.click());
+    await flush();
+
+    expect(api.addToProject).toHaveBeenCalledWith(
+      expect.objectContaining({ cwd: "/repo/proj", name: "瓦力" }),
+    );
+    expect(api.create).not.toHaveBeenCalled();
+
+    await act(async () => {
+      local.unmount();
+    });
+    host.remove();
   });
 });

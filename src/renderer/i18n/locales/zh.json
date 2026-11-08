@@ -1185,7 +1185,8 @@
     },
     "projects": "项目",
     "expandProjects": "展开项目列表",
-    "collapseProjects": "收起项目列表"
+    "collapseProjects": "收起项目列表",
+    "deleteProjectBotsHint": "该项目的 Bot 也会一起删除（会话与记忆），项目文件不受影响。"
   },
   "browser": {
     "placeholder": "搜索或输入网址",
@@ -3098,7 +3099,8 @@
       "action": "删除",
       "title": "删除「{{name}}」？",
       "alsoSession": "同时删除它的会话、记忆和专属工作区（默认保留）",
-      "confirm": "删除"
+      "confirm": "删除",
+      "alsoSessionProject": "同时删除它的会话与记忆（默认保留），项目文件不受影响"
     },
     "bar": {
       "wakeups": "待执行预约",
@@ -3109,5 +3111,10 @@
       "resume": "恢复",
       "settings": "设置"
     }
+  },
+  "projectBot": {
+    "create": "新建 Bot",
+    "badge": "Bot",
+    "nameTemplate": "{{project}} · Bot"
   }
 }

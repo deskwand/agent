@@ -27,7 +27,10 @@ import {
   type PersistentAgentUpdateInput,
   type PersistentAgentView,
   type PersistentAgentWakeup,
+  type ProjectAgentCreateInput,
+  isProjectAgent,
 } from "../../shared/persistent-agent";
+import { toWorkspaceKey } from "../../shared/workspace-path";
 import {
   MAX_TIMER_DELAY_MS,
   computeNextRunAt,
@@ -161,6 +164,13 @@ export class PersistentAgentManager {
     return this.store.getBySessionId(sessionId);
   }
 
+  /** 某个项目下的全部 Bot（按创建时间升序）。 */
+  listByProjectKey(projectKey: string): PersistentAgentView[] {
+    return this.store
+      .listByProjectKey(projectKey)
+      .map((agent) => this.toView(agent));
+  }
+
   listWakeups(id: string): PersistentAgentWakeup[] {
     return this.store.listWakeups(id);
   }
@@ -191,6 +201,52 @@ export class PersistentAgentManager {
       checkInNote: null,
       trustedRecipients: [],
       riskyCapabilities: { ...(input.riskyCapabilities ?? ALL_RISKY_DISABLED) },
+      projectKey: null,
+    };
+    this.store.insert(agent);
+    this.arm(agent.id);
+    if (input.wakeImmediately) {
+      await this.deliver(agent.id, [{ type: "manual" }], 0);
+    }
+    return this.emit(agent.id)!;
+  }
+
+  /**
+   * 为项目目录新建一个 Bot。不幂等：同一项目可以挂多个不同角色的 Bot，
+   * 每次调用都是一条新记录。与 create() 的唯一区别是 cwd 来自项目目录、不分配托管工作区。
+   */
+  async createForProject(
+    input: ProjectAgentCreateInput,
+  ): Promise<PersistentAgentView> {
+    const cwd = input.cwd.trim();
+    const reason = this.checkWorkspace(cwd);
+    if (reason) {
+      throw new Error(reason);
+    }
+    const projectKey = toWorkspaceKey(cwd);
+    const now = this.now();
+    const id = uuidv4();
+    const sessionId = this.sessions.createAgentSession(input.name, cwd);
+    const agent: PersistentAgent = {
+      id,
+      name: input.name,
+      instructions: input.instructions,
+      cwd,
+      sessionId,
+      avatarSeed: input.avatarSeed?.trim() || uuidv4(),
+      schedule: input.schedule,
+      enabled: true,
+      nextPeriodicAt: nextPeriodicFrom(input.schedule, now),
+      consecutiveFailures: 0,
+      lastWakeupAt: null,
+      lastError: null,
+      createdAt: now,
+      updatedAt: now,
+      nextCheckInAt: null,
+      checkInNote: null,
+      trustedRecipients: [],
+      riskyCapabilities: { ...(input.riskyCapabilities ?? ALL_RISKY_DISABLED) },
+      projectKey,
     };
     this.store.insert(agent);
     this.arm(agent.id);
@@ -250,9 +306,12 @@ export class PersistentAgentManager {
     this.store.delete(id);
     if (options.deleteSession) {
       await this.sessions.deleteSession(agent.sessionId);
-      void this.storage
-        .removeAgentData(id)
-        .catch((e) => logError("[PersistentAgents] remove data failed:", e));
+      // 项目 Bot 的数据不在 teammates/<id>/ 下，别去碰它
+      if (!isProjectAgent(agent)) {
+        void this.storage
+          .removeAgentData(id)
+          .catch((e) => logError("[PersistentAgents] remove data failed:", e));
+      }
     } else if (this.sessions.sessionExists(agent.sessionId)) {
       this.sessions.releaseSession(agent.sessionId);
     }

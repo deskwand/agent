@@ -36,6 +36,7 @@ const T = new Date(2026, 10, 1, 8, 0).getTime();
 
 let dir: string;
 let store: PersistentAgentStore;
+let storage: ReturnType<typeof createTeammateStorage>;
 let clock: number;
 let running: Set<string>;
 let existing: Set<string>;
@@ -102,10 +103,11 @@ beforeEach(() => {
     releaseSession: vi.fn<(sessionId: string) => void>(),
     deleteSession: vi.fn(async (_sessionId: string) => undefined),
   };
+  storage = createTeammateStorage(dir, { dispose: memoryDispose });
   manager = new PersistentAgentManager({
     store,
     sessions,
-    storage: createTeammateStorage(dir, { dispose: memoryDispose }),
+    storage,
     checkWorkspace: () => workspaceError,
     onEvent: (event) => events.push(event),
     now: () => clock,
@@ -587,5 +589,58 @@ describe("teammate outbound safety fields", () => {
     manager.addTrustedRecipient(view.id, "bob@x.com");
     expect(store.get(view.id)?.trustedRecipients).toEqual(["bob@x.com"]);
     expect(() => manager.addTrustedRecipient("missing", "a@b.c")).not.toThrow();
+  });
+});
+
+describe("PersistentAgentManager · project bots", () => {
+  const projectInput = {
+    cwd: "/tmp/my-proj",
+    name: "项目 Bot",
+    instructions: "盯着这个项目",
+    schedule: { kind: "interval" as const, every: 30, unit: "minute" as const },
+    wakeImmediately: false,
+  };
+
+  it("creates a bot bound to the project dir without a managed workspace", async () => {
+    const view = await manager.createForProject(projectInput);
+    expect(view.projectKey).toBe("/tmp/my-proj");
+    expect(view.cwd).toBe("/tmp/my-proj");
+    expect(existsSync(getTeammateWorkspace(dir, view.id))).toBe(false);
+  });
+
+  it("creates a second bot in the same project", async () => {
+    const a = await manager.createForProject(projectInput);
+    const b = await manager.createForProject({
+      ...projectInput,
+      name: "文档维护",
+    });
+    expect(a.id).not.toBe(b.id);
+    expect(a.sessionId).not.toBe(b.sessionId);
+    expect(manager.list().filter((item) => item.projectKey)).toHaveLength(2);
+  });
+
+  it("fails without writing anything when the dir is unusable", async () => {
+    workspaceError = "workspace-missing";
+    await expect(
+      manager.createForProject({ ...projectInput, cwd: "/tmp/gone" }),
+    ).rejects.toThrow();
+    expect(manager.list()).toHaveLength(0);
+  });
+
+  it("marks a project bot whose directory disappeared but keeps it", async () => {
+    const view = await manager.createForProject(projectInput);
+    workspaceError = "workspace-missing";
+    await manager.wakeNow(view.id);
+    expect(manager.get(view.id)?.lastError).toBe("workspace-missing");
+    expect(manager.list()).toHaveLength(1);
+  });
+
+  it("does not delete teammate data for a project bot", async () => {
+    const view = await manager.createForProject(projectInput);
+    const removeSpy = vi.spyOn(storage, "removeAgentData");
+    await manager.delete(view.id, { deleteSession: true });
+    expect(removeSpy).not.toHaveBeenCalled();
+    expect(sessions.deleteSession).toHaveBeenCalledWith(view.sessionId);
+    expect(manager.list()).toHaveLength(0);
   });
 });

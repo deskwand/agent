@@ -7,6 +7,7 @@ import type { IpcMain } from "electron";
 import type {
   PersistentAgentCreateInput,
   PersistentAgentUpdateInput,
+  ProjectAgentCreateInput,
 } from "../../shared/persistent-agent";
 import {
   RISKY_CAPABILITIES,
@@ -74,6 +75,25 @@ export function registerPersistentAgentIpc({
       }
       return manager.create({
         ...input,
+        name: input.name.trim(),
+        instructions: input.instructions.trim(),
+      });
+    },
+  );
+  ipcMain.handle(
+    "persistentAgents.addToProject",
+    (_event, input: ProjectAgentCreateInput) => {
+      const manager = requireManager();
+      assertText(input.name, "Name");
+      assertText(input.instructions, "Instructions");
+      if (!input.cwd?.trim()) throw new Error("Workspace is required");
+      assertWorkspace(input.cwd);
+      if (input.riskyCapabilities !== undefined) {
+        assertRiskyCapabilities(input.riskyCapabilities);
+      }
+      return manager.createForProject({
+        ...input,
+        cwd: input.cwd.trim(),
         name: input.name.trim(),
         instructions: input.instructions.trim(),
       });

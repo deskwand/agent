@@ -1185,7 +1185,8 @@
     },
     "projects": "Projects",
     "expandProjects": "Expand projects",
-    "collapseProjects": "Collapse projects"
+    "collapseProjects": "Collapse projects",
+    "deleteProjectBotsHint": "Its bots are deleted too (sessions and memory). Files on disk are kept."
   },
   "browser": {
     "placeholder": "Search or enter URL",
@@ -3101,7 +3102,8 @@
       "action": "Delete",
       "title": "Delete \"{{name}}\"?",
       "alsoSession": "Also delete its session, memory and dedicated workspace (kept by default)",
-      "confirm": "Delete"
+      "confirm": "Delete",
+      "alsoSessionProject": "Also delete its session and memory (kept by default). Files on disk are kept."
     },
     "bar": {
       "wakeups": "Upcoming wakeups",
@@ -3112,5 +3114,10 @@
       "resume": "Resume",
       "settings": "Settings"
     }
+  },
+  "projectBot": {
+    "create": "New bot",
+    "badge": "Bot",
+    "nameTemplate": "{{project}} · Bot"
   }
 }

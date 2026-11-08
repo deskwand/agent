@@ -39,6 +39,8 @@ export interface PersistentAgent {
   trustedRecipients: string[];
   /** 高风险能力开关（shell / 浏览器 / 电脑操作）。 */
   riskyCapabilities: RiskyCapabilities;
+  /** 项目 Bot 的归属键（`toWorkspaceKey(cwd)`）；私有伙伴为 null。 */
+  projectKey: string | null;
 }
 
 export interface PersistentAgentWakeup {
@@ -122,3 +124,21 @@ export const DEFAULT_AGENT_HEARTBEAT: AgentScheduleConfig = {
   every: 30,
   unit: "minute",
 };
+
+/** 项目 Bot 与私有伙伴的唯一判据。所有分支点走这里，不各自裸判 projectKey。 */
+export function isProjectAgent<T extends { projectKey: string | null }>(
+  agent: T,
+): agent is T & { projectKey: string } {
+  return Boolean(agent.projectKey);
+}
+
+/** 为项目目录新建 Bot 的入参：cwd 就是项目目录，也是 projectKey 的来源。 */
+export interface ProjectAgentCreateInput {
+  cwd: string;
+  name: string;
+  instructions: string;
+  schedule: AgentScheduleConfig;
+  wakeImmediately: boolean;
+  avatarSeed?: string;
+  riskyCapabilities?: RiskyCapabilities;
+}

@@ -1,3 +1,4 @@
+import { isProjectAgent } from "../../shared/persistent-agent";
 import {
   DEFAULT_WORKDIR_DIRNAME,
   toWorkspaceKey,
@@ -16,6 +17,9 @@ export interface SidebarProjectGroup {
    * 已「完成沉底」的会话照样参与 —— 它是真实活动。
    */
   latestActivityAt: number;
+  /** 挂在该项目上的 Bot（按 createdAt 升序）；没有则为空数组。 */
+  botAgentIds: string[];
+  botSessionIds: string[];
 }
 
 export interface SidebarSessionGroups {
@@ -81,16 +85,45 @@ function sortByActivity(
   });
 }
 
+export interface SidebarProjectAgent {
+  projectKey: string | null;
+  id: string;
+  sessionId: string;
+  cwd: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export function buildSidebarSessionGroups(
   sessions: Session[],
   query: string,
   pins: SidebarPins = EMPTY_SIDEBAR_PINS,
+  projectAgents: readonly SidebarProjectAgent[] = [],
 ): SidebarSessionGroups {
   const normalizedQuery = query.trim().toLowerCase();
   const pinnedSessionRanks = buildRankMap(pins.sessionIds);
   const pinnedProjectRanks = buildRankMap(pins.projectKeys);
   const unscoped: Session[] = [];
   const projects = new Map<string, { cwd: string; sessions: Session[] }>();
+  const botsByKey = new Map<string, SidebarProjectAgent[]>();
+
+  for (const agent of projectAgents) {
+    if (!isProjectAgent(agent)) continue;
+    const botKey = toWorkspaceKey(normalizeWorkspacePath(agent.projectKey));
+    const bots = botsByKey.get(botKey);
+    if (bots) bots.push(agent);
+    else botsByKey.set(botKey, [agent]);
+  }
+
+  // 只有 Bot、还没有普通会话的项目也要成组
+  for (const [botKey, bots] of botsByKey) {
+    if (!projects.has(botKey)) {
+      projects.set(botKey, {
+        cwd: normalizeWorkspacePath(bots[0].cwd),
+        sessions: [],
+      });
+    }
+  }
 
   for (const session of sessions) {
     if (session.archived) continue;
@@ -125,17 +158,32 @@ export function buildSidebarSessionGroups(
               !normalizedQuery ||
               session.title.toLowerCase().includes(normalizedQuery),
           );
+      const bots = [...(botsByKey.get(key) ?? [])].sort(
+        (a, b) => a.createdAt - b.createdAt,
+      );
       return {
         key,
         cwd,
         name,
         sessions: sortByActivity(visibleSessions, pinnedSessionRanks),
-        earliestCreatedAt: Math.min(...projectSessions.map((s) => s.createdAt)),
-        latestActivityAt: Math.max(...projectSessions.map(sessionTime)),
+        botAgentIds: bots.map((bot) => bot.id),
+        botSessionIds: bots.map((bot) => bot.sessionId),
+        earliestCreatedAt: Math.min(
+          ...projectSessions.map((s) => s.createdAt),
+          ...bots.map((bot) => bot.createdAt),
+        ),
+        latestActivityAt: Math.max(
+          ...projectSessions.map(sessionTime),
+          ...bots.map((bot) => bot.updatedAt || bot.createdAt),
+          0,
+        ),
       };
     },
   )
-    .filter(({ sessions }) => sessions.length > 0)
+    .filter(
+      ({ sessions, botAgentIds }) =>
+        sessions.length > 0 || botAgentIds.length > 0,
+    )
     .sort((a, b) => {
       const pinnedOrder = comparePinned(a.key, b.key, pinnedProjectRanks);
       if (pinnedOrder !== null) return pinnedOrder;
@@ -260,4 +308,16 @@ export function listWorkspaceProjects(sessions: Session[]): WorkspaceProject[] {
   return Array.from(byName, ([name, cwd]) => ({ name, cwd })).sort((a, b) =>
     a.name.localeCompare(b.name),
   );
+}
+
+/** 徽标与「在跑」判定用的成员列表：普通会话 + 挂在该项目上的 Bot 会话。 */
+export function projectGroupSessions(
+  group: Pick<SidebarProjectGroup, "sessions" | "botSessionIds">,
+  sessionsById: ReadonlyMap<string, Session>,
+): Session[] {
+  if (group.botSessionIds.length === 0) return group.sessions;
+  const botSessions = group.botSessionIds
+    .map((id) => sessionsById.get(id))
+    .filter((session): session is Session => Boolean(session));
+  return [...group.sessions, ...botSessions];
 }

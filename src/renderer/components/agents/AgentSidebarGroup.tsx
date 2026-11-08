@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
 import { usePersistentAgentStore } from "../../store/persistent-agents";
+import { isProjectAgent } from "../../../shared/persistent-agent";
 import { formatAgentStatus } from "../../utils/persistent-agent-status";
 import { Button } from "../app-button";
 import { PartnerAvatar } from "./PartnerAvatar";
@@ -45,7 +46,9 @@ export function AgentSidebarGroup({
       .catch(() => undefined);
   }, [setAll]);
   const sessions = useAppStore((s) => s.sessions);
-  const list = Object.values(agents).sort((a, b) => a.createdAt - b.createdAt);
+  const list = Object.values(agents)
+    .filter((agent) => !isProjectAgent(agent))
+    .sort((a, b) => a.createdAt - b.createdAt);
   const now = Date.now();
 
   return (
