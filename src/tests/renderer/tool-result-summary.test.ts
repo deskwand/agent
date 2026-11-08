@@ -34,24 +34,28 @@ describe("getCollapsedToolSummary", () => {
   });
 
   // --- bash / execute_command ---
-  it("shows last non-empty line for bash", () => {
+  // 行尾后缀不显示：最后一行输出不是结论（`}`、`---`、进度条残渣），
+  // 标题已经说清了在干什么，要看输出就点开这一行。
+  it("shows no suffix for bash", () => {
     expect(
       getCollapsedToolSummary(
         "bash",
         "building...\ncompiling...\nexit 0",
         false,
       ),
-    ).toEqual({
-      kind: "exitLine",
-      text: "exit 0",
+    ).toEqual({ kind: "none" });
+  });
+
+  it("shows no suffix for execute_command", () => {
+    expect(getCollapsedToolSummary("execute_command", "ok", false)).toEqual({
+      kind: "none",
     });
   });
 
-  it("shows last line for execute_command", () => {
-    expect(getCollapsedToolSummary("execute_command", "ok", false)).toEqual({
-      kind: "exitLine",
-      text: "ok",
-    });
+  it("still reports errors for bash", () => {
+    expect(
+      getCollapsedToolSummary("bash", "permission denied\nstack trace", true),
+    ).toEqual({ kind: "error", text: "permission denied" });
   });
 
   // --- write / edit ---
@@ -350,15 +354,6 @@ describe("formatCollapsedToolSummary", () => {
         t as never,
       ),
     ).toBe("+3 -1");
-  });
-
-  it("formats exitLine summaries directly", () => {
-    expect(
-      formatCollapsedToolSummary(
-        { kind: "exitLine", text: "exit 0" },
-        t as never,
-      ),
-    ).toBe("exit 0");
   });
 
   it("formats line summaries through i18n", () => {

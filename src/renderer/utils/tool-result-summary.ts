@@ -17,8 +17,7 @@ export type CollapsedToolSummary =
   | { kind: "matches"; count: number }
   | { kind: "chars"; count: number }
   | { kind: "modified" }
-  | { kind: "diff"; added: number; removed: number }
-  | { kind: "exitLine"; text: string };
+  | { kind: "diff"; added: number; removed: number };
 
 function isFileReadTool(name: string): boolean {
   const lower = name.toLowerCase();
@@ -122,12 +121,6 @@ function getFirstContentLine(text: string, maxLen = 80): string {
   return firstLine;
 }
 
-function getLastNonEmptyLine(text: string): string {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  const last = lines[lines.length - 1] ?? "";
-  return last.length > 80 ? `${last.substring(0, 77)}…` : last;
-}
-
 function isScreenshotToolName(toolName?: string): boolean {
   if (!toolName) {
     return false;
@@ -202,9 +195,12 @@ export function getCollapsedToolSummary(
     return { kind: "text", text: getFirstContentLine(normalized) };
   }
 
-  // Bash — show last non-empty line (typically exit code or final status)
+  // Bash — 不出后缀。输出的最后一行几乎从来不是「结论」：闭合括号、分隔线、
+  // 进度条残渣各占一份，而这些行的标题（模型写的 description / 命令动词）已经
+  // 说清做了什么；真正要看输出就点开这一行。失败时的信息仍由上面的 isError
+  // 分支给出，不在这里丢。
   if (isBashTool(toolNameLower)) {
-    return { kind: "exitLine", text: getLastNonEmptyLine(normalized) };
+    return { kind: "none" };
   }
 
   // Write / Edit — show diff line counts when available, otherwise "modified"
@@ -273,9 +269,6 @@ export function formatCollapsedToolSummary(
       added: summary.added,
       removed: summary.removed,
     });
-  }
-  if (summary.kind === "exitLine") {
-    return summary.text;
   }
   if (summary.kind === "lines") {
     return t("tool.summaryLines", { count: summary.count });
