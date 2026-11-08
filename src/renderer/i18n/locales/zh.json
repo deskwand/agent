@@ -1917,7 +1917,9 @@
       "cmdBuild": "构建项目",
       "cmdInstall": "安装依赖",
       "cmdSearchCode": "在代码里搜索",
-      "statusUnavailable": "输出不可用"
+      "statusUnavailable": "输出不可用",
+      "scriptSteps_one": "脚本 · {{count}} 步",
+      "scriptSteps_other": "脚本 · {{count}} 步"
     },
     "askUser": {
       "title": "向你提问",

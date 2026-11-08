@@ -1918,7 +1918,9 @@
       "cmdBuild": "Built the project",
       "cmdInstall": "Installed dependencies",
       "cmdSearchCode": "Searched the code",
-      "statusUnavailable": "Output unavailable"
+      "statusUnavailable": "Output unavailable",
+      "scriptSteps_one": "Script · {{count}} step",
+      "scriptSteps_other": "Script · {{count}} steps"
     },
     "askUser": {
       "title": "Question for you",

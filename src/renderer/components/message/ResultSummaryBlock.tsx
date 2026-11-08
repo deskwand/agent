@@ -14,6 +14,7 @@ import {
 } from "../../utils/tool-result-summary";
 import { shortenPath } from "./toolHelpers";
 import { ToolUseBlock } from "./ToolUseBlock";
+import { getCodemodeScriptLabel } from "../../utils/codemode-script-label";
 import {
   Collapsible,
   CollapsibleContent,
@@ -85,6 +86,15 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
 
   const scriptIds = new Set((block.scripts ?? []).map((script) => script.id));
   const visibleItems = block.items.filter((item) => !scriptIds.has(item.id));
+
+  // 每个脚本调了几次子工具：没有意图注释时用它区分多个脚本。
+  // 零子调用时投影会把父块自己推回来（id === parentToolCallId），不算子调用。
+  const scriptStepCounts = new Map<string, number>();
+  for (const item of block.items) {
+    const parentId = item.trace?.parentToolCallId;
+    if (!parentId || parentId === item.id) continue;
+    scriptStepCounts.set(parentId, (scriptStepCounts.get(parentId) ?? 0) + 1);
+  }
   const highlighted = containsToolCall(highlightedToolCallId);
 
   const allMessages = useAppStore((s) =>
@@ -198,9 +208,14 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
                   <Button
                     variant="ghost"
                     type="button"
+                    data-script-row
                     className="text-xs text-muted-foreground h-auto px-0 hover:bg-transparent hover:text-current"
                   >
-                    {t("tool.grouped.scriptDetails")}
+                    {getCodemodeScriptLabel(
+                      script.input.code,
+                      scriptStepCounts.get(script.id) ?? 0,
+                      t,
+                    )}
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>

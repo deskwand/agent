@@ -252,8 +252,9 @@ describe("codemode tool group UI", () => {
     // 外部高亮请求（从活动面板点进来）仍然展开详情并一次性消费待展开标记。
     act(() => useAppStore.getState().highlightToolCallId("write-1"));
 
-    expect(container.textContent).toContain(
-      i18n.t("tool.grouped.scriptDetails"),
+    // 脚本行标题不再写死「脚本详情」：这个脚本没有意图注释、只有一个子调用
+    expect(container.querySelector("[data-script-row]")?.textContent).toBe(
+      i18n.t("tool.step.scriptSteps", { count: 1 }),
     );
     expect(
       container
@@ -322,13 +323,16 @@ describe("codemode tool group UI", () => {
         ?.click(),
     );
 
-    // 脚本卡迁到 Collapsible 后关闭态会卸载内容 ⇒ 先展开，卡片数才对得上迁移前。
-    openDetailsByLabel(i18n.t("tool.grouped.scriptDetails"));
-
-    // 父条目与脚本引用同 ID：脚本详情只渲染一次。
-    expect(
-      container.textContent?.split(i18n.t("tool.grouped.scriptDetails")).length,
-    ).toBe(2); // 出现 1 次
+    // 脚本行的标题现在由脚本内容决定（意图注释 → `脚本 · N 步`），不再写死
+    // 「脚本详情」，所以按 data 属性定位这一行。
+    const scriptRows = container.querySelectorAll("[data-script-row]");
+    // 父条目与脚本引用同 ID：脚本行只渲染一次。
+    expect(scriptRows.length).toBe(1);
+    // SCRIPT_CODE 没有意图注释，只有一个子调用 ⇒ 标题退化成「脚本 · 1 步」
+    expect(scriptRows[0]?.textContent).toBe(
+      i18n.t("tool.step.scriptSteps", { count: 1 }),
+    );
+    openDetailsByLabel(i18n.t("tool.step.scriptSteps", { count: 1 }));
     // 摘要行 + 脚本卡 + 子调用卡；父条目没有被重复渲染成第 4 张卡。
     expect(cardToggles().length).toBe(3);
 

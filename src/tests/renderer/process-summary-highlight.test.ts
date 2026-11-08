@@ -285,10 +285,11 @@ describe("ProcessSummaryBlock highlight and expand", () => {
     expect(container.textContent).toContain(
       i18n.t("tool.grouped.scriptDetails"),
     );
-    // 脚本折叠行与工具行同一档内缩（坞与转录共用这张卡片，改一半会错位）
-    expect(
-      container.querySelector("[data-tool-group-card] > div")?.className,
-    ).toContain("px-4");
+    // 脚本折叠行与工具行同一档内缩（坞与转录共用这张卡片，改一半会错位）。
+    // 内边距现在长在行本身（与 ToolStepRow 同构），所以查行、不查外层容器。
+    expect(container.querySelector("[data-script-row]")?.className).toContain(
+      "px-4",
+    );
 
     act(() => {
       useAppStore.setState({ highlightedToolCallId: "script-1" });

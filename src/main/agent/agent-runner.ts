@@ -3078,7 +3078,7 @@ If your answer uses linkable content from Web Access or MCP tools, include a "So
         `\u003ctool_behavior\u003e\n
 Tool routing:\n
 - web_search and fetch_content: call them directly for quick research and readable pages; use get_search_content when a result was truncated.\n
-- Browser, document (office_read_*), vision, OCR, TTS and idea (idea_search / idea_read / idea_add) tools come through codemode: await tools.<name>({...}). Use searchTools("<what you need>") to find the tool, then describeTool(name) for its arguments. Links and local files open in the in-app browser by default; its panel opens on its own, and the globe icon in the top toolbar reopens it if the user closed it. Ideas are the user's notes; never act on them on your own.\n
+- Browser, document (office_read_*), vision, OCR, TTS and idea (idea_search / idea_read / idea_add) tools come through codemode: await tools.<name>({...}). Use searchTools("<what you need>") to find the tool, then describeTool(name) for its arguments. Links and local files open in the in-app browser by default; its panel opens on its own, and the globe icon in the top toolbar reopens it if the user closed it. Ideas are the user's notes; never act on them on your own. ${codemodeIntentPrefix}\n
 \u003c/tool_behavior\u003e`,
         `<file_references>
 引用工作区内的文件时，给出相对工作区的路径或完整路径，不要只给文件名（例如写 \u0060test_docs/report.docx\u0060 而不是 \u0060report.docx\u0060）。这条对表格单元格、代码块、列表里的文件名同样适用——最容易漏的正是表格：上文已经写了目录、表格里却只填裸名，用户点不到。
@@ -5761,3 +5761,13 @@ export async function rewriteSessionFileTo(
   }
   return { backupPath, keptEntries: branch.length };
 }
+
+/**
+ * codemode 脚本的意图约定。脚本首行写一句 `// 意图`，界面拿它当脚本行的标题
+ * （读取见 src/renderer/utils/codemode-script-label.ts）——不占用工具参数，
+ * 所以不需要改 codemode 的 schema。
+ */
+const codemodeIntentPrefix =
+  "Start every codemode script with one `// …` line naming what the script does, " +
+  "in the user's language, 5–12 words (after any `// @options` line). " +
+  "It is shown to the user as the script's title.";

@@ -30,6 +30,7 @@ import {
   CollapsibleTrigger,
 } from "../ui/collapsible";
 import { ToolStepRow } from "./ToolStepRow";
+import { getCodemodeScriptLabel } from "../../utils/codemode-script-label";
 import { OutputClamp } from "./OutputClamp";
 import { useAppStore } from "../../store";
 import { Button } from "../app-button";
@@ -143,6 +144,17 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
   const scriptIds = new Set((block.scripts ?? []).map((script) => script.id));
   const visibleItems = block.items.filter((item) => !scriptIds.has(item.id));
 
+  // 每个脚本调了几次子工具：没有意图注释时用它区分多个脚本。
+  // ⚠️ 零子调用时 nested-tool-display 会把父块自己推回来（id === parentToolCallId，
+  // source:"missing"），那不是一次子调用 —— 数进来会让历史会话里每个脚本都显示
+  // 「脚本 · 1 步」，正是这次要消灭的「行行一样」。
+  const scriptStepCounts = new Map<string, number>();
+  for (const item of block.items) {
+    const parentId = item.trace?.parentToolCallId;
+    if (!parentId || parentId === item.id) continue;
+    scriptStepCounts.set(parentId, (scriptStepCounts.get(parentId) ?? 0) + 1);
+  }
+
   const highlighted = containsToolCall(highlightedToolCallId);
 
   return (
@@ -219,30 +231,47 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 <div
                   key={script.id}
                   ref={failedToolCallId === script.id ? failedItemRef : null}
-                  className="px-4 py-2"
                 >
                   <Collapsible>
                     <CollapsibleTrigger asChild>
                       <Button
                         variant="ghost"
                         type="button"
-                        className="text-xs text-muted-foreground h-auto px-0 hover:bg-transparent hover:text-current"
+                        data-script-row
+                        className="group/script flex h-auto w-full items-center gap-2 px-4 py-2 text-left text-sm font-normal text-muted-foreground hover:bg-hover-surface hover:text-current [&_svg]:size-3.5"
                       >
-                        {t("tool.grouped.scriptDetails")}
+                        <span className="min-w-0 truncate">
+                          {getCodemodeScriptLabel(
+                            script.input.code,
+                            scriptStepCounts.get(script.id) ?? 0,
+                            t,
+                          )}
+                        </span>
+                        {/* 空占位在箭头**之前**：箭头因此贴在行右缘，与 ToolStepRow 同位置 */}
+                        <span className="flex-1" />
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition-transform group-data-[state=open]/script:rotate-90" />
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <ToolUseBlock
-                        block={{
-                          type: "tool_use",
-                          id: script.id,
-                          name: "codemode",
-                          input: script.input,
-                        }}
-                        allBlocks={allBlocks}
-                        message={message}
-                        showIcon={false}
-                      />
+                      {/* 与 ToolStepRow 的 data-step-body 同款：内嵌块和标签左缘对齐 */}
+                      <div className="px-4 pb-3">
+                        <div
+                          data-script-detail
+                          className="overflow-hidden rounded-lg border border-border/60 bg-background/70 p-3"
+                        >
+                          <ToolUseBlock
+                            block={{
+                              type: "tool_use",
+                              id: script.id,
+                              name: "codemode",
+                              input: script.input,
+                            }}
+                            allBlocks={allBlocks}
+                            message={message}
+                            showIcon={false}
+                          />
+                        </div>
+                      </div>
                     </CollapsibleContent>
                   </Collapsible>
                 </div>
