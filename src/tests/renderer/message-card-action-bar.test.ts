@@ -232,6 +232,51 @@ describe("MessageCard action bar", () => {
   });
 });
 
+describe("MessageCard action bar right edge", () => {
+  // 2026-11-15 用户报障「下面都没有右对齐」：用户消息的动作条比上面那排（气泡 + 回执环）
+  // 的右边缘还左 28px。旧写法给动作条加 `pr-[22px]`，把整排按「气泡右边缘」对齐 ——
+  // 而有环时块的右边缘是**环的**右边缘（气泡右侧 22px 窄槽）。
+  // jsdom 没有布局 ⇒ 只能锁类名：`-mr-1.5` 在场（补 `iconSm` 28×28 盒子里 16px 图标的
+  // 6px 内边距 ⇒ 对齐图标而非按钮盒子）、任何 `pr-*` 不在场，且**不随 readState 变**。
+  function actionRow(): HTMLElement {
+    let el = container.querySelector(
+      '[aria-label="Copy message"]',
+    ) as HTMLElement | null;
+    while (
+      el &&
+      !el.className.split(/\s+/).includes("group-hover:opacity-100")
+    ) {
+      el = el.parentElement;
+    }
+    if (!el) throw new Error("action row not found");
+    return el;
+  }
+
+  for (const readState of ["read", null] as const) {
+    it(`用户消息的动作条贴块的右边缘（readState=${String(readState)}）`, () => {
+      act(() => {
+        root.render(
+          React.createElement(MessageCard, {
+            message: makeMessage({ id: "u1", role: "user" }),
+            readState,
+            isLatestRound: true,
+            // 报障截图里最后一下是「回滚」键（时间 → 复制 → 回滚）；不传它就只剩复制，
+            // 贴边的那个图标（History）反而没进这条测试。
+            onRewindMessage: vi.fn(),
+          }),
+        );
+      });
+      const row = actionRow();
+      expect(row.lastElementChild?.getAttribute("aria-label")).toBe(
+        "Rewind to here",
+      );
+      const tokens = row.className.split(/\s+/);
+      expect(tokens).toContain("-mr-1.5");
+      expect(tokens.filter((token) => token.startsWith("pr-"))).toEqual([]);
+    });
+  }
+});
+
 describe("MessageCard rewind entry", () => {
   function renderRewindCard(
     message: Message,

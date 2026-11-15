@@ -699,7 +699,14 @@ export const MessageCard = memo(function MessageCard({
               </div>
               {readState ? <ReadReceiptRing state={readState} /> : null}
             </div>
-            {renderActionBar(readState ? "mt-0.5 pr-[22px]" : "mt-0.5")}
+            {/* 这排要贴**块的右边缘** —— 有回执环时那块边缘是环的右边缘（气泡右侧的 22px
+                窄槽 = gap 6 + 16），没环时是气泡的右边缘。旧写法 `pr-[22px]` 把整排按
+                「气泡右边缘」对齐 ⇒ 有环时图标右缘比环还左 27.5px（Chromium 实测：
+                588 / 615.5 ✓），即用户 2026-11-15 报障的「下面都没有右对齐」。
+                `-mr-1.5` 补的是 `iconSm` 28×28 盒子里 16px 图标的 6px 内边距：要对齐的是
+                **图标**不是按钮盒子（环的字形在 16px 盒里也内缩 ~1.4px，两侧字形边缘实测
+                差不到 1px）。按钮盒子因此外伸 6px 进右侧留白（页面 inset 从 20px 起，不裁切）。 */}
+            {renderActionBar("mt-0.5 -mr-1.5")}
           </div>
         </div>
       ) : (
