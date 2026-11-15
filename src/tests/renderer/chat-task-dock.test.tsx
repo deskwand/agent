@@ -8,6 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ChatTaskDock,
   resolveDockAction,
+  resolveDockStepCandidate,
+  resolveHeldStep,
+  STEP_DWELL_MS,
 } from "../../renderer/components/ChatTaskDock";
 import type { CurrentTodos } from "../../renderer/utils/current-todos";
 import { useAppStore } from "../../renderer/store";
@@ -238,10 +241,13 @@ describe("chat task dock", () => {
       running: true,
       currentTodos: PLAN,
       executionClock: { startAt: Date.now(), endAt: null },
-      summary: { block },
+      summary: { block, allBlocks: [] },
     });
-    // 摘要进来了
-    expect(container.textContent).toContain("tool.grouped.executedCommands");
+    // 摘要进来了：显示的是**当前那一步**，不再是聚合计数
+    expect(container.textContent).toContain("tool.labelBash");
+    expect(container.textContent).not.toContain(
+      "tool.grouped.executedCommands",
+    );
     // 进行态措辞不再重复（摘要说的已经是这件事）
     expect(container.textContent).not.toContain("chat.processing");
     // 旋转图标与回合耗时都还在这一行里
@@ -541,8 +547,264 @@ describe("chat task dock", () => {
       lastNonEmptyTodos: null,
       summary: { block },
     });
-    expect(container.textContent).toContain("tool.grouped.executedCommands");
     expect(container.textContent).toContain("chat.compacted");
+    // 一次性结果独占这一行：不再同时挂着聚合计数
+    expect(container.textContent).not.toContain(
+      "tool.grouped.executedCommands",
+    );
+  });
+
+  const BASH_BLOCK = buildProcessSummaryDisplayBlock([
+    {
+      type: "tool_use",
+      id: "b1",
+      name: "bash",
+      input: { command: "git status", description: "查看仓库状态和最近提交" },
+    },
+  ]);
+
+  it("长命令跑很久也一直显示它的描述（不能 1.5 秒后说「正在回复」）", async () => {
+    vi.useFakeTimers(); // ⚠️ 必须在 render 之前装，否则 interval 是真的
+    try {
+      render({
+        status: { type: "responding" },
+        running: true,
+        currentTodos: [],
+        executionClock: { startAt: Date.now(), endAt: null },
+        // b1 还没有 tool_result → 还在跑
+        summary: { block: BASH_BLOCK, allBlocks: [] },
+      });
+      expect(container.textContent).toContain("查看仓库状态和最近提交");
+      await act(async () => {
+        vi.advanceTimersByTime(8000);
+      });
+      expect(container.textContent).toContain("查看仓库状态和最近提交");
+      expect(container.textContent).not.toContain("chat.responding");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("命令已结束：驻留 1.5s 后回到动作文案", async () => {
+    vi.useFakeTimers();
+    try {
+      render({
+        status: { type: "responding" },
+        running: true,
+        currentTodos: [],
+        executionClock: { startAt: Date.now(), endAt: null },
+        summary: {
+          block: BASH_BLOCK,
+          // b1 已有结果 → 已停
+          allBlocks: [{ type: "tool_result", toolUseId: "b1", content: "" }],
+        },
+      });
+      expect(container.textContent).toContain("查看仓库状态和最近提交");
+      await act(async () => {
+        vi.advanceTimersByTime(STEP_DWELL_MS + 1000);
+      });
+      expect(container.textContent).not.toContain("查看仓库状态和最近提交");
+      expect(container.textContent).toContain("chat.responding");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("没有 description 时回落到本地动词表", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      {
+        type: "tool_use",
+        id: "b1",
+        name: "bash",
+        input: { command: "git status" },
+      },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      summary: { block, allBlocks: [] },
+    });
+    expect(container.textContent).toContain("tool.step.cmdGitStatus");
+  });
+
+  it("右侧耗时与速率在同一行内且不可收缩（窄窗先截断文案）", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      {
+        type: "tool_use",
+        id: "b1",
+        name: "bash",
+        input: {
+          command: "rg --count-matches 一些特别长的搜索串",
+          description:
+            "在仓库里搜索所有引用这个特别长的符号名的地方并统计出现次数",
+        },
+      },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      executionClock: { startAt: Date.now(), endAt: null },
+      summary: { block, allBlocks: [] },
+      tokenSpeedLabel: "38 tok/s",
+    });
+    const label = container.querySelector(
+      '[data-testid="summary-trigger-label"]',
+    );
+    const speed = container.querySelector('[data-testid="turn-speed-visible"]');
+    // ① 文案可收缩、单行省略
+    expect(label?.className).toContain("min-w-0");
+    expect(label?.className).toContain("overflow-hidden");
+    expect(label?.className).toContain("text-ellipsis");
+    // ② 速率挂在不可收缩的容器里，且不在文案那一层
+    expect(speed?.closest(".flex-none")).not.toBeNull();
+    expect(label?.contains(speed ?? null)).toBe(false);
+    // ③ 仍在同一行
+    const actionRow = container.querySelector(
+      '[data-testid="dock-status-glyph"]',
+    )?.parentElement?.parentElement;
+    expect(actionRow?.contains(speed ?? null)).toBe(true);
+  });
+
+  it("摘要存在时不再另起动作文案节点（这一行只说一件事）", () => {
+    render({
+      status: { type: "responding" },
+      running: true,
+      currentTodos: [],
+      executionClock: { startAt: Date.now(), endAt: null },
+      summary: { block: BASH_BLOCK, allBlocks: [] },
+    });
+    expect(
+      container.querySelector('[data-testid="dock-action-text"]'),
+    ).toBeNull();
+  });
+
+  it("组里有多个调用时，钉住正在跑的那一个", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      { type: "tool_use", id: "b1", name: "bash", input: { command: "ls" } },
+      {
+        type: "tool_use",
+        id: "b2",
+        name: "bash",
+        input: { command: "npm test", description: "运行相关测试" },
+      },
+      { type: "tool_use", id: "b3", name: "bash", input: { command: "pwd" } },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      summary: {
+        block,
+        // b1、b3 已有结果，b2 还没有 → 正在跑的是 b2
+        allBlocks: [
+          { type: "tool_result", toolUseId: "b1", content: "" },
+          { type: "tool_result", toolUseId: "b3", content: "" },
+        ],
+      },
+    });
+    const label = container.querySelector(
+      '[data-testid="summary-trigger-label"]',
+    );
+    expect(label?.textContent).toBe("运行相关测试");
+  });
+
+  it("codemode 里正在跑的嵌套调用也能当这一行的文案", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      {
+        type: "tool_use",
+        id: "s1",
+        name: "codemode",
+        input: { code: "// 读配置" },
+        trace: {
+          parentToolCallId: "s1",
+          status: "running",
+          parentStatus: "running",
+          complete: false,
+          source: "live",
+        },
+      },
+      {
+        type: "tool_use",
+        id: "n1",
+        name: "read",
+        input: { path: "src/config.ts" },
+        trace: {
+          parentToolCallId: "s1",
+          status: "running",
+          parentStatus: "running",
+          complete: false,
+          source: "live",
+          script: { id: "s1", input: { code: "// 读配置" } },
+        },
+      },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      summary: { block, allBlocks: [] },
+    });
+    const label = container.querySelector(
+      '[data-testid="summary-trigger-label"]',
+    );
+    expect(label?.textContent).toContain("tool.labelRead");
+  });
+
+  it("失败的那一步：文案与失败计数同处一行", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      {
+        type: "tool_use",
+        id: "b1",
+        name: "bash",
+        input: { command: "npm run lint", description: "跑 lint" },
+        trace: {
+          parentToolCallId: "p1",
+          status: "error",
+          parentStatus: "error",
+          complete: true,
+          source: "final",
+          script: { id: "p1", input: { command: "npm run lint" } },
+        },
+      },
+    ]);
+    render({
+      status: { type: "thinking" },
+      running: true,
+      currentTodos: [],
+      summary: { block, allBlocks: [] },
+    });
+    const label = container.querySelector(
+      '[data-testid="summary-trigger-label"]',
+    );
+    expect(label?.textContent).toBe("跑 lint");
+    // 失败计数仍在（与文案同处一行，不互相顶掉）
+    expect(
+      container.querySelector("[data-tool-group-failure-count]")?.textContent,
+    ).toContain("tool.grouped.failedCount");
+  });
+
+  it("拿不到 allBlocks 时不把标签钉死（驻留窗口照常结束）", async () => {
+    vi.useFakeTimers();
+    try {
+      render({
+        status: { type: "responding" },
+        running: true,
+        currentTodos: [],
+        executionClock: { startAt: Date.now(), endAt: null },
+        // 没有 allBlocks：无从判断"是否还在跑" → 按已停处理
+        summary: { block: BASH_BLOCK },
+      });
+      expect(container.textContent).toContain("查看仓库状态和最近提交");
+      await act(async () => {
+        vi.advanceTimersByTime(STEP_DWELL_MS + 1000);
+      });
+      expect(container.textContent).not.toContain("查看仓库状态和最近提交");
+      expect(container.textContent).toContain("chat.responding");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("超长清单只在卡内滚动，不把消息区挤没", () => {
@@ -717,5 +979,188 @@ describe("dock turn clock", () => {
     expect(
       container.querySelectorAll('[data-testid="turn-elapsed-visible"]'),
     ).toHaveLength(1);
+  });
+});
+
+describe("resolveDockStepCandidate", () => {
+  const t = ((key: string, options?: Record<string, unknown>) =>
+    options ? `${key}:${JSON.stringify(options)}` : key) as never;
+
+  const bash = (id: string, input: Record<string, unknown>) => ({
+    type: "tool_use" as const,
+    id,
+    name: "bash",
+    input,
+  });
+
+  it("采信 description（人话、非等宽）", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      bash("b1", {
+        command: "git status",
+        description: "查看仓库状态和最近提交",
+      }),
+    ]);
+    const found = resolveDockStepCandidate(block, t, new Set());
+    expect(found?.key).toBe("b1");
+    expect(found?.label).toEqual({
+      text: "查看仓库状态和最近提交",
+      mono: false,
+    });
+  });
+
+  it("没有 description 回落到本地动词表", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      bash("b1", { command: "git status" }),
+    ]);
+    expect(resolveDockStepCandidate(block, t, new Set())?.label).toEqual({
+      text: "tool.step.cmdGitStatus",
+      mono: false,
+    });
+  });
+
+  it("两头都没有就回落 $ 命令，等宽显示", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      bash("b1", { command: "curl -s https://x.dev" }),
+    ]);
+    const label = resolveDockStepCandidate(block, t, new Set())?.label;
+    expect(label?.mono).toBe(true);
+    expect(label?.text).toContain("tool.labelBash");
+  });
+
+  it("没有 trace 的调用：本轮还没有它的结果 → 仍在跑", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      bash("b1", { command: "npm test" }),
+    ]);
+    expect(resolveDockStepCandidate(block, t, new Set())?.running).toBe(true);
+  });
+
+  it("没有 trace 的调用：本轮已有它的结果 → 已停", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      bash("b1", { command: "npm test" }),
+    ]);
+    expect(resolveDockStepCandidate(block, t, new Set(["b1"]))?.running).toBe(
+      false,
+    );
+  });
+
+  it("多个调用里优先正在跑的那个，而不是最后一个", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      bash("b1", { command: "npm test" }),
+      bash("b2", { command: "ls" }),
+    ]);
+    const found = resolveDockStepCandidate(block, t, new Set(["b2"]));
+    expect(found?.key).toBe("b1");
+    expect(found?.running).toBe(true);
+  });
+
+  it("全都停下来了也取最后一条（已跑完 ≠ 没东西可说）", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      bash("b1", { command: "npm test" }),
+      bash("b2", { command: "ls" }),
+    ]);
+    const found = resolveDockStepCandidate(block, t, new Set(["b1", "b2"]));
+    expect(found?.key).toBe("b2");
+    expect(found?.running).toBe(false);
+  });
+
+  it("codemode 嵌套调用以 trace 为准（trace 存在时不看结果集）", () => {
+    const block = buildProcessSummaryDisplayBlock([
+      {
+        type: "tool_use",
+        id: "c1",
+        name: "read",
+        input: { path: "src/a.ts" },
+        trace: {
+          parentToolCallId: "p1",
+          status: "running",
+          parentStatus: "running",
+          complete: false,
+          source: "live",
+        },
+      },
+    ]);
+    const found = resolveDockStepCandidate(block, t, new Set(["c1"]));
+    expect(found?.running).toBe(true);
+  });
+
+  it("没有 items 时返回 null", () => {
+    expect(resolveDockStepCandidate(null, t, new Set())).toBeNull();
+    expect(
+      resolveDockStepCandidate(
+        buildProcessSummaryDisplayBlock([]),
+        t,
+        new Set(),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("step dwell window", () => {
+  const label = { text: "查看目录内容", mono: false };
+  const cand = (running: boolean, key = "b1") => ({ key, label, running });
+
+  it("新出现的一步立刻显示，并从此刻起算", () => {
+    const { hold, label: shown } = resolveHeldStep(null, cand(true), 1000);
+    expect(hold).toEqual({ key: "b1", label, refreshedAt: 1000 });
+    expect(shown).toEqual(label);
+  });
+
+  it("还在跑就一直刷新时间戳（长命令整段可见）", () => {
+    const first = resolveHeldStep(null, cand(true), 0);
+    const later = resolveHeldStep(first.hold, cand(true), 8000);
+    expect(later.hold?.refreshedAt).toBe(8000);
+    expect(later.label).toEqual(label);
+  });
+
+  it("停下后 1.5s 内还在显示，之后交还给动作文案", () => {
+    const running = resolveHeldStep(null, cand(true), 0);
+    // 命令在 100ms 就结束了：同一把 key，时间戳停在最后一次"还在跑"
+    const stopped = resolveHeldStep(running.hold, cand(false), 200);
+    expect(stopped.hold?.refreshedAt).toBe(0);
+    expect(stopped.label).toEqual(label);
+    expect(
+      resolveHeldStep(stopped.hold, cand(false), STEP_DWELL_MS - 1).label,
+    ).toEqual(label);
+    expect(
+      resolveHeldStep(stopped.hold, cand(false), STEP_DWELL_MS + 1).label,
+    ).toBeNull();
+  });
+
+  it("驻留期间来了新的一步，立刻换成新的", () => {
+    const held = resolveHeldStep(null, cand(false), 0);
+    const next = resolveHeldStep(
+      held.hold,
+      {
+        key: "b2",
+        label: { text: "运行相关测试", mono: false },
+        running: true,
+      },
+      500,
+    );
+    expect(next.hold?.key).toBe("b2");
+    expect(next.label?.text).toBe("运行相关测试");
+  });
+
+  it("同一把 key 的文案变了也要跟上（切语言不留在旧说法）", () => {
+    const first = resolveHeldStep(null, cand(false), 0);
+    const renamed = resolveHeldStep(
+      first.hold,
+      {
+        key: "b1",
+        label: { text: "Running tests", mono: false },
+        running: false,
+      },
+      300,
+    );
+    expect(renamed.label?.text).toBe("Running tests");
+    // 时间戳不动：这不是"新的一步"，驻留窗口不该被续命
+    expect(renamed.hold?.refreshedAt).toBe(0);
+  });
+
+  it("同一个 now 重复调用结果一致（StrictMode 双渲染安全）", () => {
+    const once = resolveHeldStep(null, cand(true), 700);
+    const twice = resolveHeldStep(once.hold, cand(true), 700);
+    expect(twice.hold).toBe(once.hold);
+    expect(twice.label).toEqual(once.label);
   });
 });

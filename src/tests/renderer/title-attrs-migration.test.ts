@@ -71,7 +71,7 @@ const ALLOWED_NATIVE_TITLES: Record<string, number> = {
   "components/MergedInputChip.tsx": 2, // 模型名全文 + 模型/思考等级的控件说明
   "components/message/ContentBlockView.tsx": 2, // 文件链接的完整路径
   "components/message/ElementRefChips.tsx": 1, // 完整 CSS selector
-  "components/message/ProcessSummaryBlock.tsx": 1, // 片段全文
+  "components/message/ProcessSummaryBlock.tsx": 2, // 片段全文 + 坞头步骤文案被省略时的全文
   "components/Sidebar.tsx": 2, // 标记完成按钮 + 项目分组完整 cwd
   // —— 状态说明（说明这个元素为什么不可用，不是操作提示） ——
   "components/message/ArtifactCard.tsx": 1, // 「已回退」：解释该行为何点不动

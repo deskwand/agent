@@ -12,6 +12,7 @@ import type { TFunction } from "i18next";
 import type { CurrentTodos } from "../utils/current-todos";
 import type { DisplayBlock } from "../utils/tool-display-blocks";
 import type { ContentBlock, Message } from "../types";
+import { getToolStepLabel, type ToolStepLabel } from "../utils/tool-step-label";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import {
   TURN_CLOCK_SLOT_SENTINEL_SECONDS,
@@ -333,6 +334,32 @@ export function ChatTaskDock({
   );
   const action = resolveDockAction(status, t);
 
+  // 本轮已经有 tool_result 的调用：普通工具没有 trace，只能靠"还没结果"判断还在跑。
+  // 没有 allBlocks 时返回 undefined（而不是空集）——空集会把每个调用都判成"还在跑"，
+  // 时间戳每帧刷新、驻留窗口永不结束，这一行会被钉死在某一步上。
+  const settledIds = useMemo(() => {
+    if (!summary?.allBlocks) return undefined;
+    const ids = new Set<string>();
+    for (const item of summary.allBlocks) {
+      if (item.type === "tool_result") ids.add(item.toolUseId);
+    }
+    return ids;
+  }, [summary?.allBlocks]);
+
+  // 当前那一步 + 驻留窗口（纯函数算；`now` 由坞既有的 500ms 心跳推进，不新增定时器）
+  const stepCandidate = useMemo(
+    () => resolveDockStepCandidate(summary?.block, t, settledIds),
+    [summary?.block, settledIds, t],
+  );
+  const holdRef = useRef<StepHold | null>(null);
+  const { hold, label: stepLabel } = resolveHeldStep(
+    holdRef.current,
+    stepCandidate,
+    now,
+  );
+  // 渲染期写 ref：resolveHeldStep 对同一个 now 幂等，StrictMode 双渲染得到同一结果。
+  holdRef.current = hold;
+
   // 回合秒表：运行中走实时，收尾窗口内冻结在 endAt。
   const elapsed = (() => {
     if (!executionClock || executionClock.startAt === null) return null;
@@ -347,9 +374,16 @@ export function ChatTaskDock({
   })();
 
   const hasPlan = display.todos.length > 0;
-  // 有摘要行时不再重复"思考中/执行中"这类进行态措辞 —— 摘要说的已经是这件事，
-  // 同一件事不说两遍（eagent 坞的同一条规则）。压缩完成/失败这类一次性结果照旧说。
-  const showActionText = action !== null && !(summary && action.isRunning);
+  // 这一行只说一件事，优先级：一次性结果 > 步骤（运行中或驻留窗口内）> 动作文案。
+  // 有摘要时三者都折进触发按钮里，所以独立节点只在**没有摘要**时才渲染。
+  const oneShotText = action !== null && !action.isRunning ? action.text : null;
+  const triggerLabel: ToolStepLabel | null = summary
+    ? oneShotText !== null
+      ? { text: oneShotText, mono: false }
+      : (stepLabel ??
+        (action?.isRunning ? { text: action.text, mono: false } : null))
+    : null;
+  const showActionText = action !== null && summary === null;
   // 动作行只要还有东西可说就渲染：摘要、动作文案，或回合结束后 5s 内那格冻结的
   // 耗时（旧状态栏的既有保证 —— 状态解析成 null 之后仍要看得到本轮花了多久）。
   // ⚠️ 冻结耗时只在状态**确实解析成 null** 时单独成行：目标长跑的耗时归输入框上方
@@ -440,6 +474,7 @@ export function ChatTaskDock({
                 block={summary.block}
                 allBlocks={summary.allBlocks}
                 message={summary.message}
+                triggerLabel={triggerLabel ?? undefined}
                 // 耗时进触发器行内：那一列不再占在摘要块外面，展开后卡片铺满整行
                 trailing={elapsedNode}
                 // 头部紧凑（按内容宽）：转录里的摘要行仍整行可点，所以开关只在坞里给
@@ -466,4 +501,89 @@ export function ChatTaskDock({
       ) : null}
     </div>
   );
+}
+
+/** 坞头那一步：一行只说一件事，所以只挑**一个**调用。
+ *  「还在跑」的判定与 ToolStepRow 同口径：`trace` 只由 nested-tool-display 补给
+ *  codemode 外层与其嵌套子调用，普通工具（bash/read…）没有 trace —— 那种只能靠
+ *  "本轮还没有它的 tool_result"来说它还在跑（坞只在 turnLive 时出现，所以成立）。 */
+export interface DockStepCandidate {
+  /** `item.id`：running → completed 时不变，驻留窗口据此持续计时。 */
+  key: string;
+  label: ToolStepLabel;
+  running: boolean;
+}
+
+export function resolveDockStepCandidate(
+  block: Extract<DisplayBlock, { type: "process-summary" }> | null | undefined,
+  t: TFunction,
+  settledIds?: ReadonlySet<string>,
+): DockStepCandidate | null {
+  const items = block?.items ?? [];
+  if (items.length === 0) return null;
+
+  const isRunning = (item: (typeof items)[number]): boolean => {
+    const status = item.trace?.status;
+    if (status !== undefined) return status === "running";
+    return settledIds !== undefined && !settledIds.has(item.id);
+  };
+  const from = (item: (typeof items)[number]): DockStepCandidate => ({
+    key: item.id,
+    label: getToolStepLabel(item.name, item.input, t),
+    running: isRunning(item),
+  });
+
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    const item = items[i];
+    if (item && isRunning(item)) return from(item);
+  }
+  const last = items[items.length - 1];
+  return last ? from(last) : null;
+}
+
+/** 快命令（几十毫秒）在坞收到数据前就跑完了，只认"正在跑"会让这一行一直停在
+ *  "思考中"。停下来的那一步再留一会儿，让人看得见它在做什么。 */
+export const STEP_DWELL_MS = 1500;
+// ⚠️ 计时取自坞里 500ms 的心跳（`now`），所以实际停留是 1000–1500ms：命令在两次心跳
+// 之间停下时，时间戳停在最后一次看见它还在跑的那一刻。不为此新增定时器。
+
+export interface StepHold {
+  key: string;
+  label: ToolStepLabel;
+  /** 最近一次确认它还在跑的时刻（停下后冻结，驻留窗口从这里起算）。 */
+  refreshedAt: number;
+}
+
+/** 纯函数：推进驻留状态，并给出这一行该显示的步骤文案（null = 交还动作文案）。
+ *  - 换了一步（key 变）→ 立刻显示新的，从 now 起算；
+ *  - 还在跑 → 刷新时间戳，长命令整段可见；
+ *  - 停下来了 → 冻结时间戳，窗口内继续显示。
+ *  幂等：同一个 now 重复调用返回同一个 hold 对象（StrictMode 双渲染安全）。 */
+export function resolveHeldStep(
+  hold: StepHold | null,
+  candidate: DockStepCandidate | null,
+  now: number,
+): { hold: StepHold | null; label: ToolStepLabel | null } {
+  let next = hold;
+  if (candidate) {
+    if (!next || next.key !== candidate.key) {
+      next = { key: candidate.key, label: candidate.label, refreshedAt: now };
+    } else {
+      const needsRefresh = candidate.running && next.refreshedAt !== now;
+      // 同一把 key 的文案也可能变（切语言、模型改写参数）：跟着更新，别留着旧说法
+      const labelStale =
+        next.label.text !== candidate.label.text ||
+        next.label.mono !== candidate.label.mono;
+      if (needsRefresh || labelStale) {
+        next = {
+          ...next,
+          label: candidate.label,
+          refreshedAt: needsRefresh ? now : next.refreshedAt,
+        };
+      }
+    }
+  }
+  const shown =
+    next && now - next.refreshedAt < STEP_DWELL_MS ? next.label : null;
+  return { hold: next, label: shown };
 }

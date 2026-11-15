@@ -82,6 +82,11 @@ interface ProcessSummaryBlockProps {
    * 只在坞里开 —— 转录里的摘要行必须保持整行可点、hover 满宽。
    */
   compactHeader?: boolean;
+  /**
+   * 覆盖触发器文案：给了就只显示它，不再渲染聚合片段。
+   * 只由任务坞传（坞头只说"此刻在做什么"）；转录仍走聚合片段。
+   */
+  triggerLabel?: { text: string; mono: boolean };
 }
 
 export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
@@ -90,11 +95,15 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
   message,
   trailing,
   compactHeader = false,
+  triggerLabel,
 }: ProcessSummaryBlockProps) {
   const { t } = useTranslation();
   const failureSuffix = formatFailureSuffix(block.status?.failedCount ?? 0, t);
   const [expanded, setExpanded] = useState(false);
-  const fragments = getProcessSummaryFragments(block.summary, t, block.status);
+  // 给了 triggerLabel 就不算聚合片段：省掉这趟调用，也不会残留旧文案。
+  const fragments = triggerLabel
+    ? []
+    : getProcessSummaryFragments(block.summary, t, block.status);
   const failedToolCallId = block.status?.firstFailedToolCallId;
   const failedItemRef = useRef<HTMLDivElement | null>(null);
 
@@ -177,6 +186,19 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 compactHeader ? "" : "flex-1"
               }`}
             >
+              {triggerLabel ? (
+                /* 这一行只有它可以被压缩，右边的箭头 / 耗时 / 速度都锁死。
+                   ⚠️ 它必须是**非 flex** 的块级子项，`textOverflow` 才出省略号。 */
+                <span
+                  data-testid="summary-trigger-label"
+                  title={triggerLabel.text}
+                  className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${
+                    triggerLabel.mono ? "font-mono" : ""
+                  }`}
+                >
+                  {triggerLabel.text}
+                </span>
+              ) : null}
               {fragments.map((frag, fi) => (
                 <span
                   key={fi}
