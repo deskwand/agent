@@ -67,6 +67,10 @@ import {
   notifyApprovalNeeded,
 } from "./agents/persistent-agent-runtime";
 import { createTeammateStorage } from "./agents/teammate-storage";
+import { SessionWakeupExtension } from "./agents/session-wakeup-extension";
+import type { SessionWakeupManager } from "./agents/session-wakeup-manager";
+import { registerSessionWakeupIpc } from "./agents/session-wakeup-ipc";
+import { createSessionWakeupRuntime } from "./agents/session-wakeup-runtime";
 import { registerPersistentAgentIpc } from "./agents/persistent-agent-ipc";
 import type {
   IdeaCreateInput,
@@ -364,6 +368,7 @@ let feedService: FeedService | null = null;
 let feedScheduler: FeedScheduler | null = null;
 let scheduledTaskManager: ScheduledTaskManager | null = null;
 let persistentAgentManager: PersistentAgentManager | null = null;
+let sessionWakeupManager: SessionWakeupManager | null = null;
 let petWindowController: PetWindowController | null = null;
 let voiceIpc: VoiceIpcHandle | null = null;
 let ttsIpc: TtsIpcHandle | null = null;
@@ -1286,6 +1291,7 @@ app
             mainWindow.focus();
           }),
       ),
+      new SessionWakeupExtension(() => sessionWakeupManager),
     ]);
 
     // Initialize session manager before creating an interactive window.
@@ -1559,6 +1565,14 @@ app
       storage: createTeammateStorage(app.getPath("userData"), teammateMemory),
     });
     persistentAgentManager.start();
+
+    // 普通会话的自我唤醒：没有兜底心跳，只有模型显式预约的那几次
+    sessionWakeupManager = createSessionWakeupRuntime({
+      db,
+      sessionManager,
+      sendToRenderer,
+    });
+    sessionWakeupManager.start();
 
     // ---- 动态（feed）：后台生成 + 未读计数，默认关闭 ----
     const feedImagesDir = join(app.getPath("userData"), "feed-images");
@@ -3445,6 +3459,11 @@ registerPersistentAgentIpc({
   ipcMain,
   getManager: () => persistentAgentManager,
   checkWorkspace: getWorkspacePathUnsupportedReason,
+});
+
+registerSessionWakeupIpc({
+  ipcMain,
+  getManager: () => sessionWakeupManager,
 });
 
 // 邮箱：账号级 IPC。与连接页共用 `mcp.json`，但删一个邮箱走的是账号通道 ——

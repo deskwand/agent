@@ -48,7 +48,7 @@ function formatClock(ts: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function formatMonthDayClock(ts: number): string {
+export function formatMonthDayClock(ts: number): string {
   const d = new Date(ts);
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${formatClock(ts)}`;
 }

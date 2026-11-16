@@ -109,6 +109,7 @@ import {
 import { ChatInputActionBar } from "./ChatInputActionBar";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { ChatInputFooterBar } from "./ChatInputFooterBar";
+import { SessionWakeupChip } from "./SessionWakeupChip";
 import { toMicButtonProps } from "./VoiceMicButton";
 import {
   shouldShowRecordingStrip,
@@ -2425,6 +2426,12 @@ export function ChatView() {
             onGoalCommand={handleCommand}
           />
         </div>
+        {activeSessionId ? (
+          <SessionWakeupChip
+            sessionId={activeSessionId}
+            className={`${chatColumnClass} mx-auto ${PAGE_INSET_X} pt-1`}
+          />
+        ) : null}
         <div
           className={`${chatColumnClass} mx-auto ${PAGE_INSET_X} pt-0.5 pb-5`}
         >

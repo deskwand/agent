@@ -83,6 +83,8 @@ export interface AgentRuntimeExtension {
   ): Promise<AfterSessionRunResult | void>;
   onCommand?(context: CommandContext): Promise<CommandResult | void>;
   onSessionDeleted?(context: SessionDeletedContext): Promise<void>;
+  /** 会话被归档：不再活跃，但数据还在。用于取消只对活跃会话有意义的定时任务。 */
+  onSessionClosed?(context: SessionDeletedContext): Promise<void>;
   onSessionRunError?(
     context: SessionRunErrorContext,
   ): Promise<AfterSessionRunResult | void>;

@@ -3115,6 +3115,17 @@
       "settings": "Settings"
     }
   },
+  "sessionWakeup": {
+    "chipToday": "Continues today at {{time}}",
+    "chipTomorrow": "Continues tomorrow at {{time}}",
+    "chipOther": "Continues {{date}} at {{time}}",
+    "countdownDays": "Continues in {{days}}d {{hours}}h",
+    "countdownHours": "Continues in {{hours}}h {{minutes}}m",
+    "countdownMinutes": "Continues in {{minutes}}m",
+    "countdownSeconds": "Continues in {{seconds}}s",
+    "imminent": "Continuing now",
+    "cancelTitle": "Cancel this automatic wakeup"
+  },
   "projectBot": {
     "create": "New bot",
     "badge": "Bot",

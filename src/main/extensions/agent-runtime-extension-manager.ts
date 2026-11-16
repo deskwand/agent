@@ -175,6 +175,24 @@ export class AgentRuntimeExtensionManager {
     return null;
   }
 
+  async onSessionClosed(context: SessionDeletedContext): Promise<void> {
+    await Promise.allSettled(
+      this.extensions.map(async (extension) => {
+        if (!extension.onSessionClosed) {
+          return;
+        }
+        try {
+          await extension.onSessionClosed(context);
+        } catch (error) {
+          logError(
+            `[AgentRuntimeExtensionManager] onSessionClosed failed for ${extension.name}:`,
+            error,
+          );
+        }
+      }),
+    );
+  }
+
   async onSessionDeleted(context: SessionDeletedContext): Promise<void> {
     await Promise.allSettled(
       this.extensions.map(async (extension) => {

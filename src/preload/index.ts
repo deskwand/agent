@@ -19,6 +19,7 @@ import type {
   MemorySearchScope,
 } from "../renderer/types";
 import type { FeedBodyPayload, FeedSnapshot } from "../shared/feed";
+import type { SessionWakeupView } from "../shared/session-wakeup";
 import type {
   PersistentAgentCreateInput,
   PersistentAgentUpdateInput,
@@ -876,6 +877,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("persistentAgents.cancelWakeup", agentId, wakeupId),
   },
 
+  sessionWakeup: {
+    next: (sessionId: string): Promise<SessionWakeupView | null> =>
+      ipcRenderer.invoke("sessionWakeup.next", sessionId),
+    cancel: (sessionId: string, wakeupId: string): Promise<boolean> =>
+      ipcRenderer.invoke("sessionWakeup.cancel", sessionId, wakeupId),
+  },
+
   memory: {
     search: (payload: {
       query: string;
@@ -1606,6 +1614,10 @@ declare global {
         wakeNow: (id: string) => Promise<PersistentAgentView | null>;
         listWakeups: (id: string) => Promise<PersistentAgentWakeup[]>;
         cancelWakeup: (agentId: string, wakeupId: string) => Promise<boolean>;
+      };
+      sessionWakeup: {
+        next: (sessionId: string) => Promise<SessionWakeupView | null>;
+        cancel: (sessionId: string, wakeupId: string) => Promise<boolean>;
       };
       memory: {
         search: (payload: {

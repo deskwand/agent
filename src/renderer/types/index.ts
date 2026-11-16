@@ -32,6 +32,7 @@ import type { VoiceShortcut } from "../../shared/voice-shortcuts";
 import type { FeedPhase, FeedRunStatus } from "../../shared/feed";
 import type { SessionKind } from "../../shared/session-kind";
 import type { PersistentAgentView } from "../../shared/persistent-agent";
+import type { SessionWakeupView } from "../../shared/session-wakeup";
 
 export interface Session {
   id: string;
@@ -915,6 +916,10 @@ export type ServerEvent =
   | {
       type: "persistent-agent.remove";
       payload: { agentId: string };
+    }
+  | {
+      type: "session-wakeup.update";
+      payload: { sessionId: string; next: SessionWakeupView | null };
     };
 
 // Settings types

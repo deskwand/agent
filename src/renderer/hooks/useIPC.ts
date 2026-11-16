@@ -28,6 +28,7 @@ import type { ElementSelection } from "../../shared/ipc-types";
 import type { TurnProfileName } from "../../shared/voice-mode";
 import { toElementSelectionRefs } from "../../shared/element-selection-ref";
 import { usePersistentAgentStore } from "../store/persistent-agents";
+import { useSessionWakeupStore } from "../store/session-wakeups";
 
 // Check if running in Electron
 const isElectron =
@@ -326,6 +327,12 @@ function registerSharedIpcListener(): () => void {
 
         case "persistent-agent.remove":
           usePersistentAgentStore.getState().remove(event.payload.agentId);
+          break;
+
+        case "session-wakeup.update":
+          useSessionWakeupStore
+            .getState()
+            .upsert(event.payload.sessionId, event.payload.next);
           break;
 
         case "pi.set-editor-text": {

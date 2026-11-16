@@ -3112,6 +3112,17 @@
       "settings": "设置"
     }
   },
+  "sessionWakeup": {
+    "chipToday": "今天 {{time}} 自动继续",
+    "chipTomorrow": "明天 {{time}} 自动继续",
+    "chipOther": "{{date}} {{time}} 自动继续",
+    "countdownDays": "还有 {{days}} 天 {{hours}} 小时后自动继续",
+    "countdownHours": "还有 {{hours}} 小时 {{minutes}} 分后自动继续",
+    "countdownMinutes": "还有 {{minutes}} 分钟后自动继续",
+    "countdownSeconds": "还有 {{seconds}} 秒后自动继续",
+    "imminent": "即将自动继续",
+    "cancelTitle": "取消这次自动唤醒"
+  },
   "projectBot": {
     "create": "新建 Bot",
     "badge": "Bot",
