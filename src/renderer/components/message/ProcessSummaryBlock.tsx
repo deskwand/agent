@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
@@ -98,6 +98,10 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
   triggerLabel,
 }: ProcessSummaryBlockProps) {
   const { t } = useTranslation();
+  const labelRef = useLabelSpring(
+    triggerLabel?.text ?? null,
+    triggerLabel !== undefined,
+  );
   const failureSuffix = formatFailureSuffix(block.status?.failedCount ?? 0, t);
   const [expanded, setExpanded] = useState(false);
   // 给了 triggerLabel 就不算聚合片段：省掉这趟调用，也不会残留旧文案。
@@ -190,9 +194,10 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 /* 这一行只有它可以被压缩，右边的箭头 / 耗时 / 速度都锁死。
                    ⚠️ 它必须是**非 flex** 的块级子项，`textOverflow` 才出省略号。 */
                 <span
+                  ref={labelRef}
                   data-testid="summary-trigger-label"
                   title={triggerLabel.text}
-                  className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${
+                  className={`origin-left min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${
                     triggerLabel.mono ? "font-mono" : ""
                   }`}
                 >
@@ -319,3 +324,103 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
     </Collapsible>
   );
 });
+
+const LABEL_SPRING_MS = 320;
+/** 过冲 ~10%：98px 的位移约 9px，几 px 的小切换只有 3~4px（效果图实测）。 */
+const LABEL_SPRING_EASING = "cubic-bezier(.34, 1.56, .64, 1)";
+const LABEL_STRETCH_MS = 300;
+const LABEL_STRETCH_EASING = "cubic-bezier(.34, 1.4, .64, 1)";
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function isReducedMotion(): boolean {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia(REDUCED_MOTION_QUERY).matches
+  );
+}
+
+/**
+ * 坞头文案切换的弹簧：宽度从"上一次切换后的宽度"弹到新文案的自然宽度。
+ *
+ * 用 WAAPI 而不是 CSS transition —— 起止都是 px 值，动画结束后元素自然回到
+ * `auto`，不留内联样式，也不需要 transitionend 清理（与 sidebar-disclosure-motion
+ * 同款写法）。量宽度依赖真实布局，jsdom 里靠测试 stub 提供读数。
+ *
+ * 依赖只放原始值：坞每 500ms 心跳重渲染，effect 一旦依赖对象就会被反复触发。
+ */
+function useLabelSpring(
+  text: string | null,
+  enabled: boolean,
+): React.RefObject<HTMLSpanElement> {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  /** 上一次切换后量到的自然宽度（= 下一次的起点）。null = 还没有可信起点。 */
+  const previousWidthRef = useRef<number | null>(null);
+  /** 上一个挂 ref 的元素：换了元素说明标签重新挂载过，旧宽度不能当起点。 */
+  const lastElementRef = useRef<HTMLSpanElement | null>(null);
+  const widthAnimationRef = useRef<Animation | null>(null);
+  const stretchAnimationRef = useRef<Animation | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // 标签重新挂载（坞头先回落成动作态、随后又出现新步骤）：上一个元素的宽度
+    // 不能当起点，否则新标签会"从上一段的宽度弹进来"。
+    if (lastElementRef.current !== el) {
+      lastElementRef.current = el;
+      previousWidthRef.current = null;
+    }
+
+    // 上一条还在跑时，用户眼前是动画中途的宽度而不是上一句的终点：以它作起点，
+    // A→B→C 连续快切才不会被硬拽回 B 的终点。
+    // ⚠️ 用 offsetWidth 而不是 getBoundingClientRect —— 后者含 transform，
+    // 会被同时跑着的拉伸动画缩小 3% 左右，起点就偏了。
+    const liveWidth =
+      widthAnimationRef.current?.playState === "running"
+        ? el.offsetWidth
+        : null;
+    widthAnimationRef.current?.cancel();
+    widthAnimationRef.current = null;
+
+    const to = el.offsetWidth;
+    const from = liveWidth ?? previousWidthRef.current;
+    previousWidthRef.current = to;
+
+    // 保留：坞不给 triggerLabel 时不动（当前 wiring 下 span 不渲染，上面已提前返回）。
+    if (!enabled) return;
+    // 整数 px 比较：1px 以内不值得弹一下
+    if (from === null || Math.abs(to - from) < 1) return;
+    if (isReducedMotion()) return;
+    if (typeof el.animate !== "function") return;
+
+    widthAnimationRef.current = el.animate(
+      [{ width: `${from}px` }, { width: `${to}px` }],
+      { duration: LABEL_SPRING_MS, easing: LABEL_SPRING_EASING },
+    );
+
+    // 拉伸还在跑就让它跑完：重开会把 1.015 硬拽回 .965，一帧内挤出 5%
+    if (stretchAnimationRef.current?.playState !== "running") {
+      stretchAnimationRef.current = el.animate(
+        [
+          { transform: "scaleX(.965) scaleY(1.03)" },
+          { transform: "scaleX(1.015) scaleY(.99)", offset: 0.55 },
+          { transform: "scaleX(1) scaleY(1)" },
+        ],
+        { duration: LABEL_STRETCH_MS, easing: LABEL_STRETCH_EASING },
+      );
+    }
+  }, [text, enabled]);
+
+  // 唯一的一处卸载清理：主 effect 故意不带 cleanup —— 它的 cleanup 会在每次
+  // 文案变化之前就跑，把正要接管的那条动画取消掉。
+  useLayoutEffect(() => {
+    return () => {
+      widthAnimationRef.current?.cancel();
+      stretchAnimationRef.current?.cancel();
+      widthAnimationRef.current = null;
+      stretchAnimationRef.current = null;
+    };
+  }, []);
+
+  return ref;
+}
