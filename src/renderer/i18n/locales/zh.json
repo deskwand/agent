@@ -1868,6 +1868,8 @@
       "savedIdeas_other": "已记录 {{count}} 条想法",
       "scheduledWakeups_one": "已安排 {{count}} 次唤醒",
       "scheduledWakeups_other": "已安排 {{count}} 次唤醒",
+      "checkedParallelSessions_one": "查看了 {{count}} 次并行会话",
+      "checkedParallelSessions_other": "查看了 {{count}} 次并行会话",
       "managedGoal": "已管理目标",
       "executedCommands_one": "已执行了 {{count}} 条命令",
       "executedCommands_other": "已执行了 {{count}} 条命令",

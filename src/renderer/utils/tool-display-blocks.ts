@@ -39,6 +39,8 @@ export interface ProcessSummary {
   ideaAddedCount?: number;
   /** 常驻智能体安排 / 取消唤醒与设置签到的次数（`schedule_wakeup` + `cancel_wakeup` + `set_next_check_in`）。 */
   wakeupCount?: number;
+  /** `workspace_peers` 的次数（查看并行会话）。 */
+  peerCheckCount?: number;
 }
 
 export interface ResultSummary {
@@ -274,6 +276,7 @@ function buildProcessSummary(
   let ideaLookupCount = 0;
   let ideaAddedCount = 0;
   let wakeupCount = 0;
+  let peerCheckCount = 0;
   let scriptCount = 0;
   let calledRead = false;
   let calledSearch = false;
@@ -395,6 +398,10 @@ function buildProcessSummary(
       wakeupCount += 1;
       countedAsSpecific = true;
     }
+    if (lower === "workspace_peers") {
+      peerCheckCount += 1;
+      countedAsSpecific = true;
+    }
     if (!countedAsSpecific) {
       usedToolCount += 1;
     }
@@ -423,6 +430,7 @@ function buildProcessSummary(
     ideaLookupCount,
     ideaAddedCount,
     wakeupCount,
+    peerCheckCount,
   };
 }
 
@@ -735,7 +743,8 @@ export type ProcessSummaryFragment = {
     | "tts"
     | "tool"
     | "ideas"
-    | "wakeup";
+    | "wakeup"
+    | "peers";
 };
 
 export function getProcessSummaryFragments(
@@ -817,6 +826,15 @@ export function getProcessSummaryFragments(
     fragments.push({
       text: t(pluralKey("tool.grouped.scheduledWakeups", count), { count }),
       iconType: "wakeup",
+    });
+  }
+  if ((summary.peerCheckCount ?? 0) > 0) {
+    const count = summary.peerCheckCount ?? 0;
+    fragments.push({
+      text: t(pluralKey("tool.grouped.checkedParallelSessions", count), {
+        count,
+      }),
+      iconType: "peers",
     });
   }
   if (summary.commandCount > 0) {

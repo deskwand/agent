@@ -162,6 +162,10 @@ import { getCloudProvider } from "../tts/cloud";
 import { createOfficeTools } from "./tools/office/office-tools";
 import { codemodeOnly } from "./tools/tool-exposure";
 import { createTodoTools } from "./tools/todo-tools";
+import {
+  createWorkspacePeersTool,
+  type WorkspacePeersResult,
+} from "./tools/workspace-peers";
 import { createAskUserTools } from "./tools/ask-user-tools";
 import { createToolCallGuardExtension } from "./tool-call-guard-extension";
 import type { ToolCallGuard } from "../extensions/agent-runtime-extension";
@@ -463,6 +467,23 @@ interface AgentRunnerOptions {
   activateSession?: (sessionId: string) => void;
   /** 按会话 id 查询基本信息（冷启动手动压缩时从 JSONL 重建 pi session 用）。 */
   getSessionInfo?: (sessionId: string) => Session | null;
+  /**
+   * 工具开始执行时上报「动过什么」—— `workspace_peers` 的内存活动表数据源。
+   * 用 `tool_execution_start` 的 `args`，因为 `trace_steps.tool_input` 在那一刻还是 `{}`。
+   */
+  recordToolActivity?: (
+    sessionId: string,
+    toolName: string,
+    args: unknown,
+  ) => void;
+  /**
+   * 同工作目录下其他会话的并行活动 —— `workspace_peers` 工具的数据源。
+   * 不注入就不注册该工具（后台 review runner 与测试都不需要它）。
+   */
+  listWorkspacePeers?: (
+    selfSessionId: string,
+    selfCwd: string,
+  ) => WorkspacePeersResult;
 }
 
 interface CachedPiSession {
@@ -561,6 +582,15 @@ export class AgentRunner {
   private _turnFinalizer: TurnFinalizer | null = null;
   onSessionFileCreated?: (sessionId: string, path: string) => void;
   private _customTools: ToolDefinition[] = [];
+  private _recordToolActivity?: (
+    sessionId: string,
+    toolName: string,
+    args: unknown,
+  ) => void;
+  private _listWorkspacePeers?: (
+    selfSessionId: string,
+    selfCwd: string,
+  ) => WorkspacePeersResult;
   private static readonly MAX_CACHED_SESSIONS = 50;
 
   // Per-instance caches — invalidated when the underlying config changes.
@@ -1074,6 +1104,8 @@ export class AgentRunner {
       log("[AgentRunner] Turn finalizer (background review) enabled");
     }
     this._customTools = options.customTools || [];
+    this._recordToolActivity = options.recordToolActivity;
+    this._listWorkspacePeers = options.listWorkspacePeers;
   }
 
   // ---- browser automation (Playwright over CDP) ----
@@ -3323,6 +3355,17 @@ Tool routing:\n
         // Add office tools (always registered, no config required)
         ...officeTools,
         ...createTodoTools(),
+        ...(this._listWorkspacePeers
+          ? [
+              createWorkspacePeersTool({
+                selfSessionId: session.id,
+                // 沙盒会话的 effectiveCwd 是 Guest 路径（~/.deskwand/sandbox/<id>），
+                // 而 peers 的 cwd 是宿主路径 —— 用它比对永远不等，工具会 100% 假阴性。
+                selfCwd: session.cwd || effectiveCwd,
+                listPeers: this._listWorkspacePeers,
+              }),
+            ]
+          : []),
         // ask_user：仅主对话可用（有回调才注册；子代理在 extension 中过滤）
         ...(this.requestAskUser
           ? createAskUserTools(session.id, this.requestAskUser)
@@ -4259,6 +4302,12 @@ Tool routing:\n
               if (event.toolName === AGENT_TOOL_NAME) {
                 subagentTap.observeAgentToolCall(session.id, event.toolCallId);
               }
+              // 入参这一刻已完整（trace_steps 里同样的调用还在 `{}`），并行探测靠它。
+              this._recordToolActivity?.(
+                session.id,
+                event.toolName,
+                event.args,
+              );
               // Layer 2: the agent acting on the user's behalf. This fires when a
               // call actually starts executing — not when the model merely emits
               // one, so a call cancelled before execution is never counted.

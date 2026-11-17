@@ -1869,6 +1869,8 @@
       "savedIdeas_other": "Saved {{count}} ideas",
       "scheduledWakeups_one": "Scheduled {{count}} wakeup",
       "scheduledWakeups_other": "Scheduled {{count}} wakeups",
+      "checkedParallelSessions_one": "Checked {{count}} parallel session",
+      "checkedParallelSessions_other": "Checked {{count}} parallel sessions",
       "managedGoal": "Managed goal",
       "executedCommands_one": "Executed {{count}} command",
       "executedCommands_other": "Executed {{count}} commands",

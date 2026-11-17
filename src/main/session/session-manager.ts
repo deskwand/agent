@@ -62,6 +62,16 @@ import {
   getDefaultWorkingDirPath,
   toWorkspaceKey,
 } from "../../shared/workspace-path";
+import {
+  MAX_PEERS,
+  extractPeerActivity,
+  pruneActivity,
+  selectWorkspacePeerIds,
+  toPeerActivityEntry,
+  type PeerActivityEntry,
+  type WorkspacePeerSnapshot,
+  type WorkspacePeersResult,
+} from "../agent/tools/workspace-peers";
 import type { AppConfig, ProviderProfileKey } from "../config/config-store";
 import type { BrowserViewManager } from "../browser/browser-view-manager";
 import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
@@ -199,6 +209,9 @@ export class SessionManager {
   /** 见 `setSkillsAdapter()`：必须活过 `setBrowserViewManager()` 的 runner 重建。 */
   private skillsAdapter?: SkillsAdapter;
   private activeSessions: Map<string, AbortController> = new Map();
+
+  /** 并行活动：每个会话「动过哪些文件 / 跑过什么命令 / 当前待办」。只在内存里，重启即空。 */
+  private sessionActivity = new Map<string, PeerActivityEntry[]>();
   private promptQueues: Map<
     string,
     Array<{
@@ -318,6 +331,13 @@ export class SessionManager {
           this.findSessionByPiFile(piFile),
         activateSession: (sessionId: string) => this.activateSession(sessionId),
         getSessionInfo: (sessionId: string) => this.loadSession(sessionId),
+        recordToolActivity: (
+          sessionId: string,
+          toolName: string,
+          args: unknown,
+        ) => this.recordToolActivity(sessionId, toolName, args),
+        listWorkspacePeers: (selfSessionId: string, selfCwd: string) =>
+          this.listWorkspacePeers(selfSessionId, selfCwd),
         turnFinalizer: {
           getReviewService: () => {
             // Lazily create the review service with current config.
@@ -2340,6 +2360,7 @@ export class SessionManager {
     this.sessionTitleAttempts.delete(sessionId);
     this.titleGenerationTokens.delete(sessionId);
     webAccessCache.clearSession(sessionId);
+    this.sessionActivity.delete(sessionId);
     try {
       await removeWebAccessTempDir(sessionId);
     } catch (error) {
@@ -2389,6 +2410,7 @@ export class SessionManager {
         this.sessionTitleAttempts.delete(sessionId);
         this.titleGenerationTokens.delete(sessionId);
         webAccessCache.clearSession(sessionId);
+        this.sessionActivity.delete(sessionId);
       }
       this.db.raw.exec("COMMIT");
     } catch (e) {
@@ -2729,6 +2751,61 @@ export class SessionManager {
       timestamp: row.timestamp,
       duration: row.duration ?? undefined,
     }));
+  }
+
+  /**
+   * 记下"这个会话刚动过什么"。由 `agent-runner` 在 `tool_execution_start` 调用 ——
+   * 那时入参已完整，而 `trace_steps.tool_input` 在同样的时刻还是 `{}`。
+   */
+  recordToolActivity(sessionId: string, toolName: string, args: unknown): void {
+    const now = Date.now();
+    const entry = toPeerActivityEntry(toolName, args, now);
+    if (!entry) return;
+    const entries = this.sessionActivity.get(sessionId) ?? [];
+    entries.push(entry);
+    this.sessionActivity.set(sessionId, pruneActivity(entries, now));
+  }
+
+  /**
+   * 同工作目录下其他会话的并行活动。
+   *
+   * running 在前、其次按最近活动倒序，取前 `MAX_PEERS` 个；被丢掉的个数一并返回，
+   * 报告里要如实说明（不静默截断）。
+   */
+  listWorkspacePeers(
+    selfSessionId: string,
+    selfCwd: string,
+    now: number = Date.now(),
+  ): WorkspacePeersResult {
+    const sessions = this.listSessions().sessions;
+    const ids = new Set(
+      selectWorkspacePeerIds(sessions, selfSessionId, selfCwd),
+    );
+    const ordered = sessions
+      .filter((session) => ids.has(session.id))
+      .sort((a, b) => {
+        const running =
+          Number(this.isSessionRunning(b.id)) -
+          Number(this.isSessionRunning(a.id));
+        return running !== 0 ? running : b.updatedAt - a.updatedAt;
+      });
+
+    const peers: WorkspacePeerSnapshot[] = ordered
+      .slice(0, MAX_PEERS)
+      .map((session) =>
+        extractPeerActivity({
+          title: session.title,
+          lastActivityAt: session.updatedAt,
+          isRunning:
+            this.isSessionRunning(session.id) || session.status === "running",
+          entries: pruneActivity(
+            this.sessionActivity.get(session.id) ?? [],
+            now,
+          ),
+        }),
+      );
+
+    return { peers, omittedCount: Math.max(0, ordered.length - MAX_PEERS) };
   }
 
   // Handle permission response
