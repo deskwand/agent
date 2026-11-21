@@ -5705,12 +5705,14 @@ export function applySessionTurnPolicyToSdk(
   // setActiveToolsByName() 会无条件重建系统提示词（SDK 的 _rebuildSystemPrompt 没有短路；
   // pi-subagents 的 renarrow() 为此也加了同款守卫）。名单没变就别写 —— 不然稳态每轮白付
   // 一次重建，而"前缀字节稳定"才是 prompt cache 能命中的前提。
-  // 前提：SDK 会把传入的名单原样存下（当前 _applyToolLoadout 就是 [...new Set(names)] 后逐个
-  // 取注册表项，会去重、不改次序）；哪天它开始过滤/重排，这里会退化成每轮重建 —— 无害。
+  // 比较按集合，不按顺序：1.6.0 起 SDK 保留既有工具的顺序、只把新激活的追加到末尾
+  // （`_applyToolLoadout`），所以写一次之后 current 的次序不再等于注册表次序 ——
+  // 按顺序比会让稳态每轮都判成"变了"，把提示词缓存打掉。
   const current = piSession.getActiveToolNames();
+  const currentSet = new Set(current);
   const unchanged =
     current.length === next.length &&
-    current.every((name, i) => name === next[i]);
+    next.every((name) => currentSet.has(name));
   if (!unchanged) piSession.setActiveToolsByName(next);
   if (sessionRecord) sessionRecord.turnProfile = profile;
 }

@@ -19,6 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 
 /**
  * 复刻 patch 后 loader.js resolveWorkspaceOrImport 的解析顺序。
@@ -304,5 +305,73 @@ describe("getAliases dev (nested) layout resolution", () => {
         "compat.js",
       ),
     );
+  });
+});
+
+/**
+ * 已安装 SDK 源码断言：1.6.0 把 pi-ai 的扩展视图搬到了
+ * dist/core/extensions/pi-ai-extension-view.js，而 Electron 主进程是打包过的
+ * （__dirname = dist-electron/main），必须从 packagesRoot 解析；否则扩展加载
+ * @earendil-works/pi-ai 时会指到不存在的文件，且只在打包版复现。
+ *
+ * 同时锁住 resolveModule 与 typebox 入口的定义顺序：resolveModule 是 const，
+ * 被提前调用会抛 ReferenceError，所有扩展都加载不了。
+ */
+describe("installed pi-coding-agent loader patch", () => {
+  const loaderSource = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js",
+    ),
+    "utf8",
+  );
+
+  it("walks up to the package root instead of trusting __dirname", () => {
+    expect(loaderSource).toContain("const packagesRoot = (() => {");
+    expect(loaderSource).toContain(
+      'path.join(dir, "node_modules", "@earendil-works", "pi-coding-agent")',
+    );
+  });
+
+  it("resolves the pi-ai extension view inside the package", () => {
+    expect(loaderSource).toContain(
+      'path.join(packagesRoot, "dist", "core", "extensions", "pi-ai-extension-view.js")',
+    );
+    expect(loaderSource).not.toContain(
+      'const piAiCompatEntry = path.resolve(__dirname, "pi-ai-extension-view.js");',
+    );
+  });
+
+  it("defines resolveModule before the typebox entries use it", () => {
+    const resolveModuleAt = loaderSource.indexOf("const resolveModule = ");
+    const typeboxAt = loaderSource.indexOf("const typeboxEntry = ");
+    expect(resolveModuleAt).toBeGreaterThan(-1);
+    expect(typeboxAt).toBeGreaterThan(resolveModuleAt);
+    expect(loaderSource).not.toContain('require.resolve("typebox")');
+  });
+});
+
+/**
+ * 行为断言，不是文本断言：1.6.0 的 loader 把 `@earendil-works/pi-ai` 指向包内的
+ * `pi-ai-extension-view.js`（compat + TypeBox 的 Type/StringEnum）。这个文件真能加载、
+ * 真能导出扩展依赖的符号，别名链才算闭合；只有源码 grep 时，文件被删或改成空壳也会绿。
+ */
+describe("pi-ai extension view module", () => {
+  const viewPath = path.join(
+    process.cwd(),
+    "node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/pi-ai-extension-view.js",
+  );
+
+  it("exists and exposes the symbols extensions import from pi-ai", async () => {
+    expect(fs.existsSync(viewPath)).toBe(true);
+    const view = (await import(pathToFileURL(viewPath).href)) as {
+      Type?: unknown;
+      StringEnum?: unknown;
+      getModels?: unknown;
+    };
+    // Type 是 TypeBox 命名空间对象；StringEnum 是函数；compat 的 getModels 顺带透出。
+    expect(typeof view.Type).toBe("object");
+    expect(typeof view.StringEnum).toBe("function");
+    expect(typeof view.getModels).toBe("function");
   });
 });

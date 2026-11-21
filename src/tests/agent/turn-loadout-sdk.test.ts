@@ -104,14 +104,24 @@ describe("每轮策略 × 真 SDK 会话", () => {
       seen.push(session.getActiveToolNames());
     }
 
-    // 每一轮的声明集合都一致（第一轮从"建会话时的全量"写起，后面三轮应原样不动）
+    // 每一轮的声明集合都一致（第一轮从"建会话时的全量"写起，后面三轮应原样不动）。
+    // 1.6.0 起 setActiveToolsByName 保留既有工具的顺序、把新激活的追加到末尾，
+    // 所以这里比集合而不是比顺序（顺序稳定性由「四轮完全一致」这条覆盖）。
+    const asSet = (names: string[]) => [...names].sort();
     for (const [turn, active] of seen.entries()) {
-      expect(active, `第 ${turn + 1} 轮的 active 集合`).toEqual(expected);
+      expect(asSet(active), `第 ${turn + 1} 轮的 active 集合`).toEqual(
+        asSet(expected),
+      );
       for (const name of ["Agent", "SubagentWorkflow", "grep", "find", "ls"]) {
         expect(active, `第 ${turn + 1} 轮缺了 ${name}`).toContain(name);
       }
       for (const name of [...CODEMODE_STUBS, "set_voice"]) {
         expect(active, `第 ${turn + 1} 轮不该声明 ${name}`).not.toContain(name);
+      }
+      // 顺序也要逐轮一致：系统提示词里的工具段落按声明顺序生成，顺序抖一次就是
+      // 一次前缀变化 ⇒ 提示词缓存失效。稳态下 sdk 不该重排（我们的守卫也不该重写）。
+      if (turn > 0) {
+        expect(seen[turn], `第 ${turn + 1} 轮的 active 顺序`).toEqual(seen[0]);
       }
     }
 

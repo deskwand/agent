@@ -1,0 +1,4 @@
+# 上游 pi 扩展示例的逐字副本（用 tab 缩进的 .ts），维持原样便于与 examples/ 对照。
+# 格式化它们会产生近 600 行纯空白 diff，掩盖真正的改动。
+src/tests/extensions/fixtures/hello.ts
+src/tests/extensions/fixtures/todo.ts

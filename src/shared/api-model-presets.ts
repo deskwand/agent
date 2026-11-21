@@ -170,7 +170,7 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
       { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
       { id: "kimi-k3", name: "kimi-k3" },
       { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
-      { id: "glm-5.2", name: "glm-5.2" },
+      { id: "glm-5.3", name: "glm-5.3" },
       { id: "gemini-3.6-flash", name: "gemini-3.6-flash" },
       { id: "grok-4.5", name: "grok-4.5" },
     ],

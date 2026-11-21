@@ -2,7 +2,9 @@
  * Hello Tool - Minimal custom tool example
  */
 
-import { Type } from "@earendil-works/pi-ai";
+// pi-ai 1.5.0 起主入口不再 re-export TypeBox（扩展在运行期由 pi 的 loader
+// 别名补上 Type），编译期从已安装的 TypeBox 取类型。
+import { Type } from "@sinclair/typebox";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const helloTool = defineTool({

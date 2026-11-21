@@ -1,8 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-index 8728a3e..376b386 100644
+index 009632b..6d5a901 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -800,7 +800,10 @@ export class AgentSession {
+@@ -863,7 +863,10 @@ export class AgentSession {
          if (this._agentRunAbortRequested)
              return false;
          const settings = this.settingsManager.getRetrySettings();
@@ -14,7 +14,7 @@ index 8728a3e..376b386 100644
              return false;
          }
          for (let i = event.messages.length - 1; i >= 0; i--) {
-@@ -3093,7 +3096,7 @@ export class AgentSession {
+@@ -3202,7 +3205,7 @@ export class AgentSession {
              return false;
          }
          this._retryAttempt++;
@@ -24,10 +24,10 @@ index 8728a3e..376b386 100644
              this._retryAttempt--;
              return false;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-index eb2bd28..3f9728c 100644
+index 7178a02..913dcb7 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-@@ -39,16 +39,186 @@ function getAliases() {
+@@ -40,25 +40,194 @@ function getAliases() {
          return _aliases;
      const __dirname = path.dirname(fileURLToPath(import.meta.url));
      const packageIndex = path.resolve(__dirname, "../..", "index.js");
@@ -35,100 +35,18 @@ index eb2bd28..3f9728c 100644
 -    const typeboxCompileEntry = require.resolve("typebox/compile");
 -    const typeboxValueEntry = require.resolve("typebox/value");
 -    const packagesRoot = path.resolve(__dirname, "../../../../");
-+
-+    // Find pi-coding-agent's package root by walking up from __dirname.
-+    // In Electron bundles __dirname points to dist-electron/main/;
-+    // in unbundled dev it points into node_modules/…/extensions/.
-+    // We look for node_modules/@earendil-works/pi-coding-agent at each level.
 +    const packagesRoot = (() => {
-+      let dir = __dirname;
-+      while (true) {
-+        const candidate = path.join(dir, "node_modules", "@earendil-works", "pi-coding-agent");
-+        if (fs.existsSync(candidate)) return candidate;
-+        const parent = path.dirname(dir);
-+        if (parent === dir) break;
-+        dir = parent;
-+      }
-+      // Last resort (should never happen)
-+      return path.resolve(__dirname, "../../../../");
-+    })();
-+
-+
-+    // Resolve a module specifier (e.g. "typebox", "typebox/compile")
-+    // under packagesRoot/node_modules, using package.json exports/maps.
-+    const resolveModule = (specifier) => {
-+        const parts = specifier.split("/");
-+        // Determine package name: "@scope/name" or "name"
-+        const pkgName = specifier.startsWith("@") && parts.length >= 2
-+            ? parts.slice(0, 2).join("/")
-+            : parts[0];
-+        const subpath = pkgName === specifier
-+            ? "."
-+            : "./" + parts.slice(pkgName.startsWith("@") ? 2 : 1).join("/");
-+        // Packaged (hoisted) layout: electron-builder lifts @earendil-works/*
-+        // deps to the app's top-level node_modules. packagesRoot is
-+        // <app>/node_modules/@earendil-works/pi-coding-agent, so the
-+        // top-level node_modules root is two levels up.
-+        const topLevelNodeModules = path.resolve(packagesRoot, "../..");
-+        const hoistedPkgRoot = path.join(topLevelNodeModules, pkgName);
-+        if (fs.existsSync(hoistedPkgRoot)) {
-+            const hoistedPkgJsonPath = path.join(hoistedPkgRoot, "package.json");
-+            if (fs.existsSync(hoistedPkgJsonPath)) {
-+                try {
-+                    const hoistedPkg = JSON.parse(fs.readFileSync(hoistedPkgJsonPath, "utf-8"));
-+                    if (typeof hoistedPkg.exports === "object" && hoistedPkg.exports !== null) {
-+                        const hoistedTarget = hoistedPkg.exports[subpath];
-+                        if (typeof hoistedTarget === "string") {
-+                            const hoistedResolved = path.join(hoistedPkgRoot, hoistedTarget);
-+                            if (fs.existsSync(hoistedResolved)) return hoistedResolved;
-+                        } else if (typeof hoistedTarget === "object" && hoistedTarget !== null) {
-+                            const hoistedEntry = hoistedTarget.import || hoistedTarget.default || hoistedTarget.require;
-+                            if (typeof hoistedEntry === "string") {
-+                                const hoistedResolved = path.join(hoistedPkgRoot, hoistedEntry);
-+                                if (fs.existsSync(hoistedResolved)) return hoistedResolved;
-+                            }
-+                        }
-+                    }
-+                    if (typeof hoistedPkg.main === "string") {
-+                        const hoistedResolved = path.join(hoistedPkgRoot, hoistedPkg.main);
-+                        if (fs.existsSync(hoistedResolved)) return hoistedResolved;
-+                    }
-+                } catch { /* ignore */ }
-+            }
++        let dir = __dirname;
++        while (true) {
++            const candidate = path.join(dir, "node_modules", "@earendil-works", "pi-coding-agent");
++            if (fs.existsSync(candidate)) return candidate;
++            const parent = path.dirname(dir);
++            if (parent === dir) break;
++            dir = parent;
 +        }
-+        const pkgRoot = path.join(packagesRoot, "node_modules", pkgName);
-+        if (!fs.existsSync(pkgRoot)) return require.resolve(specifier);
-+        const pkgJsonPath = path.join(pkgRoot, "package.json");
-+        if (!fs.existsSync(pkgJsonPath)) return require.resolve(specifier);
-+        try {
-+            const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
-+            // Use exports map if available, otherwise main
-+            if (typeof pkg.exports === "object" && pkg.exports !== null) {
-+                const target = pkg.exports[subpath];
-+                if (typeof target === "string") {
-+                    const resolved = path.join(pkgRoot, target);
-+                    if (fs.existsSync(resolved)) return resolved;
-+                } else if (typeof target === "object" && target !== null) {
-+                    const entry = target.import || target.default || target.require;
-+                    if (typeof entry === "string") {
-+                        const resolved = path.join(pkgRoot, entry);
-+                        if (fs.existsSync(resolved)) return resolved;
-+                    }
-+                }
-+            }
-+            // Fallback to "main" field
-+            if (typeof pkg.main === "string") {
-+                const resolved = path.join(pkgRoot, pkg.main);
-+                if (fs.existsSync(resolved)) return resolved;
-+            }
-+        } catch { /* ignore */ }
-+        return require.resolve(specifier);
-+    };
-+
-+    const typeboxEntry = resolveModule("typebox");
-+    const typeboxCompileEntry = resolveModule("typebox/compile");
-+    const typeboxValueEntry = resolveModule("typebox/value");
-+
++        // Last resort (should never happen)
++        return path.resolve(__dirname, "../../../../");
++    })();
      const resolveWorkspaceOrImport = (workspaceRelativePath, specifier) => {
 +        // 1. npm-installed under packagesRoot/node_modules/<specifier>/<relPath>
 +        const nmPath = path.join(packagesRoot, "node_modules", specifier, workspaceRelativePath);
@@ -214,26 +132,113 @@ index eb2bd28..3f9728c 100644
 +                    }
 +                } catch { /* ignore */ }
 +            }
-         }
--        return fileURLToPath(import.meta.resolve(specifier));
++        }
 +
 +        return require.resolve(specifier);
-     };
-     const piCodingAgentEntry = packageIndex;
-     const piAgentCoreEntry = resolveWorkspaceOrImport("agent/dist/index.js", "@earendil-works/pi-agent-core");
-@@ -84,6 +254,7 @@ function getAliases() {
-         "@sinclair/typebox/compile": typeboxCompileEntry,
-         "@sinclair/typebox/value": typeboxValueEntry,
++    };
++    // Resolve a module specifier under packagesRoot/.. node_modules or the hoisted
++    // top-level node_modules, falling back to require.resolve.
++    // Resolve a module specifier (e.g. "typebox", "typebox/compile")
++    // under packagesRoot/node_modules, using package.json exports/maps.
++    const resolveModule = (specifier) => {
++        const parts = specifier.split("/");
++        // Determine package name: "@scope/name" or "name"
++        const pkgName = specifier.startsWith("@") && parts.length >= 2
++            ? parts.slice(0, 2).join("/")
++            : parts[0];
++        const subpath = pkgName === specifier
++            ? "."
++            : "./" + parts.slice(pkgName.startsWith("@") ? 2 : 1).join("/");
++        // Packaged (hoisted) layout only: electron-builder lifts @earendil-works/*
++        // deps to the app's top-level node_modules. packagesRoot is
++        // <app>/node_modules/@earendil-works/pi-coding-agent, so the
++        // top-level node_modules root is two levels up.
++        const topLevelNodeModules = path.resolve(packagesRoot, "../..");
++        const hoistedPkgRoot = path.join(topLevelNodeModules, pkgName);
++        if (fs.existsSync(hoistedPkgRoot)) {
++            const hoistedPkgJsonPath = path.join(hoistedPkgRoot, "package.json");
++            if (fs.existsSync(hoistedPkgJsonPath)) {
++                try {
++                    const hoistedPkg = JSON.parse(fs.readFileSync(hoistedPkgJsonPath, "utf-8"));
++                    if (typeof hoistedPkg.exports === "object" && hoistedPkg.exports !== null) {
++                        const hoistedTarget = hoistedPkg.exports[subpath];
++                        if (typeof hoistedTarget === "string") {
++                            const hoistedResolved = path.join(hoistedPkgRoot, hoistedTarget);
++                            if (fs.existsSync(hoistedResolved)) return hoistedResolved;
++                        } else if (typeof hoistedTarget === "object" && hoistedTarget !== null) {
++                            const hoistedEntry = hoistedTarget.import || hoistedTarget.default || hoistedTarget.require;
++                            if (typeof hoistedEntry === "string") {
++                                const hoistedResolved = path.join(hoistedPkgRoot, hoistedEntry);
++                                if (fs.existsSync(hoistedResolved)) return hoistedResolved;
++                            }
++                        }
++                    }
++                    if (typeof hoistedPkg.main === "string") {
++                        const hoistedResolved = path.join(hoistedPkgRoot, hoistedPkg.main);
++                        if (fs.existsSync(hoistedResolved)) return hoistedResolved;
++                    }
++                } catch { /* ignore */ }
++            }
+         }
+-        return fileURLToPath(import.meta.resolve(specifier));
++        const pkgRoot = path.join(packagesRoot, "node_modules", pkgName);
++        if (!fs.existsSync(pkgRoot)) return require.resolve(specifier);
++        const pkgJsonPath = path.join(pkgRoot, "package.json");
++        if (!fs.existsSync(pkgJsonPath)) return require.resolve(specifier);
++        try {
++            const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
++            // Use exports map if available, otherwise main
++            if (typeof pkg.exports === "object" && pkg.exports !== null) {
++                const target = pkg.exports[subpath];
++                if (typeof target === "string") {
++                    const resolved = path.join(pkgRoot, target);
++                    if (fs.existsSync(resolved)) return resolved;
++                } else if (typeof target === "object" && target !== null) {
++                    const entry = target.import || target.default || target.require;
++                    if (typeof entry === "string") {
++                        const resolved = path.join(pkgRoot, entry);
++                        if (fs.existsSync(resolved)) return resolved;
++                    }
++                }
++            }
++            // Fallback to "main" field
++            if (typeof pkg.main === "string") {
++                const resolved = path.join(pkgRoot, pkg.main);
++                if (fs.existsSync(resolved)) return resolved;
++            }
++        } catch { /* ignore */ }
++        return require.resolve(specifier);
      };
 +
-     return _aliases;
- }
- let extensionCacheCwd;
++    const typeboxEntry = resolveModule("typebox");
++    const typeboxCompileEntry = resolveModule("typebox/compile");
++    const typeboxValueEntry = resolveModule("typebox/value");
+     const piCodingAgentEntry = packageIndex;
+     const piAgentCoreEntry = resolveWorkspaceOrImport("agent/dist/index.js", "@earendil-works/pi-agent-core");
+     const piTuiEntry = resolveWorkspaceOrImport("tui/dist/index.js", "@earendil-works/pi-tui");
+-    // Extensions resolve the pi-ai root to the extension view: the compat
+-    // entrypoint (a strict superset of the core entrypoint) plus TypeBox's Type,
+-    // Static and TSchema, so extensions using the old global API and pi-ai's
+-    // former TypeBox re-exports keep working.
+-    const piAiCompatEntry = path.resolve(__dirname, "pi-ai-extension-view.js");
++    // The extension view (compat + TypeBox Type/StringEnum) is a file inside this package.
++    // In the Electron bundle __dirname is dist-electron/main, so resolve it from the package
++    // root instead, and fall back to pi-ai's compat entry only if that file is missing.
++    const piAiCompatEntry = (() => {
++        const local = path.resolve(__dirname, "pi-ai-extension-view.js");
++        if (fs.existsSync(local)) return local;
++        const packaged = path.join(packagesRoot, "dist", "core", "extensions", "pi-ai-extension-view.js");
++        if (fs.existsSync(packaged)) return packaged;
++        return resolveWorkspaceOrImport("ai/dist/compat.js", "@earendil-works/pi-ai/compat");
++    })();
+     const piAiModelsEntry = resolveWorkspaceOrImport("ai/dist/models.js", "@earendil-works/pi-ai/models");
+     const piAiOauthEntry = resolveWorkspaceOrImport("ai/dist/oauth.js", "@earendil-works/pi-ai/oauth");
+     const piAiProvidersEntry = resolveWorkspaceOrImport("ai/dist/providers/all.js", "@earendil-works/pi-ai/providers/all");
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
-index a40ba7f..eaa557d 100644
+index 5d05602..2719a5c 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
-@@ -144,6 +144,7 @@ export declare class SettingsManager {
+@@ -146,6 +146,7 @@ export declare class SettingsManager {
          maxRetries: number;
          baseDelayMs: number;
          maxAgentDelayMs: number;
@@ -242,10 +247,10 @@ index a40ba7f..eaa557d 100644
      getHttpIdleTimeoutMs(): number;
      setHttpIdleTimeoutMs(timeoutMs: number): void;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
-index d5ce9cd..ebb7c46 100644
+index 1a02347..5de81ba 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
-@@ -697,6 +697,7 @@ export class SettingsManager {
+@@ -708,6 +708,7 @@ export class SettingsManager {
              maxRetries: this.settings.retry?.maxRetries ?? SETTINGS_DEFAULTS.retry.maxRetries,
              baseDelayMs: this.settings.retry?.baseDelayMs ?? SETTINGS_DEFAULTS.retry.baseDelayMs,
              maxAgentDelayMs: this.settings.retry?.maxAgentDelayMs ?? SETTINGS_DEFAULTS.retry.maxAgentDelayMs,
@@ -254,7 +259,7 @@ index d5ce9cd..ebb7c46 100644
      }
      getHttpIdleTimeoutMs() {
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-schema.d.ts b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-schema.d.ts
-index 28676b7..54b81dd 100644
+index 99113ea..6fe29e4 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-schema.d.ts
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-schema.d.ts
 @@ -26,6 +26,7 @@ declare const RetrySettingsSchema: Type.TObject<{
@@ -266,7 +271,7 @@ index 28676b7..54b81dd 100644
          timeoutMs: Type.TOptional<Type.TNumber>;
          maxRetries: Type.TOptional<Type.TNumber>;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-schema.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-schema.js
-index 28c00ed..6a9d42e 100644
+index 45c3ce8..7f6c5e9 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-schema.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-schema.js
 @@ -45,6 +45,9 @@ const RetrySettingsSchema = Type.Object({

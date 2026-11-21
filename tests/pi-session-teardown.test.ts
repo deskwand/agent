@@ -121,6 +121,9 @@ describe("pi 会话收尾走 runtime", () => {
  */
 function makeFakeRuntime(order: string[]) {
   const session = {
+    // 1.6.0 起 dispose() 先 await session.abort()，再发 session_shutdown；
+    // 假会话只需可调用，不参与顺序断言。
+    abort: async () => {},
     extensionRunner: {
       hasHandlers: (type: string) => type === "session_shutdown",
       emit: async (event: { type: string }) => {
@@ -133,7 +136,8 @@ function makeFakeRuntime(order: string[]) {
   };
   return new AgentSessionRuntime(
     session as never,
-    {} as never,
+    // 1.6.0 起 dispose() 末尾还会 settleCredentialWrites()，假 services 要接得住。
+    { modelRuntime: { settleCredentialWrites: async () => {} } } as never,
     (() => {
       throw new Error("unused");
     }) as never,
