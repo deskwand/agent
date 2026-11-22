@@ -1912,6 +1912,7 @@ app.on("before-quit", async (event) => {
   // 收尾是异步的，应用可能在它完成前就退出 —— 兜底是 pi-mcp 的进程退出钩子与
   // 内置 server 认 stdin EOF。
   sessionManager?.clearAllCachedAgentSessions();
+  sessionManager?.killAllShellTasks();
 
   if (isCleaningUp) {
     if (!isCleanupComplete && !isQuittingForUpdate) {
@@ -1988,6 +1989,41 @@ registerVaultIpc({
   // 且以 existsSync(密库目录) 过滤 —— 启动时目录可能还不存在。
   onSkillsChanged: () => sessionManager?.invalidateSkillsSetup(),
 });
+// ── 后台终端任务 ──────────────────────────────────────────────
+ipcMain.handle(
+  "session.shellTask.detach",
+  (_e, payload: { sessionId?: unknown; toolCallId?: unknown }) => ({
+    success:
+      typeof payload?.sessionId === "string" &&
+      typeof payload?.toolCallId === "string"
+        ? (sessionManager?.detachShellTask(
+            payload.sessionId,
+            payload.toolCallId,
+          ) ?? false)
+        : false,
+  }),
+);
+
+ipcMain.handle(
+  "session.shellTask.cancel",
+  (_e, payload: { sessionId?: unknown; taskId?: unknown }) => ({
+    success:
+      typeof payload?.sessionId === "string" &&
+      typeof payload?.taskId === "string"
+        ? (sessionManager?.cancelShellTask(payload.sessionId, payload.taskId) ??
+          false)
+        : false,
+  }),
+);
+
+ipcMain.handle(
+  "session.shellTask.list",
+  (_e, payload: { sessionId?: unknown }) =>
+    typeof payload?.sessionId === "string"
+      ? (sessionManager?.listShellTasks(payload.sessionId) ?? [])
+      : [],
+);
+
 ipcMain.handle("openrouterAuth.login", async () => {
   return openRouterPkceService.login();
 });

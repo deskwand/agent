@@ -1336,7 +1336,17 @@
     "voiceDownloadConfirmOk": "Download and turn on",
     "voiceReady": "Voice input is ready — tap the mic to start",
     "voiceEnableFailed": "Could not turn voice input on — please try again",
-    "voiceInstalling": "Downloading the voice model — {{percent}}%"
+    "voiceInstalling": "Downloading the voice model — {{percent}}%",
+    "shellTask": {
+      "detach": "Run in background",
+      "cancel": "Cancel",
+      "runningInBackground": "Background #{{id}}",
+      "statusChip": "{{count}} background shell task(s)",
+      "completed": "Finished · exit {{code}}",
+      "failed": "Failed · exit {{code}}",
+      "timeout": "Timed out",
+      "killed": "Cancelled"
+    }
   },
   "steer": {
     "label": "Steer",
@@ -3038,6 +3048,9 @@
       "empty": "No background tasks",
       "finishedCount": "{{count}} finished",
       "showLess": "Show less"
+    },
+    "shellTasks": {
+      "title": "Background shell"
     }
   },
   "split": {

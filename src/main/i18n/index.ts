@@ -115,6 +115,8 @@ const MSG: Record<Locale, MessageTable> = {
     // ── background subagent ──
     "agent.backgroundAgentDone":
       "[系统通知] 后台子代理 {{agentId}} 已完成。请调用 get_subagent_result 获取结果并汇总给用户。",
+    "agent.backgroundShellStarted":
+      "已转入后台运行（任务 #{{taskId}}）：{{command}}。完成后我会接着往下做，不要重复执行这条命令。",
 
     // ── remote channels ──
     "feishu.unsupportedMessageType": "[不支持的消息类型: {{type}}]",
@@ -287,6 +289,8 @@ const MSG: Record<Locale, MessageTable> = {
     // ── background subagent ──
     "agent.backgroundAgentDone":
       "[System notice] Background subagent {{agentId}} finished. Call get_subagent_result to fetch the result and summarize it for the user.",
+    "agent.backgroundShellStarted":
+      "Transferred to background as task #{{taskId}}: {{command}}. I will continue when it finishes; do not re-run it.",
 
     // ── remote channels ──
     "feishu.unsupportedMessageType": "[Unsupported message type: {{type}}]",

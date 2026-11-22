@@ -10,6 +10,7 @@ import { getToolLabel } from "../message/toolHelpers";
 import { SubagentSteps } from "../message/SubagentSteps";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { OverviewSection } from "./OverviewSection";
+import { splitShellTaskRows } from "../../utils/shell-task-card";
 
 const MAX_FINISHED_ROWS = 5;
 
@@ -90,6 +91,14 @@ export function BackgroundTasksSection() {
       ? s.sessionStates[s.activeSessionId]?.subagentActivities
       : undefined,
   );
+  const shellTasks = useAppStore((s) =>
+    s.activeSessionId
+      ? s.sessionStates[s.activeSessionId]?.shellTasks
+      : undefined,
+  );
+  const { detached: shellDetached, finished: shellFinished } =
+    splitShellTaskRows(shellTasks ?? {});
+
   const focusId = useAppStore((s) => s.overviewTaskFocusId);
   const focusNonce = useAppStore((s) => s.overviewTaskFocusNonce);
   const clearOverviewTaskFocus = useAppStore((s) => s.clearOverviewTaskFocus);
@@ -190,6 +199,58 @@ export function BackgroundTasksSection() {
         )}
         {renderRows(finishedVisible)}
         {pinnedFinished ? renderRows([pinnedFinished]) : null}
+        {(shellDetached.length > 0 || shellFinished.length > 0) && (
+          <div className="mt-2 border-t border-border pt-2">
+            <div className="mb-1 px-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              {t("overview.shellTasks.title")}
+            </div>
+            {[...shellDetached, ...shellFinished.slice(-MAX_FINISHED_ROWS)].map(
+              (task) => (
+                <div
+                  key={task.toolCallId}
+                  className="flex items-start gap-2 rounded px-1 py-1"
+                >
+                  <span
+                    className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${
+                      task.status === "detached"
+                        ? "bg-primary"
+                        : task.status === "completed"
+                          ? "bg-success"
+                          : "bg-destructive"
+                    }`}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs text-foreground">
+                      #{task.id} {task.command}
+                    </span>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {t(`chat.shellTask.${task.status}`, {
+                        code: task.exitCode ?? "?",
+                      })}
+                      {durationLabel(task.durationMs ?? 0)
+                        ? ` · ${durationLabel(task.durationMs ?? 0)}`
+                        : ""}
+                    </span>
+                  </span>
+                  {task.status === "detached" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.electronAPI.shellTasks.cancel(
+                          task.sessionId,
+                          task.id,
+                        )
+                      }
+                      className="flex-none rounded px-1 py-0.5 text-[11px] text-muted-foreground hover:bg-hover-surface"
+                    >
+                      {t("chat.shellTask.cancel")}
+                    </button>
+                  )}
+                </div>
+              ),
+            )}
+          </div>
+        )}
       </div>
     </OverviewSection>
   );

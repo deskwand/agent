@@ -254,6 +254,7 @@ export function Sidebar({
           s,
           sessionStates[s.id]?.backgroundAgents,
           sessionHasPendingAskUser(s.id),
+          Object.values(sessionStates[s.id]?.shellTasks ?? {}),
         ),
       )
     ) {
@@ -266,6 +267,7 @@ export function Sidebar({
             s,
             sessionStates[s.id]?.backgroundAgents,
             sessionHasPendingAskUser(s.id),
+            Object.values(sessionStates[s.id]?.shellTasks ?? {}),
           ),
         )
       ) {
@@ -746,6 +748,7 @@ export function Sidebar({
             s,
             sessionStates[s.id]?.backgroundAgents,
             sessionHasPendingAskUser(s.id),
+            Object.values(sessionStates[s.id]?.shellTasks ?? {}),
           )
         );
       }).length;
@@ -864,6 +867,7 @@ export function Sidebar({
       session,
       sessionStates[session.id]?.backgroundAgents,
       hasPendingAskUser,
+      Object.values(sessionStates[session.id]?.shellTasks ?? {}),
     );
     const isPinned = pinnedSessionIds.has(session.id);
     const isHovered = hoveredSessionId === session.id;
@@ -1256,6 +1260,7 @@ export function Sidebar({
             session,
             sessionStates[session.id]?.backgroundAgents,
             sessionHasPendingAskUser(session.id),
+            Object.values(sessionStates[session.id]?.shellTasks ?? {}),
           ),
       });
 

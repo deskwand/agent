@@ -1335,7 +1335,17 @@
     "voiceDownloadConfirmOk": "下载并开启",
     "voiceReady": "语音输入已就绪，点麦克风开始说话",
     "voiceEnableFailed": "没能开启语音输入，请再试一次",
-    "voiceInstalling": "正在下载语音模型 {{percent}}%"
+    "voiceInstalling": "正在下载语音模型 {{percent}}%",
+    "shellTask": {
+      "detach": "转后台",
+      "cancel": "取消",
+      "runningInBackground": "已在后台 #{{id}}",
+      "statusChip": "{{count}} 个后台终端任务",
+      "completed": "后台完成 · exit {{code}}",
+      "failed": "后台失败 · exit {{code}}",
+      "timeout": "超时已终止",
+      "killed": "已取消"
+    }
   },
   "steer": {
     "label": "引导",
@@ -3035,6 +3045,9 @@
       "empty": "没有后台任务",
       "finishedCount": "{{count}} 个已结束",
       "showLess": "收起"
+    },
+    "shellTasks": {
+      "title": "后台终端"
     }
   },
   "split": {

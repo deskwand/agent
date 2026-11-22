@@ -213,7 +213,11 @@ export const ToolUseBlock = memo(function ToolUseBlock({
       );
     }
   }
-  if (block.name === "bash" || block.name === "execute_command") {
+  if (
+    block.name === "bash" ||
+    block.name === "execute_command" ||
+    block.name === "powershell"
+  ) {
     if (
       canHandleBashInput(block.input as Record<string, unknown> | undefined)
     ) {

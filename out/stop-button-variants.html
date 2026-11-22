@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>停止键圆角比对</title>
+<style>
+  :root { --hover: #ececee; --ink: #17171a; --muted: #8a8a92; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 30px 40px;
+    font: 13px/1.55 -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    color: var(--ink); background: #fff;
+  }
+  h1 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
+  p.lead { margin: 0 0 22px; color: var(--muted); font-size: 12px; }
+  .grid { display: grid; gap: 14px; }
+  .row {
+    display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 18px;
+    padding: 12px 14px; border: 1px solid #e8e8ec; border-radius: 12px;
+  }
+  .row.pick { border-color: #b9d0ff; background: #f7faff; }
+  .label { font-size: 12.5px; }
+  .label b { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .label span { color: var(--muted); font-size: 11.5px; }
+  .stage { display: flex; align-items: center; gap: 14px; }
+
+  /* 1:1 复刻输入卡里的样子：pill 卡 + 36px 圆形热区 */
+  .composer {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 10px; border-radius: 22px;
+    background: #f4f4f6; border: 1px solid #ececef;
+  }
+  .ghost {
+    width: 36px; height: 36px; border: 0; padding: 0; background: transparent;
+    border-radius: 999px; display: grid; place-items: center;
+    color: var(--ink); cursor: default;
+  }
+  .ghost.hover { background: var(--hover); }
+  .mic { color: #5a5a62; display: grid; place-items: center; width: 36px; height: 36px; }
+
+  .zoom { display: grid; place-items: center; padding: 6px 14px; border-radius: 10px; background: #fafafa; }
+  .zoom svg { width: 44px; height: 44px; }
+  .zoom.hoverbg { background: var(--hover); }
+  .ruler { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 11px; }
+  .legend { margin-top: 20px; color: var(--muted); font-size: 11.5px; }
+</style>
+</head>
+<body>
+  <h1>停止键：方块四种圆角</h1>
+  <p class="lead">全部按 1:1 实际大小渲染（左：输入卡里的样子；右：放大 3 倍看圆角）。左列第二个是 hover 态。</p>
+
+  <div class="grid" id="grid"></div>
+
+  <p class="legend">字形尺寸都是 14px（<code>w-3.5</code>），只有圆角半径不同；右侧麦克风 16px，用于比视觉重量。</p>
+
+<script>
+  const mic = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>`;
+
+  // 14px 字形；rx 以 24 viewBox 计
+  const glyph = (rx, size = 14) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><rect x="0" y="0" width="24" height="24" rx="${rx}" fill="currentColor"/></svg>`;
+
+  const VARIANTS = [
+    { name: "A · 现在这样", note: "lucide Square：rx 2/24 ≈ 1.2px，看起来就是个直角方块", rx: 2, pick: false },
+    { name: "B · 圆角方块（推荐）", note: "rx 6/24 = 3.5px，仍是方块，但边角跟麦克风同一种手感", rx: 6, pick: true },
+    { name: "C · 再圆一档", note: "rx 9/24 = 5.25px，接近 iOS 那种软方，边界开始有点模糊", rx: 9, pick: false },
+    { name: "D · 圆点", note: "完全圆角 + 12px，最柔和，但读起来是「录制点」不是「停止」", rx: 12, size: 12, pick: false },
+  ];
+
+  document.getElementById("grid").innerHTML = VARIANTS.map((v) => `
+    <div class="row${v.pick ? " pick" : ""}">
+      <div class="label"><b>${v.name}</b><span>${v.note}</span></div>
+      <div class="stage">
+        <div class="composer">
+          <div class="ghost">${glyph(v.rx, v.size)}</div>
+          <div class="ghost hover">${glyph(v.rx, v.size)}</div>
+          <div class="mic">${mic(16)}</div>
+        </div>
+        <div class="zoom hoverbg">${glyph(v.rx, v.size * 3)}</div>
+        <div class="ruler">${v.size || 14}px</div>
+      </div>
+    </div>`).join("");
+</script>
+</body>
+</html>

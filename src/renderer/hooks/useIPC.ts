@@ -288,6 +288,11 @@ function registerSharedIpcListener(): () => void {
           break;
         }
 
+        case "shellTask.lifecycle": {
+          store.upsertShellTask(event.payload.sessionId, event.payload);
+          break;
+        }
+
         case "subagent.activity": {
           store.setSubagentActivity(event.payload.sessionId, event.payload);
           break;

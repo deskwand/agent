@@ -7,9 +7,11 @@ import {
   Ban,
   CircleDollarSign,
   Loader2,
+  SquareTerminal,
   XCircle,
 } from "lucide-react";
 import type { BackgroundAgentRow } from "../utils/subagent-card";
+import type { ShellTask } from "../../shared/shell-task";
 import { useAppStore } from "../store";
 import type { SessionExecutionClock } from "../store";
 import { Button } from "./app-button";
@@ -76,6 +78,8 @@ interface ChatInputStatusBarProps {
   onGoalCommand?: (action: string) => void;
   /** 后台任务行（只用来算计数与失败态）；列表本身在右侧概览面板里。 */
   backgroundAgentRows?: BackgroundAgentRow[];
+  /** 后台终端任务（只算「还有几条在跑」）。 */
+  shellTaskRows?: ShellTask[];
 }
 
 // Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
@@ -98,9 +102,13 @@ export function ChatInputStatusBar({
   status,
   onGoalCommand,
   backgroundAgentRows,
+  shellTaskRows,
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
   const rows = backgroundAgentRows ?? [];
+  const shellDetached = (shellTaskRows ?? []).filter(
+    (task) => task.status === "detached",
+  );
 
   // 目标长跑期间每秒推进一次。
   // dep 是布尔量而不是 now，所以窗口内不会每秒重建 effect；
@@ -128,7 +136,7 @@ export function ChatInputStatusBar({
   const focusTarget = rows.find((row) => row.status === "running") ?? rows[0];
   const focusOverviewTask = useAppStore((s) => s.focusOverviewTask);
 
-  const rightZone = hasActivity ? (
+  const subagentChip = hasActivity ? (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
@@ -159,6 +167,24 @@ export function ChatInputStatusBar({
       <TooltipContent side="top">{t("activity.openOverview")}</TooltipContent>
     </Tooltip>
   ) : null;
+
+  const shellChip =
+    shellDetached.length > 0 ? (
+      <span className="flex h-auto min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-left text-xs font-normal text-foreground [&_svg]:size-3">
+        <SquareTerminal className="h-3 w-3 flex-none text-primary-text" />
+        <span className="flex-none">
+          {t("chat.shellTask.statusChip", { count: shellDetached.length })}
+        </span>
+      </span>
+    ) : null;
+
+  const rightZone =
+    shellChip || subagentChip ? (
+      <div className="flex items-center gap-1">
+        {shellChip}
+        {subagentChip}
+      </div>
+    ) : null;
 
   // ── Goal status rendering ──
   if (

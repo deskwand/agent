@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>坞内动作行：耗时放哪儿</title>
+<style>
+  :root{
+    --bg:#131316; --panel:#191920; --line:rgba(255,255,255,.10);
+    --fg:#e6e6ea; --muted:#9b9ba5; --dim:#6b6b76; --accent:#cbbfb2;
+    --card:#101014; --cardline:rgba(255,255,255,.13);
+    --bad:#c98a7a; --good:#8fbf9a;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:34px 38px 42px;background:var(--bg);color:var(--fg);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1{margin:0 0 4px;font-size:17px;font-weight:600}
+  .sub{margin:0 0 26px;color:var(--dim);font-size:12.5px}
+  .case{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:22px;overflow:hidden}
+  .case>header{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .tag{padding:1px 7px;border-radius:999px;font-size:11px;border:1px solid}
+  .tag.now{color:var(--bad);border-color:rgba(201,138,122,.45);background:rgba(201,138,122,.09)}
+  .tag.a{color:var(--good);border-color:rgba(143,191,154,.45);background:rgba(143,191,154,.09)}
+  .tag.b{color:var(--dim);border-color:var(--line);background:rgba(255,255,255,.03)}
+  .stage{padding:18px 20px 22px}
+
+  /* ── 坞的骨架 ── */
+  .dock{position:relative;max-width:760px}
+  .row{display:flex;align-items:flex-start;gap:6px}
+  .dots{position:relative;width:14px;height:36px;flex:none;color:var(--accent)}
+  .dots i{position:absolute;left:5px;width:4px;height:4px;border-radius:999px;background:currentColor}
+  .dots i:nth-child(1){top:11px}
+  .dots i:nth-child(2){top:16px;left:10px;opacity:.6}
+  .dots i:nth-child(3){top:21px;opacity:.3}
+  .dots i:nth-child(4){top:16px;left:0;opacity:.45}
+  .trigger{display:flex;align-items:center;gap:6px;height:36px;padding:0 4px;border-radius:8px;color:var(--muted);min-width:0}
+  .frag{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ico{width:14px;height:14px;flex:none;color:var(--muted)}
+  .chev{width:14px;height:14px;flex:none;color:var(--dim)}
+  .elapsed{display:flex;align-items:center;height:36px;flex:none;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .sep{color:var(--dim);margin-right:4px}
+
+  .card{
+    margin-top:2px;margin-left:20px;border:1px solid var(--cardline);border-radius:10px;
+    background:var(--card);overflow:hidden;
+  }
+  .card .crow{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border-top:1px solid rgba(255,255,255,.06);font-size:12.5px;color:var(--muted)}
+  .card .crow:first-child{border-top:0}
+  .card .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+  .card .more{font-size:11.5px;color:var(--dim);text-align:center;padding:8px 0 9px;border-top:1px solid rgba(255,255,255,.06)}
+
+  /* 现在：耗时占掉的那一列，从第一行一直空到最后一行 */
+  .strip{position:absolute;right:0;top:38px;bottom:0;width:236px;border:1px dashed rgba(201,138,122,.6);border-radius:8px;background:repeating-linear-gradient(135deg,rgba(201,138,122,.10) 0 6px,transparent 6px 13px)}
+  .strip span{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;font-size:11px;color:var(--bad);background:rgba(19,19,22,.85);padding:2px 0}
+
+  .note{margin-top:14px;display:flex;gap:8px;font-size:11.5px;color:var(--dim);line-height:1.7}
+  .note .bar{width:2px;flex:none;border-radius:2px;background:var(--line)}
+  .note.bad .bar{background:rgba(201,138,122,.6)}
+  .note.good .bar{background:rgba(143,191,154,.6)}
+  .note b{color:var(--muted);font-weight:600}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted)}
+
+  .legend{margin-top:26px;border-top:1px solid var(--line);padding-top:16px;font-size:12.5px;color:var(--muted)}
+  .legend b{color:var(--fg);font-weight:600}
+  .legend ul{margin:8px 0 0;padding-left:18px}
+  .legend li{margin:5px 0}
+</style>
+</head>
+<body>
+  <h1>坞里「已运行」放在哪儿</h1>
+  <p class="sub">三个方案的实际几何（示意草图，非截图）。卡片用 3 行工具行代替你那 12 行。</p>
+
+  <!-- 现在 -->
+  <section class="case">
+    <header><span class="tag now">现在</span> 耗时占掉右侧一整列 → 下面空出一条竖带</header>
+    <div class="stage">
+      <div class="dock">
+        <div class="row">
+          <span class="dots"><i></i><i></i><i></i><i></i></span>
+          <span class="trigger">
+            <span class="frag">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5V5a2 2 0 012-2h13v18H6a2 2 0 01-2-2z"/><path d="M8 7h8M8 11h5"/></svg>
+              <span>已读取 3 个文件 并</span>
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/></svg>
+              <span>已执行了 12 条命令</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+          </span>
+          <span class="elapsed"><span class="sep">·</span>已运行 5m03s</span>
+        </div>
+        <div class="card" style="width:calc(100% - 20px - 236px)">
+          <div class="crow"><span class="mono">$ cd ~/src/bot &amp;&amp; git status --porcelain</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="crow"><span class="mono">细采样侧栏行、分隔线、输入框与状态栏</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="crow"><span class="mono">测量当前应用界面的实际颜色</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="more">显示全部输出</div>
+        </div>
+        <div class="strip"><span>这块从第一行空到最后一行</span></div>
+      </div>
+      <div class="note bad">
+        <span class="bar"></span>
+        <div>原因：行是 <code>[图标][摘要块][已运行]</code> 三段 flex，<b>卡片的宽度只到"摘要块"自己的右缘</b>，
+        而「已运行」那一列高度跟着整行（= 展开后的卡片高度）。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 方案 A -->
+  <section class="case">
+    <header><span class="tag a">方案 A（推荐）</span> 耗时挪进那一行 → 卡片铺满，不再有竖带</header>
+    <div class="stage">
+      <div class="dock">
+        <div class="row">
+          <span class="dots"><i></i><i></i><i></i><i></i></span>
+          <span class="trigger" style="flex:1;justify-content:space-between">
+            <span class="frag">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5V5a2 2 0 012-2h13v18H6a2 2 0 01-2-2z"/><path d="M8 7h8M8 11h5"/></svg>
+              <span>已读取 3 个文件 并</span>
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/></svg>
+              <span>已执行了 12 条命令</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+            </span>
+            <span class="elapsed" style="padding-right:2px"><span class="sep">·</span>已运行 5m03s</span>
+          </span>
+        </div>
+        <div class="card" style="width:calc(100% - 20px)">
+          <div class="crow"><span class="mono">$ cd ~/src/bot &amp;&amp; git status --porcelain</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="crow"><span class="mono">细采样侧栏行、分隔线、输入框与状态栏</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="crow"><span class="mono">测量当前应用界面的实际颜色</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="more">显示全部输出</div>
+        </div>
+      </div>
+      <div class="note good">
+        <span class="bar"></span>
+        <div>「已运行」成为<b>触发按钮内部的一段文本</b>（chevron 之后、行末右对齐）。按钮因此占满整行，
+        卡片自然铺满；点它和点摘要是同一个动作（都展开/收起）。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 方案 B -->
+  <section class="case">
+    <header><span class="tag b">方案 B</span> 删掉「已运行」→ 同样铺满，但看不到本轮耗时</header>
+    <div class="stage">
+      <div class="dock">
+        <div class="row">
+          <span class="dots"><i></i><i></i><i></i><i></i></span>
+          <span class="trigger" style="flex:1">
+            <span class="frag">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5V5a2 2 0 012-2h13v18H6a2 2 0 01-2-2z"/><path d="M8 7h8M8 11h5"/></svg>
+              <span>已读取 3 个文件 并</span>
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/></svg>
+              <span>已执行了 12 条命令</span>
+            </span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+          </span>
+        </div>
+        <div class="card" style="width:calc(100% - 20px)">
+          <div class="crow"><span class="mono">$ cd ~/src/bot &amp;&amp; git status --porcelain</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="crow"><span class="mono">细采样侧栏行、分隔线、输入框与状态栏</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="crow"><span class="mono">测量当前应用界面的实际颜色</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+          <div class="more">显示全部输出</div>
+        </div>
+      </div>
+      <div class="note">
+        <span class="bar"></span>
+        <div>改动最小（删一处渲染 + 相关测试），代价是<b>本轮跑了多久只有这里能看到</b>，删了就没有了。</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="legend">
+    <b>三个方案的差别只有一件事：那一刻的耗时放在哪个盒子里。</b>
+    <ul>
+      <li>A：盒子 = 触发按钮 → 按钮占满整行 → 卡片铺满，耗时仍可见、仍对齐首行（上一轮修的 <code>h-9</code> 对齐照旧生效）。</li>
+      <li>B：没有那个盒子 → 同样铺满，但不显示耗时。</li>
+      <li>现在：盒子是按钮的<b>兄弟</b> → 占掉一整列，展开后这一列下面全空。</li>
+    </ul>
+  </div>
+</body>
+</html>

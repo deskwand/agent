@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>模型菜单 · 改前改后</title>
+<style>
+  :root{
+    --background:#fff;
+    --foreground:#1a1a1a;
+    --muted-foreground:#757575;
+    --border:rgba(0,0,0,.09);
+    --hover-surface:rgba(0,0,0,.055);
+    --selected-surface:rgba(0,0,0,.09);
+    --canvas:#f4f4f3;
+    --accent:#3b82f6;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:28px 24px 48px;
+    background:var(--canvas);
+    color:var(--foreground);
+    font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1{font-size:16px;font-weight:600;margin:0 0 4px}
+  .sub{font-size:12px;color:var(--muted-foreground);margin:0 0 24px}
+  .stage{display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap}
+  .col{width:340px}
+  .col > h2{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin:0 0 2px}
+  .col > .note{font-size:12px;color:var(--muted-foreground);margin:0 0 12px;min-height:32px}
+
+  /* ── 面板（模拟 MENU_PANEL_PADDED_CLASS）── */
+  .panel{
+    width:320px;
+    background:var(--background);
+    border:1px solid rgba(0,0,0,.16);
+    border-radius:12px;
+    padding:4px;
+    box-shadow:0 12px 32px rgba(0,0,0,.16),0 2px 8px rgba(0,0,0,.06);
+  }
+  /* 现在：整个面板是一个滚动容器 */
+  .panel.current{max-height:330px;overflow-y:auto}
+
+  /* 改后：flex 列，只有列表滚 */
+  .panel.next{display:flex;flex-direction:column;max-height:330px}
+  .panel.next .list{min-height:0;flex:1 1 auto;overflow-y:auto}
+  .panel.next .footer{flex:0 0 auto}
+  .panel.next .search{flex:0 0 auto}
+
+  .search{
+    height:28px;margin:0 0 6px;padding:0 8px;
+    display:flex;align-items:center;
+    border:1px solid var(--border);border-radius:8px;
+    font-size:12px;color:var(--muted-foreground);
+  }
+  .group{margin-bottom:4px}
+  .group:last-child{margin-bottom:0}
+
+  /* 分组标题：改后变成可点的行（行尾 chevron） */
+  .ghead{
+    display:flex;width:100%;align-items:center;justify-content:space-between;
+    height:24px;padding:0 10px;border:0;border-radius:8px;
+    background:transparent;color:var(--muted-foreground);
+    font:12px/1 inherit;font-family:inherit;cursor:pointer;text-align:left;
+  }
+  .ghead.static{cursor:default}
+  .ghead.clickable:hover{background:var(--hover-surface)}
+  .ghead .chev{transition:transform .12s ease;color:var(--muted-foreground)}
+  .group.collapsed .ghead .chev{transform:rotate(-90deg)}
+
+  .row{
+    display:flex;width:100%;align-items:center;gap:8px;
+    height:28px;padding:0 10px;border:0;border-radius:8px;
+    background:transparent;color:var(--foreground);
+    font:14px/1 inherit;font-family:inherit;text-align:left;cursor:pointer;
+  }
+  button.row:hover{background:var(--hover-surface)}
+  .row.selected{background:var(--selected-surface)}
+  .row .name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .tail{margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 0 auto}
+  .tick{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .sep{height:1px;background:var(--border);margin:4px 8px}
+  .group.collapsed .rows{display:none}
+
+  .think{
+    display:flex;width:100%;align-items:center;justify-content:space-between;
+    height:28px;padding:0 10px;border:0;border-radius:8px;
+    background:transparent;color:var(--foreground);font:500 14px/1 inherit;font-family:inherit;
+    cursor:pointer;text-align:left;
+  }
+  .think:hover{background:var(--hover-surface)}
+  .think .lbl{color:var(--foreground)}
+  .chev-r{color:var(--muted-foreground)}
+
+  /* 面板下方的输入卡 footer 里的合并 chip */
+  .chipwrap{display:flex;justify-content:flex-end;padding:4px 2px 0}
+  .chip{
+    display:inline-flex;align-items:center;gap:10px;
+    height:28px;padding:0 4px;border-radius:6px;font-size:12px;color:var(--foreground);
+  }
+  .chip .model{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip .up{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;color:var(--muted-foreground)}
+
+  .fadehint{
+    position:relative;
+  }
+  .cut{
+    margin-top:8px;border:1px dashed rgba(0,0,0,.18);border-radius:8px;
+    padding:6px 10px;font-size:12px;color:var(--muted-foreground);
+  }
+  .cut b{color:var(--foreground);font-weight:600}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted-foreground)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:2px;background:rgba(0,0,0,.16)}
+  .dot.a{background:#c9b8ff}
+  .dot.b{background:#ffd9a8}
+  .dot.c{background:#bfe3c8}
+  .hint{font-size:12px;color:var(--muted-foreground);margin-top:14px;line-height:1.6}
+  .kbd{
+    display:inline-block;padding:1px 5px;border:1px solid var(--border);border-radius:4px;
+    font-size:11px;background:#fff;color:var(--foreground);
+  }
+</style>
+</head>
+<body>
+  <h1>模型菜单：思考行常驻 · 分组可折叠</h1>
+  <p class="sub">左右两栏是同一个数据集（eagent 4 个模型 + Magpie 10 个模型），右栏可以直接点分组标题试折叠。</p>
+
+  <div class="stage">
+    <!-- ───────── 现在 ───────── -->
+    <div class="col">
+      <h2>现在</h2>
+      <p class="note">面板整体滚动：思考行在列表最末尾，被 14 个模型推到可视区外，要滚到底才看得到 → 选完模型还得再滚／再点一次。</p>
+
+      <div class="panel current" id="currentPanel">
+        <div class="group">
+          <div class="ghead static">eagent</div>
+          <button class="row selected"><span class="name">deepseek-flash</span><span class="tail"><svg class="tick" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span></button>
+          <button class="row"><span class="name">deepseek-v4-pro</span></button>
+          <button class="row"><span class="name">glm-5.3-flash</span></button>
+          <button class="row"><span class="name">MiniMax-M3.1-Flash</span></button>
+        </div>
+        <div class="group">
+          <div class="ghead static">Magpie</div>
+          <button class="row"><span class="name">GPT-5.6 Luna</span></button>
+          <button class="row"><span class="name">GPT-6 Luna</span></button>
+          <button class="row"><span class="name">GPT-5.6-Luna</span></button>
+          <button class="row"><span class="name">GPT-5.6-Sol</span></button>
+          <button class="row"><span class="name">GPT-5.6-Terra</span></button>
+          <button class="row"><span class="name">GPT-6-Astra</span></button>
+          <button class="row"><span class="name">GPT-6-Luna</span></button>
+          <button class="row"><span class="name">GPT-6-Sol</span></button>
+          <button class="row"><span class="name">GPT-6.1-Sol</span></button>
+          <button class="row"><span class="name">GPT-6.1 Terra</span></button>
+        </div>
+        <div class="sep"></div>
+        <button class="think"><span class="lbl">思考：极高</span><svg class="chev-r" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+
+      <div class="chipwrap">
+        <div class="chip"><span class="model">DeepSeek-Flash</span><span>极高</span><svg class="up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></div>
+      </div>
+
+      <div class="cut">面板内容总高约 <b>470px</b>：列表吃满 512px 上限，思考行落在下面（在上面这块里往下滚能看到它）。</div>
+    </div>
+
+    <!-- ───────── 改后 ───────── -->
+    <div class="col">
+      <h2>改后</h2>
+      <p class="note">面板拆成三段，只有中间那段滚；分组默认只展开当前 provider，其余收成一行标题。</p>
+
+      <div class="panel next" id="nextPanel">
+        <div class="list" id="nextList">
+          <div class="group" data-expanded="true">
+            <button class="ghead clickable" aria-expanded="true">
+              <span>eagent</span>
+              <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="rows">
+              <button class="row selected"><span class="name">deepseek-flash</span><span class="tail"><svg class="tick" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span></button>
+              <button class="row"><span class="name">deepseek-v4-pro</span></button>
+              <button class="row"><span class="name">glm-5.3-flash</span></button>
+              <button class="row"><span class="name">MiniMax-M3.1-Flash</span></button>
+            </div>
+          </div>
+          <div class="group collapsed" data-expanded="false">
+            <button class="ghead clickable" aria-expanded="false">
+              <span>Magpie</span>
+              <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="rows">
+              <button class="row"><span class="name">GPT-5.6 Luna</span></button>
+              <button class="row"><span class="name">GPT-6 Luna</span></button>
+              <button class="row"><span class="name">GPT-5.6-Luna</span></button>
+              <button class="row"><span class="name">GPT-5.6-Sol</span></button>
+              <button class="row"><span class="name">GPT-5.6-Terra</span></button>
+              <button class="row"><span class="name">GPT-6-Astra</span></button>
+              <button class="row"><span class="name">GPT-6-Luna</span></button>
+              <button class="row"><span class="name">GPT-6-Sol</span></button>
+              <button class="row"><span class="name">GPT-6.1-Sol</span></button>
+              <button class="row"><span class="name">GPT-6.1 Terra</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <div class="sep"></div>
+          <button class="think"><span class="lbl">思考：极高</span><svg class="chev-r" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+      </div>
+
+      <div class="chipwrap">
+        <div class="chip"><span class="model">DeepSeek-Flash</span><span>极高</span><svg class="up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg></div>
+      </div>
+
+      <div class="legend">
+        <span><i class="dot a"></i>固定头：搜索框（长列表时才有）</span>
+        <span><i class="dot b"></i>滚动区：只看这块滚</span>
+        <span><i class="dot c"></i>固定脚：思考行，永远在</span>
+      </div>
+
+      <div class="hint">
+        点 <b>Magpie</b> 标题可以展开/收起 → 列表变长，底部的思考行不动。<br>
+        点 <b>思考：极高</b> 仍是进二层子面板选档位，行为不变。<br>
+        <span class="kbd">搜索有输入时</span> 所有分组强制展开，避免命中的结果被折叠吞掉。
+      </div>
+    </div>
+  </div>
+
+<script>
+  // 只让右栏的分组标题可折叠；不动左栏（左栏就是在演示"没这东西"）
+  document.querySelectorAll('#nextPanel .ghead.clickable').forEach(function (head) {
+    head.addEventListener('click', function () {
+      var group = head.closest('.group');
+      var open = group.classList.toggle('collapsed') === false;
+      head.setAttribute('aria-expanded', String(open));
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import type { ShellTask } from "../../shared/shell-task";
 import type { EmotionSignal } from "../../shared/voice-emotion";
 import type { ThemePreset, ThemeAccent } from "../../shared/theme";
 import type { ChatWidth } from "../../shared/chat-width";
@@ -790,6 +791,7 @@ export type ServerEvent =
       };
     }
   | { type: "native-theme.changed"; payload: { shouldUseDarkColors: boolean } }
+  | { type: "shellTask.lifecycle"; payload: ShellTask }
   | {
       type: "subagent.lifecycle";
       payload: {

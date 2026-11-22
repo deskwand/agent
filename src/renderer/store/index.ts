@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { DEFAULT_THEME_ACCENT, DEFAULT_THEME_PRESET } from "../../shared/theme";
 import { DEFAULT_CHAT_WIDTH } from "../../shared/chat-width";
 import type { NestedToolRuntimeUi } from "../../shared/nested-tool-calls";
+import type { ShellTask } from "../../shared/shell-task";
 import type { PromptParts } from "../../shared/prompt-parts";
 import type { IdeaSummary } from "../../shared/ideas";
 import type { SubagentActivity } from "../../shared/subagent-activity";
@@ -126,6 +127,8 @@ export interface SessionState {
     description: string;
     status: "running" | "done";
   }>;
+  /** 后台终端任务，key = 触发它的工具调用 id（卡片 block.id）。可选：老快照/测试夹具没有它。 */
+  shellTasks?: Record<string, ShellTask>;
   /** 子代理实时活动快照，key = 触发它的 Agent 工具调用 id（卡片 block.id）。 */
   subagentActivities: Record<string, SubagentActivity>;
   /** 当前生效的任务清单。null = 未知/没有；[] = 没有当前计划（模型显式清空，或新一轮开始）。 */
@@ -152,6 +155,9 @@ const MESSAGE_PAGE_SIZE = 1000;
 /** 每会话保留的子代理快照条数上限；超出丢最久未更新的那条。 */
 export const MAX_SUBAGENT_ACTIVITIES = 32;
 
+/** 「后台任务」面板里最多保留多少条已结束的终端任务。 */
+const MAX_FINISHED_SHELL_TASKS = 5;
+
 const DEFAULT_SESSION_STATE: SessionState = {
   historyHydrated: false,
   hasMoreOlder: false,
@@ -174,6 +180,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   partialToolResults: {},
   nestedToolCalls: {},
   backgroundAgents: [],
+  shellTasks: {},
   subagentActivities: {},
   currentTodos: null,
   currentPlanDone: false,
@@ -478,6 +485,8 @@ interface AppState {
     status: "running" | "done",
   ) => void;
   removeBackgroundAgent: (sessionId: string, agentId: string) => void;
+  upsertShellTask: (sessionId: string, task: ShellTask) => void;
+  clearSessionShellTasks: (sessionId: string) => void;
   setSubagentActivity: (sessionId: string, activity: SubagentActivity) => void;
   setMessages: (sessionId: string, messages: Message[]) => void;
   setMessagesTail: (
@@ -1257,6 +1266,44 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  upsertShellTask: (sessionId, task) =>
+    set((state) => {
+      const current = state.sessionStates[sessionId] ?? DEFAULT_SESSION_STATE;
+      const next: Record<string, ShellTask> = {
+        ...(current.shellTasks ?? {}),
+        [task.toolCallId]: task,
+      };
+      // 已结束的只留最近若干条：卡片本身还在消息流里，store 只服务「后台任务」
+      // 面板，没必要无限增长。
+      const finished = Object.values(next).filter(
+        (item) => item.status !== "detached",
+      );
+      if (finished.length > MAX_FINISHED_SHELL_TASKS) {
+        finished
+          .sort((a, b) => (a.settledAt ?? 0) - (b.settledAt ?? 0))
+          .slice(0, finished.length - MAX_FINISHED_SHELL_TASKS)
+          .forEach((item) => {
+            delete next[item.toolCallId];
+          });
+      }
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          shellTasks: next,
+        }),
+      };
+    }),
+
+  clearSessionShellTasks: (sessionId) =>
+    set((state) => {
+      const current = state.sessionStates[sessionId] ?? DEFAULT_SESSION_STATE;
+      if (Object.keys(current.shellTasks ?? {}).length === 0) return {};
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          shellTasks: {},
+        }),
+      };
+    }),
+
   setSubagentActivity: (sessionId, activity) =>
     set((state) => {
       const current = state.sessionStates[sessionId] ?? DEFAULT_SESSION_STATE;
@@ -1341,6 +1388,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         partialByTurn: {},
         partialToolResults: {},
         backgroundAgents: [],
+        shellTasks: {},
         steerRecords: [],
         currentTodos: plan ? plan.todos : null,
         currentPlanDone: plan ? plan.done : false,

@@ -18,6 +18,7 @@ import {
   SessionManager as PiSessionManager,
   SettingsManager as PiSettingsManager,
   createCodingTools,
+  createPowerShellToolDefinition,
   type AgentSession as PiAgentSession,
   type ToolDefinition,
   type ToolExposure,
@@ -29,6 +30,14 @@ import {
   type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
 import { withBashIntentParam } from "./bash-intent-param";
+import { BackgroundShellTaskManager } from "./background-shell-task-manager";
+import {
+  createShellDetachHub,
+  foregroundSecondsFor,
+  withShellBackground,
+  type ShellDetachHub,
+} from "./shell-tool-background";
+import type { ShellTask } from "../../shared/shell-task";
 import { createNestedToolCallTracker } from "./nested-tool-call-tracker";
 import { measureSessionPromptParts } from "./prompt-parts";
 import type { PromptParts } from "../../shared/prompt-parts";
@@ -457,6 +466,8 @@ interface AgentRunnerOptions {
   customTools?: ToolDefinition[];
   /** Called when a background subagent completes, so the host can trigger auto-continue. */
   onBackgroundAgentComplete?: (sessionId: string, agentId: string) => void;
+  /** 后台终端任务结算后回调（回填 + 续跑）。 */
+  onShellTaskSettled?: (sessionId: string, task: ShellTask) => void;
   /** 扩展 newSession/fork 时创建 DeskWand 会话记录（不 enqueue prompt）。 */
   createSessionRecord?: (title: string, cwd?: string) => Session | null;
   /** 对指定会话发起 prompt（扩展 newSession 的 withSession 转发）。 */
@@ -524,6 +535,14 @@ export class AgentRunner {
     agentId: string,
   ) => void;
   private _backgroundAgentIds = new Set<string>();
+  /** 后台终端任务状态机（按 sessionId 分桶）。 */
+  private readonly shellTasks = new BackgroundShellTaskManager({
+    onEvent: (task) =>
+      this.sendToRenderer({ type: "shellTask.lifecycle", payload: task }),
+  });
+  /** sessionId → detach hub（toolCallId → 回调）。 */
+  private readonly shellDetachHubs = new Map<string, ShellDetachHub>();
+  private onShellTaskSettled?: (sessionId: string, task: ShellTask) => void;
   private requestSudoPassword?: (
     sessionId: string,
     toolUseId: string,
@@ -1080,6 +1099,7 @@ export class AgentRunner {
     this.sendToRenderer = options.sendToRenderer;
     this.saveMessage = options.saveMessage;
     this.onBackgroundAgentComplete = options.onBackgroundAgentComplete;
+    this.onShellTaskSettled = options.onShellTaskSettled;
     this.requestSudoPassword = options.requestSudoPassword;
     this.requestAskUser = options.requestAskUser;
     this.createSessionRecord = options.createSessionRecord;
@@ -2024,7 +2044,9 @@ export class AgentRunner {
               process.platform === "win32"
                 ? ["/c", plan.command]
                 : ["-c", plan.command];
-            const timeoutMs = (params.timeout ?? 120) * 1000;
+            // 上游包装把 timeout 抬到了后台上限（1800s）；这条路不经 pi 的超时
+            // 机制，必须自己折回前台语义，否则一条交互式命令能挂住整轮半小时。
+            const timeoutMs = foregroundSecondsFor(params.timeout) * 1000;
             const result = await new Promise<{
               output: string;
               exitCode: number | null;
@@ -2041,6 +2063,15 @@ export class AgentRunner {
                   new Error(`Sudo command timed out after ${timeoutMs}ms`),
                 );
               }, timeoutMs);
+              // 本轮被中止（Esc / 取消后台任务）时也要把子进程带走，
+              // 否则它会在后台活到 pid 自己退出。
+              const onAbort = () => {
+                child.kill("SIGKILL");
+              };
+              if (signal) {
+                if (signal.aborted) onAbort();
+                else signal.addEventListener("abort", onAbort, { once: true });
+              }
               child.stdout.on("data", (chunk: Buffer) => {
                 stdout += chunk.toString();
               });
@@ -2049,10 +2080,12 @@ export class AgentRunner {
               });
               child.on("error", (err) => {
                 clearTimeout(timer);
+                signal?.removeEventListener("abort", onAbort);
                 reject(err);
               });
               child.on("close", (code) => {
                 clearTimeout(timer);
+                signal?.removeEventListener("abort", onAbort);
                 resolve({ output: stdout + stderr, exitCode: code });
               });
               child.stdin.write(password + "\n");
@@ -3210,8 +3243,39 @@ Tool routing:\n
       );
 
       // 0.78.0 SDK: tools is string[] (tool name filter), customTools overrides built-in tools.
+      // bash 仍走上面那条链；本层只负责「可以被甩到后台」。
+      const shellHub =
+        this.shellDetachHubs.get(session.id) ?? createShellDetachHub();
+      this.shellDetachHubs.set(session.id, shellHub);
+      // powershell 不在 createCodingToolDefinitions 里（默认走内置）：要接管它的执行
+      // 必须先自己构造，再作为 customTools 覆盖内置。只在 Windows 上存在。
+      const powershellTool: ToolDefinition | undefined =
+        process.platform === "win32"
+          ? (createPowerShellToolDefinition(effectiveCwd) as ToolDefinition)
+          : undefined;
+      const backgroundTools = withShellBackground(
+        [
+          ...(wrappedTools as ToolDefinition[]),
+          ...(powershellTool ? [powershellTool] : []),
+        ],
+        {
+          manager: this.shellTasks,
+          hub: shellHub,
+          sessionId: session.id,
+          cwd: effectiveCwd,
+          strings: {
+            detachedNotice: (taskId, command) =>
+              t("agent.backgroundShellStarted", { taskId, command }),
+          },
+          onSettled: (task) => this.onShellTaskSettled?.(session.id, task),
+        },
+      );
+
       // Extract the wrapped bash tool to inject our sudo/timeout interceptors
-      const wrappedBashTool = wrappedTools.find((t) => t.name === "bash");
+      const wrappedBashTool = backgroundTools.find((t) => t.name === "bash");
+      const wrappedPowerShellTool = backgroundTools.find(
+        (t) => t.name === "powershell",
+      );
 
       // Register vision_describe tool if a vision model is configured and enabled.
       // Config is read once at session initialization to keep the tool list stable
@@ -3348,6 +3412,7 @@ Tool routing:\n
         ...customTools,
         ...this._customTools, // background review tools
         ...(wrappedBashTool ? [wrappedBashTool] : []),
+        ...(wrappedPowerShellTool ? [wrappedPowerShellTool] : []),
         ...(visionTool ? [visionTool] : []),
         ...(ocrTool ? [ocrTool] : []),
         ttsTool,
@@ -5071,6 +5136,34 @@ Tool routing:\n
         logWarn("[AgentRunner] pi session abort rejected:", e);
       });
     }
+  }
+
+  /** 把正在跑的终端工具调用转后台。返回 false = 该调用不在跑。 */
+  detachShellTask(sessionId: string, toolCallId: string): boolean {
+    const hub = this.shellDetachHubs.get(sessionId);
+    if (!hub) return false;
+    // 名额先查：超限要明确失败，而不是把调用摘出去之后再退化成前台
+    if (!this.shellTasks.canPromote(sessionId)) return false;
+    return hub.request(toolCallId);
+  }
+
+  cancelShellTask(sessionId: string, taskId: string): boolean {
+    return this.shellTasks.cancel(sessionId, taskId);
+  }
+
+  listShellTasks(sessionId: string): ShellTask[] {
+    return this.shellTasks.list(sessionId);
+  }
+
+  /** 会话被删除时收尾：kill 在跑的任务并丢掉 detach hub。stop 不走这条。 */
+  disposeShellTasks(sessionId: string): void {
+    this.shellTasks.disposeSession(sessionId);
+    this.shellDetachHubs.delete(sessionId);
+  }
+
+  killAllShellTasks(): void {
+    this.shellTasks.killAll();
+    this.shellDetachHubs.clear();
   }
 
   /**

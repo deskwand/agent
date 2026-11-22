@@ -319,6 +319,11 @@ export function ChatView() {
     [messages],
   );
 
+  const shellTaskRows = useMemo(
+    () => Object.values(sessionState?.shellTasks ?? {}),
+    [sessionState?.shellTasks],
+  );
+
   const backgroundRows = useMemo(
     () =>
       buildBackgroundAgentRows(
@@ -373,6 +378,26 @@ export function ChatView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
   const [useTextInput, setUseTextInput] = useState(false);
+  // 重新加载后 store 是空的：把还在跑的后台终端任务捞回来，
+  // 否则侧边栏会以为这个会话空闲，用户也找不到取消入口。
+  const upsertShellTask = useAppStore((s) => s.upsertShellTask);
+  useEffect(() => {
+    if (!activeSessionId) return;
+    let cancelled = false;
+    void window.electronAPI.shellTasks
+      .list(activeSessionId)
+      .then((tasks) => {
+        if (cancelled) return;
+        for (const task of tasks) upsertShellTask(activeSessionId, task);
+      })
+      .catch(() => {
+        /* 主进程还没起来时静默跳过，下一次切会话会再试 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSessionId, upsertShellTask]);
+
   useEffect(() => setUseTextInput(false), [activeSessionId]);
   const voiceModeOpen = useAppStore((s) => s.voiceModeOpen);
   const openVoiceMode = useAppStore((s) => s.openVoiceMode);
@@ -2423,6 +2448,7 @@ export function ChatView() {
           <ChatInputStatusBar
             status={inputStatus}
             backgroundAgentRows={backgroundRows}
+            shellTaskRows={shellTaskRows}
             onGoalCommand={handleCommand}
           />
         </div>

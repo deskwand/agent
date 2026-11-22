@@ -26,6 +26,7 @@ import {
   CollapsibleTrigger,
 } from "../ui/collapsible";
 import { OutputClamp } from "./OutputClamp";
+import { shellTaskCardState } from "../../utils/shell-task-card";
 
 interface BashToolBlockProps {
   block: ToolUseContent;
@@ -128,6 +129,72 @@ export const BashToolBlock = memo(function BashToolBlock({
   const isRunning = !toolResult && hasActiveTurn;
   const isError = toolResult?.isError === true;
 
+  const shellTask = useAppStore((s) =>
+    message?.sessionId
+      ? s.sessionStates[message.sessionId]?.shellTasks?.[block.id]
+      : undefined,
+  );
+
+  const onDetach = async () => {
+    if (!message?.sessionId) return;
+    await window.electronAPI.shellTasks.detach(message.sessionId, block.id);
+  };
+  const onCancel = async () => {
+    if (!shellTask) return;
+    await window.electronAPI.shellTasks.cancel(
+      shellTask.sessionId,
+      shellTask.id,
+    );
+  };
+
+  const cardState = shellTaskCardState({
+    task: shellTask,
+    hasResult: Boolean(toolResult),
+  });
+
+  const shellTaskAction = !shellTask ? (
+    isRunning ? (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mr-2 flex-shrink-0 text-xs"
+        onClick={onDetach}
+      >
+        {t("chat.shellTask.detach")}
+      </Button>
+    ) : null
+  ) : (
+    <div className="mr-2 flex flex-shrink-0 items-center gap-1">
+      {shellTask.status === "detached" ? (
+        <>
+          <span className="whitespace-nowrap text-xs text-primary-text">
+            {t("chat.shellTask.runningInBackground", { id: shellTask.id })}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs"
+            onClick={onCancel}
+          >
+            {t("chat.shellTask.cancel")}
+          </Button>
+        </>
+      ) : (
+        <span
+          className={`whitespace-nowrap text-xs ${
+            shellTask.status === "completed"
+              ? "text-success"
+              : "text-destructive"
+          }`}
+        >
+          {t(`chat.shellTask.${shellTask.status}`, {
+            code: shellTask.exitCode ?? "?",
+          })}
+        </span>
+      )}
+    </div>
+  );
+
   // Output text (for ANSI→HTML conversion)
   const outputText =
     typeof toolResult?.content === "string" ? toolResult.content : "";
@@ -179,60 +246,72 @@ export const BashToolBlock = memo(function BashToolBlock({
     >
       {/* Collapsed header */}
       {!detailOnly && (
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-hover-surface transition-colors"
-          >
-            {/* Status icon */}
-            <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
-              {isRunning ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : isError ? (
-                <XCircle className="w-3.5 h-3.5" />
-              ) : (
-                <CheckCircle2 className="w-3.5 h-3.5" />
-              )}
-            </div>
-
-            {/* Tool icon */}
-            {showIcon ? (
+        <div className="flex items-center">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="group min-w-0 flex-1 flex items-start gap-2.5 py-2 pl-3 pr-1 text-left hover:bg-hover-surface transition-colors"
+            >
+              {/* Status icon —— 后台任务还在跑时不能显示绿勾 */}
               <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
-                {getToolIcon(block.name)}
-              </div>
-            ) : null}
-
-            {/* Label: $ command · exit N */}
-            <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-              <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
-                $ {cmd}
-              </span>
-              {isRunning ? (
-                <span className="whitespace-nowrap text-xs text-muted-foreground">
-                  · {t("tool.bashRunning")}
-                </span>
-              ) : null}
-              <span
-                className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
-                  expanded
-                    ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-                }`}
-              >
-                {expanded ? (
-                  <ChevronDown className="w-3.5 h-3.5" />
+                {cardState === "detached" || isRunning ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : isError ||
+                  cardState === "failed" ||
+                  cardState === "timeout" ||
+                  cardState === "killed" ? (
+                  <XCircle className="w-3.5 h-3.5" />
                 ) : (
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <CheckCircle2 className="w-3.5 h-3.5" />
                 )}
-              </span>
-            </div>
-          </Button>
-        </CollapsibleTrigger>
+              </div>
+
+              {/* Tool icon */}
+              {showIcon ? (
+                <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
+                  {getToolIcon(block.name)}
+                </div>
+              ) : null}
+
+              {/* Label: $ command · exit N */}
+              <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
+                <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
+                  $ {cmd}
+                </span>
+                {isRunning ? (
+                  <span className="whitespace-nowrap text-xs text-muted-foreground">
+                    · {t("tool.bashRunning")}
+                  </span>
+                ) : null}
+                <span
+                  className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
+                    expanded
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+                  }`}
+                >
+                  {expanded ? (
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  )}
+                </span>
+              </div>
+            </Button>
+          </CollapsibleTrigger>
+          {shellTaskAction}
+        </div>
       )}
 
       {(detailOnly || expanded) && (
         <CollapsibleContent>
           {/* Expanded content — streaming during execution, terminal after */}
+          {shellTask?.status === "detached" && (
+            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words px-3 pb-2 font-mono text-xs text-muted-foreground">
+              {shellTask.tail || t("tool.bashNoOutput")}
+            </pre>
+          )}
+
           {isRunning && partialToolResult && partialToolResult.content && (
             <div className="animate-fade-in px-3 py-2">
               <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center gap-1.5">

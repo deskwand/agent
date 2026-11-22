@@ -20,6 +20,7 @@ import type {
 } from "../renderer/types";
 import type { FeedBodyPayload, FeedSnapshot } from "../shared/feed";
 import type { SessionWakeupView } from "../shared/session-wakeup";
+import type { ShellTask } from "../shared/shell-task";
 import type {
   PersistentAgentCreateInput,
   PersistentAgentUpdateInput,
@@ -1110,6 +1111,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ) as Promise<VaultResetResult>,
   },
 
+  // ── 后台终端任务 ──────────────────────────────────────────────
+  shellTasks: {
+    detach: (
+      sessionId: string,
+      toolCallId: string,
+    ): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("session.shellTask.detach", { sessionId, toolCallId }),
+    cancel: (
+      sessionId: string,
+      taskId: string,
+    ): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("session.shellTask.cancel", { sessionId, taskId }),
+    list: (sessionId: string): Promise<ShellTask[]> =>
+      ipcRenderer.invoke("session.shellTask.list", { sessionId }),
+  },
+
   // ── Voice input（语音输入）──────────────────────────────────────
   voice: {
     start: (): Promise<VoiceStartResult> => ipcRenderer.invoke("voice.start"),
@@ -1224,6 +1241,17 @@ declare global {
       on: (callback: (event: ServerEvent) => void) => () => void;
       invoke: <T>(event: ClientEvent) => Promise<T>;
       platform: NodeJS.Platform;
+      shellTasks: {
+        detach: (
+          sessionId: string,
+          toolCallId: string,
+        ) => Promise<{ success: boolean }>;
+        cancel: (
+          sessionId: string,
+          taskId: string,
+        ) => Promise<{ success: boolean }>;
+        list: (sessionId: string) => Promise<ShellTask[]>;
+      };
       getSystemTheme: () => Promise<{ shouldUseDarkColors: boolean }>;
       getVersion: () => Promise<string>;
       openExternal: (url: string) => Promise<boolean>;

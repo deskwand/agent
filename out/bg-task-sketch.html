@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>后台任务细节挪到右面板 — 草图</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --fg: #1b1b1b;
+        --muted: #6c6c6c;
+        --faint: #9a9a9a;
+        --border: rgba(0, 0, 0, 0.1);
+        --border-strong: rgba(0, 0, 0, 0.18);
+        --soft: rgba(0, 0, 0, 0.032);
+        --soft-2: rgba(0, 0, 0, 0.055);
+        --ink: #1b1b1b;
+        --error: #c0392b;
+        --accent: #2f6dd0;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 28px 32px 40px;
+        background: #f4f4f3;
+        color: var(--fg);
+        font: 13px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1 { font-size: 17px; margin: 0 0 4px; font-weight: 600; letter-spacing: -0.01em; }
+      .sub { color: var(--muted); font-size: 12px; margin-bottom: 22px; }
+      .grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 22px; }
+      @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+      .col-title {
+        font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase;
+        color: var(--faint); margin: 0 0 8px 2px; font-weight: 600;
+      }
+      .frame {
+        background: var(--bg); border: 1px solid var(--border); border-radius: 14px;
+        padding: 16px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(0,0,0,.03);
+      }
+      .frame.dim { background: #fbfbfa; }
+      .tag {
+        display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
+        padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border);
+        color: var(--muted); background: var(--soft); margin-bottom: 12px;
+      }
+      .tag b { font-weight: 600; color: var(--fg); }
+      .tag.now { border-color: rgba(192,57,43,.28); background: rgba(192,57,43,.05); color: #8d3225; }
+      .tag.next { border-color: rgba(47,109,208,.28); background: rgba(47,109,208,.055); color: #2a5da8; }
+
+      /* card geometry mimics the real message column */
+      .card {
+        border-radius: 16px; padding: 9px 12px 9px 10px; display: flex; gap: 10px;
+        align-items: flex-start; font-size: 12px; margin-bottom: 10px;
+      }
+      .card.off { background: rgba(0,0,0,.035); }
+      .card.live { background: rgba(0,0,0,.055); }
+      .col { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+      .row { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+      .g { width: 14px; display: inline-flex; justify-content: center; flex: 0 0 14px; }
+      .mono { font-family: var(--mono); }
+      .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .t-muted { color: var(--muted); }
+      .t-faint { color: var(--faint); }
+      .t-xs { font-size: 11px; }
+      .spin { color: var(--accent); }
+      .chev { color: var(--faint); margin-left: auto; padding-left: 6px; }
+      .jump {
+        color: var(--accent); font-size: 11px; margin-left: auto; padding-left: 8px;
+        white-space: nowrap; border: 1px solid rgba(47,109,208,.3);
+        background: rgba(47,109,208,.06); border-radius: 999px; padding: 1px 8px;
+      }
+
+      .steps {
+        margin: 6px 0 0 24px; padding: 10px 12px; border-left: 1px solid var(--border);
+        background: linear-gradient(90deg, rgba(0,0,0,.018), transparent 60%);
+        border-radius: 0 10px 10px 0;
+      }
+      .steps-title {
+        font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase;
+        color: var(--faint); font-weight: 600; margin-bottom: 5px;
+        display: flex; align-items: center; gap: 5px;
+      }
+      .steps-title .mono { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+      .step { display: flex; gap: 5px; align-items: center; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+      .step .cur { color: var(--accent); }
+      .step .dur { color: var(--faint); }
+      .stats {
+        margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--border);
+        font-size: 11px; color: var(--faint);
+      }
+
+      /* right panel */
+      .panel {
+        border: 1px solid var(--border); border-radius: 14px; background: var(--bg);
+        overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.03);
+      }
+      .panel-head {
+        display: flex; align-items: center; gap: 7px; padding: 9px 13px;
+        border-bottom: 1px solid rgba(0,0,0,.06); font-size: 12.5px; font-weight: 500;
+      }
+      .panel-head .icons { margin-left: auto; display: flex; gap: 10px; color: var(--faint); font-size: 11px; }
+      .panel-body { padding: 11px 13px 14px; display: flex; flex-direction: column; gap: 9px; }
+      .sec { border: 1px solid rgba(0,0,0,.06); border-radius: 9px; padding: 7px 9px; }
+      .sec-h {
+        display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted);
+      }
+      .sec-b { margin-top: 5px; height: 6px; border-radius: 3px; background: var(--soft-2); width: 62%; }
+      .sec-b + .sec-b { width: 40%; margin-top: 4px; }
+      .sec.tasks { border-color: rgba(0,0,0,.12); background: rgba(0,0,0,.014); }
+      .kicker { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+      .task {
+        display: flex; gap: 7px; align-items: flex-start; padding: 5px 6px; border-radius: 7px;
+        font-size: 12px; margin-top: 4px;
+      }
+      .task.sel { background: rgba(47,109,208,.07); box-shadow: inset 2px 0 0 var(--accent); }
+      .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex: 0 0 6px; }
+      .dot.live { background: var(--ink); }
+      .dot.done { background: rgba(0,0,0,.32); }
+      .dot.err { background: var(--error); }
+      .task-sub { font-size: 10.5px; color: var(--faint); }
+      .task-dur { margin-left: auto; font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+      .more { font-size: 10.5px; color: var(--faint); padding: 4px 6px; }
+      .detail {
+        margin: 2px 0 4px 13px; padding: 8px 10px; border-radius: 9px;
+        border: 1px dashed rgba(0,0,0,.16); background: rgba(0,0,0,.022);
+      }
+      .note { font-size: 11.5px; color: var(--muted); margin: 10px 2px 0; display: flex; gap: 6px; }
+      .note .n {
+        flex: 0 0 16px; height: 16px; border-radius: 50%; background: var(--ink); color: #fff;
+        font-size: 10px; display: inline-flex; align-items: center; justify-content: center;
+        font-weight: 600; margin-top: 1px;
+      }
+      .note b { color: var(--fg); font-weight: 600; }
+      .strike { text-decoration: line-through; text-decoration-color: rgba(192,57,43,.5); }
+      .foot {
+        margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--border);
+        font-size: 11.5px; color: var(--muted);
+      }
+      .foot code { font-family: var(--mono); font-size: 11px; background: var(--soft-2); padding: 1px 4px; border-radius: 4px; }
+      .bar {
+        display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 6px 9px;
+        border-radius: 9px; background: var(--soft); font-size: 11px; color: var(--muted);
+      }
+      .bar .pill { border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; background: #fff; }
+      .arrow { color: var(--faint); }
+    </style>
+  </head>
+  <body>
+    <h1>后台任务细节：消息区 → 右侧会话概览</h1>
+    <div class="sub">草图，不是最终样式。左列是消息区，右列是右面板；虚线框表示这次新增/改写的部分。</div>
+
+    <div class="grid">
+      <!-- ================= message area ================= -->
+      <div>
+        <p class="col-title">消息区</p>
+
+        <div class="frame dim">
+          <div class="tag now">现在 · 展开后是一整段步骤</div>
+
+          <div class="card live">
+            <span class="g">⌄</span>
+            <span class="g">✓</span>
+            <div class="col">
+              <div class="row">
+                <span class="mono t-muted truncate">Agent</span>
+                <span class="t-muted truncate">· Explore · 找 subagent 卡片渲染点 · 12.3s</span>
+                <span class="chev">⌄</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="steps">
+            <div class="steps-title">
+              <span class="spin">◌</span> 子代理步骤 <span class="mono">@curie</span>
+            </div>
+            <div class="step"><span class="cur">◐</span> bash · grep -rn "SubagentSteps" src/renderer</div>
+            <div class="step"><span class="t-faint">✓</span> read · ToolUseBlock.tsx <span class="dur">· 41ms</span></div>
+            <div class="step"><span class="t-faint">✓</span> grep · subagentActivities <span class="dur">· 12ms</span></div>
+            <div class="stats">5 步 · 3 轮 · 18.2k token · 12.3s · gpt-5-codex</div>
+          </div>
+
+          <div class="card off" style="margin-top: 10px; margin-bottom: 0">
+            <span class="g">✓</span>
+            <span class="g">🧭</span>
+            <div class="col">
+              <div class="row">
+                <span class="mono t-muted truncate">Agent</span>
+                <span class="t-muted truncate">· Plan · 复核动手方案 · 3.1s</span>
+                <span class="chev">›</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="note">
+            <span class="n">!</span>
+            <span>
+              展开区把子代理的每一次工具调用都摊在对话里，一轮多派几个代理时消息流会被这些
+              <b>元信息</b>淹没；而同一份数据在右面板里已经有一份索引。
+            </span>
+          </div>
+        </div>
+
+        <div class="frame">
+          <div class="tag next">改后 · 一行，不可展开</div>
+
+          <div class="card off">
+            <span class="g">✓</span>
+            <span class="g">🧭</span>
+            <div class="col">
+              <div class="row">
+                <span class="mono t-muted truncate">Agent</span>
+                <span class="t-muted truncate">· Explore · 找 subagent 卡片渲染点 · 12.3s</span>
+                <span class="jump">概览 ⇢</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card off" style="margin-bottom: 0">
+            <span class="g">◌</span>
+            <span class="g">🧭</span>
+            <div class="col">
+              <div class="row">
+                <span class="mono t-muted truncate">Agent</span>
+                <span class="t-muted truncate">· Plan · 复核动手方案 · 运行中</span>
+                <span class="jump">概览 ⇢</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="note">
+            <span class="n">1</span>
+            <span>
+              后台子代理的卡片退化成一行：<b>状态图标 + Agent · 名字 + 描述 + 耗时</b>，没有展开箭头、
+              不再渲染步骤，也不再显示上游那句 “Agent started in background…”。
+            </span>
+          </div>
+          <div class="note">
+            <span class="n">2</span>
+            <span>
+              整行可点 → 打开右面板并选中这个任务。<b>前台阻塞型子代理不变</b>，展开照旧看步骤。
+            </span>
+          </div>
+        </div>
+
+        <div class="frame" style="margin-bottom: 0">
+          <div class="tag">输入框上方 · 同一条路由</div>
+          <div class="bar">
+            <span class="pill">◌ 2 个后台代理</span>
+            <span>Explore · 找渲染点</span>
+            <span class="arrow">→</span>
+            <span class="t-faint">点它也打开面板，不再跳回消息区</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= right panel ================= -->
+      <div>
+        <p class="col-title">右侧会话概览面板</p>
+
+        <div class="panel" style="margin-bottom: 18px">
+          <div class="panel-head">
+            <span>▤</span> 会话概览
+            <span class="icons"><span>⟳</span><span>✕</span></span>
+          </div>
+          <div class="panel-body">
+            <div class="sec"><div class="sec-h">▣ 环境</div><div class="sec-b"></div></div>
+            <div class="sec"><div class="sec-h">▣ 上下文</div><div class="sec-b"></div></div>
+
+            <div class="sec tasks">
+              <div class="kicker">后台任务</div>
+
+              <div class="task sel">
+                <span class="dot live"></span>
+                <span class="col">
+                  <span class="truncate">Explore · 找 subagent 卡片渲染点</span>
+                  <span class="task-sub truncate">bash · grep -rn "SubagentSteps" src/renderer</span>
+                </span>
+                <span class="task-dur">12.3s</span>
+              </div>
+
+              <div class="detail">
+                <div class="steps-title"><span class="spin">◌</span> 子代理步骤 <span class="mono">@curie</span></div>
+                <div class="step"><span class="cur">◐</span> bash · grep -rn "SubagentSteps" src/renderer</div>
+                <div class="step"><span class="t-faint">✓</span> read · ToolUseBlock.tsx <span class="dur">· 41ms</span></div>
+                <div class="step"><span class="t-faint">✓</span> grep · subagentActivities <span class="dur">· 12ms</span></div>
+                <div class="stats">5 步 · 3 轮 · 18.2k token · 12.3s · gpt-5-codex</div>
+              </div>
+
+              <div class="task">
+                <span class="dot live"></span>
+                <span class="col">
+                  <span class="truncate">Plan · 复核动手方案</span>
+                  <span class="task-sub truncate">read · ChatTaskDock.tsx</span>
+                </span>
+                <span class="task-dur">3.1s</span>
+              </div>
+
+              <div class="more">已完成 2 项 ›</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span>▤</span> 会话概览
+            <span class="icons"><span>⟳</span><span>✕</span></span>
+          </div>
+          <div class="panel-body">
+            <div class="sec tasks">
+              <div class="kicker">后台任务</div>
+              <div class="task">
+                <span class="dot done"></span>
+                <span class="col">
+                  <span class="truncate">Explore · 找 subagent 卡片渲染点</span>
+                </span>
+                <span class="task-dur">12.3s</span>
+              </div>
+              <div class="task">
+                <span class="dot err"></span>
+                <span class="col">
+                  <span class="truncate">Review · 审一下提交</span>
+                  <span class="task-sub truncate">bash · npx vitest run</span>
+                </span>
+                <span class="task-dur">48.0s</span>
+              </div>
+              <div class="more">收起已完成</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="note">
+          <span class="n">3</span>
+          <span>
+            行点击从「跳回消息区」改成<b>就地展开 / 收起</b>，展开区直接复用现有
+            <span class="mono">SubagentSteps</span>。从消息区或状态栏过来的选中项如果落在折叠的
+            “已完成”组里，自动展开该组并滚到位。
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      被删掉的旧路径：<code>pendingFocusToolCallId</code> + <code>use-pending-focus-tool-call.ts</code>
+      —— 它唯一的消费者就是“从概览行滚回消息卡”。<code>highlightToolCallId</code> 保留，任务坞与过程摘要还在用。
+    </div>
+  </body>
+</html>

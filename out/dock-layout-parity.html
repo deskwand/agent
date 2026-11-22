@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>任务坞布局：现状 vs 参考图</title>
+<style>
+  :root{
+    --bg:#131316; --panel:#191920; --line:rgba(255,255,255,.10);
+    --fg:#e6e6ea; --muted:#9b9ba5; --dim:#6b6b76; --accent:#cbbfb2;
+    --card:rgba(30,30,38,.55); --cardline:rgba(255,255,255,.12);
+    --bad:#c98a7a; --good:#8fbf9a; --cmd:#8fbf9a; --flag:#9fc0e8;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:34px 38px 44px;background:var(--bg);color:var(--fg);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1{margin:0 0 4px;font-size:17px;font-weight:600}
+  .sub{margin:0 0 26px;color:var(--dim);font-size:12.5px}
+  .case{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:24px;overflow:hidden}
+  .case>header{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .tag{padding:1px 7px;border-radius:999px;font-size:11px;border:1px solid}
+  .tag.now{color:var(--bad);border-color:rgba(201,138,122,.45);background:rgba(201,138,122,.09)}
+  .tag.goal{color:var(--good);border-color:rgba(143,191,154,.45);background:rgba(143,191,154,.09)}
+  .stage{padding:18px 20px 20px}
+
+  /* ── 坞 ── */
+  .dock{position:relative;max-width:780px}
+  .row{display:flex;align-items:flex-start;gap:6px}
+  .dots{position:relative;width:14px;height:36px;flex:none;color:var(--accent)}
+  .dots i{position:absolute;left:5px;width:4px;height:4px;border-radius:999px;background:currentColor}
+  .dots i:nth-child(1){top:11px}
+  .dots i:nth-child(2){top:16px;left:10px;opacity:.6}
+  .dots i:nth-child(3){top:21px;opacity:.3}
+  .dots i:nth-child(4){top:16px;left:0;opacity:.45}
+
+  /* 现状：触发器被拉伸，箭头+耗时被推到行末 */
+  .trigger-now{display:flex;align-items:center;gap:6px;height:36px;padding:0 4px;border-radius:8px;
+    color:var(--muted);flex:1;min-width:0;background:rgba(255,255,255,.02)}
+  .trigger-goal{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 4px;border-radius:8px;color:var(--muted)}
+  .frag{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .ico{width:14px;height:14px;flex:none;color:var(--muted)}
+  .chev{width:14px;height:14px;flex:none;color:var(--dim)}
+  .elapsed{display:flex;align-items:center;height:36px;flex:none;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .elapsed.ml{margin-left:8px}
+
+  /* 卡片 */
+  .card{margin-top:2px;border:1px solid var(--cardline);border-radius:12px;background:var(--card);overflow:hidden}
+  .card.now{margin-left:20px}     /* 现状：卡片左缘 = 摘要块左缘（图标列之后） */
+
+  /* 行：现状 12px / py-6px */
+  .r{display:flex;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid rgba(255,255,255,.07);color:var(--muted);font-size:12px}
+  .r:first-child{border-top:0}
+  .label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta{color:rgba(155,155,165,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52%}
+  .grow{flex:1}
+
+  /* 行：目标 14px / py-10px */
+  .r.goal{padding:10px 16px;font-size:14px}
+
+  /* 详情：现状深缩进无底 */
+  .detail-now{padding:0 10px 10px 36px;font-size:12px;color:var(--muted)}
+  .cmd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;line-height:1.6}
+  .cmd .p{color:var(--dim)}
+  .cmd .a{color:var(--cmd)}
+  .cmd .f{color:var(--flag)}
+  /* 详情：目标内嵌块 */
+  .detail-goal{padding:0 16px 12px}
+  .inset{border:1px solid rgba(255,255,255,.12);background:rgba(16,16,20,.72);border-radius:10px;padding:12px;font-size:12px;color:var(--muted);overflow:hidden}
+
+  .callout{margin-top:16px;display:flex;gap:10px;font-size:11.5px;color:var(--dim);line-height:1.75}
+  .callout .bar{width:2px;flex:none;border-radius:2px;background:var(--line)}
+  .callout.bad .bar{background:rgba(201,138,122,.6)}
+  .callout.good .bar{background:rgba(143,191,154,.6)}
+  .callout b{color:var(--muted);font-weight:600}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted)}
+
+  /* 尺寸标尺 */
+  .ruler{display:flex;align-items:flex-end;gap:26px;margin-top:6px}
+  .ruler .col{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:var(--dim)}
+  .ruler .box{border:1px dashed rgba(255,255,255,.22);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px}
+  .ruler .h-now{height:28px;width:150px}
+  .ruler .h-goal{height:44px;width:150px}
+  .ruler .h-trigger{height:36px;width:150px}
+
+  .deltas{margin-top:26px;border-top:1px solid var(--line);padding-top:16px}
+  .deltas h2{margin:0 0 10px;font-size:13px;font-weight:600;color:var(--muted)}
+  .deltas table{border-collapse:collapse;font-size:12.5px;color:var(--muted);width:100%;max-width:760px}
+  .deltas td,.deltas th{border-bottom:1px solid rgba(255,255,255,.07);padding:7px 10px 7px 0;text-align:left;vertical-align:top}
+  .deltas th{color:var(--dim);font-weight:500;font-size:11.5px;letter-spacing:.3px;text-transform:uppercase}
+  .deltas code{white-space:nowrap}
+  .keep{margin-top:14px;font-size:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+  <h1>任务坞：现状 vs 参考图（只改布局）</h1>
+  <p class="sub">示意草图，1px = 1px，便于比较密度。内容与文案两边完全一致，只有几何不同。</p>
+
+  <!-- 现状 -->
+  <section class="case">
+    <header><span class="tag now">现状</span> 坞头被拉成一条长杠 / 行 28px / 箭头在中间 / 详情深缩进</header>
+    <div class="stage">
+      <div class="dock">
+        <div class="row">
+          <span class="dots"><i></i><i></i><i></i><i></i></span>
+          <span class="trigger-now">
+            <span class="frag">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5V5a2 2 0 012-2h13v18H6a2 2 0 01-2-2z"/><path d="M8 7h8M8 11h5"/></svg>
+              <span>已读取 3 个文件 并</span>
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/></svg>
+              <span>已执行了 12 条命令</span>
+            </span>
+            <span class="grow"></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+            <span class="elapsed"><span style="margin-right:4px">·</span>已运行 5m03s</span>
+          </span>
+        </div>
+        <div class="card now" style="width:calc(100% - 20px)">
+          <div class="r">
+            <span class="label">运行了 npm run typecheck…</span>
+            <span class="meta">· tsc --noEmit</span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+            <span class="grow"></span>
+          </div>
+          <div class="r">
+            <span class="label">读取 4 个文件</span>
+            <span class="meta">· route-identity.test.ts</span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+            <span class="grow"></span>
+          </div>
+          <div class="r">
+            <span class="label">执行 git status --porcelain</span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+            <span class="grow"></span>
+          </div>
+          <div class="detail-now">
+            <div class="cmd"><span class="p">$</span> <span class="a">cd /Users/zoujichun/src/bot; npm run typecheck 2&gt;&amp;1 | tail -2</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="callout bad">
+        <span class="bar"></span>
+        <div>① 头部：片段 <code>flex-1</code> 吸走空白 ⇒ 箭头与耗时被推到行末，中间是一整段空杠。<br>
+        ② 行：<code>text-xs px-2.5 py-1.5</code> ≈ 28px，箭头紧跟文字（后面才是空）。<br>
+        ③ 详情：<code>pl-9</code>（36px）深缩进、无底色，跟行不是一个视觉层。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 目标 -->
+  <section class="case">
+    <header><span class="tag goal">目标（参考图）</span> 坞头紧凑 / 行 44px / 箭头贴右 / 详情内嵌块</header>
+    <div class="stage">
+      <div class="dock">
+        <div class="row">
+          <span class="dots"><i></i><i></i><i></i><i></i></span>
+          <span class="trigger-goal">
+            <span class="frag">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5V5a2 2 0 012-2h13v18H6a2 2 0 01-2-2z"/><path d="M8 7h8M8 11h5"/></svg>
+              <span>已读取 3 个文件 并</span>
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none"/></svg>
+              <span>已执行了 12 条命令</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+            </span>
+            <span class="elapsed ml"><span style="margin-right:4px">·</span>已运行 5m03s</span>
+          </span>
+        </div>
+        <div class="card">
+          <div class="r goal">
+            <span class="label">运行了 npm run typecheck…</span>
+            <span class="meta">· tsc --noEmit</span>
+            <span class="grow"></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+          </div>
+          <div class="r goal">
+            <span class="label">读取 4 个文件</span>
+            <span class="meta">· route-identity.test.ts</span>
+            <span class="grow"></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+          </div>
+          <div class="r goal">
+            <span class="label">执行 git status --porcelain</span>
+            <span class="grow"></span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+          </div>
+          <div class="detail-goal">
+            <div class="inset">
+              <div class="cmd"><span class="p">$</span> <span class="a">cd /Users/zoujichun/src/bot; npm run typecheck 2&gt;&amp;1 | tail -2</span></div>
+              <div class="cmd" style="margin-top:6px"><span class="p">&gt;</span> tsc --noEmit</div>
+              <div class="cmd" style="margin-top:6px;color:var(--flag)">FAIL tests/channels/route-identity.test.ts &gt; ChannelD0.currentRoute</div>
+              <div class="cmd"><span class="p">Tests 1 failed | 1130 passed (1131)</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="callout good">
+        <span class="bar"></span>
+        <div>① 片段去掉 <code>flex-1</code>（留 <code>min-w-0 truncate</code>）⇒ 箭头与耗时紧贴文案，右侧留白。<br>
+        ② 行 <code>text-sm px-4 py-2.5</code> ≈ 44px，箭头成为行末最后一项（<code>flex-1</code> 占位挪到它之前）。<br>
+        ③ 详情与行标签左缘对齐（<code>px-4</code>），包一层 <code>rounded-lg border bg-background/70 p-3</code> 的内嵌块。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 标尺 -->
+  <section class="case">
+    <header><span class="tag now">几何</span> 三处高度对照（虚线框为实际盒高）</header>
+    <div class="stage">
+      <div class="ruler">
+        <div class="col"><div class="box h-trigger">坞头 36px（不变）</div><span>触发器 h-9</span></div>
+        <div class="col"><div class="box h-now">行 28px</div><span>现状 py-1.5 / 12px</span></div>
+        <div class="col"><div class="box h-goal">行 44px</div><span>目标 py-2.5 / 14px</span></div>
+      </div>
+      <div class="deltas">
+        <h2>四处改动（其余一概不动）</h2>
+        <table>
+          <tr><th>项</th><th>现状</th><th>目标</th></tr>
+          <tr><td>片段容器</td><td><code>flex flex-1</code></td><td><code>flex min-w-0 shrink</code></td></tr>
+          <tr><td>行档位</td><td><code>text-xs px-2.5 py-1.5</code></td><td><code>text-sm px-4 py-2.5</code></td></tr>
+          <tr><td>箭头</td><td>紧跟文字（占位在其后）</td><td>行末最后一项（占位在其前）</td></tr>
+          <tr><td>详情</td><td><code>pl-9</code>，无底色</td><td><code>px-4</code> + 内嵌块 <code>p-3</code></td></tr>
+        </table>
+        <p class="keep">不动：坞头文案（不做“动作词+类别+时长”）、坞里仍只放本轮尾部一组、子代理不进坞（chip 保持）、清单卡位置、卡片外壳 <code>rounded-xl border bg-card/20</code>、零 i18n 改动。</p>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

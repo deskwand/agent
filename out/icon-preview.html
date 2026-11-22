@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bot 图标 · HAL / TARS 参考</title>
+<style>
+  :root {
+    --bg:#fff; --panel:#fff; --sidebar:#fafafa; --fg:#18181b; --muted:#71717a;
+    --hover:#f0f0f1; --border:#e4e4e7; --dot:#22c55e; --mark:#e5322d;
+  }
+  html[data-theme="dark"] {
+    --bg:#121215; --panel:#18181b; --sidebar:#27272a; --fg:#fafafa; --muted:#a1a1aa;
+    --hover:#34343a; --border:#3f3f46; --dot:#22c55e; --mark:#ff6b60;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:28px 30px 52px;background:var(--bg);color:var(--fg);
+    font:400 13px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    transition:background .18s ease,color .18s ease;
+  }
+  h1{font-size:17px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+  h2{font-size:13.5px;font-weight:600;margin:30px 0 4px}
+  .sub{color:var(--muted);margin:0;font-size:12.5px}
+  .sub b{color:var(--fg);font-weight:600}
+  .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .seg{display:inline-flex;padding:2px;gap:2px;background:var(--hover);border-radius:8px;flex:0 0 auto}
+  .seg button{font:inherit;font-size:12px;color:var(--muted);background:transparent;border:0;cursor:pointer;padding:4px 12px;border-radius:6px;transition:all .15s ease}
+  .seg button[aria-pressed="true"]{background:var(--panel);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12),0 0 0 1px var(--border)}
+
+  .refs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .ref{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 16px}
+  .ref .t{font-weight:600;font-size:12.5px;margin:0 0 2px}
+  .ref .d{margin:0;color:var(--muted);font-size:12px}
+  .ref .d code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+
+  .strip{display:flex;align-items:flex-end;justify-content:space-between;gap:2px;margin-top:12px;border:1px solid var(--border);border-radius:12px;background:var(--sidebar);padding:14px 10px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:7px;padding:0 6px;flex:1 1 0;min-width:0;color:var(--muted)}
+  .cell .big{height:16px;display:grid;place-items:center}
+  .cell svg{width:14px;height:14px;display:block}
+  .cell .cap{font-size:10px;text-align:center;line-height:1.35;white-space:nowrap}
+  .cell.mine .cap{color:var(--fg);font-weight:600}
+  .cell.mine svg{color:var(--fg)}
+
+  .grid{display:grid;gap:12px;margin-top:12px}
+  .card{display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
+  .card.pick{border-color:color-mix(in srgb,var(--fg) 26%,transparent)}
+  .name{font-weight:600;font-size:13.5px;margin:0 0 3px;display:flex;align-items:center;gap:8px}
+  .badge{font-size:10.5px;font-weight:600;letter-spacing:.02em;padding:1px 6px;border-radius:999px;background:var(--fg);color:var(--bg)}
+  .why{margin:0;color:var(--muted);font-size:12.5px}
+  .why em{color:var(--fg);font-style:normal;font-weight:500}
+  .risk{margin:7px 0 0;font-size:12px;color:var(--muted)}
+  mark{background:color-mix(in srgb,var(--mark) 16%,transparent);color:inherit;padding:0 2px;border-radius:3px}
+  .spec{margin:8px 0 0;color:var(--muted);font-size:11.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .pane{display:grid;gap:6px}
+  .state{display:flex;align-items:center;gap:9px}
+  .state .lab{font-size:10.5px;color:var(--muted);width:34px;flex:0 0 auto}
+  .mock{flex:1;background:var(--sidebar);border-radius:10px;border:1px solid var(--border);padding:0}
+  .hrow{display:flex;align-items:center}
+  .hbtn{flex:1;display:flex;align-items:center;gap:8px;padding:4px 12px;height:28px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;line-height:20px;border-radius:8px;text-align:left}
+  .hbtn svg{width:14px;height:14px;flex:0 0 auto}
+  .plus{flex:0 0 auto;width:24px;height:24px;margin-right:6px;display:grid;place-items:center;color:var(--muted)}
+  .plus svg{width:14px;height:14px}
+
+  .zgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+  .zcell{border:1px solid var(--border);border-radius:10px;padding:16px 10px 11px;background:var(--panel);display:flex;flex-direction:column;align-items:center;gap:12px}
+  .zpair{display:flex;align-items:center;gap:12px}
+  .zpair svg{width:46px;height:46px}
+  .zpair .ar{color:var(--muted);font-size:12px}
+  .zcell .cap{font-size:10.5px;color:var(--muted);text-align:center;line-height:1.4}
+  .zcell.mine{border-color:color-mix(in srgb,var(--fg) 24%,transparent)}
+  .zcell.mine .cap{color:var(--fg)}
+  .foot{margin-top:26px;color:var(--muted);font-size:11.5px;line-height:1.75}
+  .foot code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>Bot 图标 · 从 HAL 和 TARS 各取一样东西</h1>
+    <p class="sub">HAL 9000 取<b>单眼透镜</b>（同心环 + 一颗亮核），TARS 取<b>分段方碑</b>（几块石板 + 一条亮缝）。14px 是侧边栏真实尺寸。</p>
+  </div>
+  <div class="seg" role="group" aria-label="明暗">
+    <button type="button" aria-pressed="true" data-theme-btn="light">亮</button>
+    <button type="button" aria-pressed="false" data-theme-btn="dark">暗</button>
+  </div>
+</div>
+
+<div class="refs">
+  <div class="ref">
+    <p class="t">HAL 9000 —— 取「眼」</p>
+    <p class="d">一个黑面板上一颗红眼：<code>外环 → 内环 → 亮核</code>，三级同心，正中不偏移。它的科幻感来自<b>克制</b>：整颗眼只有三种元素，没有一根多余的线。</p>
+  </div>
+  <div class="ref">
+    <p class="t">TARS —— 取「体」</p>
+    <p class="d">四块独立石板并排，靠<b>缝隙</b>而不是靠零件表达结构；石板面上有一条横向亮缝当显示器。它的科幻感来自<b>重复的等距块</b>和那条不对称的亮缝。</p>
+  </div>
+</div>
+
+<h2>① 和邻居一起（14px 实景）</h2>
+<div class="strip" id="strip"></div>
+
+<h2>② 原位：两态都看</h2>
+<p class="sub">顺便借用了它们的「休眠/工作」：<b>折叠 = 核心熄灭，展开 = 核心亮起</b>。这样两态差异只剩一个实心点，crossfade 退化成一个极轻的呼吸，不为图标改动画结构。</p>
+<div class="grid" id="grid"></div>
+
+<h2>③ 放大 4×（左 = 折叠，右 = 展开）</h2>
+<div class="zgrid" id="zgrid"></div>
+
+<p class="foot">
+  为什么 HAL 的眼放得下、TARS 的身体放不下：<b>同心圆抗缩放，等距细缝不抗</b>。14px 下 1.5 单位的缝只剩 0.9px，
+  TARS 那三块石板会糊成一根「|||」——所以 TARS 方案里我把石板从 4 块减到 2–3 块，并加大缝宽。<br>
+  标注的是我判断的风险点。
+</p>
+
+<script>
+const A='viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const dot=(x,y,r)=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="currentColor" stroke="none"/>';
+const bar=(x,y,w,h,r)=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+r+'" fill="currentColor" stroke="none"/>';
+const svg=(b)=>'<svg '+A+'>'+b+'</svg>';
+const PLUS=svg('<path d="M5 12h14"></path><path d="M12 5v14"></path>');
+
+const LUCIDE={
+  MessageSquare:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>',
+  MessageSquareText:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M13 8H7"></path><path d="M17 12H7"></path>',
+  Folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>',
+  FolderOpen:'<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"></path>'
+};
+
+const RING_OUT='<circle cx="12" cy="12" r="8.6"/>';
+const RING_IN='<circle cx="12" cy="12" r="5.6"/>';
+const SLAB1='<rect x="2.6" y="3" width="4.6" height="18" rx="1.7"/>';
+const SLAB2x='<rect x="9.7" y="3" width="4.6" height="18" rx="1.7"/>';
+const SLAB3x='<rect x="16.8" y="3" width="4.6" height="18" rx="1.7"/>';
+const SLABS3=SLAB1+SLAB2x+SLAB3x;
+const SLABS2='<rect x="3.6" y="2.8" width="7.2" height="18.4" rx="2.2"/><rect x="13.2" y="2.8" width="7.2" height="18.4" rx="2.2"/>';
+
+const CANDS=[
+  {
+    key:'P1', name:'HAL · 透镜', pick:true,
+    off: RING_OUT + RING_IN,
+    on: RING_OUT + RING_IN + dot(12,12,2.6),
+    spec:'外环 r8.6 + 内环 r5.6 + 核点 r2.6 · 折叠态无核点',
+    why:'三级同心全部留足间距——内环直径 11.2 单位，扣掉描边后中间还剩 2.8px 净空装那颗核点。这是它比上一轮「三环」更能活到 14px 的原因。',
+    risk:'纯圆和上面那排人脸 avatars 轮廓重复；可能被读成「靶心」'
+  },
+  {
+    key:'P2', name:'HAL · 光圈刻线',
+    off: RING_OUT + '<circle cx="12" cy="12" r="4.6"/>',
+    on: RING_OUT + '<circle cx="12" cy="12" r="4.6"/>' + dot(12,12,1.8) + '<path d="M12 3.4v2.4"/><path d="M12 18.2v2.4"/><path d="M3.4 12h2.4"/><path d="M18.2 12h2.4"/>',
+    spec:'外环 + 内环 + 核点 + 四向短刻线（6.2 单位）',
+    why:'那四道刻线是「仪器」的语汇——相机光圈、雷达屏四角都有。它把图标从「一个圆」变成「一台设备」。',
+    risk:'四道刻线在 14px 下各只有 1.4px，可能读成噪点'
+  },
+  {
+    key:'P4', name:'TARS · 三碑',
+    off: SLABS3,
+    on: SLAB1 + SLAB2x + bar(10.8,10.2,2.4,3.6,1.2) + SLAB3x,
+    spec:'三块石板 4.6 宽 / 缝 2.5 → 中碑亮缝',
+    why:'石板之间的缝是 2.5 单位（14px 下 1.5px），比 TARS 原型的密排宽一倍——原型的缝在 14px 会整个消失，变成一块实心砖。',
+    risk:'三根竖条在 14px 下可能读成「|||」或条形码'
+  },
+  {
+    key:'P5', name:'TARS · 双碑',
+    off: SLABS2,
+    on: SLABS2 + bar(10.9,10.6,2.2,2.6,1.1),
+    spec:'两块石板 7.2 宽 / 缝 2.4 → 中间亮缝',
+    why:'减到两块，每块宽到能在 14px 下看清「这是一块板」而不是一根线。亮缝放在缝里，读起来像两块板之间的光。',
+    risk:'两块竖板可能读成「暂停 / 两根柱子」'
+  }
+];
+
+// ① 邻居
+const strip=document.getElementById('strip');
+[['MessageSquare','最近·折叠'],['MessageSquareText','最近·展开'],['Folder','项目·折叠'],['FolderOpen','项目·展开']]
+  .concat(CANDS.map(c=>['@'+c.key,'候选 '+c.key]))
+  .forEach(([k,cap])=>{
+    const mine=k[0]==='@';
+    const el=document.createElement('div');
+    el.className='cell'+(mine?' mine':'');
+    const body=mine?CANDS.find(c=>'@'+c.key===k).off:LUCIDE[k];
+    el.innerHTML='<span class="big">'+svg(body)+'</span><span class="cap">'+cap+'</span>';
+    strip.appendChild(el);
+  });
+
+// ② 原位两态
+const grid=document.getElementById('grid');
+CANDS.forEach(c=>{
+  const card=document.createElement('div');
+  card.className='card'+(c.pick?' pick':'');
+  card.innerHTML=
+    '<div>'+
+      '<p class="name">'+c.key+' · '+c.name+(c.pick?'<span class="badge">推荐</span>':'')+'</p>'+
+      '<p class="why">'+c.why+'</p>'+
+      '<p class="risk"><mark>'+c.risk+'</mark></p>'+
+      '<p class="spec">'+c.spec+'</p>'+
+    '</div>'+
+    '<div class="pane">'+
+      '<div class="state"><span class="lab">折叠</span><span class="mock"><span class="hrow"><span class="hbtn">'+svg(c.off)+'<span>Bot</span></span><span class="plus">'+PLUS+'</span></span></span></div>'+
+      '<div class="state"><span class="lab">展开</span><span class="mock"><span class="hrow"><span class="hbtn">'+svg(c.on)+'<span>Bot</span></span><span class="plus">'+PLUS+'</span></span></span></div>'+
+    '</div>';
+  grid.appendChild(card);
+});
+
+// ③ 放大
+const zgrid=document.getElementById('zgrid');
+CANDS.forEach(c=>{
+  const el=document.createElement('div');
+  el.className='zcell'+(c.pick?' mine':'');
+  el.innerHTML='<div class="zpair">'+svg(c.off)+'<span class="ar">→</span>'+svg(c.on)+'</div><span class="cap">'+c.key+' · '+c.name+'</span>';
+  zgrid.appendChild(el);
+});
+
+document.querySelectorAll('[data-theme-btn]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.documentElement.dataset.theme=btn.dataset.themeBtn;
+    document.querySelectorAll('[data-theme-btn]').forEach(b=>b.setAttribute('aria-pressed',String(b===btn)));
+  });
+});
+</script>
+</body>
+</html>
